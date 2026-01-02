@@ -4,7 +4,10 @@
     "declarationMap": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "lib": ["ES2022", "DOM"],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "skipLibCheck": true,

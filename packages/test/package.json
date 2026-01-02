@@ -1,5 +1,5 @@
 {
-  "name": "@system/core",
+  "name": "@system/test",
   "version": "0.1.0",
   "type": "module",
   "exports": {
@@ -17,8 +17,18 @@
     "build": "yarn compile",
     "compile": "tsc -b",
     "clean": "rm -rf dist",
-    "start": "node dist/index.js",
+    "start": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "watch": "tsc -b -w"
+  },
+  "dependencies": {
+    "@system/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.1",
+    "jsdom": "^27.4.0",
+    "vitest": "^4.0.16"
   }
 }

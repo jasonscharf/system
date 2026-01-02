@@ -3,6 +3,8 @@ DS_Store
 dist
 node_modules
 
+install-state.gz
+
 *.d.ts
 *.js
 *.js.map

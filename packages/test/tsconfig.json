@@ -4,9 +4,6 @@
     "composite": true,
     "rootDir": "src",
     "outDir": "dist",
-    "types": [
-      "intern"
-    ]
   },
   "include": [
     "src"

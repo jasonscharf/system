@@ -11,7 +11,8 @@
     "clean": "yarn workspaces foreach -pt run clean",
     "typecheck": "yarn workspaces foreach -pt run typecheck",
     "aliases": "--- Workspace aliases ---",
-    "core": "yarn workspace @system/core"
+    "core": "yarn workspace @system/core",
+    "test": "yarn workspace @system/test"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",

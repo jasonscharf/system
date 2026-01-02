@@ -6,5 +6,6 @@ node_modules
 *.d.ts
 *.js
 *.js.map
+*.tsbuildinfo
 
 *.local.*

@@ -1,0 +1,23 @@
+{
+  "name": "@system/core",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "yarn compile",
+    "compile": "tsc -b",
+    "clean": "rm -rf dist",
+    "watch": "tsc -b -w",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

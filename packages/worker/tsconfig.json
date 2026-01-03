@@ -1,11 +1,12 @@
 {
   "extends": "../tsconfig.base.json",
+  "references": [{ "path": "../core" }],
   "compilerOptions": {
     "composite": true,
-    "outDir": "dist",
+    "rootDir": "src",
+    "outDir": "dist"
   },
   "include": [
-    "src",
-    "vitest.config.ts"
+    "src"
   ]
 }

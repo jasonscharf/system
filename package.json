@@ -8,14 +8,24 @@
   "scripts": {
     "all": "yarn workspaces foreach --all run",
     "build": "yarn all compile",
-    "clean": "yarn workspaces foreach -pt run clean",
+    "bup": "yarn compose up --build -d && yarn tail",
+    "clean": "yarn workspaces foreach --all run clean",
+    "compose": "docker compose -p sys -f docker-compose.yml -f docker-compose.dev.yml",
+    "compose:prod": "docker compose -p sys -f docker-compose.yml",
+    "dev": "yarn compose up -d && yarn tail",
+    "mux": "stmux -w always -e ERROR -m beep,system --",
+    "tail": "yarn compose logs -f",
     "typecheck": "yarn workspaces foreach -pt run typecheck",
+    "watch": "tsc -b -w --preserveWatchOutput",
+    "watch:reload": "node dev.watch.js",
     "aliases": "--- Workspace aliases ---",
     "core": "yarn workspace @system/core",
-    "test": "yarn workspace @system/test"
+    "test": "yarn workspace @system/test",
+    "worker": "yarn workspace @system/worker"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",
+    "chokidar": "^5.0.0",
     "typescript": "^5.4.0"
   }
 }

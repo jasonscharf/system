@@ -8,6 +8,7 @@ install-state.gz
 *.d.ts
 *.js
 *.js.map
+*.ts.map
 *.tsbuildinfo
 
 *.local.*

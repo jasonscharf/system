@@ -7,5 +7,8 @@
     {
       "path": "packages/test"
     },
+    {
+      "path": "packages/worker"
+    },
   ]
 }

@@ -8,6 +8,11 @@
         "**/dist": true,
         "**/node_modules": true,
         "**/.yarn": true,
+        "**/*.tsbuildinfo": true,
+        "**/vitest.config.js": true,
+        "**/vitest.config.d.ts": true,
+        "**/vitest.config.d.ts.map": true,
+        "**/*.js.map": true,
     },
     "search.exclude": {
         "**/node_modules": true,

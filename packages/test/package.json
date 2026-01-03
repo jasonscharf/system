@@ -16,18 +16,25 @@
   "scripts": {
     "build": "yarn compile",
     "compile": "tsc -b",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist && rm tsconfig.tsbuildinfo",
     "start": "vitest run",
+    "start:debug": "vitest watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "watch": "tsc -b -w"
   },
   "dependencies": {
-    "@system/core": "workspace:^"
+    "@system/core": "workspace:^",
+    "@system/worker": "workspace:^",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
+    "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "jsdom": "^27.4.0",
     "vitest": "^4.0.16"
   }

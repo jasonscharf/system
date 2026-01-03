@@ -1,0 +1,13 @@
+services:
+
+  #
+  # Worker
+  #
+  worker:
+    build:
+      context: .
+      target: worker
+    environment:
+      NODE_ENV: production
+
+

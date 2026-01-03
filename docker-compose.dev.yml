@@ -1,0 +1,39 @@
+services:
+
+  #
+  # Build
+  #
+  builder:
+    build:
+      context: .
+      target: dev
+
+    command: yarn watch
+    volumes:
+      - ./:/app
+
+  #
+  # Test
+  #
+  test:
+    build:
+      context: .
+      target: test
+
+    command: yarn test start:debug
+    stop_grace_period: 1s
+    volumes:
+      - ./:/app
+
+  #
+  # Worker
+  #
+  worker:
+    build:
+      context: .
+      target: worker
+
+    command: yarn worker start:debug
+    stop_grace_period: 1s
+    volumes:
+      - ./:/app

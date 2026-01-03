@@ -1,5 +1,5 @@
 {
-  "name": "@system/core",
+  "name": "@system/worker",
   "version": "0.1.0",
   "type": "module",
   "exports": {
@@ -18,7 +18,12 @@
     "compile": "tsc -b",
     "clean": "rm -rf dist && rm tsconfig.tsbuildinfo",
     "start": "node dist/index.js",
+    "start:debug": "nodemon",
+    "start:debug:break": "node --inspect-brk=0.0.0.0:9000 dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "watch": "tsc -b -w"
+  },
+  "dependencies": {
+    "nodemon": "^3.1.11"
   }
 }

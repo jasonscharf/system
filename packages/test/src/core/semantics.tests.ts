@@ -9,6 +9,6 @@ describe('IRI', () => {
 
         const iri = new IRI(uri);
         expect(iri.toString()).to.eq(uri);
-        expect(iri.toJSON()).to.eq(uri + "faasdfasdfil");
+        expect(iri.toJSON()).to.eq(uri);
     });
 });

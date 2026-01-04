@@ -19,6 +19,7 @@
     "watch": "tsc -b -w --preserveWatchOutput",
     "watch:reload": "node dev.watch.js",
     "aliases": "--- Workspace aliases ---",
+    "api": "yarn workspace @system/api",
     "core": "yarn workspace @system/core",
     "test": "yarn workspace @system/test",
     "worker": "yarn workspace @system/worker"

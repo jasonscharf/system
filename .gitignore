@@ -12,3 +12,5 @@ install-state.gz
 *.tsbuildinfo
 
 *.local.*
+
+!dev.watch.js

@@ -1,6 +1,10 @@
 #
 # This Dockerfile builds both production and development images.
-# Development images have dev-only bind mounts and config overlaid via compose.
+#
+# Notes:
+# - Development images have dev-only bind mounts and config overlaid via compose
+# - Each image currently contains all packages, as they are not shipped outside of the repo
+# - Further hardening and production prep will occur as the repo stabilizes
 #
 
 #
@@ -15,8 +19,7 @@ COPY .yarn .yarn
 RUN corepack enable \
     && corepack prepare yarn@4.1.0 --activate \
     && yarn --version \
-    && yarn install \
-    && npm i -g nodemon
+    && yarn install
 
 RUN yarn build
 

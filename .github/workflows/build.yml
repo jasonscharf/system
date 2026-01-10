@@ -59,8 +59,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: system/${{ matrix.package }}
-          # Configures the short SHA to be exactly 6 characters
+          images: ghcr.io/${{ github.repository_owner }}/system-${{ matrix.package }}
           tags: |
             type=sha,format=short,prefix=,length=6
 

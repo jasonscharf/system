@@ -15,8 +15,7 @@ export function randomUInt8Array(length: number): Uint8Array {
     // Node.js (ESM)
     if (typeof process !== "undefined" && process.versions?.node) {
         // Lazy ESM import to avoid bundling Node crypto in browsers
-        // @ts-ignore
-        const crypto = await import("crypto");
+        const crypto = require("crypto");
         return new Uint8Array(crypto.randomBytes(length));
     }
 

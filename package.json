@@ -15,18 +15,20 @@
     "dev": "yarn compose up -d && yarn tail",
     "mux": "stmux -w always -e ERROR -m beep,system --",
     "tail": "yarn compose logs -f",
+    "test": "yarn vitest run --coverage",
     "typecheck": "yarn workspaces foreach -pt run typecheck",
     "watch": "tsc -b -w --preserveWatchOutput",
     "watch:reload": "node dev.watch.js",
     "aliases": "--- Workspace aliases ---",
     "api": "yarn workspace @system/api",
     "core": "yarn workspace @system/core",
-    "test": "yarn workspace @system/test",
+    "tests": "yarn workspace @system/test",
     "worker": "yarn workspace @system/worker"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",
     "chokidar": "^5.0.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^4.0.16"
   }
 }

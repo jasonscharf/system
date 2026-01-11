@@ -7,12 +7,10 @@ export default defineConfig({
         globals: true,
         environment: 'node',
         include: [
-            '**/src/**/*.tests.ts',
-            '**/src/**/*.test.ts',
+            'packages/**/src/**/*.tests.ts',
+            'packages/**/src/**/*.test.ts',
         ],
-        //include: ['../**/*.tests.js'],
         coverage: {
-            //provider: 'v8',
             provider: 'v8',
             enabled: true,
 
@@ -20,12 +18,15 @@ export default defineConfig({
             reporter: ['text-summary', 'html', 'lcov'],
 
             include: [
-                '**/src/**/*.ts',
-                '**/src/**/*.tsx',
+                'packages/**/src/**/*.ts',
+                'packages/**/src/**/*.tsx',
             ],
             exclude: [
+                '**/*.test.*',
+                '**/*.tests.*',
                 '**/*.spec.*',
                 '**/*.d.ts',
+                '**/dist/**',
                 '**/node_modules/**',
                 '**/playwright/**',
             ],
@@ -34,10 +35,10 @@ export default defineConfig({
     },
     resolve: {
         alias: {
-            '@system/api': path.resolve(__dirname, '../api/src'),
-            '@system/core': path.resolve(__dirname, '../core/src'),
-            '@system/test': path.resolve(__dirname, '../test/src'),
-            '@system/worker': path.resolve(__dirname, '../worker/src'),
+            '@system/api': path.resolve(__dirname, 'packages/api/src'),
+            '@system/core': path.resolve(__dirname, 'packages/core/src'),
+            '@system/test': path.resolve(__dirname, '.packages/test/src'),
+            '@system/worker': path.resolve(__dirname, 'packages/worker/src'),
         },
     }
 });

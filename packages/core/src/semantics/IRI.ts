@@ -1,4 +1,5 @@
 import { PrefixRegistry } from './PrefixRegistry.js';
+import { exists } from '../util/objects.js';
 
 
 /**
@@ -31,7 +32,11 @@ export class IRI {
             throw new Error(`Invalid URN NID: ${nid}`);
         }
 
-        if (!nss || /\s/.test(nss)) {
+        if (!exists(nid) || /\s/.test(nid)) {
+            throw new Error(`Invalid URN NSS: ${nss}`);
+        }
+
+        if (!exists(nss) || /\s/.test(nss)) {
             throw new Error(`Invalid URN NSS: ${nss}`);
         }
 

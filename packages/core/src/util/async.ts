@@ -7,12 +7,24 @@ export async function flush() {
     return new Promise((resolve) => { schedule(resolve); })
 }
 
+/**
+ * Sleeps for the provided number of milliseconds before invoking the specified function.
+ * @param ms 
+ * @returns A promise that resolved once the supplied interval has elapsed
+ */
 export async function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function repeat(ms: number, fn: Function) {
+/**
+ * Repeats the given function on the specified interval.
+ * @param ms 
+ * @param fn 
+ * @returns A handle for `clearInterval`
+ */
+export function repeat(ms: number, fn: Function): number {
     return setInterval(fn, ms);
 }
 
-const schedule = typeof setImmediate === "function" ? setImmediate : setTimeout;
+/* c8 ignore next */
+const schedule = setTimeout;

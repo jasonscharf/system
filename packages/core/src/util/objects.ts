@@ -1,13 +1,4 @@
 /**
- * Checks whether an object exists.
- * An object exists if it is not `null` and not `undefined`.
- */
-export function exists<T>(obj: T): obj is NonNullable<T> {
-    return (obj !== null && obj !== undefined);
-}
-
-
-/**
  * Recursively freezes an entire object tree.
  * It's important to note that this implies that objects don't share subtrees, which is a common
  * occurrance in applications that don't studiously maintain state boundaries.
@@ -28,3 +19,12 @@ export function deepFreeze<TObject>(obj: TObject | any, seen = new WeakMap<objec
 
     return Object.freeze<TObject>(obj);
 }
+
+/**
+ * Checks whether an object exists.
+ * An object exists if it is not `null` and not `undefined`.
+ */
+export function exists<T>(obj: T): obj is NonNullable<T> {
+    return (obj !== null && obj !== undefined);
+}
+

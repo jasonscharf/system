@@ -23,6 +23,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@system/core": "workspace:^"
+    "@system/core": "workspace:^",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.14"
   }
 }

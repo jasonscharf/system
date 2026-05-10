@@ -1,0 +1,31 @@
+{
+  "name": "@system/gen",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "tern-codegen": "./dist/bin.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "yarn compile",
+    "compile": "tsc -b",
+    "clean": "rm -rf dist && rm -f tsconfig.tsbuildinfo",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "watch": "tsc -b -w"
+  },
+  "dependencies": {
+    "@system/core": "workspace:^"
+  }
+}

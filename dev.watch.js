@@ -1,9 +1,12 @@
 /**
  * This script reloads containers when relevant changes are detected.
- * This is as opposed to having in-container tooling perform these duties
+ * This is as opposed to having in-container tooling perform these duties.
+ *
+ * RDF hot-reload pipeline:
+ *   *.nt / *.ttl change → gen → *.generated.ts → tsc → dist change → container restart
  */
 import chokidar from 'chokidar';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 
 
 let restarting = false;
@@ -15,7 +18,7 @@ export function restartRoles() {
 
     restarting = true;
 
-    console.log(`♻️ Restarting ${roleName}...`);
+    console.log(`♻️ Restarting roles...`);
 
     exec('yarn compose restart worker api', (err, stdout, stderr) => {
         if (err) {
@@ -31,6 +34,7 @@ export function restartRoles() {
 const watcher = chokidar.watch(
     [
         'packages/api/dist',
+        'packages/backend/dist',
         'packages/core/dist',
         'packages/worker/dist'
     ],
@@ -47,3 +51,22 @@ watcher.on('all', (event, path) => {
 
     restartRoles();
 });
+
+// RDF → TypeScript gen watcher
+// When any N-Triples / Turtle file changes, regenerate its .generated.ts counterpart.
+// tsc -b -w (run separately via `yarn watch`) picks up the new .ts and emits to dist.
+const rdfWatcher = chokidar.watch(
+    ['packages/**/src/**/*.nt', 'packages/**/src/**/*.ttl'],
+    { ignoreInitial: false, ignored: /node_modules|dist/ }
+);
+
+rdfWatcher.on('add', runCodegen);
+rdfWatcher.on('change', runCodegen);
+
+function runCodegen(filePath) {
+    console.log(`[gen] ${filePath}`);
+    const proc = spawn('yarn', ['type-gen', filePath], { stdio: 'inherit' });
+    proc.on('exit', (code) => {
+        if (code !== 0) console.error(`[gen] Failed for ${filePath} (exit ${code})`);
+    });
+}

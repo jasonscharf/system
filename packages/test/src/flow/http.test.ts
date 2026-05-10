@@ -27,7 +27,7 @@ async function freePort(): Promise<number> {
         const srv = net.createServer();
         srv.listen(0, () => {
             const addr = srv.address();
-            srv.close(() => resolve((addr as net.AddressInfo).port));
+            srv.close(() => resolve((addr as { port: number }).port));
         });
         srv.on('error', reject);
     });

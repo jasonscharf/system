@@ -17,7 +17,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
-import { join, sep } from 'node:path';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
     FlowApp,
@@ -36,7 +36,7 @@ async function freePort(): Promise<number> {
         const srv = net.createServer();
         srv.listen(0, () => {
             const addr = srv.address();
-            srv.close(() => resolve((addr as net.AddressInfo).port));
+            srv.close(() => resolve((addr as { port: number }).port));
         });
         srv.on('error', reject);
     });

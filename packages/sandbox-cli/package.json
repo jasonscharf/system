@@ -1,0 +1,18 @@
+{
+  "name": "@system/sandbox-cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "sandbox": "./dist/bin.js"
+  },
+  "scripts": {
+    "build": "yarn compile",
+    "compile": "tsc -b",
+    "clean": "rm -rf dist && rm -f tsconfig.tsbuildinfo",
+    "start": "node dist/bin.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@system/core": "workspace:^"
+  }
+}

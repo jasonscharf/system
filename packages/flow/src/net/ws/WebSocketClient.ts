@@ -7,7 +7,9 @@ export interface WebSocketClientOptions extends FlowComponentOptions {
 }
 
 /**
- * A Flow component that wraps a WebSocket client connection.
+ * A Flow component that wraps a WebSocket client connection using the
+ * platform-native WebSocket API (globalThis.WebSocket — Node.js ≥ 22,
+ * all modern browsers). No third-party dependencies.
  *
  * Ports:
  *   send        (in)   — data to transmit to the server
@@ -34,14 +36,14 @@ export class WebSocketClient extends FlowComponent {
     }
 
     protected override async onInit(): Promise<void> {
-        // Use the native global WebSocket when available (browsers, Node ≥ 22),
-        // otherwise fall back to the ws package (Node < 22 / test env).
-        const WsClass: typeof WebSocket =
-            typeof globalThis.WebSocket !== 'undefined'
-                ? globalThis.WebSocket
-                : (await import('ws')).WebSocket as unknown as typeof WebSocket;
+        if (typeof globalThis.WebSocket === 'undefined') {
+            throw new Error(
+                'WebSocketClient requires a platform-native WebSocket (Node.js ≥ 22, ' +
+                'modern browsers). No globalThis.WebSocket found.',
+            );
+        }
 
-        const ws = new WsClass(this._url);
+        const ws = new globalThis.WebSocket(this._url);
         this._ws = ws;
 
         await new Promise<void>((resolve, reject) => {

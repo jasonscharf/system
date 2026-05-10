@@ -13,6 +13,7 @@ export abstract class FlowScheduler {
     abstract tick(): void;
 
     start(): void {
+        if (this._running) return;
         this._running = true;
         void this._loop();
     }

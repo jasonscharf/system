@@ -9,4 +9,5 @@ export * from './FlowPortGroup.js';
 export * from './FlowScheduler.js';
 export * from './FlowTransport.js';
 export * from './types.js';
+export * from './net/http/index.js';
 export * from './net/ws/index.js';

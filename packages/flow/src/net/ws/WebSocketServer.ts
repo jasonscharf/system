@@ -99,7 +99,10 @@ export class WebSocketServer extends FlowComponent {
         });
 
         this.addDisposable({
-            dispose: () => new Promise<void>(resolve => wss.close(() => resolve())),
+            dispose: () => new Promise<void>(resolve => {
+                for (const client of wss.clients) client.terminate();
+                wss.close(() => resolve());
+            }),
         });
 
         await new Promise<void>((resolve, reject) => {

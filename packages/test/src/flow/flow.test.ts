@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { IRI } from '@system/core';
 import {
     FlowApp,
     FlowComponent,
@@ -10,6 +11,7 @@ import {
     PullScheduler,
     LocalTransport,
     createMessage,
+    type FlowComponentOptions,
     type FlowMessage,
     type IDisposable,
     type PortDirection,
@@ -349,7 +351,7 @@ describe('FlowComponent', () => {
     it('toQuads includes quads for each port', () => {
         const c = new Counter(ctx);
         const quads = c.toQuads();
-        const subjects = quads.map(q => q.subject.value);
+        const subjects = quads.map(q => (q.subject as IRI).value);
         // At least one quad per port
         expect(subjects.some(s => s.includes('port'))).toBe(true);
     });
@@ -697,8 +699,12 @@ connections: []
             connections: [],
         });
 
-        const registry = new Map<string, new (ctx: FlowContext) => FlowComponent>();
-        registry.set('Counter', Counter);
+        class LoadableCounter extends FlowComponent {
+            constructor(options: FlowComponentOptions) { super(options); }
+            override step(): void {}
+        }
+        const registry = new Map<string, new (options: FlowComponentOptions) => FlowComponent>();
+        registry.set('Counter', LoadableCounter);
 
         const app = await FlowLoader.fromJSON(json, {
             moduleResolver: async (uri: string) => {

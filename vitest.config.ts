@@ -29,6 +29,8 @@ export default defineConfig({
                 '**/dist/**',
                 '**/node_modules/**',
                 '**/playwright/**',
+                // CLI entry points — thin argument-parsing shims, not library code
+                '**/src/bin.ts',
             ],
         },
 
@@ -36,6 +38,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@system/api': path.resolve(__dirname, 'packages/api/src'),
+            '@system/gen': path.resolve(__dirname, 'packages/gen/src'),
             '@system/core': path.resolve(__dirname, 'packages/core/src'),
             '@system/test': path.resolve(__dirname, '.packages/test/src'),
             '@system/worker': path.resolve(__dirname, 'packages/worker/src'),

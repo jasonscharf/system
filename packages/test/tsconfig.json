@@ -3,7 +3,19 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
+    "paths": {
+      "@system/api": ["../api/src/index.ts"],
+      "@system/core": ["../core/src/index.ts"],
+      "@system/gen": ["../gen/src/index.ts"],
+      "@system/worker": ["../worker/src/index.ts"]
+    }
   },
+  "references": [
+    { "path": "../api" },
+    { "path": "../core" },
+    { "path": "../gen" },
+    { "path": "../worker" }
+  ],
   "include": [
     "src",
     "vitest.config.ts"

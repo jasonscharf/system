@@ -1,4 +1,4 @@
-import { deepFreeze, exists, flush, randomUInt8Array, repeat, shannonEntropy, sleep, uint8ToHex, uuidv4Binary } from '@system/core';
+import { deepFreeze, exists, flush, randomUInt8Array, repeat, shannonEntropy, sleep, uint8ToHex, uuidToHex, uuidv4Binary } from '@system/core';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -52,7 +52,7 @@ describe('async', () => {
     describe(repeat, () => {
         it('runs the callback multiple times', async () => {
             const spy = vi.fn();
-            const p = repeat(1000, spy);
+            repeat(1000, spy);
 
             vi.advanceTimersByTime(1000);
             await flush();
@@ -83,7 +83,7 @@ describe('async', () => {
     describe(sleep, () => {
         it('executes the callback', async () => {
             const spy = vi.fn();
-            const p = sleep(1000).then(spy);
+            sleep(1000).then(spy);
 
             vi.advanceTimersByTime(999);
             expect(spy).not.toHaveBeenCalled();
@@ -104,6 +104,15 @@ describe('binary', () => {
         it('produces lowercase hex', () => {
             const hex = uint8ToHex(new Uint8Array([0xFE, 0xFF]));
             expect(hex).to.eq('feff')
+        });
+    });
+
+    describe(uuidToHex, () => {
+        it('converts 16-byte UUID to a 32-char hex string', () => {
+            const uuid = uuidv4Binary();
+            const hex = uuidToHex(uuid);
+            expect(hex.length).toBe(32);
+            expect(/^[0-9a-f]+$/.test(hex)).toBe(true);
         });
     });
 });

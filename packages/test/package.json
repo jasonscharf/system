@@ -25,6 +25,7 @@
   "dependencies": {
     "@system/api": "workspace:^",
     "@system/core": "workspace:^",
+    "@system/gen": "workspace:^",
     "@system/worker": "workspace:^",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"

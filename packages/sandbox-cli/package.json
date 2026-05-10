@@ -13,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@system/core": "workspace:^"
+    "@system/core": "workspace:^",
+    "@system/flow": "workspace:^"
   }
 }

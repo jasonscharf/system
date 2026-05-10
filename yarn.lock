@@ -1165,6 +1165,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@system/flow@workspace:^, @system/flow@workspace:packages/flow":
+  version: 0.0.0-use.local
+  resolution: "@system/flow@workspace:packages/flow"
+  dependencies:
+    "@system/core": "workspace:^"
+  languageName: unknown
+  linkType: soft
+
 "@system/gen@workspace:^, @system/gen@workspace:packages/gen":
   version: 0.0.0-use.local
   resolution: "@system/gen@workspace:packages/gen"
@@ -1180,6 +1188,7 @@ __metadata:
   resolution: "@system/sandbox-cli@workspace:packages/sandbox-cli"
   dependencies:
     "@system/core": "workspace:^"
+    "@system/flow": "workspace:^"
   bin:
     sandbox: ./dist/bin.js
   languageName: unknown
@@ -1209,6 +1218,7 @@ __metadata:
     "@playwright/test": "npm:^1.57.0"
     "@system/api": "workspace:^"
     "@system/core": "workspace:^"
+    "@system/flow": "workspace:^"
     "@system/gen": "workspace:^"
     "@system/worker": "workspace:^"
     "@testing-library/dom": "npm:^10.4.1"

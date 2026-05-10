@@ -1,6 +1,3 @@
-export * from './flow/FlowComponent.js';
-export * from './flow/FlowNode.js';
-export * from './flow/FlowPort.js';
 export * from './hydration/index.js';
 export * from './rdf/index.js';
 export * from './semantics/IRI.js';

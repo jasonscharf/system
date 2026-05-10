@@ -6,9 +6,9 @@
     "outDir": "dist"
   },
   "references": [
-    { "path": "../core" },
-    { "path": "../flow" }
+    { "path": "../core" }
   ],
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }
-

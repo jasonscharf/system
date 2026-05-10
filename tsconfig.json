@@ -16,5 +16,11 @@
     {
       "path": "packages/worker"
     },
+    {
+      "path": "packages/sandbox-server"
+    },
+    {
+      "path": "packages/sandbox-cli"
+    },
   ]
 }

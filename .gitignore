@@ -15,3 +15,6 @@ install-state.gz
 *.local.*
 
 !dev.watch.js
+
+# Skip agent helper file
+CLAUDE.md

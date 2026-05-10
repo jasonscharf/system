@@ -26,7 +26,10 @@
     "core": "yarn workspace @system/core",
     "gen": "yarn workspace @system/gen",
     "tests": "yarn workspace @system/test",
-    "worker": "yarn workspace @system/worker"
+    "worker": "yarn workspace @system/worker",
+    "sb-web": "yarn workspace @system/sandbox-web",
+    "sb-server": "yarn workspace @system/sandbox-server",
+    "sb-cli": "yarn workspace @system/sandbox-cli"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",

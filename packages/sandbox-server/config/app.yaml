@@ -1,0 +1,37 @@
+# ────────────────────────────────────────────────────────────────────────────
+# Tern Application Config — sandbox-server
+#
+# Field reference:
+#   name         display / log identifier
+#   version      SemVer string
+#   description  human-readable purpose
+#   author       maintainer contact
+#   license      SPDX identifier
+#   ternVersion  minimum @system/core version this config targets
+#
+# extensions[]  paths to extension config files (YAML or Turtle), resolved
+#               relative to this file.  Merged left → right; later extensions
+#               can shadow earlier handlers by registering lower priority numbers.
+#
+# handlers[]    user-level handler registrations — highest priority, applied
+#               last.  Useful for one-off overrides without editing extension files.
+# ────────────────────────────────────────────────────────────────────────────
+
+name:        tern-sandbox-server
+version:     "1.0.0"
+description: >
+  Development sandbox demonstrating a minimal Tern server application.
+  Loads core handlers from YAML, data handlers from Turtle/RDF, and the
+  echo sample endpoint from a standalone YAML extension.
+author:      jason <jasonlscharf@gmail.com>
+license:     MIT
+ternVersion: "1.0.0"
+
+extensions:
+  - ./extensions/core.yaml   # tern:ping        — YAML format
+  - ./extensions/data.ttl    # tern:triple.*    — Turtle/RDF format
+  - ./extensions/echo.yaml   # tern:echo        — YAML, sample endpoint
+
+# User overrides — add entries here to shadow any extension handler at runtime
+# without editing the extension files themselves.
+handlers: []

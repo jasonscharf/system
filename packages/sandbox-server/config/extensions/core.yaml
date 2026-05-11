@@ -1,0 +1,17 @@
+# tern-core extension — YAML format
+# Registers the ping handler for the sandbox server.
+#
+# This is an example of loading extension configuration from YAML.
+# See data.ttl for the same concept expressed in Turtle/RDF.
+
+name: tern-core
+version: "1.0.0"
+description: >
+  Core extension providing baseline message handlers.
+  Registers tern:ping so clients can test connectivity.
+
+handlers:
+  - type: "http://tern.dev/ns/msg/ping"
+    module: "../src/handlers/ping.js"
+    export: "handlePing"
+    priority: 100

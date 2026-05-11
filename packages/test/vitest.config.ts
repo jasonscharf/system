@@ -30,8 +30,10 @@ export default defineConfig({
     },
     resolve: {
         alias: {
-            '@system/api': path.resolve(__dirname, '../api/src'),
+            '@system/api':  path.resolve(__dirname, '../api/src'),
+            '@system/app':  path.resolve(__dirname, '../app/src'),
             '@system/core': path.resolve(__dirname, '../core/src'),
+            '@system/data': path.resolve(__dirname, '../data/src'),
             '@system/flow': path.resolve(__dirname, '../flow/src'),
             '@system/test': path.resolve(__dirname, '../test/src'),
             '@system/worker': path.resolve(__dirname, '../worker/src'),

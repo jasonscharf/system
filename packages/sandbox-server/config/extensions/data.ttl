@@ -1,0 +1,48 @@
+# tern-data extension — Turtle/RDF format
+# Registers triple store handlers for the sandbox server.
+#
+# This is an example of loading extension configuration from RDF.
+# The same content expressed in YAML would look like:
+#
+#   name: tern-data
+#   handlers:
+#     - type: "http://tern.dev/ns/msg/triple.find"
+#       module: "../src/handlers/triples.js"
+#       export: "handleFind"
+#     ...
+#
+# Using RDF aligns with Tern's graph-native architecture: every piece of
+# configuration is a set of quads that can live in the datastore, be queried,
+# versioned, and reasoned over.
+
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix ternapp: <http://tern.dev/ns/app/> .
+@prefix msg:     <http://tern.dev/ns/msg/> .
+@prefix ext:     <http://tern.dev/sandbox/ext/data#> .
+
+ext:DataExtension
+    a ternapp:Extension ;
+    ternapp:name    "tern-data" ;
+    ternapp:version "1.0.0" ;
+    ternapp:description "Triple-store handlers: find, insert, stats." ;
+
+    ternapp:handler [
+        ternapp:type     msg:triple.find ;
+        ternapp:module   "../src/handlers/triples.js" ;
+        ternapp:export   "handleFind" ;
+        ternapp:priority 100
+    ] ;
+
+    ternapp:handler [
+        ternapp:type     msg:triple.insert ;
+        ternapp:module   "../src/handlers/triples.js" ;
+        ternapp:export   "handleInsert" ;
+        ternapp:priority 100
+    ] ;
+
+    ternapp:handler [
+        ternapp:type     msg:triple.stats ;
+        ternapp:module   "../src/handlers/triples.js" ;
+        ternapp:export   "handleStats" ;
+        ternapp:priority 100
+    ] .

@@ -24,7 +24,9 @@
   },
   "dependencies": {
     "@system/api": "workspace:^",
+    "@system/app": "workspace:^",
     "@system/core": "workspace:^",
+    "@system/data": "workspace:^",
     "@system/flow": "workspace:^",
     "@system/gen": "workspace:^",
     "@system/worker": "workspace:^",

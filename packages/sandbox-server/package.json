@@ -10,6 +10,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@system/core": "workspace:^"
+    "@system/app": "workspace:^",
+    "@system/core": "workspace:^",
+    "@system/data": "workspace:^",
+    "@system/flow": "workspace:^",
+    "better-sqlite3": "^11.10.0"
   }
 }

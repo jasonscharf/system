@@ -1,0 +1,248 @@
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --color-bg:        #0f0f13;
+    --color-surface:   #1a1a22;
+    --color-border:    #2e2e3a;
+    --color-text:      #e2e2e8;
+    --color-muted:     #7c7c94;
+    --color-accent:    #7c6af7;
+    --color-ok:        #3ecf8e;
+    --color-err:       #f87171;
+    --radius:          8px;
+    --font:            'Inter', system-ui, sans-serif;
+}
+
+body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100dvh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem 1rem;
+}
+
+/* ── Showcase shell ────────────────────────────────────────────────────────── */
+
+.showcase {
+    width: 100%;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.showcase__header {
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 1.25rem;
+}
+
+.showcase__title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.showcase__subtitle {
+    color: var(--color-muted);
+    margin-top: 0.25rem;
+    font-size: 0.9rem;
+}
+
+.showcase__section {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.showcase__section h2 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-muted);
+}
+
+.showcase__row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* ── Status badge ──────────────────────────────────────────────────────────── */
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-badge__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-err);
+}
+
+.status-badge--ok .status-badge__dot {
+    background: var(--color-ok);
+    box-shadow: 0 0 6px var(--color-ok);
+}
+
+/* ── Button ────────────────────────────────────────────────────────────────── */
+
+.btn {
+    background: var(--color-accent);
+    color: #fff;
+    border: none;
+    border-radius: calc(var(--radius) / 2);
+    padding: 0.45rem 0.9rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.btn:hover:not(:disabled) {
+    opacity: 0.85;
+}
+
+.btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+/* ── Ping result ───────────────────────────────────────────────────────────── */
+
+.ping-result {
+    font-variant-numeric: tabular-nums;
+    color: var(--color-ok);
+    font-size: 0.9rem;
+}
+
+/* ── Stats table ───────────────────────────────────────────────────────────── */
+
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.stats-table th,
+.stats-table td {
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.stats-table th {
+    text-align: left;
+    color: var(--color-muted);
+    font-weight: 400;
+    width: 50%;
+}
+
+.stats-table td {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Endpoint badge ────────────────────────────────────────────────────────── */
+
+.endpoint-badge {
+    display: inline-block;
+    background: rgba(124, 106, 247, 0.15);
+    color: var(--color-accent);
+    border: 1px solid rgba(124, 106, 247, 0.3);
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    padding: 0.1rem 0.45rem;
+    font-family: 'Menlo', 'Fira Code', monospace;
+    vertical-align: middle;
+    margin-left: 0.4rem;
+}
+
+/* ── Section hint ──────────────────────────────────────────────────────────── */
+
+.showcase__hint {
+    color: var(--color-muted);
+    font-size: 0.825rem;
+    line-height: 1.5;
+}
+
+.showcase__hint code {
+    font-family: 'Menlo', 'Fira Code', monospace;
+    font-size: 0.8rem;
+    background: rgba(255,255,255,0.06);
+    padding: 0.05rem 0.3rem;
+    border-radius: 3px;
+}
+
+/* ── Text input ────────────────────────────────────────────────────────────── */
+
+.text-input {
+    flex: 1;
+    background: var(--color-bg);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: calc(var(--radius) / 2);
+    padding: 0.45rem 0.65rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.text-input:focus {
+    border-color: var(--color-accent);
+}
+
+.text-input:disabled {
+    opacity: 0.4;
+}
+
+/* ── Echo result ───────────────────────────────────────────────────────────── */
+
+.echo-result {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    background: rgba(62, 207, 142, 0.08);
+    border: 1px solid rgba(62, 207, 142, 0.2);
+    border-radius: calc(var(--radius) / 2);
+}
+
+.echo-result__label {
+    font-size: 0.75rem;
+    color: var(--color-muted);
+    white-space: nowrap;
+}
+
+.echo-result__value {
+    font-family: 'Menlo', 'Fira Code', monospace;
+    font-size: 0.9rem;
+    color: var(--color-ok);
+    flex: 1;
+}
+
+.echo-result__meta {
+    font-size: 0.75rem;
+    color: var(--color-muted);
+    white-space: nowrap;
+}

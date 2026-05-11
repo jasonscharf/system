@@ -6,6 +6,8 @@
     "paths": {
       "@system/api": ["../api/src/index.ts"],
       "@system/core": ["../core/src/index.ts"],
+      "@system/app":  ["../app/src/index.ts"],
+      "@system/data": ["../data/src/index.ts"],
       "@system/flow": ["../flow/src/index.ts"],
       "@system/gen": ["../gen/src/index.ts"],
       "@system/worker": ["../worker/src/index.ts"]
@@ -13,7 +15,9 @@
   },
   "references": [
     { "path": "../api" },
+    { "path": "../app" },
     { "path": "../core" },
+    { "path": "../data" },
     { "path": "../flow" },
     { "path": "../gen" },
     { "path": "../worker" }

@@ -1,4 +1,5 @@
 export * from './hydration/index.js';
+export * from './messages/TernMessage.js';
 export * from './rdf/index.js';
 export * from './semantics/IRI.js';
 export * from './semantics/PrefixRegistry.js';

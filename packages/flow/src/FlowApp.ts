@@ -96,7 +96,7 @@ export class FlowApp {
             const neighbors = adj.get(fromOwner)!;
             if (!neighbors.has(toOwner)) {
                 neighbors.add(toOwner);
-                inDegree.set(toOwner, (inDegree.get(toOwner) ?? 0) + 1);
+                inDegree.set(toOwner, inDegree.get(toOwner)! + 1);
             }
         }
 
@@ -109,7 +109,7 @@ export class FlowApp {
         while (queue.length > 0) {
             const node = queue.shift()!;
             sorted.push(node);
-            for (const neighbor of adj.get(node) ?? []) {
+            for (const neighbor of adj.get(node)!) {
                 const deg = inDegree.get(neighbor)! - 1;
                 inDegree.set(neighbor, deg);
                 if (deg === 0) queue.push(neighbor);

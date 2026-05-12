@@ -2,41 +2,39 @@ import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 
 
+const workspaceRoot = path.resolve(__dirname, '../..');
+
 export default defineConfig({
+    root: workspaceRoot,
     test: {
         globals: true,
         environment: 'node',
-        include: ['**/src/**/*.test.ts'],
+        include: ['packages/test/src/**/*.test.ts'],
         coverage: {
-            //provider: 'v8',
             provider: 'v8',
             enabled: true,
+            reportsDirectory: path.resolve(__dirname, 'coverage/vitest'),
+            reporter: ['text', 'html', 'lcov'],
 
-            reportsDirectory: 'coverage/vitest',
-            reporter: ['text-summary', 'html', 'lcov'],
-
-            include: [
-                '**/src/**/*.ts',
-                '**/src/**/*.tsx',
-            ],
+            include: ['packages/*/src/**/*.ts'],
             exclude: [
-                '**/*.spec.*',
                 '**/*.d.ts',
                 '**/node_modules/**',
-                '**/playwright/**',
+                '**/dist/**',
+                '**/gen/src/bin.ts',
             ],
         },
-
     },
     resolve: {
         alias: {
-            '@system/api':  path.resolve(__dirname, '../api/src'),
-            '@system/app':  path.resolve(__dirname, '../app/src'),
-            '@system/core': path.resolve(__dirname, '../core/src'),
-            '@system/data': path.resolve(__dirname, '../data/src'),
-            '@system/flow': path.resolve(__dirname, '../flow/src'),
-            '@system/test': path.resolve(__dirname, '../test/src'),
+            '@system/api':    path.resolve(__dirname, '../api/src'),
+            '@system/app':    path.resolve(__dirname, '../app/src'),
+            '@system/core':   path.resolve(__dirname, '../core/src'),
+            '@system/data':   path.resolve(__dirname, '../data/src'),
+            '@system/flow':   path.resolve(__dirname, '../flow/src'),
+            '@system/gen':    path.resolve(__dirname, '../gen/src'),
+            '@system/test':   path.resolve(__dirname, '../test/src'),
             '@system/worker': path.resolve(__dirname, '../worker/src'),
         },
-    }
+    },
 });

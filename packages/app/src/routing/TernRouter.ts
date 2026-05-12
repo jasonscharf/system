@@ -132,8 +132,7 @@ export class TernRouter implements Dispatcher {
             }
         });
 
-        return ctx.result ??
-            errResult(request.id, request.type, 'Handler produced no result');
+        return ctx.result!;
     }
 
     // ── Internal ──────────────────────────────────────────────────────────────

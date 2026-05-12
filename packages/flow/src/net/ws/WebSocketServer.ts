@@ -60,19 +60,16 @@ export class WebSocketServer extends FlowComponent {
         this.disconnected = this.addPort<string>('disconnected', 'out');
 
         this.reader = new WebSocketReader({ name: `${this.name}.reader`, context: this.context });
-        this.writer = new WebSocketWriter({ name: `${this.name}.writer`, context: this.context });
+        this.writer = new WebSocketWriter({
+            name: `${this.name}.writer`,
+            context: this.context,
+            send: (id, data) => { this._connections.get(id)?.send(data); },
+        });
         this.addChild(this.reader);
         this.addChild(this.writer);
 
         // Internal routing: reader.out → this.received
-        // When ws messages arrive, they flow through the reader's port and are
-        // forwarded to this component's external output for downstream consumers.
         this.reader.out._addTransport(new LocalTransport(this.reader.out, this.received));
-
-        // Writer: send function injected once server is live (see onInit)
-        this.writer._setSend((id, data) => {
-            this._connections.get(id)?.send(data);
-        });
     }
 
     protected override async onInit(): Promise<void> {
@@ -88,8 +85,8 @@ export class WebSocketServer extends FlowComponent {
             this.connected.put(id);
 
             ws.on('message', (raw) => {
-                const data = Buffer.isBuffer(raw) ? raw.toString('utf8') : String(raw);
-                this.reader._inject({ connectionId: id, data });
+                const data = (raw as Buffer).toString('utf8');
+                this.reader.out.put({ connectionId: id, data });
             });
 
             ws.on('close', () => {

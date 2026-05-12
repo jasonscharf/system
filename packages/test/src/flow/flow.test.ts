@@ -717,3 +717,357 @@ connections: []
         expect(app.components.size).toBe(1);
     });
 });
+
+
+// ── Additional coverage: FlowComponent BigInt id, FlowLoader, FlowScheduler, FlowApp ──
+
+describe('FlowComponent.toQuads() with BigInt id', () => {
+    it('uses BigInt.toString(16) for the node IRI', () => {
+        const ctx = new FlowContext();
+        class Minimal extends FlowComponent {
+            constructor() { super({ id: BigInt(0xdeadbeef), context: ctx }); }
+            override step(): void {}
+        }
+        const c = new Minimal();
+        const quads = c.toQuads();
+        expect(quads.length).toBeGreaterThan(0);
+        const subject = (quads[0].subject as IRI).value;
+        expect(subject).toContain('deadbeef');
+    });
+});
+
+describe('FlowLoader extras', () => {
+    it('fromRDF throws NotImplemented', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        await expect(FlowLoader.fromRDF('anything')).rejects.toThrow('not yet implemented');
+    });
+
+    it('fromYAML with unknown component in connection throws', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        const json = JSON.stringify({
+            name: 'bad', mode: 'push',
+            components: [],
+            connections: [{ from: 'ghost.out', to: 'also-ghost.in' }],
+        });
+        await expect(FlowLoader.fromJSON(json, { moduleResolver: async () => { throw new Error('nope'); } }))
+            .rejects.toThrow();
+    });
+
+    it('fromYAML with connections wires components via moduleResolver', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        class Src extends FlowComponent {
+            readonly out = this.addPort<number>('out', 'out');
+            constructor(options: FlowComponentOptions) { super(options); }
+            override step(): void {}
+        }
+        class Dst extends FlowComponent {
+            readonly in = this.addPort<number>('in', 'in');
+            constructor(options: FlowComponentOptions) { super(options); }
+            override step(): void {}
+        }
+        const classes: Record<string, new (o: FlowComponentOptions) => FlowComponent> = { Src, Dst };
+        const app = await FlowLoader.fromJSON(JSON.stringify({
+            name: 'test', mode: 'push',
+            components: [
+                { id: 'src', type: 'Src' },
+                { id: 'dst', type: 'Dst' },
+            ],
+            connections: [{ from: 'src.out', to: 'dst.in' }],
+        }), {
+            moduleResolver: async (uri) => ({ default: classes[uri]! }),
+        });
+        expect(app.components.size).toBe(2);
+    });
+
+    it('fromJSON with unknown port in connection throws', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        class Simple extends FlowComponent {
+            constructor(o: FlowComponentOptions) { super(o); }
+            override step(): void {}
+        }
+        await expect(FlowLoader.fromJSON(JSON.stringify({
+            name: 'x', mode: 'push',
+            components: [{ id: 'a', type: 'Simple' }, { id: 'b', type: 'Simple' }],
+            connections: [{ from: 'a.nonexistent', to: 'b.alsomissing' }],
+        }), { moduleResolver: async () => ({ default: Simple }) })).rejects.toThrow('Unknown port');
+    });
+});
+
+describe('PullScheduler.queueSize', () => {
+    it('always returns 0', () => {
+        expect(new PullScheduler().queueSize).toBe(0);
+    });
+});
+
+describe('FlowApp pull mode topo sort', () => {
+    it('ignores self-loops in connection graph', () => {
+        const app = new FlowApp({ mode: 'pull' });
+        const c = new Counter(app.context, 'self');
+        // Connect output to own input — self-loop
+        app.connect(c.output, c.input);
+        // Should not throw and should produce a valid (possibly empty) order
+        expect(app.components.has(c)).toBe(true);
+    });
+
+    it('topo sorts a three-node chain A→B→C', () => {
+        const app = new FlowApp({ mode: 'pull' });
+        const a = new Counter(app.context, 'a');
+        const b = new Counter(app.context, 'b');
+        const c = new Counter(app.context, 'c');
+        app.connect(a.output, b.input).connect(b.output, c.input);
+        a.input.put(1);
+        app.scheduler.tick();
+        // a processes 1 → outputs to b → b processes → outputs to c → c processes
+        expect(a.count).toBe(1);
+        expect(b.count).toBe(1);
+        expect(c.count).toBe(1);
+    });
+});
+
+
+// ── FlowApp topo sort: duplicate edge + diamond ───────────────────────────────
+
+class Sink extends FlowComponent {
+    readonly in1 = this.addPort<number>('in1', 'in');
+    readonly in2 = this.addPort<number>('in2', 'in');
+    visits = 0;
+    constructor(ctx: FlowContext, name = 'sink') { super({ name, context: ctx }); }
+    override step(): void { while (this.in1.read() !== undefined || this.in2.read() !== undefined) { this.visits++; } }
+}
+
+describe('FlowApp topo sort: diamond graph (covers deg>0 branch)', () => {
+    it('two sources feeding one sink (in-degree 2)', () => {
+        const app = new FlowApp({ mode: 'pull' });
+        const a = new Counter(app.context, 'a');
+        const b = new Counter(app.context, 'b');
+        const c = new Counter(app.context, 'c');
+        const sink = new Sink(app.context);
+
+        // a→b, a→c, b→sink.in1, c→sink.in2
+        app.connect(a.output, b.input);
+        app.connect(a.output, c.input);  // second transport on a.output
+        app.connect(b.output, sink.in1);
+        app.connect(c.output, sink.in2);
+
+        // sink has in-degree 2 from b and c
+        // When b processes, sink's in-degree goes 2→1 (deg>0, NOT enqueued yet)
+        // When c processes, sink's in-degree goes 1→0 (enqueued)
+        a.input.put(1);
+        app.scheduler.tick();
+        expect(a.count).toBe(1);
+    });
+});
+
+describe('FlowApp topo sort: duplicate edge ignored (line 97-99 false branch)', () => {
+    it('connecting same pair twice only adds one edge in adjacency', () => {
+        const app = new FlowApp({ mode: 'pull' });
+        const a = new Counter(app.context, 'dup-a');
+        const b = new Counter(app.context, 'dup-b');
+        app.connect(a.output, b.input);
+        // A second connect between same owners hits the !neighbors.has(toOwner) false branch
+        // We need a second port to create a second connection with same owners
+        class TwoPorts extends FlowComponent {
+            readonly out1 = this.addPort<number>('out1', 'out');
+            readonly out2 = this.addPort<number>('out2', 'out');
+            readonly in1  = this.addPort<number>('in1',  'in');
+            readonly in2  = this.addPort<number>('in2',  'in');
+            constructor(ctx: FlowContext) { super({ name: 'two', context: ctx }); }
+            override step(): void {}
+        }
+        const src = new TwoPorts(app.context);
+        const dst = new TwoPorts(app.context);
+        app.connect(src.out1, dst.in1);
+        app.connect(src.out2, dst.in2); // same src→dst owners, second edge
+        a.input.put(2);
+        app.scheduler.tick();
+        expect(a.count).toBe(2);
+    });
+});
+
+describe('FlowLoader: default module resolver', () => {
+    it('fromJSON without moduleResolver uses defaultModuleResolver (fails gracefully)', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        // With a nonexistent module, the defaultModuleResolver will try to import and fail
+        await expect(FlowLoader.fromJSON(JSON.stringify({
+            name: 'test', mode: 'push',
+            components: [{ id: 'c', type: './totally-nonexistent-module-xyz.js' }],
+            connections: [],
+        }))).rejects.toThrow();
+    });
+
+    it('fromYAML with a mapping key having no value and no indented block', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        const yaml = 'name: test\nmode: push\ncomponents: []\nconnections: []';
+        const app = await FlowLoader.fromYAML(yaml, {
+            moduleResolver: async () => { throw new Error('should not be called'); },
+        });
+        expect(app.components.size).toBe(0);
+    });
+});
+
+
+// ── FlowLoader: YAML null-value and scalar branches ───────────────────────────
+
+describe('FlowLoader: YAML parser internal branches', () => {
+    it('fromYAML: mapping key with no inline value and no indented block → null', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        // "mode:\ncomponents: []" — mode has empty afterColon, next line not indented
+        const yaml = 'name: test\nmode:\ncomponents: []\nconnections: []';
+        const app = await FlowLoader.fromYAML(yaml, {
+            moduleResolver: async () => { throw new Error('nope'); },
+        });
+        expect(app.components.size).toBe(0);
+    });
+
+    it('fromYAML: mapping key with indented scalar value (scalar block, line 146)', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        // mode has an indented scalar value "push" which triggers the scalar-block path
+        const yaml = 'name: test\nmode:\n  push\ncomponents: []\nconnections: []';
+        const app = await FlowLoader.fromYAML(yaml, {
+            moduleResolver: async () => { throw new Error('nope'); },
+        });
+        expect(app.components.size).toBe(0);
+    });
+});
+
+
+// ── FlowLoader: quoted string in YAML (parseScalar quoted branch, line 59) ────
+
+describe('FlowLoader: quoted string value in YAML', () => {
+    it('fromYAML with double-quoted name field covers parseScalar quoted branch', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        const yaml = 'name: "My Flow App"\ncomponents: []\nconnections: []';
+        const app = await FlowLoader.fromYAML(yaml, {
+            moduleResolver: async () => { throw new Error('nope'); },
+        });
+        expect(app.components.size).toBe(0);
+    });
+
+    it('fromYAML with single-quoted name field also hits quoted branch', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        const yaml = "name: 'My App'\ncomponents: []\nconnections: []";
+        const app = await FlowLoader.fromYAML(yaml, {
+            moduleResolver: async () => { throw new Error('nope'); },
+        });
+        expect(app.components.size).toBe(0);
+    });
+});
+
+
+// ── FlowLoader: YAML list with mapping items (sequence branch, lines 84-114) ──
+
+describe('FlowLoader: YAML sequence branch', () => {
+    it('fromYAML: component list with inline mapping (- id: c1 type: mod) covers line 95', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        // Each "- id: c1\n  type: mod" item has ": " in itemContent → mapping branch
+        const yaml = [
+            'name: test',
+            'components:',
+            '  - id: c1',
+            '    type: testModule',
+            'connections: []',
+        ].join('\n');
+        await expect(FlowLoader.fromYAML(yaml)).rejects.toThrow();
+    });
+
+    it('fromYAML: bare - item with indented block covers itemContent === "" branch (line 89)', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        // A bare "-" with the mapping on the next line → itemContent === '' branch
+        const yaml = [
+            'name: test',
+            'components:',
+            '  -',
+            '    id: c1',
+            '    type: testModule',
+            'connections: []',
+        ].join('\n');
+        await expect(FlowLoader.fromYAML(yaml)).rejects.toThrow();
+    });
+
+    it('fromYAML: scalar list items cover parseScalar else branch (lines 110-111)', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        // connections list with plain scalar items — itemContent has no ": " so hits
+        // the else branch: arr.push(parseScalar(itemContent)); i++;
+        // _build then tries conn.from.split('.') → TypeError, which is expected
+        const yaml = [
+            'name: test',
+            'components: []',
+            'connections:',
+            '  - simple-scalar-item',
+            '  - another-item',
+        ].join('\n');
+        await expect(FlowLoader.fromYAML(yaml)).rejects.toThrow();
+    });
+});
+
+
+// ── FlowLoader: parseScalar special-value branches ────────────────────────────
+
+describe('FlowLoader: parseScalar boolean/null/numeric branches', () => {
+    const noComponents = { moduleResolver: async () => { throw new Error('nope'); } };
+
+    it('parses true/false scalar values (lines 50-51)', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        // Extra fields with boolean values cause parseScalar to hit 'true'/'false' branches
+        const yaml = 'flag1: true\nflag2: false\nname: t\ncomponents: []\nconnections: []';
+        const app = await FlowLoader.fromYAML(yaml, noComponents);
+        expect(app.components.size).toBe(0);
+    });
+
+    it('parses null scalar value (line 52)', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        const yaml = 'extra: null\nname: t\ncomponents: []\nconnections: []';
+        const app = await FlowLoader.fromYAML(yaml, noComponents);
+        expect(app.components.size).toBe(0);
+    });
+
+    it('parses {} inline empty map scalar (line 54)', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        const yaml = 'meta: {}\nname: t\ncomponents: []\nconnections: []';
+        const app = await FlowLoader.fromYAML(yaml, noComponents);
+        expect(app.components.size).toBe(0);
+    });
+
+    it('parses integer scalar (line 55)', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        const yaml = 'count: 42\nname: t\ncomponents: []\nconnections: []';
+        const app = await FlowLoader.fromYAML(yaml, noComponents);
+        expect(app.components.size).toBe(0);
+    });
+
+    it('parses float scalar (line 56)', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        const yaml = 'version: 1.5\nname: t\ncomponents: []\nconnections: []';
+        const app = await FlowLoader.fromYAML(yaml, noComponents);
+        expect(app.components.size).toBe(0);
+    });
+});
+
+
+// ── FlowLoader: empty YAML (line 151) and bare - at end (lines 78, 91) ────────
+
+describe('FlowLoader: parseBlock edge cases', () => {
+    it('fromYAML with empty string hits lines.length === 0 (line 151)', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        // Empty YAML → parseYaml returns null → _build(null) → spec.mode throws TypeError
+        await expect(FlowLoader.fromYAML('')).rejects.toThrow();
+    });
+
+    it('fromYAML with bare - at end triggers start >= lines.length (line 78)', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        // Bare "-" at end → parseBlock(lines, i+1, childIndent) with i+1 >= lines.length
+        // connections becomes [null] → _build fails with TypeError (expected)
+        const yaml = 'name: t\ncomponents: []\nconnections:\n  -';
+        await expect(FlowLoader.fromYAML(yaml)).rejects.toThrow();
+    });
+
+    it('fromYAML with no-colon line in mapping triggers break (line 124)', async () => {
+        const { FlowLoader } = await import('@system/flow');
+        // A line with no colon inside a mapping block → colonIdx === -1 → break
+        const yaml = 'name: t\njust a plain line\ncomponents: []\nconnections: []';
+        const app = await FlowLoader.fromYAML(yaml, {
+            moduleResolver: async () => { throw new Error('nope'); },
+        });
+        expect(app.components.size).toBe(0);
+    });
+});

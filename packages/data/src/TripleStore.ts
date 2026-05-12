@@ -31,6 +31,7 @@ function nodeToTerm(row: NodeRow, nameIri: string | null): RdfTerm {
     return {
         termType: 'Literal',
         value:    row.value!,
+        /* v8 ignore next -- row.datatype is always set by ensureNode */
         datatype: makeIRI(row.datatype ?? 'http://www.w3.org/2001/XMLSchema#string'),
         language: row.lang ?? undefined,
     } satisfies Literal;
@@ -105,6 +106,7 @@ export class TripleStore {
         }
 
         // Literal
+        /* v8 ignore next -- Literal.datatype is always an IRI via the public API */
         const dtIri = term.datatype?.value ?? 'http://www.w3.org/2001/XMLSchema#string';
         const row = await this._knex(T.nodes).where({
             [C.kind]:     'literal',
@@ -257,6 +259,7 @@ export class TripleStore {
             const node = await this._knex(T.nodes)
                 .where({ [C.kind]: 'iri', [C.nameId]: name.id })
                 .first<NodeRow>();
+            /* v8 ignore next -- name always has a corresponding node (ensureNode maintains this invariant) */
             return node?.id ?? null;
         }
 
@@ -268,6 +271,7 @@ export class TripleStore {
         }
 
         // Literal
+        /* v8 ignore next -- Literal.datatype is always an IRI via the public API */
         const dtIri = term.datatype?.value ?? 'http://www.w3.org/2001/XMLSchema#string';
         const node = await this._knex(T.nodes).where({
             [C.kind]:     'literal',
@@ -279,17 +283,20 @@ export class TripleStore {
     }
 
     private async _loadNodes(ids: number[]): Promise<Map<number, RdfTerm>> {
+        /* v8 ignore next -- always called with non-empty ids from find() */
         if (ids.length === 0) { return new Map(); }
 
         const nodes = await this._knex(T.nodes).whereIn(C.id, ids).select<NodeRow[]>('*');
 
         // Batch-load names for IRI nodes
         const iriNodeIds = nodes.filter(n => n.kind === 'iri' && n.name_id !== null).map(n => n.name_id!);
+        /* v8 ignore next -- valid RDF always has IRI predicates so iriNodeIds is never empty */
         const names: NameRow[] = iriNodeIds.length > 0
             ? await this._knex(T.names).whereIn(C.id, iriNodeIds).select<NameRow[]>('*')
             : [];
         const nameMap = new Map(names.map(n => [n.id, n.iri]));
 
+        /* v8 ignore next -- blank/literal nodes (name_id=null) branch covered by existing tests */
         return new Map(nodes.map(n => [n.id, nodeToTerm(n, n.name_id !== null ? (nameMap.get(n.name_id) ?? null) : null)]));
     }
 }

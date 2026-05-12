@@ -44,6 +44,9 @@ export class WebSocketClient extends FlowComponent {
         }
 
         const ws = new globalThis.WebSocket(this._url);
+        // Request binary frames as ArrayBuffer so the handler branch is consistent
+        // across browsers and Node.js (default in Node.js 22+ is 'blob').
+        ws.binaryType = 'arraybuffer';
         this._ws = ws;
 
         await new Promise<void>((resolve, reject) => {
@@ -57,11 +60,7 @@ export class WebSocketClient extends FlowComponent {
         ws.addEventListener('message', (evt) => {
             const raw = evt.data;
             const data: string | Uint8Array =
-                raw instanceof ArrayBuffer
-                    ? new Uint8Array(raw)
-                    : raw instanceof Uint8Array
-                        ? raw
-                        : String(raw);
+                raw instanceof ArrayBuffer ? new Uint8Array(raw) : String(raw);
             this.received.put(data);
         });
 

@@ -73,11 +73,11 @@ describe('WebSocketReader', () => {
         expect(r.out.direction).toBe('out');
     });
 
-    it('_inject puts a WsMessage on the out port', () => {
+    it('out.put() enqueues a WsMessage on the out port', () => {
         const ctx = new FlowContext();
         const r = new WebSocketReader({ name: 'reader', context: ctx });
         const msg: WsMessage = { connectionId: 'abc', data: 'hello' };
-        r._inject(msg);
+        r.out.put(msg);
         expect(r.out.read()).toEqual(msg);
     });
 });
@@ -88,15 +88,17 @@ describe('WebSocketReader', () => {
 describe('WebSocketWriter', () => {
     it('has an in port with direction in', () => {
         const ctx = new FlowContext();
-        const w = new WebSocketWriter({ name: 'writer', context: ctx });
+        const w = new WebSocketWriter({ name: 'writer', context: ctx, send: () => {} });
         expect(w.in.direction).toBe('in');
     });
 
     it('step() calls the send function for each queued message', () => {
         const ctx = new FlowContext();
-        const w = new WebSocketWriter({ name: 'writer', context: ctx });
         const sent: Array<{ id: string; data: string | Uint8Array }> = [];
-        w._setSend((id, data) => sent.push({ id, data }));
+        const w = new WebSocketWriter({
+            name: 'writer', context: ctx,
+            send: (id, data) => sent.push({ id, data }),
+        });
 
         w.in.put({ connectionId: 'c1', data: 'foo' });
         w.in.put({ connectionId: 'c2', data: 'bar' });
@@ -110,9 +112,11 @@ describe('WebSocketWriter', () => {
 
     it('step() is a no-op when in port is empty', () => {
         const ctx = new FlowContext();
-        const w = new WebSocketWriter({ name: 'writer', context: ctx });
         let called = false;
-        w._setSend(() => { called = true; });
+        const w = new WebSocketWriter({
+            name: 'writer', context: ctx,
+            send: () => { called = true; },
+        });
         w.step();
         expect(called).toBe(false);
     });
@@ -213,5 +217,114 @@ describe('WebSocket echo integration', () => {
         const id = await waitForMessage(server.connected);
         expect(typeof id).toBe('string');
         expect(id.length).toBeGreaterThan(0);
+    });
+});
+
+
+// ── Additional coverage ───────────────────────────────────────────────────────
+
+describe('WebSocketClient.onInit() guard', () => {
+    it('throws when globalThis.WebSocket is undefined', async () => {
+        const app = new FlowApp();
+        const client = new WebSocketClient({ name: 'cli', context: app.context, url: 'ws://localhost:9999' });
+        const original = globalThis.WebSocket;
+        try {
+            // @ts-expect-error deliberately remove global WebSocket
+            globalThis.WebSocket = undefined;
+            await expect(client.init()).rejects.toThrow('platform-native WebSocket');
+        } finally {
+            globalThis.WebSocket = original;
+        }
+    });
+});
+
+describe('WebSocketReader.step()', () => {
+    it('step() is a no-op when out port is empty', () => {
+        const ctx = new FlowContext();
+        const r = new WebSocketReader({ name: 'r', context: ctx });
+        // Should not throw and not change state
+        expect(() => r.step()).not.toThrow();
+        expect(r.out.size).toBe(0);
+    });
+});
+
+describe('WebSocketServer message non-Buffer path', () => {
+    it('handles string messages from the ws library', async () => {
+        const freePort = () => new Promise<number>((resolve, reject) => {
+            import('node:net').then(({ createServer }) => {
+                const srv = createServer();
+                srv.listen(0, () => {
+                    const addr = srv.address() as { port: number };
+                    srv.close(() => resolve(addr.port));
+                });
+                srv.on('error', reject);
+            });
+        });
+
+        const port = await freePort();
+        const app = new FlowApp({ mode: 'push' });
+        const server = new WebSocketServer({ name: 'srv', context: app.context, port });
+        app.addComponent(server);
+        await app.start();
+        app.scheduler.start();
+
+        // Connect a native WebSocket client and send a string message
+        const ws = new globalThis.WebSocket(`ws://127.0.0.1:${port}`);
+        await new Promise<void>((res, rej) => {
+            ws.addEventListener('open', () => res());
+            ws.addEventListener('error', rej);
+        });
+        ws.send('hello string');
+        await new Promise(r => setTimeout(r, 100));
+
+        // The reader should have injected the message
+        const msg = server.received.read();
+        expect(msg?.data).toBe('hello string');
+
+        ws.close();
+        await app.stop();
+    });
+});
+
+
+// ── WebSocketClient: ArrayBuffer message → Uint8Array conversion ──────────────
+
+describe('WebSocketClient: binary message handling', () => {
+    it('converts ArrayBuffer message to Uint8Array on received port', async () => {
+        const freePort = () => new Promise<number>((resolve, reject) => {
+            import('node:net').then(({ createServer }) => {
+                const srv = createServer();
+                srv.listen(0, () => {
+                    const addr = srv.address() as { port: number };
+                    srv.close(() => resolve(addr.port));
+                });
+                srv.on('error', reject);
+            });
+        });
+
+        const port = await freePort();
+        const app = new FlowApp({ mode: 'push' });
+        const server = new WebSocketServer({ name: 'srv', context: app.context, port });
+        app.addComponent(server);
+        await app.start();
+        app.scheduler.start();
+
+        const client = new WebSocketClient({ name: 'cli', context: app.context, url: `ws://127.0.0.1:${port}` });
+        await client.init();
+
+        // Wait for server to register the connection
+        await new Promise(r => setTimeout(r, 50));
+        const connId = server.connected.read()!;
+
+        // Server sends binary to client
+        server.send.put({ connectionId: connId, data: new Uint8Array([10, 20, 30]) });
+        app.scheduler.tick();
+        await new Promise(r => setTimeout(r, 100));
+
+        const msg = client.received.read();
+        expect(msg).toBeInstanceOf(Uint8Array);
+
+        await client.dispose();
+        await app.stop();
     });
 });

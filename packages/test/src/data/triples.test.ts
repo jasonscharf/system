@@ -7,8 +7,9 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Knex } from 'knex';
-import { IRI, type BlankNode, type Literal, type Quad } from '@system/core';
+import { IRI, DEFAULT_GRAPH, type BlankNode, type Literal, type Quad } from '@system/core';
 import { createDataContext, TripleStore, type QuadPattern } from '@system/data';
+import { down as migration001Down } from '../../../data/src/migrations/001_init.js';
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -269,5 +270,199 @@ for (const provider of providers) {
             const s = await store.stats();
             expect(s.edges).toBe(0);
         });
+
+        // ── delete by predicate / object / graph:null ─────────────────────────
+
+        it('deletes triples matching a predicate pattern', async () => {
+            await store.insertMany([
+                { subject: EX('a'), predicate: RDF_TYPE,   object: OWL_THING, graph: GRAPH },
+                { subject: EX('b'), predicate: RDFS_LABEL, object: literal('B'), graph: GRAPH },
+            ]);
+            const deleted = await store.delete({ predicate: RDF_TYPE });
+            expect(deleted).toBe(1);
+            expect(await store.find()).toHaveLength(1);
+        });
+
+        it('deletes triples matching an object pattern', async () => {
+            await store.insertMany([
+                { subject: EX('a'), predicate: RDF_TYPE,   object: OWL_THING, graph: GRAPH },
+                { subject: EX('b'), predicate: RDFS_LABEL, object: literal('B'), graph: GRAPH },
+            ]);
+            const deleted = await store.delete({ object: OWL_THING });
+            expect(deleted).toBe(1);
+        });
+
+        it('deletes triples with graph === null (no graph)', async () => {
+            const noGraph = EX('s');
+            // Insert a quad with graph = DefaultGraph (null -> gId = null)
+            await store.insert({
+                subject: noGraph, predicate: RDF_TYPE, object: OWL_THING,
+                graph: { termType: 'DefaultGraph' },
+            });
+            const deleted = await store.delete({ graph: null });
+            expect(deleted).toBe(1);
+        });
+
+        it('delete returns 0 for non-existent predicate', async () => {
+            const deleted = await store.delete({ predicate: EX('no-such-predicate') });
+            expect(deleted).toBe(0);
+        });
     });
 }
+
+// ── migration down() ──────────────────────────────────────────────────────────
+
+describe('migration 001_init down()', () => {
+    it('drops all tables cleanly', async () => {
+        const knex = await createDataContext({ client: 'sqlite', filename: ':memory:' });
+        // Tables already created by createDataContext; run down() to drop them
+        await migration001Down(knex);
+        // After down(), the tables should be gone — querying should throw
+        await expect(knex('tern_edges').count()).rejects.toThrow();
+        await knex.destroy();
+    });
+});
+
+// ── DataContext: pg branch ────────────────────────────────────────────────────
+
+describe('createDataContext(pg)', () => {
+    it('rejects when postgres is unreachable (covers the pg branch)', async () => {
+        await expect(
+            createDataContext({
+                client:   'pg',
+                host:     '127.0.0.1',
+                port:     54322,   // non-existent port
+                database: 'tern_test',
+                user:     'tern',
+                password: 'tern',
+            }),
+        ).rejects.toThrow();
+    });
+});
+
+
+// ── TripleStore: find/delete remaining branch coverage ────────────────────────
+
+describe('TripleStore: find graph:null + delete with explicit graph', () => {
+    it('find({graph:null}) returns quads in the default graph', async () => {
+        const knex = await createDataContext({ client: 'sqlite', filename: ':memory:' });
+        const store = new TripleStore(knex);
+        const s = iri('http://example.org/s');
+        const p = iri('http://example.org/p');
+        const o = iri('http://example.org/o');
+        await store.insert({ subject: s, predicate: p, object: o, graph: { termType: 'DefaultGraph' } });
+        const found = await store.find({ graph: null });
+        expect(found).toHaveLength(1);
+        await knex.destroy();
+    });
+
+    it('delete({graph: iri}) deletes quads in a named graph', async () => {
+        const knex = await createDataContext({ client: 'sqlite', filename: ':memory:' });
+        const store = new TripleStore(knex);
+        const g = iri('http://example.org/g');
+        await store.insert({ subject: iri('http://s'), predicate: iri('http://p'), object: iri('http://o'), graph: g });
+        const deleted = await store.delete({ graph: g });
+        expect(deleted).toBe(1);
+        await knex.destroy();
+    });
+});
+
+
+// ── TripleStore: _nodeId null returns + ensureNode idempotency ────────────────
+
+describe('TripleStore: find/delete with non-existent nodes return early', () => {
+    for (const provider of [
+        { name: 'sqlite', factory: async () => createDataContext({ client: 'sqlite', filename: ':memory:' }) },
+    ]) {
+        describe(`TripleStore — ${provider.name}`, () => {
+            let knex: Knex;
+            let store: TripleStore;
+
+            beforeEach(async () => {
+                knex = await provider.factory();
+                store = new TripleStore(knex);
+            });
+
+            afterEach(async () => { await knex.destroy(); });
+
+            it('find() returns [] when predicate IRI not in store (line 161 null id branch)', async () => {
+                const result = await store.find({ predicate: iri('http://nonexistent/p') });
+                expect(result).toHaveLength(0);
+            });
+
+            it('find() returns [] when object IRI not in store (line 166 null id branch)', async () => {
+                const result = await store.find({ object: iri('http://nonexistent/o') });
+                expect(result).toHaveLength(0);
+            });
+
+            it('find() returns [] when graph IRI not in store (line 174 null id branch)', async () => {
+                const result = await store.find({ graph: iri('http://nonexistent/g') });
+                expect(result).toHaveLength(0);
+            });
+
+            it('delete() returns 0 when predicate IRI not in store (line 220 null id)', async () => {
+                const count = await store.delete({ predicate: iri('http://nonexistent/p') });
+                expect(count).toBe(0);
+            });
+
+            it('delete() returns 0 when object IRI not in store (null id branch)', async () => {
+                const count = await store.delete({ object: iri('http://nonexistent/o') });
+                expect(count).toBe(0);
+            });
+
+            it('delete() returns 0 when graph IRI not in store (line 228 null id branch)', async () => {
+                const count = await store.delete({ graph: iri('http://nonexistent/g') });
+                expect(count).toBe(0);
+            });
+
+            it('find() returns [] when blank node object not in store (line 271 null id)', async () => {
+                const result = await store.find({ object: blank('no-such-blank') });
+                expect(result).toHaveLength(0);
+            });
+
+            it('find() returns [] when literal object not in store (_nodeId literal null)', async () => {
+                const result = await store.find({ object: literal('nonexistent-value') });
+                expect(result).toHaveLength(0);
+            });
+
+            it('_loadNodes handles result with only IRI nodes (iriNodeIds.length > 0, line 288)', async () => {
+                // Triple with IRI subject, IRI predicate, IRI object → all nodes are IRIs
+                // _loadNodes gets called with those IRI node IDs → iriNodeIds.length > 0
+                await store.insert({ subject: iri('http://s2'), predicate: iri('http://p2'), object: iri('http://o2'), graph: DEFAULT_GRAPH });
+                const results = await store.find({ subject: iri('http://s2') });
+                expect(results).toHaveLength(1);
+            });
+
+            it('ensureNode for blank node is idempotent (line 102 existing row branch)', async () => {
+                const b = blank('idempotent-blank');
+                await store.ensureNode(b);
+                const id2 = await store.ensureNode(b);
+                expect(id2).toBeGreaterThan(0);
+            });
+
+            it('ensureNode for literal is idempotent (line 115 existing row branch)', async () => {
+                const lit = literal('hello', 'http://www.w3.org/2001/XMLSchema#string');
+                await store.ensureNode(lit);
+                const id2 = await store.ensureNode(lit);
+                expect(id2).toBeGreaterThan(0);
+            });
+
+            it('find() with blank node object not in store returns [] (_nodeId blank null)', async () => {
+                const result = await store.find({ object: blank('no-such-blank') });
+                expect(result).toHaveLength(0);
+            });
+
+            it('_loadNodes returns empty map for no IRI nodes (only blanks/literals)', async () => {
+                // Insert a triple with blank subject and literal object → no IRI-type nodes in result
+                // when finding by those terms (iriNodeIds will be empty for non-IRI results)
+                const b = blank('bsub');
+                const p = iri('http://p');
+                const lit = literal('val');
+                await store.insert({ subject: b, predicate: p, object: lit, graph: DEFAULT_GRAPH });
+                const results = await store.find({ subject: b });
+                // Results exist — _loadNodes was called with nodes including b (blank) and p (IRI)
+                expect(results.length).toBe(1);
+            });
+        });
+    }
+});

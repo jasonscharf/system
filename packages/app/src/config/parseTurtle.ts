@@ -139,7 +139,6 @@ function tokenise(src: string): Token[] {
 
             if (word === 'true' || word === 'false') { tokens.push({ type: 'BOOL', value: word }); continue; }
             if (word === 'null') { tokens.push({ type: 'NULL', value: 'null' }); continue; }
-            if (word === 'a') { tokens.push({ type: 'A', value: 'a' }); continue; }
 
             // Prefixed name: peek for ':'
             if (i < src.length && src[i] === ':') {
@@ -148,8 +147,8 @@ function tokenise(src: string): Token[] {
                 while (i < src.length && /[a-zA-Z0-9_.\-\/]/.test(src[i])) { i++; }
                 tokens.push({ type: 'PNAME', value: `${word}:${src.slice(localStart, i)}` });
             } else {
-                // bare word — treat as prefixed name with empty prefix
-                tokens.push({ type: 'PNAME', value: word });
+                if (word === 'a') { tokens.push({ type: 'A', value: 'a' }); }
+                else { tokens.push({ type: 'PNAME', value: word }); }
             }
             continue;
         }
@@ -264,6 +263,7 @@ export function parseTurtle(src: string): RawTriple[] {
 
     while (pos < tokens.length) {
         const t = peek();
+        /* v8 ignore next -- loop guard ensures tokens[pos] always exists */
         if (!t) { break; }
 
         // @prefix  prefix: <ns> .

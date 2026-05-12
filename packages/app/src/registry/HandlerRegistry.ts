@@ -81,12 +81,12 @@ export class HandlerRegistry implements Dispatcher {
         }
 
         for (const entry of entries) {
-            const fn = await this._load(entry);
             try {
+                const fn = await this._load(entry);
                 const result = await fn(request, ctx);
                 if (result.ok) { return result; }
             } catch (err) {
-                // Log and try the next handler
+                // Log the failure and try the next registered handler
                 console.error(`[HandlerRegistry] Handler ${entry.moduleUrl}#${entry.exportName} threw:`, err);
             }
         }

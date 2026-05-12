@@ -3,29 +3,28 @@ import { FlowPort } from '../../FlowPort.js';
 import type { WsMessage } from './WsMessage.js';
 
 
-export type WsSendFn = (connectionId: string, data: string | Uint8Array) => void;
+export interface WebSocketWriterOptions extends FlowComponentOptions {
+    send: (connectionId: string, data: string | Uint8Array) => void;
+}
 
 /**
  * Reads WsMessages from its input port and dispatches them to the appropriate
- * WebSocket connection via the send function injected by WebSocketServer.
+ * WebSocket connection via the send function provided at construction.
  */
 export class WebSocketWriter extends FlowComponent {
     readonly in: FlowPort<WsMessage>;
-    private _send?: WsSendFn;
+    private readonly _send: (connectionId: string, data: string | Uint8Array) => void;
 
-    constructor(options: FlowComponentOptions) {
+    constructor(options: WebSocketWriterOptions) {
         super(options);
+        this._send = options.send;
         this.in = this.addPort<WsMessage>('in', 'in');
-    }
-
-    _setSend(fn: WsSendFn): void {
-        this._send = fn;
     }
 
     override step(): void {
         let msg: WsMessage | undefined;
         while ((msg = this.in.read()) !== undefined) {
-            this._send?.(msg.connectionId, msg.data);
+            this._send(msg.connectionId, msg.data);
         }
     }
 }

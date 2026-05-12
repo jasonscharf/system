@@ -372,3 +372,55 @@ describe('HttpRouter', () => {
         expect(resp.contentType).toContain('application/json');
     });
 });
+
+
+// ── Additional coverage: compose + TernRouter branches ───────────────────────
+
+import { compose, type Next } from '@system/app';
+
+describe('compose: defensive branches', () => {
+    it('throws when next() is called a second time', async () => {
+        const fn = compose<object>([
+            async (_ctx, next) => {
+                await next();
+                await next(); // second call should throw
+            },
+        ]);
+        await expect(fn({}, async () => {})).rejects.toThrow('next() called multiple times');
+    });
+
+    it('is a no-op when fn resolves to undefined (if(fn) false branch)', async () => {
+        // When fns is empty and finalNext is undefined, the if(fn) guard prevents a throw
+        const fn = compose<object>([]);
+        await expect(fn({}, undefined as unknown as Next)).resolves.toBeUndefined();
+    });
+});
+
+describe('TernRouter: finalNext !ctx.result false branch', () => {
+    it('middleware sets result and calls next — finalNext sees ctx.result already set', async () => {
+        const router = new TernRouter();
+        router.use(async (ctx, next) => {
+            ctx.result = okResult(ctx.request.id, ctx.request.type, 'set by mw');
+            await next(); // reaches finalNext with result already set → !ctx.result is false
+        });
+        // No explicit handler — finalNext runs but skips the errResult assignment
+        const r = await router.dispatch(query(TERN_TYPES.ping), { connectionId: 'c' });
+        expect(r.ok).toBe(true);
+        expect(r.data).toBe('set by mw');
+    });
+});
+
+describe('TernRouter._findRoute: second mount matched (line 146 branch)', () => {
+    it('falls through first empty mount and finds handler in second mount', async () => {
+        const router = new TernRouter();
+        const empty  = new TernRouter();                        // no handlers
+        const second = new TernRouter();
+        second.handle(TERN_TYPES.echo, async ctx => {
+            ctx.result = okResult(ctx.request.id, ctx.request.type, 'from-second');
+        });
+        router.mount(empty).mount(second);
+        const r = await router.dispatch(query(TERN_TYPES.echo), { connectionId: 'c' });
+        expect(r.ok).toBe(true);
+        expect(r.data).toBe('from-second');
+    });
+});

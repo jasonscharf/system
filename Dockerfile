@@ -1,101 +1,83 @@
 #
-# This Dockerfile builds both production and development images.
+# Multi-stage Dockerfile for all Tern services.
 #
-# Notes:
-# - Development images have dev-only bind mounts and config overlaid via compose
-# - Each image currently contains all packages, as they are not shipped outside of the repo
-# - Further hardening and production prep will occur as the repo stabilizes
+# Targets:
+#   base       — deps installed + all packages compiled (shared layer)
+#   dev        — development / TypeScript watch mode
+#   test       — test runner
+#   worker     — @system/worker process
+#   server     — sandbox-server (WS :8080, HTTP :8081)
+#   web-build  — Vite production build of sandbox-web
+#   web        — nginx serving web assets + reverse proxy to server
+#
+# Build arguments:
+#   none required — VITE_* vars are NOT baked in so one image serves every env.
 #
 
-#
-# Base
-#
-FROM node:20-slim AS base
+# ── Base ──────────────────────────────────────────────────────────────────────
+FROM node:22-slim AS base
 
 WORKDIR /app
-COPY package.json yarn.lock .yarnrc.yml /app
-COPY .yarn .yarn
 
-RUN corepack enable \
-    && corepack prepare yarn@4.1.0 --activate \
-    && yarn --version \
-    && yarn install
+# Activate Yarn 4 via Corepack before any yarn commands.
+# .yarn/cache is gitignored and not needed — Corepack fetches the binary.
+RUN corepack enable && corepack prepare yarn@4.1.0 --activate
 
+# Copy manifests first so the install layer is cached unless deps change.
+COPY package.json yarn.lock .yarnrc.yml ./
+
+# Copy all workspace source (node_modules, dist/, .git excluded by .dockerignore)
+COPY packages/ packages/
+
+# Install workspace dependencies then compile every TypeScript package.
+RUN yarn install --frozen-lockfile
 RUN yarn build
 
 
-#
-# Dev / Build container
-#
+# ── Dev / Build container ─────────────────────────────────────────────────────
 FROM base AS dev
 
 ENV NODE_ENV=development
 CMD ["tsc", "-b", "-w"]
 
 
-#
-# Test
-#
+# ── Test ──────────────────────────────────────────────────────────────────────
 FROM base AS test
 
-WORKDIR /app
 ENV NODE_ENV=production
-
-COPY --from=base /app /app
-RUN yarn install
+CMD ["yarn", "test"]
 
 
-#
-# Worker
-#
+# ── Worker ────────────────────────────────────────────────────────────────────
 FROM base AS worker
 
-WORKDIR /app
 ENV NODE_ENV=production
-
-COPY --from=base /app /app
-RUN yarn
 ENTRYPOINT ["node", "packages/worker/dist/index.js"]
 
 
-#
-# Server  —  WebSocket on :8080, HTTP auth on :8081
-#
+# ── Server  —  WebSocket on :8080, HTTP auth on :8081 ────────────────────────
 FROM base AS server
 
-WORKDIR /app
 ENV NODE_ENV=production
-
-COPY --from=base /app /app
-RUN yarn
-
 EXPOSE 8080 8081
 
-# Health-check hits the HTTP health endpoint on :8081 (returns {"ok":true})
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD node -e "fetch('http://localhost:8081/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
 ENTRYPOINT ["node", "packages/sandbox-server/dist/index.js"]
 
 
+# ── Web builder  —  Vite production build ────────────────────────────────────
 #
-# Web builder  —  Vite production build
-#
-# VITE_* vars are NOT baked in; the app derives WS/auth URLs from
-# window.location at runtime so the same image works in every environment.
+# VITE_* env vars are NOT baked in: the app derives WS/auth URLs from
+# window.location at runtime so the same image works across all environments.
 #
 FROM base AS web-build
 
-WORKDIR /app
-ENV NODE_ENV=production
-
-COPY --from=base /app /app
 RUN yarn workspace @system/sandbox-web build
 
 
-#
-# Web  —  nginx static files + reverse proxy to server
-#
+# ── Web  —  nginx static files + reverse proxy ───────────────────────────────
 FROM nginx:1.27-alpine AS web
 
 COPY --from=web-build /app/packages/sandbox-web/dist /usr/share/nginx/html

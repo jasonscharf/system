@@ -1,0 +1,28 @@
+# Version control
+.git
+.gitignore
+
+# Yarn — cache and ephemeral directories are rebuilt inside Docker
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+
+# Node modules (reinstalled by yarn install inside Docker)
+node_modules
+packages/*/node_modules
+
+# Compiled output (rebuilt by yarn build inside Docker)
+packages/*/dist
+packages/*/tsconfig.tsbuildinfo
+
+# Dev / local tooling
+.env
+.env.local
+*.env.local
+docker-compose*.yml
+k8s/
+
+# Editor
+.vscode
+.idea
+*.swp

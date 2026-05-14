@@ -717,10 +717,11 @@ describe('AuthRouterComponent.sessionMiddleware()', () => {
             baseUrl:      'http://localhost:3000',
         });
 
-        const mw      = router.sessionMiddleware();
-        const fakeCtx = { req: { headers: { cookie: 'tern_session=bad-token' } }, user: undefined } as unknown as import('@system/flow').HttpCtx;
+        const mw = router.sessionMiddleware();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fakeCtx: any = { req: { headers: { cookie: 'tern_session=bad-token' } } };
         await mw(fakeCtx, async () => {});
-        expect((fakeCtx as { user: unknown }).user).toBeUndefined();
+        expect(fakeCtx.user).toBeUndefined();
 
         await knex.destroy();
     });

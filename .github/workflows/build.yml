@@ -39,18 +39,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Corepack must be enabled before setup-node so that the `cache: yarn`
+      # option resolves the cache directory with Yarn 4, not the pre-installed
+      # Yarn 1.22 that ships on the runner.
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Activate Yarn 4.1.0
+        run: corepack prepare yarn@4.1.0 --activate
+
       - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: yarn
           cache-dependency-path: yarn.lock
-
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Activate Yarn 4.1.0
-        run: corepack prepare yarn@4.1.0 --activate
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
@@ -128,18 +131,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Activate Yarn 4.1.0
+        run: corepack prepare yarn@4.1.0 --activate
+
       - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: yarn
           cache-dependency-path: yarn.lock
-
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Activate Yarn 4.1.0
-        run: corepack prepare yarn@4.1.0 --activate
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile

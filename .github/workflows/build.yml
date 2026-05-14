@@ -118,8 +118,6 @@ jobs:
   # ── 3. Publish npm packages to GitHub Packages ────────────────────────────────
   publish:
     needs: build-and-test
-  publish:
-    needs: build-and-test
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
     runs-on: ubuntu-latest
     permissions:

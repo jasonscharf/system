@@ -73,8 +73,8 @@ async function main(): Promise<void> {
     const redisUrl = await secrets.getWithDefault('REDIS_URL', process.env['REDIS_URL'] ?? '');
     let sessionStore: MemorySessionStore | RedisSessionStore;
     if (redisUrl) {
-        const { default: Redis } = await import('ioredis');
-        sessionStore = new RedisSessionStore(new Redis(redisUrl));
+        const { Redis: RedisClient } = await import('ioredis');
+        sessionStore = new RedisSessionStore(new RedisClient(redisUrl));
         console.log(`[sandbox-server] Session store: Redis (${redisUrl})`);
     } else {
         sessionStore = new MemorySessionStore();

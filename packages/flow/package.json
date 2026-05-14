@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": {
+      "browser": "./dist/browser.js",
       "source": "./src/index.ts",
       "default": "./dist/index.js",
       "types": "./dist/index.d.ts",

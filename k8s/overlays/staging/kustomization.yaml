@@ -1,0 +1,58 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: tern-staging
+
+bases:
+  - ../../base
+
+# ── Extra resources only in staging/prod ─────────────────────────────────────
+resources:
+  - service-account.yaml
+  - postgres/statefulset.yaml
+  - postgres/service.yaml
+  - redis-pvc.yaml
+  - ingress.yaml
+
+# ── Server config: point at PostgreSQL + Redis + vault ───────────────────────
+configMapGenerator:
+  - name: server-config
+    behavior: replace
+    literals:
+      - TERN_DB_CLIENT=pg
+      - TERN_PG_HOST=postgres
+      - TERN_PG_PORT=5432
+      - TERN_PG_DATABASE=tern
+      - TERN_PG_USER=tern
+      - REDIS_URL=redis://redis:6379
+      - AUTH_BASE_URL=https://staging.example.com
+      # SecretsManager reads this and switches to AzureKeyVaultProvider.
+      # All OAuth + DB + Redis secrets are pulled from the vault at runtime.
+      - AZURE_KEY_VAULT_URI=https://tern-staging.vault.azure.net/
+
+# ── ONLY the vault URI is stored as a k8s Secret in staging/prod ─────────────
+# All other secrets (OAuth keys, DB password) live in Azure Key Vault.
+secretGenerator:
+  - name: server-secrets
+    behavior: replace
+    literals:
+      # No secret values here — the vault handles them.
+      # Keeping the Secret non-empty so the envFrom reference in the base
+      # Deployment continues to work without patching it out.
+      - _PLACEHOLDER=unused
+
+patches:
+  # Boost resources for staging
+  - path: server-resources.yaml
+  # Persist Redis data
+  - path: redis-pvc-patch.yaml
+  # Enable Azure Workload Identity on server pods
+  - path: server-workload-identity.yaml
+
+images:
+  - name: tern/server
+    newName: ghcr.io/jasonlscharf/system-server
+    newTag: latest
+  - name: tern/web
+    newName: ghcr.io/jasonlscharf/system-web
+    newTag: latest

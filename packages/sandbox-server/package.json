@@ -15,7 +15,9 @@
     "@system/core": "workspace:^",
     "@system/data": "workspace:^",
     "@system/flow": "workspace:^",
+    "@system/secrets": "workspace:^",
     "better-sqlite3": "^11.10.0",
-    "ioredis": "^5.6.1"
+    "ioredis": "^5.6.1",
+    "pg": "^8.16.0"
   }
 }

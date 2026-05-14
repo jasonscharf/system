@@ -1,0 +1,36 @@
+# Requires cert-manager and an Ingress controller (nginx-ingress or similar).
+# Install cert-manager: https://cert-manager.io/docs/installation/
+# Install nginx-ingress: helm install ingress-nginx ingress-nginx/ingress-nginx
+#
+# Set AZURE_KEY_VAULT_URI in the configMapGenerator, and configure:
+#   - DNS: staging.example.com → Ingress LoadBalancer IP
+#   - cert-manager ClusterIssuer (Let's Encrypt)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tern
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+    nginx.ingress.kubernetes.io/proxy-read-timeout:   "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout:   "3600"
+    # WebSocket upgrade support
+    nginx.ingress.kubernetes.io/proxy-http-version:   "1.1"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [staging.example.com]
+      secretName: tern-staging-tls
+  rules:
+    - host: staging.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  name: http

@@ -1,0 +1,52 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: tern-prod
+
+bases:
+  - ../../base
+
+resources:
+  - service-account.yaml
+  - postgres/statefulset.yaml
+  - postgres/service.yaml
+  - redis-pvc.yaml
+  - ingress.yaml
+  - hpa-server.yaml
+  - hpa-web.yaml
+  - pdb.yaml
+
+configMapGenerator:
+  - name: server-config
+    behavior: replace
+    literals:
+      - TERN_DB_CLIENT=pg
+      - TERN_PG_HOST=postgres
+      - TERN_PG_PORT=5432
+      - TERN_PG_DATABASE=tern
+      - TERN_PG_USER=tern
+      - REDIS_URL=redis://redis:6379
+      - AUTH_BASE_URL=https://example.com
+      - AZURE_KEY_VAULT_URI=https://tern-prod.vault.azure.net/
+
+secretGenerator:
+  - name: server-secrets
+    behavior: replace
+    literals:
+      - _PLACEHOLDER=unused
+
+patches:
+  - path: server-resources.yaml
+  - path: server-replicas.yaml
+  - path: web-replicas.yaml
+  - path: redis-pvc-patch.yaml
+  - path: server-workload-identity.yaml
+  - path: redis-persistence.yaml     # enable AOF in prod
+
+images:
+  - name: tern/server
+    newName: ghcr.io/jasonlscharf/system-server
+    newTag: latest
+  - name: tern/web
+    newName: ghcr.io/jasonlscharf/system-web
+    newTag: latest

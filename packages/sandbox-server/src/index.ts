@@ -2,15 +2,13 @@
  * Sandbox server — a minimal Tern application loaded from config.
  *
  * Boot sequence:
- *   1. Open the SQLite triple store (seeded with well-known namespaces).
- *   2. Load app config from  config/app.yaml, which references:
- *        config/extensions/core.yaml   — ping handler (YAML format)
- *        config/extensions/data.ttl    — triple-store handlers (Turtle/RDF)
- *   3. TernApp merges extension configs, builds the HandlerRegistry.
- *   4. Two FBP pipelines are wired:
+ *   1. Init SecretsManager (Azure Key Vault in staging/prod; env vars locally).
+ *   2. Open the triple store (SQLite locally; PostgreSQL in staging/prod).
+ *   3. Load app config from config/app.yaml → HandlerRegistry.
+ *   4. Wire two FBP pipelines:
  *        WS pipeline:   WS → decode → route → encode → WS
  *        HTTP pipeline: HTTP → decode → AuthRouter → encode → HTTP
- *   5. Session management works across both WS and HTTP transports.
+ *   5. Session management shared across WS and HTTP.
  */
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
@@ -23,57 +21,93 @@ import {
     GoogleProvider,
     GitHubProvider,
     MemorySessionStore,
+    RedisSessionStore,
     UserRepository,
     UserIdentityRepository,
     UserSessionRepository,
     UserDeviceRepository,
 } from '@system/auth';
+import { SecretsManager } from '@system/secrets';
 import { MessageDecoder } from './components/MessageDecoder.js';
 import { MessageEncoder } from './components/MessageEncoder.js';
 import { MessageRouter } from './components/MessageRouter.js';
 
 
-const WS_PORT   = Number(process.env['PORT']         ?? 8080);
-const HTTP_PORT = Number(process.env['AUTH_PORT']     ?? 8081);
-const DB_PATH   = process.env['TERN_DB_PATH']         ?? ':memory:';
-const BASE_URL  = process.env['AUTH_BASE_URL']        ?? `http://localhost:${HTTP_PORT}`;
+const WS_PORT   = Number(process.env['PORT']     ?? 8080);
+const HTTP_PORT = Number(process.env['AUTH_PORT'] ?? 8081);
+const BASE_URL  = process.env['AUTH_BASE_URL']   ?? `http://localhost:${HTTP_PORT}`;
 const CONFIG    = resolve(fileURLToPath(new URL('../config/app.yaml', import.meta.url)));
 
 async function main(): Promise<void> {
-    // ── Data layer ────────────────────────────────────────────────────────────
-    const knex  = await createDataContext({ client: 'sqlite', filename: DB_PATH });
-    const store = new TripleStore(knex);
+    // ── Secrets ───────────────────────────────────────────────────────────────
+    // Azure Key Vault when AZURE_KEY_VAULT_URI is set; process.env otherwise.
+    const secrets = SecretsManager.fromEnvironment();
 
+    // ── Data layer ────────────────────────────────────────────────────────────
+    const dbClient = (await secrets.getWithDefault('TERN_DB_CLIENT', process.env['TERN_DB_CLIENT'] ?? 'sqlite')) as 'sqlite' | 'pg';
+
+    let knex: Awaited<ReturnType<typeof createDataContext>>;
+    if (dbClient === 'pg') {
+        knex = await createDataContext({
+            client:   'pg',
+            host:     await secrets.getWithDefault('TERN_PG_HOST',     process.env['TERN_PG_HOST']     ?? 'localhost'),
+            port:     Number(await secrets.getWithDefault('TERN_PG_PORT', process.env['TERN_PG_PORT'] ?? '5432')),
+            database: await secrets.getWithDefault('TERN_PG_DATABASE', process.env['TERN_PG_DATABASE'] ?? 'tern'),
+            user:     await secrets.getWithDefault('TERN_PG_USER',     process.env['TERN_PG_USER']     ?? 'tern'),
+            password: await secrets.getRequired('TERN_PG_PASSWORD'),
+        });
+        console.log('[sandbox-server] DB: PostgreSQL');
+    } else {
+        const dbPath = await secrets.getWithDefault('TERN_DB_PATH', process.env['TERN_DB_PATH'] ?? ':memory:');
+        knex = await createDataContext({ client: 'sqlite', filename: dbPath });
+        console.log(`[sandbox-server] DB: SQLite (${dbPath})`);
+    }
+
+    const store = new TripleStore(knex);
     await store.ensureNamespace('tern', 'http://tern.dev/ns/');
     await store.ensureNamespace('rdf',  'http://www.w3.org/1999/02/22-rdf-syntax-ns#');
     await store.ensureNamespace('rdfs', 'http://www.w3.org/2000/01/rdf-schema#');
     await store.ensureNamespace('auth', 'http://tern.dev/ns/auth/');
 
-    // ── Auth repositories (share the same triple store) ───────────────────────
+    // ── Session store ─────────────────────────────────────────────────────────
+    const redisUrl = await secrets.getWithDefault('REDIS_URL', process.env['REDIS_URL'] ?? '');
+    let sessionStore: MemorySessionStore | RedisSessionStore;
+    if (redisUrl) {
+        const { default: Redis } = await import('ioredis');
+        sessionStore = new RedisSessionStore(new Redis(redisUrl));
+        console.log(`[sandbox-server] Session store: Redis (${redisUrl})`);
+    } else {
+        sessionStore = new MemorySessionStore();
+        console.log('[sandbox-server] Session store: in-memory (dev only)');
+    }
+
+    // ── Auth repositories ─────────────────────────────────────────────────────
     const users      = new UserRepository(store);
     const identities = new UserIdentityRepository(store);
     const sessions   = new UserSessionRepository(store);
     const devices    = new UserDeviceRepository(store);
 
-    // ── Session store: MemorySessionStore for dev; swap for RedisSessionStore in prod ──
-    const sessionStore = new MemorySessionStore();
+    // ── OAuth provider credentials (from vault or env) ────────────────────────
+    const googleClientId     = await secrets.getWithDefault('GOOGLE_CLIENT_ID',     'placeholder_google_client_id');
+    const googleClientSecret = await secrets.getWithDefault('GOOGLE_CLIENT_SECRET', 'placeholder_google_client_secret');
+    const githubClientId     = await secrets.getWithDefault('GITHUB_CLIENT_ID',     'placeholder_github_client_id');
+    const githubClientSecret = await secrets.getWithDefault('GITHUB_CLIENT_SECRET', 'placeholder_github_client_secret');
 
     // ── Application config ────────────────────────────────────────────────────
     const ternApp = await TernApp.fromYAML(CONFIG, { context: { store } });
+    console.log(`[sandbox-server] Loaded: ${ternApp.config.name} v${ternApp.config.version ?? '?'}`);
+    console.log(`[sandbox-server] Handlers: ${ternApp.registry.registeredTypes.join(', ')}`);
 
-    console.log(`[sandbox-server] Loaded config: ${ternApp.config.name} v${ternApp.config.version ?? '?'}`);
-    console.log(`[sandbox-server] Registered types: ${ternApp.registry.registeredTypes.join(', ')}`);
-
-    // ── Shared FBP context ────────────────────────────────────────────────────
+    // ── Shared FBP app ────────────────────────────────────────────────────────
     const flowApp = new FlowApp({ mode: 'push' });
 
     // ── Auth router ───────────────────────────────────────────────────────────
     const authRouter = new AuthRouterComponent({
         name:         'auth',
         context:      flowApp.context,
-        providers:    [
-            new GoogleProvider(),
-            new GitHubProvider(),
+        providers: [
+            new GoogleProvider(googleClientId, googleClientSecret),
+            new GitHubProvider(githubClientId, githubClientSecret),
         ],
         sessionStore,
         users,
@@ -81,19 +115,16 @@ async function main(): Promise<void> {
         sessions,
         devices,
         baseUrl:      BASE_URL,
-        loginSuccess: `http://localhost:${HTTP_PORT}/`,
-        loginFailure: `http://localhost:${HTTP_PORT}/auth/error`,
+        loginSuccess: '/',
+        loginFailure: '/auth/error',
     });
 
-    // ── HTTP pipeline (auth + CORS) ───────────────────────────────────────────
+    // ── HTTP pipeline ─────────────────────────────────────────────────────────
     const httpServer  = new HttpServer({ name: 'http',    context: flowApp.context, port: HTTP_PORT });
     const httpDecoder = new HttpDecoder({ name: 'httpDec', context: flowApp.context });
     const httpEncoder = new HttpEncoder({ name: 'httpEnc', context: flowApp.context });
+    const topRouter   = new HttpRouter({ name: 'top',     context: flowApp.context });
 
-    // Top-level HTTP router that mounts auth and serves a simple health check
-    const topRouter = new HttpRouter({ name: 'top', context: flowApp.context });
-
-    // CORS preflight
     topRouter.use(async (ctx, next) => {
         ctx.headers['access-control-allow-origin']  = '*';
         ctx.headers['access-control-allow-headers'] = 'Authorization, Content-Type';
@@ -102,12 +133,10 @@ async function main(): Promise<void> {
         await next();
     });
 
-    // Health check
     topRouter.get('/', async ctx => {
         ctx.body = { ok: true, server: 'tern-sandbox', wsPort: WS_PORT };
     });
 
-    // Mount auth router's HttpRouter so auth routes are handled by the pipeline
     topRouter.mount('/auth', authRouter.httpRouter);
 
     flowApp
@@ -116,7 +145,7 @@ async function main(): Promise<void> {
         .addComponent(topRouter)
         .addComponent(httpEncoder)
         .addComponent(authRouter)
-        .connect(httpServer.requests,   httpDecoder.requestIn)
+        .connect(httpServer.requests,    httpDecoder.requestIn)
         .connect(httpDecoder.requestOut, topRouter.requests)
         .connect(topRouter.responses,    httpEncoder.responseIn)
         .connect(httpEncoder.responseOut, httpServer.responses);
@@ -145,14 +174,13 @@ async function main(): Promise<void> {
     await flowApp.start();
     flowApp.scheduler.start();
 
-    console.log(`[sandbox-server] WS listening on  ws://127.0.0.1:${WS_PORT}`);
-    console.log(`[sandbox-server] HTTP listening on http://127.0.0.1:${HTTP_PORT}`);
-    console.log(`[sandbox-server] Auth base URL: ${BASE_URL}`);
-    console.log(`[sandbox-server] DB: ${DB_PATH}`);
+    console.log(`[sandbox-server] WS   → ws://0.0.0.0:${WS_PORT}`);
+    console.log(`[sandbox-server] HTTP → http://0.0.0.0:${HTTP_PORT}`);
 
     process.once('SIGINT', async () => {
         console.log('\n[sandbox-server] Shutting down…');
         await flowApp.stop();
+        await secrets.close();
         await knex.destroy();
         process.exit(0);
     });

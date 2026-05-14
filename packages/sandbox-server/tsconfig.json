@@ -10,7 +10,8 @@
     { "path": "../auth" },
     { "path": "../core" },
     { "path": "../data" },
-    { "path": "../flow" }
+    { "path": "../flow" },
+    { "path": "../secrets" }
   ],
   "include": ["src"]
 }

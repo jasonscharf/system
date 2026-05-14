@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server
+  labels:
+    app: server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: server
+  template:
+    metadata:
+      labels:
+        app: server
+        # Azure Workload Identity — overridden per overlay
+        azure.workload.identity/use: "false"
+    spec:
+      serviceAccountName: tern-server
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: server
+          image: tern/server:latest  # replaced by overlay imageTagPolicy
+          imagePullPolicy: Always
+          ports:
+            - name: ws
+              containerPort: 8080
+              protocol: TCP
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "8080"
+            - name: AUTH_PORT
+              value: "8081"
+            - name: NODE_ENV
+              value: production
+          envFrom:
+            - configMapRef:
+                name: server-config
+            # Secret referenced here only in local overlay; staging/prod get
+            # their secrets from Azure Key Vault at runtime (AZURE_KEY_VAULT_URI
+            # is the only value in the staging/prod secret).
+            - secretRef:
+                name: server-secrets
+          resources:
+            requests:
+              cpu:    100m
+              memory: 128Mi
+            limits:
+              cpu:    500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1001
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      securityContext:
+        fsGroup: 1001

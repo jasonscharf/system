@@ -1,0 +1,16 @@
+# Enable Redis AOF persistence in prod for durability.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+spec:
+  template:
+    spec:
+      containers:
+        - name: redis
+          args:
+            - redis-server
+            - --appendonly yes
+            - --appendfsync everysec
+            - --maxmemory 256mb
+            - --maxmemory-policy allkeys-lru

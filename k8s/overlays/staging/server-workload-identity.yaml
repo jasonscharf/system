@@ -1,0 +1,12 @@
+# Patch: enable Azure Workload Identity token injection on the server pod.
+# The webhook reads the pod label and mounts a projected service-account token
+# that DefaultAzureCredential picks up automatically.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server
+spec:
+  template:
+    metadata:
+      labels:
+        azure.workload.identity/use: "true"

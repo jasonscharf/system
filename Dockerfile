@@ -56,3 +56,52 @@ ENV NODE_ENV=production
 COPY --from=base /app /app
 RUN yarn
 ENTRYPOINT ["node", "packages/worker/dist/index.js"]
+
+
+#
+# Server  —  WebSocket on :8080, HTTP auth on :8081
+#
+FROM base AS server
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=base /app /app
+RUN yarn
+
+EXPOSE 8080 8081
+
+# Health-check hits the HTTP health endpoint on :8081 (returns {"ok":true})
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD node -e "fetch('http://localhost:8081/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+
+ENTRYPOINT ["node", "packages/sandbox-server/dist/index.js"]
+
+
+#
+# Web builder  —  Vite production build
+#
+# VITE_* vars are NOT baked in; the app derives WS/auth URLs from
+# window.location at runtime so the same image works in every environment.
+#
+FROM base AS web-build
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=base /app /app
+RUN yarn workspace @system/sandbox-web build
+
+
+#
+# Web  —  nginx static files + reverse proxy to server
+#
+FROM nginx:1.27-alpine AS web
+
+COPY --from=web-build /app/packages/sandbox-web/dist /usr/share/nginx/html
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget -qO- http://localhost/healthz || exit 1

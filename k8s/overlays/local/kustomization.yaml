@@ -1,0 +1,51 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: tern-local
+
+bases:
+  - ../../base
+
+# ── ServiceAccount ────────────────────────────────────────────────────────────
+resources:
+  - service-account.yaml
+
+# ── Per-env config ────────────────────────────────────────────────────────────
+# Generates the server-config ConfigMap and server-secrets Secret from inline
+# literals.  Secrets here are placeholder values safe to commit — real OAuth
+# credentials are not needed for local k8s development.
+configMapGenerator:
+  - name: server-config
+    behavior: replace
+    literals:
+      - TERN_DB_CLIENT=sqlite
+      - TERN_DB_PATH=/data/tern.db
+      - REDIS_URL=redis://redis:6379
+      - AUTH_BASE_URL=http://localhost:8081
+
+secretGenerator:
+  - name: server-secrets
+    behavior: replace
+    literals:
+      - GOOGLE_CLIENT_ID=placeholder_google_client_id
+      - GOOGLE_CLIENT_SECRET=placeholder_google_client_secret
+      - GITHUB_CLIENT_ID=placeholder_github_client_id
+      - GITHUB_CLIENT_SECRET=placeholder_github_client_secret
+
+# ── Patches ───────────────────────────────────────────────────────────────────
+patches:
+  # Expose the web app as a NodePort for easy local access (minikube / kind)
+  - path: web-nodeport.yaml
+
+  # Mount a volume for SQLite persistence (optional — use :memory: to skip)
+  - path: server-sqlite-volume.yaml
+
+# ── Images ───────────────────────────────────────────────────────────────────
+# Point to locally built images.  Run: docker build --target server -t tern/server:local .
+images:
+  - name: tern/server
+    newName: tern/server
+    newTag: local
+  - name: tern/web
+    newName: tern/web
+    newTag: local

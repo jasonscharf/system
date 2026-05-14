@@ -1,7 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 
 
-const AUTH_BASE = import.meta.env['VITE_AUTH_URL'] ?? 'http://localhost:8081';
+// In k8s, nginx proxies /auth/* → server:8081, so AUTH_BASE is an empty string
+// (relative URL). For local dev outside k8s, set VITE_AUTH_URL=http://localhost:8081
+// in packages/sandbox-web/.env.local.
+const AUTH_BASE = import.meta.env['VITE_AUTH_URL'] ?? '';
 
 export interface UserInfo {
     id:          string;

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { ShowcaseSnapshot, ShowcaseState } from '../ClientApp.js';
+import { SignInPanel } from './SignIn.js';
 
 
 // ── React hook ────────────────────────────────────────────────────────────────
@@ -39,7 +40,10 @@ export function ComponentShowcaseView({ model }: Props): React.ReactElement {
     return (
         <div className="showcase">
             <header className="showcase__header">
-                <h1 className="showcase__title">Tern Component Showcase</h1>
+                <div className="showcase__header-top">
+                    <h1 className="showcase__title">Tern Component Showcase</h1>
+                    <SignInPanel />
+                </div>
                 <p className="showcase__subtitle">
                     A React component that is also a Flow-based programming node.
                     Handler endpoints are registered via YAML and Turtle config files.

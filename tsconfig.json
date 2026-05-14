@@ -5,6 +5,9 @@
       "path": "packages/api"
     },
     {
+      "path": "packages/auth"
+    },
+    {
       "path": "packages/gen"
     },
     {

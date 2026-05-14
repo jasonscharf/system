@@ -6,11 +6,11 @@
     "outDir": "dist"
   },
   "references": [
-    { "path": "../app" },
-    { "path": "../auth" },
     { "path": "../core" },
     { "path": "../data" },
     { "path": "../flow" }
   ],
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }

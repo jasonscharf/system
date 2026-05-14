@@ -223,15 +223,20 @@ describe('WebSocket echo integration', () => {
 
 // ── Additional coverage ───────────────────────────────────────────────────────
 
-describe('WebSocketClient.onInit() guard', () => {
-    it('throws when globalThis.WebSocket is undefined', async () => {
-        const app = new FlowApp();
-        const client = new WebSocketClient({ name: 'cli', context: app.context, url: 'ws://localhost:9999' });
+describe('WebSocketClient.onInit() fallback', () => {
+    it('falls back to the ws package when globalThis.WebSocket is absent', async () => {
+        // WebSocketClient now uses `ws` as a fallback instead of throwing,
+        // so it should attempt a connection (and fail with a network error)
+        // rather than a "no WebSocket found" error.
+        const app    = new FlowApp();
+        const client = new WebSocketClient({ name: 'cli', context: app.context, url: 'ws://127.0.0.1:19999' });
         const original = globalThis.WebSocket;
         try {
             // @ts-expect-error deliberately remove global WebSocket
             globalThis.WebSocket = undefined;
-            await expect(client.init()).rejects.toThrow('platform-native WebSocket');
+            // Should reject with a connection error (port not listening),
+            // not the old "platform-native WebSocket" guard error.
+            await expect(client.init()).rejects.not.toThrow('platform-native WebSocket');
         } finally {
             globalThis.WebSocket = original;
         }

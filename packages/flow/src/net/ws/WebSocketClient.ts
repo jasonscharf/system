@@ -6,10 +6,25 @@ export interface WebSocketClientOptions extends FlowComponentOptions {
     url: string;
 }
 
+// Minimal interface satisfied by both globalThis.WebSocket (browsers, Node ≥ 22)
+// and ws.WebSocket (Node < 22 fallback).  Avoids importing ws types at the top
+// level so the module stays environment-agnostic.
+interface WsLike {
+    binaryType: string;
+    send(data: string | Uint8Array): void;
+    close(): void;
+    addEventListener(type: 'open',    listener: () => void): void;
+    addEventListener(type: 'message', listener: (e: { data: unknown }) => void): void;
+    addEventListener(type: 'error',   listener: (e: unknown) => void): void;
+    addEventListener(type: 'close',   listener: () => void): void;
+}
+
 /**
- * A Flow component that wraps a WebSocket client connection using the
- * platform-native WebSocket API (globalThis.WebSocket — Node.js ≥ 22,
- * all modern browsers). No third-party dependencies.
+ * A Flow component that wraps a WebSocket client connection.
+ *
+ * Uses the platform-native WebSocket when available (browsers, Node ≥ 22).
+ * Falls back to the bundled `ws` package on older Node environments so this
+ * component works on any supported Node version without configuration.
  *
  * Ports:
  *   send        (in)   — data to transmit to the server
@@ -18,34 +33,33 @@ export interface WebSocketClientOptions extends FlowComponentOptions {
  *   disconnected(out)  — fires (void) when the connection closes
  */
 export class WebSocketClient extends FlowComponent {
-    readonly send: FlowPort<string | Uint8Array>;
-    readonly received: FlowPort<string | Uint8Array>;
-    readonly connected: FlowPort<void>;
+    readonly send:         FlowPort<string | Uint8Array>;
+    readonly received:     FlowPort<string | Uint8Array>;
+    readonly connected:    FlowPort<void>;
     readonly disconnected: FlowPort<void>;
 
     private readonly _url: string;
-    private _ws?: WebSocket;
+    private _ws?: WsLike;
 
     constructor(options: WebSocketClientOptions) {
         super(options);
-        this._url = options.url;
-        this.send = this.addPort<string | Uint8Array>('send', 'in');
-        this.received = this.addPort<string | Uint8Array>('received', 'out');
-        this.connected = this.addPort<void>('connected', 'out');
+        this._url         = options.url;
+        this.send         = this.addPort<string | Uint8Array>('send',         'in');
+        this.received     = this.addPort<string | Uint8Array>('received',     'out');
+        this.connected    = this.addPort<void>('connected',    'out');
         this.disconnected = this.addPort<void>('disconnected', 'out');
     }
 
     protected override async onInit(): Promise<void> {
-        if (typeof globalThis.WebSocket === 'undefined') {
-            throw new Error(
-                'WebSocketClient requires a platform-native WebSocket (Node.js ≥ 22, ' +
-                'modern browsers). No globalThis.WebSocket found.',
-            );
-        }
+        // Prefer the platform-native WebSocket; fall back to the bundled `ws`
+        // package so this component works on Node.js < 22 and in test environments.
+        const WsCtor: new (url: string) => WsLike =
+            typeof globalThis.WebSocket !== 'undefined'
+                ? (globalThis.WebSocket as unknown as new (url: string) => WsLike)
+                : await import('ws').then(m => m.WebSocket as unknown as new (url: string) => WsLike);
 
-        const ws = new globalThis.WebSocket(this._url);
-        // Request binary frames as ArrayBuffer so the handler branch is consistent
-        // across browsers and Node.js (default in Node.js 22+ is 'blob').
+        const ws = new WsCtor(this._url);
+        // Request ArrayBuffer binary frames for consistent cross-environment handling.
         ws.binaryType = 'arraybuffer';
         this._ws = ws;
 

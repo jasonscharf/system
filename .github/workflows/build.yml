@@ -157,60 +157,76 @@ jobs:
         # TypeScript project references enforce correct dependency order.
         run: yarn build
 
+      - name: Scope packages to repository owner
+        # GitHub Packages for npm requires the package scope to match the
+        # repository owner.  Patch every publishable package.json in-place:
+        #   @system/core → @{owner}/core
+        # Also updates cross-package dependency keys so Yarn's workspace:^
+        # expansion produces the correct scoped names in published manifests.
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          for pkg in api auth core data flow gen; do
+            tmp=$(mktemp)
+            # Replace all "@system/ occurrences in JSON string values (they
+            # are always double-quoted in valid JSON, so this is safe).
+            sed "s|\"@system/|\"@${OWNER}/|g" "packages/${pkg}/package.json" > "$tmp"
+            mv "$tmp" "packages/${pkg}/package.json"
+          done
+
       - name: Publish packages
+        # Publishes in dependency order so consumers never see a package whose
+        # deps are not yet in the registry.
         # Yarn converts workspace:^ → ^<version> automatically when packing.
-        # Publishing in dependency order ensures no consumer ever sees a package
-        # whose dependencies are not yet in the registry.
-        # Already-published versions are skipped so re-runs and PR merges are safe.
+        # A 409 or "already published" response is treated as success so
+        # re-runs are safe.  All other non-zero exits (including 403 scope
+        # errors) surface as real failures.
         run: |
           set -euo pipefail
+          OWNER="${{ github.repository_owner }}"
           fail=0
 
           publish_pkg() {
             local pkg="$1"
             echo ""
             echo "──────────────────────────────────────────"
-            echo "  Publishing @system/$pkg …"
+            echo "  Publishing @${OWNER}/${pkg} …"
             echo "──────────────────────────────────────────"
 
             local out
             out=$(cd "packages/$pkg" && yarn npm publish --access public 2>&1) && {
               echo "$out"
-              echo "  ✓ @system/$pkg published"
+              echo "  ✓ @${OWNER}/${pkg} published"
               return 0
             }
 
-            # Treat "already exists" as a non-error (idempotent re-runs)
-            if echo "$out" | grep -qiE "already exists|already been published|E409|403"; then
+            # 409 / "already published" → idempotent skip (not an error).
+            # 403 is intentionally NOT in this list — a scope/permission
+            # mismatch must surface as a real failure.
+            if echo "$out" | grep -qiE "already exists|already been published|E409"; then
               echo "$out"
               echo "  ↳ version already in registry — skipping"
               return 0
             fi
 
             echo "$out"
-            echo "  ✗ @system/$pkg failed"
+            echo "  ✗ @${OWNER}/${pkg} failed"
             fail=1
           }
 
-          # Layer 0: no @system deps
+          # Layer 0 — no @{owner} deps
           publish_pkg core
-          publish_pkg worker
 
-          # Layer 1: depend only on @system/core
+          # Layer 1 — depend only on @{owner}/core
           publish_pkg data
           publish_pkg flow
           publish_pkg gen
           publish_pkg api
 
-          # Layer 2: depends on core + data + flow
+          # Layer 2 — depends on core + data + flow
           publish_pkg auth
-
-          # Standalone (no @system deps)
-          publish_pkg secrets
 
           exit $fail
         env:
-          # .yarnrc.yml reads ${YARN_NPM_AUTH_TOKEN} for GitHub Packages auth
           YARN_NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ── 3. Prune stale pre-release versions ──────────────────────────────────────
@@ -224,10 +240,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [api, auth, core, data, flow, gen, secrets, worker]
+        package: [api, auth, core, data, flow, gen]
 
     steps:
-      - name: Prune old pre-release versions of @system/${{ matrix.package }}
+      - name: Prune old pre-release versions of @${{ github.repository_owner }}/${{ matrix.package }}
         # continue-on-error: package may not exist yet on first publish
         continue-on-error: true
         uses: actions/delete-package-versions@v5

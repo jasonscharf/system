@@ -25,6 +25,7 @@
   "dependencies": {
     "@system/api": "workspace:^",
     "@system/app": "workspace:^",
+    "@system/auth": "workspace:^",
     "@system/core": "workspace:^",
     "@system/data": "workspace:^",
     "@system/flow": "workspace:^",

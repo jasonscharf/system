@@ -1,3 +1,4 @@
+export * from './auth/index.js';
 export * from './hydration/index.js';
 export * from './messages/TernMessage.js';
 export * from './rdf/index.js';

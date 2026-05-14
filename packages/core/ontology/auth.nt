@@ -1,0 +1,142 @@
+# Tern Auth Ontology — OWL/RDF in N-Triples format
+# Namespace: http://tern.dev/ns/auth/
+
+# ── Classes ────────────────────────────────────────────────────────────────────
+
+<http://tern.dev/ns/auth/User> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://tern.dev/ns/auth/User> <http://www.w3.org/2000/01/rdf-schema#comment> "A Tern platform user." .
+
+<http://tern.dev/ns/auth/UserIdentity> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://tern.dev/ns/auth/UserIdentity> <http://www.w3.org/2000/01/rdf-schema#comment> "An OAuth identity linked to a user." .
+
+<http://tern.dev/ns/auth/UserSession> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://tern.dev/ns/auth/UserSession> <http://www.w3.org/2000/01/rdf-schema#comment> "An active session for a user on a device." .
+
+<http://tern.dev/ns/auth/UserDevice> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://tern.dev/ns/auth/UserDevice> <http://www.w3.org/2000/01/rdf-schema#comment> "A device from which a user authenticates." .
+
+# ── Data Properties — User ────────────────────────────────────────────────────
+
+<http://tern.dev/ns/auth/email> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/email> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/User> .
+<http://tern.dev/ns/auth/email> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://tern.dev/ns/auth/email> <http://www.w3.org/2000/01/rdf-schema#comment> "Primary email address." .
+
+<http://tern.dev/ns/auth/displayName> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/displayName> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/User> .
+<http://tern.dev/ns/auth/displayName> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://tern.dev/ns/auth/displayName> <http://www.w3.org/2000/01/rdf-schema#comment> "Human-readable display name." .
+
+<http://tern.dev/ns/auth/avatarUrl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/avatarUrl> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/User> .
+<http://tern.dev/ns/auth/avatarUrl> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#anyURI> .
+<http://tern.dev/ns/auth/avatarUrl> <http://www.w3.org/2000/01/rdf-schema#comment> "URL of the user's avatar image." .
+
+# ── Data Properties — UserIdentity ────────────────────────────────────────────
+
+<http://tern.dev/ns/auth/provider> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/provider> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserIdentity> .
+<http://tern.dev/ns/auth/provider> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://tern.dev/ns/auth/provider> <http://www.w3.org/2000/01/rdf-schema#comment> "OAuth provider identifier (e.g. 'google', 'github')." .
+
+<http://tern.dev/ns/auth/providerUserId> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/providerUserId> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserIdentity> .
+<http://tern.dev/ns/auth/providerUserId> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://tern.dev/ns/auth/providerUserId> <http://www.w3.org/2000/01/rdf-schema#comment> "The user's ID as issued by the OAuth provider." .
+
+<http://tern.dev/ns/auth/providerEmail> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/providerEmail> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserIdentity> .
+<http://tern.dev/ns/auth/providerEmail> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://tern.dev/ns/auth/providerEmail> <http://www.w3.org/2000/01/rdf-schema#comment> "Email returned by the OAuth provider." .
+
+<http://tern.dev/ns/auth/accessToken> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/accessToken> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserIdentity> .
+<http://tern.dev/ns/auth/accessToken> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://tern.dev/ns/auth/accessToken> <http://www.w3.org/2000/01/rdf-schema#comment> "Current OAuth access token." .
+
+<http://tern.dev/ns/auth/refreshToken> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/refreshToken> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserIdentity> .
+<http://tern.dev/ns/auth/refreshToken> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://tern.dev/ns/auth/refreshToken> <http://www.w3.org/2000/01/rdf-schema#comment> "OAuth refresh token (may be absent for some providers)." .
+
+<http://tern.dev/ns/auth/tokenExpiresAt> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/tokenExpiresAt> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserIdentity> .
+<http://tern.dev/ns/auth/tokenExpiresAt> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#dateTime> .
+<http://tern.dev/ns/auth/tokenExpiresAt> <http://www.w3.org/2000/01/rdf-schema#comment> "Expiry time of the current access token." .
+
+# ── Data Properties — UserDevice ─────────────────────────────────────────────
+
+<http://tern.dev/ns/auth/deviceName> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/deviceName> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserDevice> .
+<http://tern.dev/ns/auth/deviceName> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://tern.dev/ns/auth/deviceName> <http://www.w3.org/2000/01/rdf-schema#comment> "Human-readable device name (e.g. 'Chrome on macOS')." .
+
+<http://tern.dev/ns/auth/devicePlatform> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/devicePlatform> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserDevice> .
+<http://tern.dev/ns/auth/devicePlatform> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://tern.dev/ns/auth/devicePlatform> <http://www.w3.org/2000/01/rdf-schema#comment> "Device platform: 'web', 'ios', 'android', or 'desktop'." .
+
+<http://tern.dev/ns/auth/deviceUserAgent> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/deviceUserAgent> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserDevice> .
+<http://tern.dev/ns/auth/deviceUserAgent> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://tern.dev/ns/auth/deviceUserAgent> <http://www.w3.org/2000/01/rdf-schema#comment> "Raw HTTP User-Agent string." .
+
+# ── Data Properties — UserSession ─────────────────────────────────────────────
+
+<http://tern.dev/ns/auth/sessionToken> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/sessionToken> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserSession> .
+<http://tern.dev/ns/auth/sessionToken> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://tern.dev/ns/auth/sessionToken> <http://www.w3.org/2000/01/rdf-schema#comment> "Opaque session token stored in a cookie." .
+
+<http://tern.dev/ns/auth/expiresAt> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/expiresAt> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserSession> .
+<http://tern.dev/ns/auth/expiresAt> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#dateTime> .
+<http://tern.dev/ns/auth/expiresAt> <http://www.w3.org/2000/01/rdf-schema#comment> "Session expiry timestamp." .
+
+<http://tern.dev/ns/auth/isActive> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/isActive> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserSession> .
+<http://tern.dev/ns/auth/isActive> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#boolean> .
+<http://tern.dev/ns/auth/isActive> <http://www.w3.org/2000/01/rdf-schema#comment> "Whether the session is currently valid." .
+
+<http://tern.dev/ns/auth/ipAddress> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/ipAddress> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserSession> .
+<http://tern.dev/ns/auth/ipAddress> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://tern.dev/ns/auth/ipAddress> <http://www.w3.org/2000/01/rdf-schema#comment> "Client IP address at time of login." .
+
+# ── Data Properties — Shared ──────────────────────────────────────────────────
+
+<http://tern.dev/ns/auth/createdAt> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/createdAt> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/User> .
+<http://tern.dev/ns/auth/createdAt> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserIdentity> .
+<http://tern.dev/ns/auth/createdAt> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserSession> .
+<http://tern.dev/ns/auth/createdAt> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserDevice> .
+<http://tern.dev/ns/auth/createdAt> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#dateTime> .
+<http://tern.dev/ns/auth/createdAt> <http://www.w3.org/2000/01/rdf-schema#comment> "Creation timestamp." .
+
+<http://tern.dev/ns/auth/updatedAt> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://tern.dev/ns/auth/updatedAt> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/User> .
+<http://tern.dev/ns/auth/updatedAt> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserIdentity> .
+<http://tern.dev/ns/auth/updatedAt> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#dateTime> .
+<http://tern.dev/ns/auth/updatedAt> <http://www.w3.org/2000/01/rdf-schema#comment> "Last-updated timestamp." .
+
+# ── Object Properties ─────────────────────────────────────────────────────────
+
+<http://tern.dev/ns/auth/identityOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://tern.dev/ns/auth/identityOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserIdentity> .
+<http://tern.dev/ns/auth/identityOf> <http://www.w3.org/2000/01/rdf-schema#range> <http://tern.dev/ns/auth/User> .
+<http://tern.dev/ns/auth/identityOf> <http://www.w3.org/2000/01/rdf-schema#comment> "Links an identity to its owning user." .
+
+<http://tern.dev/ns/auth/sessionUser> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://tern.dev/ns/auth/sessionUser> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserSession> .
+<http://tern.dev/ns/auth/sessionUser> <http://www.w3.org/2000/01/rdf-schema#range> <http://tern.dev/ns/auth/User> .
+<http://tern.dev/ns/auth/sessionUser> <http://www.w3.org/2000/01/rdf-schema#comment> "The user this session belongs to." .
+
+<http://tern.dev/ns/auth/sessionDevice> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://tern.dev/ns/auth/sessionDevice> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserSession> .
+<http://tern.dev/ns/auth/sessionDevice> <http://www.w3.org/2000/01/rdf-schema#range> <http://tern.dev/ns/auth/UserDevice> .
+<http://tern.dev/ns/auth/sessionDevice> <http://www.w3.org/2000/01/rdf-schema#comment> "The device this session was created on." .
+
+<http://tern.dev/ns/auth/deviceUser> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://tern.dev/ns/auth/deviceUser> <http://www.w3.org/2000/01/rdf-schema#domain> <http://tern.dev/ns/auth/UserDevice> .
+<http://tern.dev/ns/auth/deviceUser> <http://www.w3.org/2000/01/rdf-schema#range> <http://tern.dev/ns/auth/User> .
+<http://tern.dev/ns/auth/deviceUser> <http://www.w3.org/2000/01/rdf-schema#comment> "The user who owns this device record." .

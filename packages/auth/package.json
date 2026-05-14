@@ -1,21 +1,33 @@
 {
-  "name": "@system/sandbox-server",
+  "name": "@system/auth",
   "version": "0.1.0",
   "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "yarn compile",
     "compile": "tsc -b",
     "clean": "rm -rf dist && rm -f tsconfig.tsbuildinfo",
-    "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@system/app": "workspace:^",
-    "@system/auth": "workspace:^",
     "@system/core": "workspace:^",
     "@system/data": "workspace:^",
     "@system/flow": "workspace:^",
-    "better-sqlite3": "^11.10.0",
     "ioredis": "^5.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
   }
 }

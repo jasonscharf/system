@@ -1,0 +1,98 @@
+# Analytics SHACL Shapes — Turtle format
+# Namespace: http://tern.dev/ns/analytics/shapes/
+#
+# UserAnalyticsShape  — targets auth:User
+#   Constrains only the fields that are meaningful in the analytics context;
+#   core User properties remain under core's authority.
+#
+# ProjectShape — targets analytics:Project, sh:closed true
+#   All Project properties are formally constrained here.
+#   sh:closed means extra properties not listed are violations.
+
+@prefix xsd:       <http://www.w3.org/2001/XMLSchema#> .
+@prefix sh:        <http://www.w3.org/ns/shacl#> .
+@prefix auth:      <http://tern.dev/ns/auth/> .
+@prefix analytics: <http://tern.dev/ns/analytics/> .
+@prefix shapes:    <http://tern.dev/ns/analytics/shapes/> .
+
+# ── UserAnalyticsShape ────────────────────────────────────────────────────────
+
+shapes:UserAnalyticsShape a sh:NodeShape ;
+    sh:targetClass auth:User ;
+
+    sh:property [
+        sh:path     auth:email ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message  "A valid email address is required."
+    ] ;
+
+    sh:property [
+        sh:path     analytics:analyticsRole ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:pattern  "^(owner|member|viewer)$" ;
+        sh:message  "analyticsRole must be 'owner', 'member', or 'viewer'."
+    ] ;
+
+    sh:property [
+        sh:path     analytics:consentedToTracking ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:boolean
+    ] ;
+
+    sh:property [
+        sh:path     analytics:lastActiveAt ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:dateTime
+    ] .
+
+# ── ProjectShape ──────────────────────────────────────────────────────────────
+
+shapes:ProjectShape a sh:NodeShape ;
+    sh:targetClass analytics:Project ;
+    sh:closed      true ;
+
+    sh:property [
+        sh:path     analytics:projectName ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message  "projectName is required."
+    ] ;
+
+    sh:property [
+        sh:path     analytics:projectSlug ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:pattern  "^[a-z0-9][a-z0-9-]+[a-z0-9]$" ;
+        sh:message  "projectSlug must be lowercase-kebab-case (e.g. 'my-project')."
+    ] ;
+
+    sh:property [
+        sh:path     analytics:projectOwner ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class    auth:User ;
+        sh:message  "Every project must have exactly one owner."
+    ] ;
+
+    sh:property [
+        sh:path  analytics:projectMember ;
+        sh:class auth:User
+    ] ;
+
+    sh:property [
+        sh:path     analytics:isActive ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:boolean
+    ] ;
+
+    sh:property [
+        sh:path     analytics:projectCreatedAt ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:dateTime
+    ] .

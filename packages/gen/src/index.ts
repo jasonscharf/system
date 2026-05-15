@@ -1,5 +1,11 @@
-export { generate } from './generate.js';
+export { generate, generateFromConfig } from './generate.js';
+export type { GenConfig, BaseOntologyConfig } from './generate.js';
 export { parseNTriples } from './NTriplesParser.js';
+export { parseTurtle } from './TurtleParser.js';
 export { readOntology } from './OntologyReader.js';
 export type { Ontology, OntologyClass, OntologyProperty } from './OntologyReader.js';
-export { generateTypes } from './TypeGenerator.js';
+export { generateTypes, generateAugmentedTypes } from './TypeGenerator.js';
+export type { AugmentedGenConfig } from './TypeGenerator.js';
+export { readShaclShapes, mergeShapes } from './ShaclReader.js';
+export type { ShaclShapes, ShaclNodeShape, ShaclPropertyShape } from './ShaclReader.js';
+export { generateShapesDescriptor } from './ShapeGenerator.js';

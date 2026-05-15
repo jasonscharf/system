@@ -11,8 +11,8 @@
     "build": "yarn compile",
     "compile": "tsc -b",
     "clean": "rm -rf dist && rm -f tsconfig.tsbuildinfo",
-    "codegen": "node ../gen/dist/bin.js --config tern-gen.json",
-    "codegen:watch": "node ../gen/dist/bin.js --watch ./ontology/*.ttl",
+    "gen": "tern-codegen",
+    "gen:watch": "tern-codegen --watch",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

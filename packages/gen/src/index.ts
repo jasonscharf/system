@@ -9,3 +9,5 @@ export type { AugmentedGenConfig } from './TypeGenerator.js';
 export { readShaclShapes, mergeShapes } from './ShaclReader.js';
 export type { ShaclShapes, ShaclNodeShape, ShaclPropertyShape } from './ShaclReader.js';
 export { generateShapesDescriptor } from './ShapeGenerator.js';
+export { validate } from './ShaclValidator.js';
+export type { ValidationResult, ValidationViolation } from './ShaclValidator.js';

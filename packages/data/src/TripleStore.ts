@@ -71,6 +71,9 @@ export class TripleStore {
         this._knex = knex;
     }
 
+    /** Direct access to the underlying Knex instance for advanced queries. */
+    get knex(): Knex { return this._knex; }
+
     // ── Namespace registry ────────────────────────────────────────────────────
 
     async ensureNamespace(prefix: string, iriStr: string): Promise<number> {
@@ -233,6 +236,50 @@ export class TripleStore {
         }
 
         return q.delete();
+    }
+
+    /**
+     * Fetches all quads for a list of subjects in a single round-trip.
+     * Returns a Map keyed by subject IRI string (or blank-node id prefixed with `_:`).
+     */
+    async findForSubjects(subjects: readonly (IRI | BlankNode)[]): Promise<Map<string, Quad[]>> {
+        if (subjects.length === 0) { return new Map(); }
+
+        const pairs = await Promise.all(subjects.map(async s => [s, await this._nodeId(s as RdfTerm)] as const));
+        const validPairs = pairs.filter((p): p is [IRI | BlankNode, number] => p[1] !== null);
+        if (validPairs.length === 0) { return new Map(); }
+
+        const idToSubject = new Map(validPairs.map(([term, id]) => [id, term]));
+        const edges = await this._knex(T.edges)
+            .whereIn(C.subject, validPairs.map(([, id]) => id))
+            .select<EdgeRow[]>('*');
+
+        if (edges.length === 0) { return new Map(); }
+
+        const nodeIds = new Set<number>();
+        for (const e of edges) {
+            nodeIds.add(e.subject);
+            nodeIds.add(e.predicate);
+            nodeIds.add(e.object);
+            if (e.graph !== null) { nodeIds.add(e.graph); }
+        }
+        const nodeMap = await this._loadNodes([...nodeIds]);
+
+        const result = new Map<string, Quad[]>();
+        for (const e of edges) {
+            const subjTerm = idToSubject.get(e.subject)!;
+            const key = isIRI(subjTerm) ? subjTerm.value : `_:${(subjTerm as BlankNode).id}`;
+            if (!result.has(key)) { result.set(key, []); }
+            result.get(key)!.push({
+                subject:   nodeMap.get(e.subject)! as IRI | BlankNode,
+                predicate: nodeMap.get(e.predicate)! as IRI,
+                object:    nodeMap.get(e.object)!,
+                graph:     e.graph !== null
+                    ? nodeMap.get(e.graph)! as IRI
+                    : DEFAULT_GRAPH satisfies DefaultGraph,
+            });
+        }
+        return result;
     }
 
     async stats(): Promise<StoreStats> {

@@ -33,6 +33,7 @@
   "dependencies": {
     "@system/core": "workspace:^",
     "@system/data": "workspace:^",
+    "@system/entities": "workspace:^",
     "@system/flow": "workspace:^",
     "ioredis": "^5.6.1"
   },

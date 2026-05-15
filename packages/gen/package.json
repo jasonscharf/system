@@ -11,7 +11,8 @@
     }
   },
   "bin": {
-    "tern-codegen": "./dist/bin.js"
+    "tern-codegen": "./dist/bin.js",
+    "tern-gen":     "./dist/bin.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

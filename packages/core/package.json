@@ -28,7 +28,8 @@
   },
   "scripts": {
     "build": "yarn compile",
-    "codegen": "node ../gen/dist/bin.js --config tern-gen.json",
+    "gen": "tern-codegen",
+    "gen:watch": "tern-codegen --watch",
     "compile": "tsc -b",
     "clean": "rm -rf dist && rm tsconfig.tsbuildinfo",
     "start": "node dist/index.js",

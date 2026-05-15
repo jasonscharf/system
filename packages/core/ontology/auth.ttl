@@ -1,0 +1,137 @@
+# Tern Auth Ontology — Turtle format
+# Namespace: http://tern.dev/ns/auth/
+
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix auth: <http://tern.dev/ns/auth/> .
+
+# ── Classes ───────────────────────────────────────────────────────────────────
+
+auth:User         a owl:Class ; rdfs:comment "A Tern platform user." .
+auth:UserIdentity a owl:Class ; rdfs:comment "An OAuth identity linked to a user." .
+auth:UserSession  a owl:Class ; rdfs:comment "An active session for a user on a device." .
+auth:UserDevice   a owl:Class ; rdfs:comment "A device from which a user authenticates." .
+
+# ── User properties ───────────────────────────────────────────────────────────
+
+auth:email a owl:DatatypeProperty ;
+    rdfs:domain auth:User ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Primary email address." .
+
+auth:displayName a owl:DatatypeProperty ;
+    rdfs:domain auth:User ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Human-readable display name." .
+
+auth:avatarUrl a owl:DatatypeProperty ;
+    rdfs:domain auth:User ;
+    rdfs:range  xsd:anyURI ;
+    rdfs:comment "URL of the user's avatar image." .
+
+# ── UserIdentity properties ───────────────────────────────────────────────────
+
+auth:provider a owl:DatatypeProperty ;
+    rdfs:domain auth:UserIdentity ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "OAuth provider identifier (e.g. 'google', 'github')." .
+
+auth:providerUserId a owl:DatatypeProperty ;
+    rdfs:domain auth:UserIdentity ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "The user's ID as issued by the OAuth provider." .
+
+auth:providerEmail a owl:DatatypeProperty ;
+    rdfs:domain auth:UserIdentity ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Email returned by the OAuth provider." .
+
+auth:accessToken a owl:DatatypeProperty ;
+    rdfs:domain auth:UserIdentity ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Current OAuth access token." .
+
+auth:refreshToken a owl:DatatypeProperty ;
+    rdfs:domain auth:UserIdentity ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "OAuth refresh token (may be absent for some providers)." .
+
+auth:tokenExpiresAt a owl:DatatypeProperty ;
+    rdfs:domain auth:UserIdentity ;
+    rdfs:range  xsd:dateTime ;
+    rdfs:comment "Expiry time of the current access token." .
+
+# ── UserDevice properties ─────────────────────────────────────────────────────
+
+auth:deviceName a owl:DatatypeProperty ;
+    rdfs:domain auth:UserDevice ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Human-readable device name (e.g. 'Chrome on macOS')." .
+
+auth:devicePlatform a owl:DatatypeProperty ;
+    rdfs:domain auth:UserDevice ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Device platform: 'web', 'ios', 'android', or 'desktop'." .
+
+auth:deviceUserAgent a owl:DatatypeProperty ;
+    rdfs:domain auth:UserDevice ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Raw HTTP User-Agent string." .
+
+# ── UserSession properties ────────────────────────────────────────────────────
+
+auth:sessionToken a owl:DatatypeProperty ;
+    rdfs:domain auth:UserSession ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Opaque session token stored in a cookie." .
+
+auth:expiresAt a owl:DatatypeProperty ;
+    rdfs:domain auth:UserSession ;
+    rdfs:range  xsd:dateTime ;
+    rdfs:comment "Session expiry timestamp." .
+
+auth:isActive a owl:DatatypeProperty ;
+    rdfs:domain auth:UserSession ;
+    rdfs:range  xsd:boolean ;
+    rdfs:comment "Whether the session is currently valid." .
+
+auth:ipAddress a owl:DatatypeProperty ;
+    rdfs:domain auth:UserSession ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Client IP address at time of login." .
+
+# ── Shared properties (multiple domains) ─────────────────────────────────────
+
+auth:createdAt a owl:DatatypeProperty ;
+    rdfs:domain auth:User, auth:UserIdentity, auth:UserSession, auth:UserDevice ;
+    rdfs:range  xsd:dateTime ;
+    rdfs:comment "Creation timestamp." .
+
+auth:updatedAt a owl:DatatypeProperty ;
+    rdfs:domain auth:User, auth:UserIdentity ;
+    rdfs:range  xsd:dateTime ;
+    rdfs:comment "Last-updated timestamp." .
+
+# ── Object properties ─────────────────────────────────────────────────────────
+
+auth:identityOf a owl:ObjectProperty ;
+    rdfs:domain auth:UserIdentity ;
+    rdfs:range  auth:User ;
+    rdfs:comment "Links an identity to its owning user." .
+
+auth:sessionUser a owl:ObjectProperty ;
+    rdfs:domain auth:UserSession ;
+    rdfs:range  auth:User ;
+    rdfs:comment "The user this session belongs to." .
+
+auth:sessionDevice a owl:ObjectProperty ;
+    rdfs:domain auth:UserSession ;
+    rdfs:range  auth:UserDevice ;
+    rdfs:comment "The device this session was created on." .
+
+auth:deviceUser a owl:ObjectProperty ;
+    rdfs:domain auth:UserDevice ;
+    rdfs:range  auth:User ;
+    rdfs:comment "The user who owns this device record." .

@@ -1,19 +1,130 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { parseNTriples, readOntology, generateTypes } from './index.js';
+import { parseTurtle } from './TurtleParser.js';
+import { readShaclShapes, mergeShapes } from './ShaclReader.js';
+import type { ShaclShapes } from './ShaclReader.js';
+import { generateAugmentedTypes } from './TypeGenerator.js';
+import type { AugmentedGenConfig } from './TypeGenerator.js';
+import { generateShapesDescriptor } from './ShapeGenerator.js';
+import type { Triple } from '@system/core';
 
+
+export interface BaseOntologyConfig {
+    /** Path to the base .nt ontology file, relative to the config file. */
+    ontology: string;
+    /** npm package name used when marking classes as external. */
+    package: string;
+    /**
+     * TypeScript import path for the package (defaults to `package`).
+     * Override when the published name differs (e.g. scoped packages).
+     */
+    importPath?: string;
+}
+
+export interface GenConfig {
+    /** Base ontologies whose classes are treated as external (not re-generated). */
+    bases: BaseOntologyConfig[];
+    /** Extension ontology files that add new classes/properties, relative to the config. */
+    extensions: string[];
+    /** SHACL shapes files, relative to the config. Used to derive required/array types. */
+    shapes?: string[];
+    /** IRI prefix that identifies all classes and properties defined in this extension. */
+    localNamespace: string;
+    /** Output path for the generated TypeScript types file, relative to the config. */
+    out: string;
+    /** Optional output path for the generated runtime shapes descriptor. */
+    shapesOut?: string;
+    /**
+     * Import path for the `IRI` class.  Defaults to `'@system/core'`.
+     * Override to `'../semantics/IRI.js'` when generating types inside @system/core itself.
+     */
+    iriImport?: string;
+}
+
+
+function parserFor(filePath: string) {
+    return /\.(ttl|n3)$/i.test(filePath) ? parseTurtle : parseNTriples;
+}
+
+async function parseFile(filePath: string): Promise<Triple[]> {
+    const content = await readFile(filePath, 'utf-8');
+    const triples: Triple[] = [];
+    for await (const t of parserFor(filePath)(content)) {
+        triples.push(t);
+    }
+    return triples;
+}
+
+/**
+ * Reads a tern-gen.json config file and generates:
+ *   - A merged TypeScript types file (local classes + module augmentations for base classes)
+ *   - Optionally a runtime shapes descriptor for use with ShaclValidator
+ *
+ * The merged ontology is built by concatenating all base + extension triples so that
+ * cross-namespace domain/range links (e.g. analytics properties on auth:User) resolve
+ * correctly in a single readOntology pass.
+ */
+export async function generateFromConfig(configPath: string): Promise<void> {
+    const dir    = path.dirname(path.resolve(configPath));
+    const config = JSON.parse(await readFile(configPath, 'utf-8')) as GenConfig;
+
+    const externalClasses = new Map<string, string>(); // classIRI → importPath
+    const allTriples:  Triple[]       = [];
+    let   allShapes:   ShaclShapes    = { nodeShapes: new Map(), byTargetClass: new Map() };
+
+    // Parse each base ontology; record its classes as external
+    for (const base of config.bases ?? []) {
+        const triples = await parseFile(path.resolve(dir, base.ontology));
+        for (const t of triples) { allTriples.push(t); }
+        const importPath = base.importPath ?? base.package;
+        for (const cls of readOntology(triples).classes.values()) {
+            externalClasses.set(cls.iri, importPath);
+        }
+    }
+
+    // Parse extension ontologies
+    for (const extFile of config.extensions ?? []) {
+        const triples = await parseFile(path.resolve(dir, extFile));
+        for (const t of triples) { allTriples.push(t); }
+    }
+
+    // Parse SHACL shapes
+    for (const shapeFile of config.shapes ?? []) {
+        const triples = await parseFile(path.resolve(dir, shapeFile));
+        allShapes = mergeShapes(allShapes, readShaclShapes(triples));
+    }
+
+    // Single readOntology pass over all triples so cross-namespace domain links resolve
+    const merged = readOntology(allTriples);
+
+    const augConfig: AugmentedGenConfig = {
+        externalClasses,
+        localNamespace: config.localNamespace,
+        iriImport: config.iriImport,
+    };
+    const typesSource  = generateAugmentedTypes(merged, allShapes, augConfig);
+    const outPath = path.resolve(dir, config.out);
+    await mkdir(path.dirname(outPath), { recursive: true });
+    await writeFile(outPath, typesSource, 'utf-8');
+    console.log(`[gen] merged types → ${path.relative(process.cwd(), outPath)}`);
+
+    if (config.shapesOut) {
+        const shapesSource = generateShapesDescriptor(allShapes);
+        const shapesPath   = path.resolve(dir, config.shapesOut);
+        await mkdir(path.dirname(shapesPath), { recursive: true });
+        await writeFile(shapesPath, shapesSource, 'utf-8');
+        console.log(`[gen] shapes descriptor → ${path.relative(process.cwd(), shapesPath)}`);
+    }
+}
 
 /**
  * Reads an RDF file, generates TypeScript types, and writes a sibling `.generated.ts` file.
  * The output path is derived by replacing the RDF extension with `.generated.ts`.
  */
 export async function generate(inputPath: string): Promise<void> {
-    const content = await readFile(inputPath, 'utf-8');
-    const triples = [];
-    for await (const t of parseNTriples(content)) {
-        triples.push(t);
-    }
+    const triples = await parseFile(inputPath);
     const ontology = readOntology(triples);
     const source = generateTypes(ontology, path.basename(inputPath));
 

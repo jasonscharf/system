@@ -1,0 +1,8 @@
+{
+  "bases":     [],
+  "extensions": ["./ontology/auth.ttl"],
+  "shapes":    [],
+  "localNamespace": "http://tern.dev/ns/auth/",
+  "iriImport":  "../semantics/IRI.js",
+  "out":       "./src/auth/types.generated.ts"
+}

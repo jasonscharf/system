@@ -14,7 +14,8 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "ontology"
   ],
   "repository": {
     "type": "git",
@@ -27,6 +28,7 @@
   },
   "scripts": {
     "build": "yarn compile",
+    "codegen": "node ../gen/dist/bin.js --config tern-gen.json",
     "compile": "tsc -b",
     "clean": "rm -rf dist && rm tsconfig.tsbuildinfo",
     "start": "node dist/index.js",

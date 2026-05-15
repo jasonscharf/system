@@ -28,6 +28,7 @@
     "@system/auth": "workspace:^",
     "@system/core": "workspace:^",
     "@system/data": "workspace:^",
+    "@system/entities": "workspace:^",
     "@system/flow": "workspace:^",
     "@system/gen": "workspace:^",
     "@system/secrets": "workspace:^",

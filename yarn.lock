@@ -1559,6 +1559,7 @@ __metadata:
   dependencies:
     "@system/core": "workspace:^"
     "@system/data": "workspace:^"
+    "@system/entities": "workspace:^"
     "@system/flow": "workspace:^"
     "@types/node": "npm:^22.0.0"
     ioredis: "npm:^5.6.1"
@@ -1588,6 +1589,16 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@system/entities@workspace:^, @system/entities@workspace:packages/entities":
+  version: 0.0.0-use.local
+  resolution: "@system/entities@workspace:packages/entities"
+  dependencies:
+    "@system/core": "workspace:^"
+    "@system/data": "workspace:^"
+    "@system/gen": "workspace:^"
+  languageName: unknown
+  linkType: soft
+
 "@system/flow@workspace:^, @system/flow@workspace:packages/flow":
   version: 0.0.0-use.local
   resolution: "@system/flow@workspace:packages/flow"
@@ -1605,6 +1616,18 @@ __metadata:
     "@system/core": "workspace:^"
   bin:
     tern-codegen: ./dist/bin.js
+    tern-gen: ./dist/bin.js
+  languageName: unknown
+  linkType: soft
+
+"@system/sandbox-analytics@workspace:packages/sandbox-analytics":
+  version: 0.0.0-use.local
+  resolution: "@system/sandbox-analytics@workspace:packages/sandbox-analytics"
+  dependencies:
+    "@system/auth": "workspace:^"
+    "@system/core": "workspace:^"
+    "@system/entities": "workspace:^"
+    "@system/gen": "workspace:^"
   languageName: unknown
   linkType: soft
 
@@ -1679,6 +1702,7 @@ __metadata:
     "@system/auth": "workspace:^"
     "@system/core": "workspace:^"
     "@system/data": "workspace:^"
+    "@system/entities": "workspace:^"
     "@system/flow": "workspace:^"
     "@system/gen": "workspace:^"
     "@system/secrets": "workspace:^"

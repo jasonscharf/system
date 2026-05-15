@@ -38,6 +38,9 @@
       "path": "packages/sandbox-cli"
     },
     {
+      "path": "packages/entities"
+    },
+    {
       "path": "packages/sandbox-analytics"
     },
   ]

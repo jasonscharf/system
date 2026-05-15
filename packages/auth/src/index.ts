@@ -1,3 +1,6 @@
+// ── Entity schema (extend via UserSchema.register(myPropGroup)) ───────────────
+export { UserSchema, CoreHandle } from './entities/UserSchema.js';
+
 // ── Core service ──────────────────────────────────────────────────────────────
 export { AuthService } from './AuthService.js';
 export type { LoginResult } from './AuthService.js';

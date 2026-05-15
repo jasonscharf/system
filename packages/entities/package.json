@@ -1,5 +1,5 @@
 {
-  "name": "@system/gen",
+  "name": "@system/entities",
   "version": "0.1.0",
   "type": "module",
   "exports": {
@@ -10,10 +10,6 @@
       "import": "./dist/index.js"
     }
   },
-  "bin": {
-    "tern-codegen": "./dist/bin.js",
-    "tern-gen": "./dist/bin.js"
-  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
@@ -22,7 +18,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/jasonlscharf/system.git",
-    "directory": "packages/gen"
+    "directory": "packages/entities"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
@@ -36,6 +32,8 @@
     "watch": "tsc -b -w"
   },
   "dependencies": {
-    "@system/core": "workspace:^"
+    "@system/core": "workspace:^",
+    "@system/data": "workspace:^",
+    "@system/gen": "workspace:^"
   }
 }

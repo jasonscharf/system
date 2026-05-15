@@ -171,7 +171,7 @@ jobs:
         # expansion produces the correct scoped names in published manifests.
         run: |
           OWNER="${{ github.repository_owner }}"
-          for pkg in api auth core data flow gen secrets; do
+          for pkg in api auth core data entities flow gen secrets; do
             tmp=$(mktemp)
             # Replace all "@system/ occurrences in JSON string values (they
             # are always double-quoted in valid JSON, so this is safe).
@@ -229,7 +229,10 @@ jobs:
           publish_pkg gen
           publish_pkg api
 
-          # Layer 2 — depends on core + data + flow
+          # Layer 2 — depends on core + data + gen
+          publish_pkg entities
+
+          # Layer 3 — depends on core + data + entities + flow
           publish_pkg auth
 
           exit $fail
@@ -247,7 +250,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [api, auth, core, data, flow, gen, secrets]
+        package: [api, auth, core, data, entities, flow, gen, secrets]
 
     steps:
       - name: Prune old pre-release versions of @${{ github.repository_owner }}/${{ matrix.package }}

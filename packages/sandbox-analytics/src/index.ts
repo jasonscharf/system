@@ -1,6 +1,45 @@
 /**
  * sandbox-analytics — demonstration of cross-package entity extension via RDF.
  *
+ * Import this package's index (or call registerAnalytics() explicitly) to
+ * register the analytics PropGroup on UserSchema before using EntityStore.
+ */
+import { UserSchema } from '@system/auth';
+import { handle }     from '@system/entities';
+import {
+    analyticsRoleIRI,
+    lastActiveAtIRI,
+    consentedToTrackingIRI,
+} from './analytics/types.generated.js';
+import { shapes } from './analytics/shapes.generated.js';
+
+/** The stable handle that identifies the analytics PropGroup on any entity. */
+export const AnalyticsHandle = handle('com.tern.sandbox.analytics');
+
+/**
+ * Registers the analytics PropGroup on UserSchema.
+ * Call once at application startup before any EntityStore operations.
+ */
+export function registerAnalytics(): void {
+    UserSchema.register({
+        handle:     AnalyticsHandle,
+        properties: {
+            analyticsRole:       analyticsRoleIRI,
+            lastActiveAt:        lastActiveAtIRI,
+            consentedToTracking: consentedToTrackingIRI,
+        },
+        shape: shapes.byTargetClass.get('http://tern.dev/ns/auth/User'),
+    });
+}
+
+// Auto-register on import (side-effect import pattern — mirrors how
+// database drivers self-register).  Call registerAnalytics() explicitly
+// if you need to control timing.
+registerAnalytics();
+
+/**
+ * sandbox-analytics — demonstration of cross-package entity extension via RDF.
+ *
  * Pattern summary
  * ───────────────
  * 1. Write an OWL ontology (ontology/analytics.nt) that:

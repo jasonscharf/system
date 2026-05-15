@@ -1,0 +1,98 @@
+# Tern Core Platform Ontology — Turtle format
+# Namespace: http://tern.dev/ns/core/
+#
+# Defines the fundamental graph constructs used by @system/entities:
+#   PropGroup / Handle — property grouping for extension model
+#   CollectionView     — ordered, filterable views over collection properties
+#   CollectionViewItem — individual member of a CollectionView
+
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix tern: <http://tern.dev/ns/core/> .
+
+# ── PropGroup infrastructure ──────────────────────────────────────────────────
+
+tern:propGroup a owl:ObjectProperty ;
+    rdfs:comment "Links an entity node to one of its PropGroup nodes." .
+
+tern:handle a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The handle string ('id@version') identifying a PropGroup." .
+
+# ── CollectionView ────────────────────────────────────────────────────────────
+#
+# A CollectionView is a graph-native view over a collection property on a
+# PropGroup node.  It stores sorting parameters and maintains an ordered list
+# of CollectionViewItem nodes — one per item currently in the source collection.
+#
+# When items are added to the source collection via EntityStore.collectionPush,
+# the corresponding CollectionViewItem nodes are created automatically.
+# Removal via collectionRemove likewise removes the corresponding item.
+#
+# Example (Group has members; User holds a view over those members):
+#
+#   group:abc/pg/tern_core_v1  ← PropGroup that owns the members collection
+#   view:xyz  tern:cvSource  "group:abc/pg/tern_core_v1"
+#   view:xyz  tern:cvProp    "http://test.dev/group/member"
+#   view:xyz  tern:cvSortProp "http://tern.dev/ns/auth/displayName"
+#   view:xyz  tern:cvSortDir  "asc"
+#   view:xyz  tern:cvItem    view-item:1
+#   view-item:1  tern:cviView  view:xyz
+#   view-item:1  tern:cviRef   "http://tern.dev/ns/auth/user/alice_id"
+#   view-item:1  tern:cviPos   0
+
+tern:CollectionView a owl:Class ;
+    rdfs:comment "A view over a collection property.  Stores sort/filter config and owns CollectionViewItems." .
+
+tern:CollectionViewItem a owl:Class ;
+    rdfs:comment "One entry in a CollectionView.  Points back to its parent view and to the actual item." .
+
+# ── CollectionView data properties ───────────────────────────────────────────
+
+tern:cvSource a owl:DatatypeProperty ;
+    rdfs:domain tern:CollectionView ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "IRI string of the PropGroup node that owns the source collection." .
+
+tern:cvProp a owl:DatatypeProperty ;
+    rdfs:domain tern:CollectionView ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "IRI string of the property on the source PropGroup this view is over." .
+
+tern:cvSortProp a owl:DatatypeProperty ;
+    rdfs:domain tern:CollectionView ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Optional IRI string of the property to sort by on each referenced entity." .
+
+tern:cvSortDir a owl:DatatypeProperty ;
+    rdfs:domain tern:CollectionView ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Sort direction: 'asc' or 'desc' (default 'asc')." .
+
+# ── CollectionView object properties ─────────────────────────────────────────
+
+tern:cvItem a owl:ObjectProperty ;
+    rdfs:domain tern:CollectionView ;
+    rdfs:range  tern:CollectionViewItem ;
+    rdfs:comment "Links a CollectionView to one of its CollectionViewItems." .
+
+# ── CollectionViewItem data properties ───────────────────────────────────────
+
+tern:cviRef a owl:DatatypeProperty ;
+    rdfs:domain tern:CollectionViewItem ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "String representation of the referenced collection item (IRI or plain value)." .
+
+tern:cviPos a owl:DatatypeProperty ;
+    rdfs:domain tern:CollectionViewItem ;
+    rdfs:range  xsd:integer ;
+    rdfs:comment "Zero-based position of this item within the CollectionView." .
+
+# ── CollectionViewItem object properties ─────────────────────────────────────
+
+tern:cviView a owl:ObjectProperty ;
+    rdfs:domain tern:CollectionViewItem ;
+    rdfs:range  tern:CollectionView ;
+    rdfs:comment "Back-link from a CollectionViewItem to its parent CollectionView." .

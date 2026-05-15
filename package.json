@@ -7,7 +7,8 @@
   ],
   "scripts": {
     "all": "yarn workspaces foreach --all run",
-    "build": "yarn all compile",
+    "build": "node scripts/stamp.mjs && yarn all compile",
+    "stamp": "node scripts/stamp.mjs",
     "bup": "yarn compose up --build -d && yarn tail",
     "clean": "yarn workspaces foreach --all run clean",
     "compose": "docker compose -p sys -f docker-compose.yml -f docker-compose.dev.yml",

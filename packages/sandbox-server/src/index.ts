@@ -10,6 +10,7 @@
  *        HTTP pipeline: HTTP → decode → AuthRouter → encode → HTTP
  *   5. Session management shared across WS and HTTP.
  */
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { FlowApp, HttpServer, HttpDecoder, HttpEncoder, HttpRouter } from '@system/flow';
@@ -32,6 +33,16 @@ import { MessageDecoder } from './components/MessageDecoder.js';
 import { MessageEncoder } from './components/MessageEncoder.js';
 import { MessageRouter } from './components/MessageRouter.js';
 
+
+function loadVersion(): unknown {
+    try {
+        return JSON.parse(readFileSync(new URL('../version.json', import.meta.url), 'utf8'));
+    } catch {
+        return { error: 'version.json not available — run yarn build' };
+    }
+}
+
+const VERSION   = loadVersion();
 
 const WS_PORT   = Number(process.env['PORT']     ?? 8080);
 const HTTP_PORT = Number(process.env['AUTH_PORT'] ?? 8081);
@@ -135,6 +146,10 @@ async function main(): Promise<void> {
 
     topRouter.get('/', async ctx => {
         ctx.body = { ok: true, server: 'tern-sandbox', wsPort: WS_PORT };
+    });
+
+    topRouter.get('/version', async ctx => {
+        ctx.body = VERSION;
     });
 
     topRouter.mount('/auth', authRouter.httpRouter);

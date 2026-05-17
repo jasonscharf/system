@@ -179,6 +179,23 @@ jobs:
             mv "$tmp" "packages/${pkg}/package.json"
           done
 
+      - name: Append short SHA to package versions
+        # Every merge to main produces a unique pre-release version
+        # e.g. 0.1.0 → 0.1.0-abc1234  so re-runs never hit a 409.
+        # The workspace package.json files are not committed; this only
+        # affects the transient copies used inside this job.
+        run: |
+          SHORT="${GITHUB_SHA::7}"
+          for pkg in api auth core data entities flow gen secrets; do
+            node -e "
+              const fs = require('fs');
+              const p  = JSON.parse(fs.readFileSync('packages/$pkg/package.json', 'utf8'));
+              p.version = p.version + '-' + '$SHORT';
+              fs.writeFileSync('packages/$pkg/package.json', JSON.stringify(p, null, 2) + '\n');
+            "
+            echo "  $pkg → $(node -e "process.stdout.write(require('./packages/$pkg/package.json').version)")"
+          done
+
       - name: Publish packages
         # Publishes in dependency order so consumers never see a package whose
         # deps are not yet in the registry.
@@ -206,9 +223,11 @@ jobs:
             }
 
             # 409 / "already published" → idempotent skip (not an error).
+            # Matches both the legacy npm E409 code and Yarn 4's YN0035 format:
+            #   YN0035: Cannot publish over existing version
             # 403 is intentionally NOT in this list — a scope/permission
             # mismatch must surface as a real failure.
-            if echo "$out" | grep -qiE "already exists|already been published|E409"; then
+            if echo "$out" | grep -qiE "already exists|already been published|E409|YN0035|Cannot publish over existing"; then
               echo "$out"
               echo "  ↳ version already in registry — skipping"
               return 0

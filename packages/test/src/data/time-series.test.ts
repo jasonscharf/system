@@ -610,6 +610,69 @@ for (const db of providers) {
 }
 
 
+// ── DB trigger behaviour (003_timestamps) ────────────────────────────────────
+
+for (const db of providers) {
+    describe(`DB timestamp triggers (${db.name})`, () => {
+        let knex:  Knex;
+        let trx:   Knex.Transaction;
+        let store: TripleStore;
+
+        beforeEach(async () => {
+            knex  = await db.create();
+            trx   = await knex.transaction();
+            store = new TripleStore(trx as unknown as Knex);
+        });
+        afterEach(async () => { await trx.rollback(); await knex.destroy(); });
+
+        it('trigger sets created_at and updated_at on node insert without app providing them', async () => {
+            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: DEFAULT_GRAPH });
+
+            const name = await (trx as unknown as Knex)('tern_names').where('iri', 'http://example.org/s').first<{ id: number }>();
+            const node = await (trx as unknown as Knex)('tern_nodes').where({ kind: 'iri', name_id: name!.id }).first<{ created_at: string; updated_at: string }>();
+
+            expect(node!.created_at).toBeTruthy();
+            expect(node!.updated_at).toBeTruthy();
+            expect(new Date(node!.created_at).getTime()).toBeGreaterThan(0);
+        });
+
+        it('trigger sets created_at and updated_at on edge insert without app providing them', async () => {
+            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: DEFAULT_GRAPH });
+
+            const edges = await getEdgeById(trx as unknown as Knex, 'http://example.org/s');
+            const edge  = edges[0]!;
+
+            expect(edge.created_at).toBeTruthy();
+            expect(edge.updated_at).toBeTruthy();
+            expect(new Date(edge.created_at).getTime()).toBeGreaterThan(0);
+        });
+
+        it('trigger sets updated_at and deleted_at on soft-delete without app providing them', async () => {
+            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: DEFAULT_GRAPH });
+            await store.delete({ subject: EX('s') });
+
+            const edges = await getEdgeById(trx as unknown as Knex, 'http://example.org/s');
+            const edge  = edges[0]!;
+
+            expect(!!edge.is_deleted).toBe(true);
+            expect(edge.deleted_at).toBeTruthy();
+            expect(edge.updated_at).toBeTruthy();
+            expect(new Date(edge.deleted_at!).getTime()).toBeGreaterThan(0);
+        });
+
+        it('trigger preserves created_at across a soft-delete update', async () => {
+            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: DEFAULT_GRAPH });
+            const before = (await getEdgeById(trx as unknown as Knex, 'http://example.org/s'))[0]!;
+
+            await store.delete({ subject: EX('s') });
+            const after = (await getEdgeById(trx as unknown as Knex, 'http://example.org/s'))[0]!;
+
+            expect(after.created_at).toBe(before.created_at);
+        });
+    });
+}
+
+
 // ── Migration 002 down/up ─────────────────────────────────────────────────────
 
 describe('migration 002_time_series down()', () => {

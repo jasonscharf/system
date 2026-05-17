@@ -28,6 +28,7 @@ COPY package.json yarn.lock .yarnrc.yml ./
 
 # Copy all workspace source (node_modules, dist/, .git excluded by .dockerignore)
 COPY packages/ packages/
+COPY scripts/  scripts/
 
 # Install workspace dependencies then compile every TypeScript package.
 RUN yarn install --frozen-lockfile

@@ -70,26 +70,28 @@ async function teardown(ctx: Awaited<ReturnType<typeof setup>>) {
     await ctx.knex.destroy();
 }
 
-/** Creates a user, device, and session linked together, then returns all three records. */
+/** Creates a user, device, and session atomically, returning all three records. */
 async function makeUserWithSession(
-    es:       EntityStore,
-    email:    string,
-    opts:     { isActive?: boolean; deviceUserAgent?: string } = {},
+    es:    EntityStore,
+    email: string,
+    opts:  { isActive?: boolean; deviceUserAgent?: string } = {},
 ) {
-    const user   = await es.create(UserSchema,       { email });
-    const device = await es.create(UserDeviceSchema, {
-        deviceUser:      user.iri,
-        deviceUserAgent: opts.deviceUserAgent ?? 'TestBrowser/1.0',
-        devicePlatform:  'web',
+    return es.inTransaction(async ctx => {
+        const user   = await es.create(ctx, UserSchema, { email });
+        const device = await es.create(ctx, UserDeviceSchema, {
+            deviceUser:      user.iri,
+            deviceUserAgent: opts.deviceUserAgent ?? 'TestBrowser/1.0',
+            devicePlatform:  'web',
+        });
+        const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+        const session = await es.create(ctx, UserSessionSchema, {
+            sessionUser:   user.iri,
+            sessionDevice: device.iri,
+            expiresAt,
+            isActive: opts.isActive ?? true,
+        });
+        return { user, device, session };
     });
-    const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000);
-    const session = await es.create(UserSessionSchema, {
-        sessionUser:   user.iri,
-        sessionDevice: device.iri,
-        expiresAt,
-        isActive: opts.isActive ?? true,
-    });
-    return { user, device, session };
 }
 
 
@@ -110,15 +112,15 @@ for (const db of providers) {
         });
 
         it('returns all users', async () => {
-            await ctx.es.create(UserSchema, { email: 'a@test.com' });
-            await ctx.es.create(UserSchema, { email: 'b@test.com' });
-            await ctx.es.create(UserSchema, { email: 'c@test.com' });
+            await ctx.es.create({}, UserSchema, { email: 'a@test.com' });
+            await ctx.es.create({}, UserSchema, { email: 'b@test.com' });
+            await ctx.es.create({}, UserSchema, { email: 'c@test.com' });
             const users = await listUsers(ctx.es);
             expect(users).toHaveLength(3);
         });
 
         it('each user record has id, iri, and core group', async () => {
-            await ctx.es.create(UserSchema, { email: 'alice@test.com', displayName: 'Alice' });
+            await ctx.es.create({}, UserSchema, { email: 'alice@test.com', displayName: 'Alice' });
             const [user] = await listUsers(ctx.es);
             expect(user!.id).toBeTruthy();
             expect(user!.iri).toContain('http://tern.dev/ns/auth/user/');
@@ -140,18 +142,18 @@ for (const db of providers) {
         });
 
         it('returns all devices across all users', async () => {
-            const alice = await ctx.es.create(UserSchema, { email: 'a@test.com' });
-            const bob   = await ctx.es.create(UserSchema, { email: 'b@test.com' });
-            await ctx.es.create(UserDeviceSchema, { deviceUser: alice.iri, devicePlatform: 'web' });
-            await ctx.es.create(UserDeviceSchema, { deviceUser: alice.iri, devicePlatform: 'ios' });
-            await ctx.es.create(UserDeviceSchema, { deviceUser: bob.iri,   devicePlatform: 'android' });
+            const alice = await ctx.es.create({}, UserSchema, { email: 'a@test.com' });
+            const bob   = await ctx.es.create({}, UserSchema, { email: 'b@test.com' });
+            await ctx.es.create({}, UserDeviceSchema, { deviceUser: alice.iri, devicePlatform: 'web' });
+            await ctx.es.create({}, UserDeviceSchema, { deviceUser: alice.iri, devicePlatform: 'ios' });
+            await ctx.es.create({}, UserDeviceSchema, { deviceUser: bob.iri,   devicePlatform: 'android' });
             const devices = await listUserDevices(ctx.es);
             expect(devices).toHaveLength(3);
         });
 
         it('device record contains deviceUser IRI for join traversal', async () => {
-            const user = await ctx.es.create(UserSchema, { email: 'a@test.com' });
-            await ctx.es.create(UserDeviceSchema, {
+            const user = await ctx.es.create({}, UserSchema, { email: 'a@test.com' });
+            await ctx.es.create({}, UserDeviceSchema, {
                 deviceUser:      user.iri,
                 deviceUserAgent: 'Chrome/120',
                 devicePlatform:  'web',
@@ -172,7 +174,7 @@ for (const db of providers) {
 
         it('separates active and inactive sessions', async () => {
             const { user, device } = await makeUserWithSession(ctx.es, 'x@test.com');
-            await ctx.es.create(UserSessionSchema, {
+            await ctx.es.create({}, UserSessionSchema, {
                 sessionUser: user.iri, sessionDevice: device.iri,
                 expiresAt: new Date(Date.now() + 3600_000), isActive: false,
             });
@@ -213,7 +215,7 @@ for (const db of providers) {
         });
 
         it('returns user with null session and device when user has no sessions', async () => {
-            const user = await ctx.es.create(UserSchema, { email: 'a@test.com' });
+            const user = await ctx.es.create({}, UserSchema, { email: 'a@test.com' });
             const result = await findUserWithRecentActivity(ctx.es, user.id);
             expect(result).not.toBeNull();
             expect(result!.user.id).toBe(user.id);
@@ -234,7 +236,7 @@ for (const db of providers) {
             const { user, device } = await makeUserWithSession(ctx.es, 'c@test.com');
 
             // Add a second session (created after the first)
-            const laterSession = await ctx.es.create(UserSessionSchema, {
+            const laterSession = await ctx.es.create({}, UserSessionSchema, {
                 sessionUser:   user.iri,
                 sessionDevice: device.iri,
                 expiresAt:     new Date(Date.now() + 7 * 24 * 3600 * 1000),
@@ -245,16 +247,16 @@ for (const db of providers) {
         });
 
         it('resolves device from most-recent session, not older sessions', async () => {
-            const user    = await ctx.es.create(UserSchema, { email: 'd@test.com' });
-            const device1 = await ctx.es.create(UserDeviceSchema, { deviceUser: user.iri, devicePlatform: 'web' });
-            const device2 = await ctx.es.create(UserDeviceSchema, { deviceUser: user.iri, devicePlatform: 'ios' });
+            const user    = await ctx.es.create({}, UserSchema, { email: 'd@test.com' });
+            const device1 = await ctx.es.create({}, UserDeviceSchema, { deviceUser: user.iri, devicePlatform: 'web' });
+            const device2 = await ctx.es.create({}, UserDeviceSchema, { deviceUser: user.iri, devicePlatform: 'ios' });
 
-            await ctx.es.create(UserSessionSchema, {
+            await ctx.es.create({}, UserSessionSchema, {
                 sessionUser: user.iri, sessionDevice: device1.iri,
                 expiresAt: new Date(Date.now() + 1_000),
             });
             // Second (more recent) session uses device2
-            const newerSession = await ctx.es.create(UserSessionSchema, {
+            const newerSession = await ctx.es.create({}, UserSessionSchema, {
                 sessionUser: user.iri, sessionDevice: device2.iri,
                 expiresAt: new Date(Date.now() + 7 * 24 * 3600_000),
             });

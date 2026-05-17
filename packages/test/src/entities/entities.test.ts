@@ -113,21 +113,21 @@ for (const db of providers) {
         afterEach(async () => { await teardown(ctx); });
 
         it('creates a user and returns an id / iri', async () => {
-            const rec = await ctx.es.create(UserSchema, { email: 'alice@example.com' });
+            const rec = await ctx.es.create({}, UserSchema, { email: 'alice@example.com' });
             expect(rec.id).toBeTruthy();
             expect(rec.iri).toContain('http://tern.dev/ns/auth/user/');
             expect(rec.iri).toContain(rec.id);
         });
 
         it('applies createdAt / updatedAt defaults automatically', async () => {
-            const rec  = await ctx.es.create(UserSchema, { email: 'bob@example.com' });
+            const rec  = await ctx.es.create({}, UserSchema, { email: 'bob@example.com' });
             const core = rec.groups[CoreHandle.id]!;
             expect(core['createdAt']).toBeInstanceOf(Date);
             expect(core['updatedAt']).toBeInstanceOf(Date);
         });
 
         it('findById returns the entity with correct props', async () => {
-            const created = await ctx.es.create(UserSchema, { email: 'carol@example.com', displayName: 'Carol' });
+            const created = await ctx.es.create({}, UserSchema, { email: 'carol@example.com', displayName: 'Carol' });
             const found   = await ctx.es.findById(UserSchema, created.id, [CoreHandle]);
             const core    = found!.groups[CoreHandle.id]!;
             expect(core['email']).toBe('carol@example.com');
@@ -139,16 +139,16 @@ for (const db of providers) {
         });
 
         it('updateGroup patches specific fields', async () => {
-            const rec = await ctx.es.create(UserSchema, { email: 'd@example.com', displayName: 'Old' });
-            await ctx.es.updateGroup(UserSchema, rec.id, CoreHandle, { displayName: 'New' });
+            const rec = await ctx.es.create({}, UserSchema, { email: 'd@example.com', displayName: 'Old' });
+            await ctx.es.updateGroup({}, UserSchema, rec.id, CoreHandle, { displayName: 'New' });
             const updated = await ctx.es.findById(UserSchema, rec.id, [CoreHandle]);
             expect(updated!.groups[CoreHandle.id]!['displayName']).toBe('New');
             expect(updated!.groups[CoreHandle.id]!['email']).toBe('d@example.com'); // unchanged
         });
 
         it('delete removes the entity and all PropGroups', async () => {
-            const rec = await ctx.es.create(UserSchema, { email: 'e@example.com' });
-            await ctx.es.delete(UserSchema, rec.id);
+            const rec = await ctx.es.create({}, UserSchema, { email: 'e@example.com' });
+            await ctx.es.delete({}, UserSchema, rec.id);
             expect(await ctx.es.findById(UserSchema, rec.id, '*')).toBeNull();
         });
 
@@ -157,8 +157,8 @@ for (const db of providers) {
             const roleIRI   = new IRI('http://test.dev/role');
             UserSchema.register({ handle: ExtHandle, properties: { role: roleIRI } });
 
-            const rec = await ctx.es.create(UserSchema, { email: 'f@example.com' });
-            await ctx.es.addGroup(UserSchema, rec.id, ExtHandle, { role: 'admin' });
+            const rec = await ctx.es.create({}, UserSchema, { email: 'f@example.com' });
+            await ctx.es.addGroup({}, UserSchema, rec.id, ExtHandle, { role: 'admin' });
 
             const full = await ctx.es.findById(UserSchema, rec.id, '*');
             expect(full!.groups[ExtHandle.id]!['role']).toBe('admin');
@@ -169,7 +169,7 @@ for (const db of providers) {
         });
 
         it('groupOf() helper narrows the type', async () => {
-            const rec  = await ctx.es.create(UserSchema, { email: 'g@example.com' });
+            const rec  = await ctx.es.create({}, UserSchema, { email: 'g@example.com' });
             const found = await ctx.es.findById(UserSchema, rec.id, [CoreHandle]);
             const core  = groupOf(found!, UserSchema.allGroups()[0]!);
             expect(core).toBeDefined();
@@ -187,29 +187,29 @@ for (const db of providers) {
 
         it('applies static defaults when property is absent', async () => {
             const schema = makeTestSchema();
-            const rec    = await ctx.es.create(schema, { name: 'Widget' });
+            const rec    = await ctx.es.create({}, schema, { name: 'Widget' });
             expect(rec.groups[TestCoreHandle.id]!['score']).toBe(0);
         });
 
         it('does not override an explicitly supplied value', async () => {
             const schema = makeTestSchema();
-            const rec    = await ctx.es.create(schema, { name: 'Widget', score: 99 });
+            const rec    = await ctx.es.create({}, schema, { name: 'Widget', score: 99 });
             expect(rec.groups[TestCoreHandle.id]!['score']).toBe(99);
         });
 
         it('applies defaults from extension PropGroup on addGroup', async () => {
             const schema = makeTestSchema();
-            const rec    = await ctx.es.create(schema, { name: 'Widget' });
-            await ctx.es.addGroup(schema, rec.id, TestExtHandle, { rank: 5 });
+            const rec    = await ctx.es.create({}, schema, { name: 'Widget' });
+            await ctx.es.addGroup({}, schema, rec.id, TestExtHandle, { rank: 5 });
             const found  = await ctx.es.findById(schema, rec.id, [TestExtHandle]);
             expect(found!.groups[TestExtHandle.id]!['active']).toBe(true);
             expect(found!.groups[TestExtHandle.id]!['rank']).toBe(5);
         });
 
         it('factory defaults produce independent values per entity', async () => {
-            const rec1 = await ctx.es.create(UserSchema, { email: 'h1@example.com' });
+            const rec1 = await ctx.es.create({}, UserSchema, { email: 'h1@example.com' });
             await new Promise(r => setTimeout(r, 5)); // ensure different timestamps
-            const rec2 = await ctx.es.create(UserSchema, { email: 'h2@example.com' });
+            const rec2 = await ctx.es.create({}, UserSchema, { email: 'h2@example.com' });
 
             const t1 = rec1.groups[CoreHandle.id]!['createdAt'] as Date;
             const t2 = rec2.groups[CoreHandle.id]!['createdAt'] as Date;
@@ -227,9 +227,9 @@ for (const db of providers) {
         beforeEach(async () => {
             ctx    = await setup(db);
             schema = makeTestSchema();
-            await ctx.es.create(schema, { name: 'Alpha', email: 'alpha@example.com', score: 10 });
-            await ctx.es.create(schema, { name: 'Beta',  email: 'beta@example.com',  score: 20 });
-            await ctx.es.create(schema, { name: 'Gamma', email: 'gamma@example.com', score: 30 });
+            await ctx.es.create({}, schema, { name: 'Alpha', email: 'alpha@example.com', score: 10 });
+            await ctx.es.create({}, schema, { name: 'Beta',  email: 'beta@example.com',  score: 20 });
+            await ctx.es.create({}, schema, { name: 'Gamma', email: 'gamma@example.com', score: 30 });
         });
         afterEach(async () => { await teardown(ctx); });
 
@@ -292,10 +292,10 @@ for (const db of providers) {
         beforeEach(async () => {
             ctx    = await setup(db);
             schema = makeTestSchema();
-            const a = await ctx.es.create(schema, { name: 'Alice', email: 'a@example.com', score: 10 });
-            const b = await ctx.es.create(schema, { name: 'Bob',   email: 'b@example.com', score: 20 });
-            await ctx.es.addGroup(schema, a.id, TestExtHandle, { rank: 1, active: true  });
-            await ctx.es.addGroup(schema, b.id, TestExtHandle, { rank: 2, active: false });
+            const a = await ctx.es.create({}, schema, { name: 'Alice', email: 'a@example.com', score: 10 });
+            const b = await ctx.es.create({}, schema, { name: 'Bob',   email: 'b@example.com', score: 20 });
+            await ctx.es.addGroup({}, schema, a.id, TestExtHandle, { rank: 1, active: true  });
+            await ctx.es.addGroup({}, schema, b.id, TestExtHandle, { rank: 2, active: false });
         });
         afterEach(async () => { await teardown(ctx); });
 
@@ -335,8 +335,8 @@ for (const db of providers) {
                 { name: 'P3', email: 'p3@ex.com', score: 30 },
             ];
             for (const [i, e] of entities_.entries()) {
-                const rec = await ctx.es.create(schema, e);
-                await ctx.es.addGroup(schema, rec.id, TestExtHandle, {
+                const rec = await ctx.es.create({}, schema, e);
+                await ctx.es.addGroup({}, schema, rec.id, TestExtHandle, {
                     rank:   i + 1,
                     active: i !== 1, // P2 is inactive
                 });
@@ -376,9 +376,9 @@ for (const db of providers) {
         beforeEach(async () => {
             ctx    = await setup(db);
             schema = makeTestSchema();
-            await ctx.es.create(schema, { name: 'Charlie', score: 30 });
-            await ctx.es.create(schema, { name: 'Alice',   score: 10 });
-            await ctx.es.create(schema, { name: 'Bob',     score: 20 });
+            await ctx.es.create({}, schema, { name: 'Charlie', score: 30 });
+            await ctx.es.create({}, schema, { name: 'Alice',   score: 10 });
+            await ctx.es.create({}, schema, { name: 'Bob',     score: 20 });
         });
         afterEach(async () => { await teardown(ctx); });
 
@@ -410,7 +410,7 @@ for (const db of providers) {
         });
 
         it('orderBy combined with filter', async () => {
-            await ctx.es.create(schema, { name: 'Dave', score: 10 });
+            await ctx.es.create({}, schema, { name: 'Dave', score: 10 });
             const results = await entities(ctx.store)
                 .find(schema, [TestCoreHandle])
                 .where(TestCoreHandle, 'score', '=', 10)
@@ -432,7 +432,7 @@ for (const db of providers) {
         beforeEach(async () => {
             ctx    = await setup(db);
             schema = makeTestSchema();
-            const rec = await ctx.es.create(schema, { name: 'Colls' });
+            const rec = await ctx.es.create({}, schema, { name: 'Colls' });
             itemId = rec.id;
         });
         afterEach(async () => { await teardown(ctx); });
@@ -443,14 +443,14 @@ for (const db of providers) {
         });
 
         it('collectionPush appends values in insertion order', async () => {
-            await ctx.es.collectionPush(schema, itemId, TestCoreHandle, 'tags', 'alpha', 'beta', 'gamma');
+            await ctx.es.collectionPush({}, schema, itemId, TestCoreHandle, 'tags', 'alpha', 'beta', 'gamma');
             const tags = await ctx.es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual(['alpha', 'beta', 'gamma']);
         });
 
         it('collectionRemove deletes a specific value', async () => {
-            await ctx.es.collectionPush(schema, itemId, TestCoreHandle, 'tags', 'a', 'b', 'c');
-            const removed = await ctx.es.collectionRemove(schema, itemId, TestCoreHandle, 'tags', 'b');
+            await ctx.es.collectionPush({}, schema, itemId, TestCoreHandle, 'tags', 'a', 'b', 'c');
+            const removed = await ctx.es.collectionRemove({}, schema, itemId, TestCoreHandle, 'tags', 'b');
             expect(removed).toBe(true);
             const tags = await ctx.es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
             expect(tags).not.toContain('b');
@@ -459,69 +459,69 @@ for (const db of providers) {
         });
 
         it('collectionRemove returns false when value not present', async () => {
-            const removed = await ctx.es.collectionRemove(schema, itemId, TestCoreHandle, 'tags', 'ghost');
+            const removed = await ctx.es.collectionRemove({}, schema, itemId, TestCoreHandle, 'tags', 'ghost');
             expect(removed).toBe(false);
         });
 
         it('collectionPop removes and returns the last item', async () => {
-            await ctx.es.collectionPush(schema, itemId, TestCoreHandle, 'tags', 'first', 'second', 'third');
-            const last = await ctx.es.collectionPop(schema, itemId, TestCoreHandle, 'tags');
+            await ctx.es.collectionPush({}, schema, itemId, TestCoreHandle, 'tags', 'first', 'second', 'third');
+            const last = await ctx.es.collectionPop({}, schema, itemId, TestCoreHandle, 'tags');
             expect(last).toBe('third');
             const tags = await ctx.es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual(['first', 'second']);
         });
 
         it('collectionPop on empty returns undefined', async () => {
-            const last = await ctx.es.collectionPop(schema, itemId, TestCoreHandle, 'tags');
+            const last = await ctx.es.collectionPop({}, schema, itemId, TestCoreHandle, 'tags');
             expect(last).toBeUndefined();
         });
 
         it('collectionSet replaces entire collection', async () => {
-            await ctx.es.collectionPush(schema, itemId, TestCoreHandle, 'tags', 'x', 'y');
-            await ctx.es.collectionSet(schema, itemId, TestCoreHandle, 'tags', ['p', 'q', 'r']);
+            await ctx.es.collectionPush({}, schema, itemId, TestCoreHandle, 'tags', 'x', 'y');
+            await ctx.es.collectionSet({}, schema, itemId, TestCoreHandle, 'tags', ['p', 'q', 'r']);
             const tags = await ctx.es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual(['p', 'q', 'r']);
         });
 
         it('collectionSet with empty array clears the collection', async () => {
-            await ctx.es.collectionPush(schema, itemId, TestCoreHandle, 'tags', 'tag1');
-            await ctx.es.collectionSet(schema, itemId, TestCoreHandle, 'tags', []);
+            await ctx.es.collectionPush({}, schema, itemId, TestCoreHandle, 'tags', 'tag1');
+            await ctx.es.collectionSet({}, schema, itemId, TestCoreHandle, 'tags', []);
             const tags = await ctx.es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual([]);
         });
 
         it('collectionInsertAt inserts at the beginning', async () => {
-            await ctx.es.collectionPush(schema, itemId, TestCoreHandle, 'tags', 'b', 'c');
-            await ctx.es.collectionInsertAt(schema, itemId, TestCoreHandle, 'tags', 0, 'a');
+            await ctx.es.collectionPush({}, schema, itemId, TestCoreHandle, 'tags', 'b', 'c');
+            await ctx.es.collectionInsertAt({}, schema, itemId, TestCoreHandle, 'tags', 0, 'a');
             const tags = await ctx.es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual(['a', 'b', 'c']);
         });
 
         it('collectionInsertAt inserts in the middle', async () => {
-            await ctx.es.collectionPush(schema, itemId, TestCoreHandle, 'tags', 'a', 'c');
-            await ctx.es.collectionInsertAt(schema, itemId, TestCoreHandle, 'tags', 1, 'b');
+            await ctx.es.collectionPush({}, schema, itemId, TestCoreHandle, 'tags', 'a', 'c');
+            await ctx.es.collectionInsertAt({}, schema, itemId, TestCoreHandle, 'tags', 1, 'b');
             const tags = await ctx.es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual(['a', 'b', 'c']);
         });
 
         it('collectionInsertAt appends when index exceeds length', async () => {
-            await ctx.es.collectionPush(schema, itemId, TestCoreHandle, 'tags', 'one', 'two');
-            await ctx.es.collectionInsertAt(schema, itemId, TestCoreHandle, 'tags', 99, 'three');
+            await ctx.es.collectionPush({}, schema, itemId, TestCoreHandle, 'tags', 'one', 'two');
+            await ctx.es.collectionInsertAt({}, schema, itemId, TestCoreHandle, 'tags', 99, 'three');
             const tags = await ctx.es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual(['one', 'two', 'three']);
         });
 
         it('sorting a collection via collectionSet', async () => {
-            await ctx.es.collectionPush(schema, itemId, TestCoreHandle, 'tags', 'gamma', 'alpha', 'beta');
+            await ctx.es.collectionPush({}, schema, itemId, TestCoreHandle, 'tags', 'gamma', 'alpha', 'beta');
             const current = (await ctx.es.collectionGet(schema, itemId, TestCoreHandle, 'tags')) as string[];
             const sorted  = [...current].sort();
-            await ctx.es.collectionSet(schema, itemId, TestCoreHandle, 'tags', sorted);
+            await ctx.es.collectionSet({}, schema, itemId, TestCoreHandle, 'tags', sorted);
             const tags = await ctx.es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual(['alpha', 'beta', 'gamma']);
         });
 
         it('hydrated findById returns collection as array', async () => {
-            await ctx.es.collectionPush(schema, itemId, TestCoreHandle, 'tags', 'x', 'y', 'z');
+            await ctx.es.collectionPush({}, schema, itemId, TestCoreHandle, 'tags', 'x', 'y', 'z');
             const found = await ctx.es.findById(schema, itemId, [TestCoreHandle]);
             expect(found!.groups[TestCoreHandle.id]!['tags']).toEqual(['x', 'y', 'z']);
         });

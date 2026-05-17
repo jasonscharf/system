@@ -146,4 +146,29 @@ export class AuthService {
             this._sessions.revoke(token),
         ]);
     }
+
+    /** Returns all sessions (active and inactive) for a user. */
+    async listSessions(userId: string): Promise<import('./types.js').UserSessionEntity[]> {
+        return this._sessions.findByUserId(userId);
+    }
+
+    /**
+     * Revokes all active sessions for the user: removes them from the fast-path
+     * session store AND marks them inactive in the triple store.
+     * Returns the count of sessions that were revoked.
+     */
+    async revokeAllSessions(userId: string): Promise<number> {
+        const sessions = await this._sessions.findByUserId(userId);
+        const active   = sessions.filter(s => s.isActive);
+
+        await Promise.all(
+            active.map(s => this._store.del(`tern:session:${s.sessionToken}`)),
+        );
+        return this._sessions.revokeAllForUser(userId);
+    }
+
+    /** Returns true if the provider name is registered. */
+    hasProvider(name: string): boolean {
+        return this._providers.has(name as import('./types.js').OAuthProvider);
+    }
 }

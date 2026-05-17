@@ -1,5 +1,19 @@
-// ── Entity schema (extend via UserSchema.register(myPropGroup)) ───────────────
-export { UserSchema, CoreHandle } from './entities/UserSchema.js';
+// ── Entity schemas ────────────────────────────────────────────────────────────
+export { UserSchema,       CoreHandle       } from './entities/UserSchema.js';
+export { UserDeviceSchema, DeviceCoreHandle } from './entities/UserDeviceSchema.js';
+export { UserSessionSchema, SessionCoreHandle } from './entities/UserSessionSchema.js';
+
+// ── Entity queries (list, join) ───────────────────────────────────────────────
+export {
+    listUsers,
+    listUserDevices,
+    listActiveSessions,
+    listInactiveSessions,
+    findUserWithRecentActivity,
+    findSessionsByTokens,
+    findUserBySession,
+} from './queries.js';
+export type { UserWithActivity } from './queries.js';
 
 // ── Core service ──────────────────────────────────────────────────────────────
 export { AuthService } from './AuthService.js';

@@ -65,8 +65,11 @@ export class UserDeviceRepository {
     }
 
     private async _findByUserAndAgent(userId: string, userAgent?: string): Promise<UserDeviceEntity | null> {
+        // No User-Agent → always create a new device record.
+        // Falling back to the first registered device would silently associate a
+        // headless / unknown client with an existing named device (e.g. a phone).
+        if (!userAgent) { return null; }
         const devices = await this.findByUserId(userId);
-        if (!userAgent) { return devices[0] ?? null; }
         return devices.find(d => d.deviceUserAgent === userAgent) ?? null;
     }
 

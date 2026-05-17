@@ -58,6 +58,9 @@ export class EntityStore {
 
     constructor(private readonly _store: TripleStore) {}
 
+    /** The underlying TripleStore — use when you need raw quad access or the EntityQuery builder. */
+    get store(): TripleStore { return this._store; }
+
     /** Lazy-initialised CollectionViewStore — avoids import cycle at module load. */
     private _cvs(): CollectionViewStore {
         if (!this._cvsInstance) { this._cvsInstance = new CollectionViewStore(this._store); }

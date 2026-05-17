@@ -1,7 +1,7 @@
 import type { IRI } from '@system/core';
 import { DEFAULT_GRAPH } from '@system/core';
 import type { Knex } from '@system/data';
-import { TripleStore, T, C } from '@system/data';
+import { TripleStore } from '@system/data';
 import { validate } from '@system/gen';
 import type { EntityHandle } from './Handle.js';
 import type { EntitySchema, PropGroupDef } from './EntitySchema.js';
@@ -72,10 +72,6 @@ export interface ApplicationContext {
 export const noCtx: ApplicationContext = Object.freeze({});
 
 // ── Internal row types (mirror @system/data/schema.ts) ─────────────────────
-
-interface NameRow { id: number; }
-interface NodeRow { id: number; kind: string; name_id: number | null; value: string | null; datatype: string | null; lang: string | null; }
-interface EdgeRow { id: number; subject: number; predicate: number; object: number; }
 
 // ── Return types ──────────────────────────────────────────────────────────────
 
@@ -288,25 +284,8 @@ export class EntityStore {
 
         const ent      = entityIri(schema.ns, localName(schema.typeIRI.value), id);
         const pg       = pgIri(ent.value, h);
-        const pgNodeId = await this._lookupNodeId(pg);
-        if (pgNodeId === null) { return []; }
-        const propNodeId = await this._lookupNodeId(propIri);
-        if (propNodeId === null) { return []; }
-
-        const edges = await this._store.knex(T.edges)
-            .where({ [C.subject]: pgNodeId, [C.predicate]: propNodeId })
-            .orderBy(C.id, 'asc')
-            .select<EdgeRow[]>(C.id, C.object);
-
-        if (edges.length === 0) { return []; }
-
-        const objIds = edges.map(e => e.object);
-        const nodes  = await this._store.knex(T.nodes)
-            .whereIn(C.id, objIds)
-            .select<NodeRow[]>(C.id, C.kind, 'name_id', C.value, C.datatype, C.lang);
-
-        const nodeMap = new Map(nodes.map(n => [n.id, n]));
-        return edges.map(e => this._nodeToValue(nodeMap.get(e.object))).filter(v => v !== undefined);
+        const quads = await this._store.findOrdered({ subject: pg, predicate: propIri });
+        return quads.map(q => fromLiteral(q.object)).filter(v => v !== undefined);
     }
 
     /** Appends one or more values to a collection property. Registered CollectionViews update automatically. */
@@ -554,19 +533,4 @@ export class EntityStore {
         if (!result.valid) { throw new EntityValidationError(result.violations); }
     }
 
-    private async _lookupNodeId(iri: IRI): Promise<number | null> {
-        const knex    = this._store.knex;
-        const nameRow = await knex(T.names).where(C.iri, iri.value).first<NameRow | undefined>();
-        if (!nameRow) { return null; }
-        const nodeRow = await knex(T.nodes)
-            .where({ [C.kind]: 'iri', [C.nameId]: nameRow.id })
-            .first<{ id: number } | undefined>();
-        return nodeRow?.id ?? null;
-    }
-
-    private _nodeToValue(row: NodeRow | undefined): unknown {
-        if (!row || row.kind !== 'literal') { return undefined; }
-        const dt = row.datatype ?? 'http://www.w3.org/2001/XMLSchema#string';
-        return fromLiteral({ termType: 'Literal', value: row.value ?? '', datatype: { value: dt } });
-    }
 }

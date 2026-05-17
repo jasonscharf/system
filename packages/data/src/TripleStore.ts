@@ -1,15 +1,52 @@
 import type { Knex } from 'knex';
 import { DEFAULT_GRAPH, type BlankNode, type DefaultGraph, type IRI, type Literal, type Quad } from '@system/core';
-import { C, T, type NodeKind } from './schema.js';
+import { C, T, type NodeKind, type LiteralJson } from './schema.js';
+import { coerceLiteralValue } from './migrations/002_time_series.js';
 
 
 // ── Internal row types ────────────────────────────────────────────────────────
 
 interface NameRow  { id: number; iri: string; }
-interface NodeRow  { id: number; kind: NodeKind; name_id: number | null; blank: string | null; value: string | null; datatype: string | null; lang: string | null; }
-interface EdgeRow  { id: number; subject: number; predicate: number; object: number; graph: number | null; }
+interface NodeRow  {
+    id: number;
+    kind: NodeKind;
+    name_id: number | null;
+    blank: string | null;
+    value: string | null;
+    datatype: string | null;
+    lang: string | null;
+    /** JSONB payload for literal nodes.  May be an object (Postgres) or JSON string (SQLite). */
+    value_json: LiteralJson | string | null;
+    created_at: string;
+    updated_at: string;
+}
+interface EdgeRow  {
+    id: number;
+    subject: number;
+    predicate: number;
+    object: number;
+    graph: number | null;
+    created_at: string;
+    updated_at: string;
+    is_deleted: boolean;
+    deleted_at: string | null;
+}
 
 type RdfTerm = IRI | BlankNode | Literal;
+
+// ── Literal JSONB helpers ─────────────────────────────────────────────────────
+
+function makeLiteralJson(value: string, datatypeIri: string, language?: string): LiteralJson {
+    const json: LiteralJson = { v: coerceLiteralValue(value, datatypeIri), dt: datatypeIri };
+    if (language) { json.lang = language; }
+    return json;
+}
+
+function parseLiteralJson(raw: LiteralJson | string | null): LiteralJson | null {
+    if (!raw) { return null; }
+    if (typeof raw === 'string') { return JSON.parse(raw) as LiteralJson; }
+    return raw;
+}
 
 // ── Term helpers ──────────────────────────────────────────────────────────────
 
@@ -28,16 +65,30 @@ function nodeToTerm(row: NodeRow, nameIri: string | null): RdfTerm {
     if (row.kind === 'blank') {
         return { termType: 'BlankNode', id: row.blank! } satisfies BlankNode;
     }
+
+    // Literal — prefer the typed JSONB payload when present
+    const json = parseLiteralJson(row.value_json);
+    if (json) {
+        return {
+            termType: 'Literal',
+            value:    String(json.v),
+            datatype: makeIRI(json.dt),
+            language: json.lang ?? undefined,
+        } satisfies Literal;
+    }
+
+    // Fallback: legacy value / datatype / lang columns (pre-migration rows)
+    /* v8 ignore next -- row.datatype is always set by ensureNode */
+    const dtIri = row.datatype ?? 'http://www.w3.org/2001/XMLSchema#string';
     return {
         termType: 'Literal',
         value:    row.value!,
-        /* v8 ignore next -- row.datatype is always set by ensureNode */
-        datatype: makeIRI(row.datatype ?? 'http://www.w3.org/2001/XMLSchema#string'),
+        datatype: makeIRI(dtIri),
         language: row.lang ?? undefined,
     } satisfies Literal;
 }
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Public API types ──────────────────────────────────────────────────────────
 
 export interface QuadPattern {
     subject?:   IRI | BlankNode;
@@ -46,23 +97,44 @@ export interface QuadPattern {
     graph?:     IRI | null;
 }
 
+/** A quad annotated with its temporal metadata (returned by findHistory). */
+export interface QuadHistory extends Quad {
+    /** When this edge was first asserted. */
+    createdAt: Date;
+    /** When this edge was last modified (same as deletedAt when soft-deleted). */
+    updatedAt: Date;
+    /** True if this version has been superseded by a newer assertion. */
+    isDeleted: boolean;
+    /** When this version was soft-deleted; null while still active. */
+    deletedAt: Date | null;
+}
+
 export interface StoreStats {
     namespaces: number;
     names:      number;
     nodes:      number;
+    /** Count of active (non-deleted) edges only. */
     edges:      number;
+    /** Count of all edges including soft-deleted history. */
+    edgesTotal: number;
 }
 
 // ── TripleStore ───────────────────────────────────────────────────────────────
 
 /**
- * RDF quad store backed by Knex.
+ * Graph + time-series RDF quad store backed by Knex.
  *
- * Schema:
- *   tern_namespaces  — known prefix → IRI mappings
- *   tern_names       — every unique IRI encountered
- *   tern_nodes       — every unique RDF term (IRI / blank / literal)
- *   tern_edges       — quads (subject, predicate, object, graph)
+ * Schema (see migrations/001_init.ts + 002_time_series.ts):
+ *   tern_namespaces — prefix → IRI mappings
+ *   tern_names      — every unique IRI interned once
+ *   tern_nodes      — every RDF term (IRI / blank / literal); all carry created_at + updated_at.
+ *                     Literal nodes additionally store a typed JSONB payload in value_json.
+ *   tern_edges      — quads (subject, predicate, object, graph) with full temporal metadata.
+ *
+ * All writes are append-only:
+ *   - Nodes are interned on first use and never deleted.
+ *   - Edges are soft-deleted (is_deleted=true + deleted_at timestamp) rather than
+ *     physically removed.  findHistory() returns the full audit trail.
  */
 export class TripleStore {
     private readonly _knex: Knex;
@@ -93,23 +165,39 @@ export class TripleStore {
     }
 
     async ensureNode(term: RdfTerm): Promise<number> {
+        const now = new Date().toISOString();
+
         if (isIRI(term)) {
             const nameId = await this.ensureName(term.value);
-            const row = await this._knex(T.nodes).where({ [C.kind]: 'iri', [C.nameId]: nameId }).first<NodeRow>();
+            const row = await this._knex(T.nodes)
+                .where({ [C.kind]: 'iri', [C.nameId]: nameId })
+                .first<NodeRow>();
             if (row) { return row.id; }
-            const [id] = await this._knex(T.nodes).insert({ [C.kind]: 'iri', [C.nameId]: nameId });
+            const [id] = await this._knex(T.nodes).insert({
+                [C.kind]:      'iri',
+                [C.nameId]:    nameId,
+                [C.createdAt]: now,
+                [C.updatedAt]: now,
+            });
             return id as number;
         }
 
         if (term.termType === 'BlankNode') {
-            const row = await this._knex(T.nodes).where({ [C.kind]: 'blank', [C.blank]: term.id }).first<NodeRow>();
+            const row = await this._knex(T.nodes)
+                .where({ [C.kind]: 'blank', [C.blank]: term.id })
+                .first<NodeRow>();
             if (row) { return row.id; }
-            const [id] = await this._knex(T.nodes).insert({ [C.kind]: 'blank', [C.blank]: term.id });
+            const [id] = await this._knex(T.nodes).insert({
+                [C.kind]:      'blank',
+                [C.blank]:     term.id,
+                [C.createdAt]: now,
+                [C.updatedAt]: now,
+            });
             return id as number;
         }
 
-        // Literal
-        /* v8 ignore next -- Literal.datatype is always an IRI via the public API */
+        // Literal node — deduplicate by (value, datatype, lang), populate value_json
+        /* v8 ignore next */
         const dtIri = term.datatype?.value ?? 'http://www.w3.org/2001/XMLSchema#string';
         const row = await this._knex(T.nodes).where({
             [C.kind]:     'literal',
@@ -118,17 +206,27 @@ export class TripleStore {
             [C.lang]:     term.language ?? null,
         }).first<NodeRow>();
         if (row) { return row.id; }
+
+        const jsonPayload = makeLiteralJson(term.value, dtIri, term.language);
         const [id] = await this._knex(T.nodes).insert({
-            [C.kind]:     'literal',
-            [C.value]:    term.value,
-            [C.datatype]: dtIri,
-            [C.lang]:     term.language ?? null,
+            [C.kind]:      'literal',
+            [C.value]:     term.value,
+            [C.datatype]:  dtIri,
+            [C.lang]:      term.language ?? null,
+            [C.valueJson]: JSON.stringify(jsonPayload),
+            [C.createdAt]: now,
+            [C.updatedAt]: now,
         });
         return id as number;
     }
 
     // ── Write ─────────────────────────────────────────────────────────────────
 
+    /**
+     * Asserts a quad.  Idempotent: if an identical active quad already exists,
+     * nothing is written.  Restores a previously soft-deleted quad by creating
+     * a fresh edge row (the soft-deleted row is left as history).
+     */
     async insert(quad: Quad): Promise<void> {
         const [sId, pId, oId] = await Promise.all([
             this.ensureNode(quad.subject as RdfTerm),
@@ -139,52 +237,73 @@ export class TripleStore {
         const gIsDefault = !quad.graph || ('termType' in quad.graph && quad.graph.termType === 'DefaultGraph');
         const gId = gIsDefault ? null : await this.ensureNode(quad.graph as IRI);
 
-        await this._knex(T.edges)
-            .insert({ [C.subject]: sId, [C.predicate]: pId, [C.object]: oId, [C.graph]: gId })
-            .onConflict([C.subject, C.predicate, C.object, C.graph])
-            .ignore();
+        // Deduplication: skip if an active edge with exactly this quad already exists
+        const existsQ = this._knex(T.edges)
+            .where({ [C.subject]: sId, [C.predicate]: pId, [C.object]: oId })
+            .where(C.isDeleted, false);
+        if (gId === null) { existsQ.whereNull(C.graph); } else { existsQ.where(C.graph, gId); }
+
+        const existing = await existsQ.first<{ id: number }>();
+        if (existing) { return; }
+
+        const now = new Date().toISOString();
+        await this._knex(T.edges).insert({
+            [C.subject]:   sId,
+            [C.predicate]: pId,
+            [C.object]:    oId,
+            [C.graph]:     gId,
+            [C.createdAt]: now,
+            [C.updatedAt]: now,
+            [C.isDeleted]: false,
+        });
     }
 
     async insertMany(quads: readonly Quad[]): Promise<void> {
-        for (const q of quads) {
-            await this.insert(q);
-        }
+        for (const q of quads) { await this.insert(q); }
     }
 
     // ── Read ──────────────────────────────────────────────────────────────────
 
+    /**
+     * Finds all active (non-deleted) quads matching the pattern.
+     * To include historical (soft-deleted) quads, use findHistory().
+     */
     async find(pattern: QuadPattern = {}): Promise<Quad[]> {
-        let q = this._knex(T.edges).select<EdgeRow[]>('*');
+        let q = this._knex(T.edges).where(C.isDeleted, false).select<EdgeRow[]>('*');
+        const ids = await this._patternIds(pattern);
+        if (ids === null) { return []; }
+        q = this._addPatternClauses(q, ids);
+        const edges = await q;
+        if (edges.length === 0) { return []; }
+        return this._hydrateEdges(edges);
+    }
 
-        if (pattern.subject !== undefined) {
-            const id = await this._nodeId(pattern.subject);
-            if (id === null) { return []; }
-            q = q.where(C.subject, id);
-        }
-        if (pattern.predicate !== undefined) {
-            const id = await this._nodeId(pattern.predicate);
-            if (id === null) { return []; }
-            q = q.where(C.predicate, id);
-        }
-        if (pattern.object !== undefined) {
-            const id = await this._nodeId(pattern.object);
-            if (id === null) { return []; }
-            q = q.where(C.object, id);
-        }
-        if (pattern.graph !== undefined) {
-            if (pattern.graph === null) {
-                q = q.whereNull(C.graph);
-            } else {
-                const id = await this._nodeId(pattern.graph);
-                if (id === null) { return []; }
-                q = q.where(C.graph, id);
-            }
-        }
+    /**
+     * Like find(), but returns edges sorted by insertion order (edge id ascending).
+     * Use this when the order of results is semantically meaningful (e.g. ordered collections).
+     */
+    async findOrdered(pattern: QuadPattern): Promise<Quad[]> {
+        let q = this._knex(T.edges).where(C.isDeleted, false).orderBy(C.id, 'asc').select<EdgeRow[]>('*');
+        const ids = await this._patternIds(pattern);
+        if (ids === null) { return []; }
+        q = this._addPatternClauses(q, ids);
+        const edges = await q;
+        if (edges.length === 0) { return []; }
+        return this._hydrateEdges(edges);
+    }
 
+    /**
+     * Returns ALL versions of quads matching the pattern, including soft-deleted
+     * ones, in ascending creation order.  Each result is annotated with temporal metadata.
+     */
+    async findHistory(pattern: QuadPattern = {}): Promise<QuadHistory[]> {
+        let q = this._knex(T.edges).orderBy(C.createdAt, 'asc').select<EdgeRow[]>('*');
+        const ids = await this._patternIds(pattern);
+        if (ids === null) { return []; }
+        q = this._addPatternClauses(q, ids);
         const edges = await q;
         if (edges.length === 0) { return []; }
 
-        // Collect all unique node IDs, then load in two queries
         const nodeIds = new Set<number>();
         for (const e of edges) {
             nodeIds.add(e.subject);
@@ -192,55 +311,84 @@ export class TripleStore {
             nodeIds.add(e.object);
             if (e.graph !== null) { nodeIds.add(e.graph); }
         }
-
         const nodeMap = await this._loadNodes([...nodeIds]);
 
         return edges.map(e => ({
-            subject:   nodeMap.get(e.subject)! as IRI | BlankNode,
+            subject:   nodeMap.get(e.subject)!   as IRI | BlankNode,
             predicate: nodeMap.get(e.predicate)! as IRI,
-            object:    nodeMap.get(e.object)! as RdfTerm,
+            object:    nodeMap.get(e.object)!    as RdfTerm,
             graph:     e.graph !== null
                 ? nodeMap.get(e.graph)! as IRI
                 : DEFAULT_GRAPH satisfies DefaultGraph,
+            createdAt: new Date(e.created_at),
+            updatedAt: new Date(e.updated_at),
+            isDeleted: !!e.is_deleted,
+            deletedAt: e.deleted_at ? new Date(e.deleted_at) : null,
         }));
     }
 
-    // ── Delete ────────────────────────────────────────────────────────────────
+    // ── Soft delete ───────────────────────────────────────────────────────────
 
+    /**
+     * Soft-deletes all active edges matching the pattern.
+     * Returns the count of edges marked as deleted.
+     * No data is physically removed.
+     */
     async delete(pattern: QuadPattern): Promise<number> {
-        let q = this._knex(T.edges);
-
-        if (pattern.subject !== undefined) {
-            const id = await this._nodeId(pattern.subject);
-            if (id === null) { return 0; }
-            q = q.where(C.subject, id);
-        }
-        if (pattern.predicate !== undefined) {
-            const id = await this._nodeId(pattern.predicate);
-            if (id === null) { return 0; }
-            q = q.where(C.predicate, id);
-        }
-        if (pattern.object !== undefined) {
-            const id = await this._nodeId(pattern.object);
-            if (id === null) { return 0; }
-            q = q.where(C.object, id);
-        }
-        if (pattern.graph !== undefined) {
-            if (pattern.graph === null) {
-                q = q.whereNull(C.graph);
-            } else {
-                const id = await this._nodeId(pattern.graph);
-                if (id === null) { return 0; }
-                q = q.where(C.graph, id);
-            }
-        }
-
-        return q.delete();
+        const now  = new Date().toISOString();
+        const ids  = await this._patternIds(pattern);
+        if (ids === null) { return 0; }
+        let q = this._knex(T.edges).where(C.isDeleted, false);
+        q = this._addPatternClauses(q, ids);
+        return q.update({ [C.isDeleted]: true, [C.deletedAt]: now, [C.updatedAt]: now });
     }
 
     /**
-     * Fetches all quads for a list of subjects in a single round-trip.
-     * Returns a Map keyed by subject IRI string (or blank-node id prefixed with `_:`).
+     * Soft-deletes all active edges whose subject is one of the given terms.
+     * Single SQL round-trip — use instead of calling delete() N times.
+     */
+    async deleteSubjects(subjects: readonly (IRI | BlankNode)[]): Promise<number> {
+        if (subjects.length === 0) { return 0; }
+        const ids = await Promise.all(subjects.map(s => this._nodeId(s as RdfTerm)));
+        const validIds = ids.filter((id): id is number => id !== null);
+        if (validIds.length === 0) { return 0; }
+
+        const now = new Date().toISOString();
+        return this._knex(T.edges)
+            .whereIn(C.subject, validIds)
+            .where(C.isDeleted, false)
+            .update({ [C.isDeleted]: true, [C.deletedAt]: now, [C.updatedAt]: now });
+    }
+
+    /**
+     * Soft-deletes active edges matching a subject AND whose predicate is one
+     * of the given IRIs.  Single SQL round-trip — use in updateGroup instead
+     * of N × delete(predicate).
+     */
+    async deleteBySubjectPredicates(
+        subject:    IRI | BlankNode,
+        predicates: readonly IRI[],
+    ): Promise<number> {
+        if (predicates.length === 0) { return 0; }
+        const sId  = await this._nodeId(subject as RdfTerm);
+        if (sId === null) { return 0; }
+        const pIds = await Promise.all(predicates.map(p => this._nodeId(p as RdfTerm)));
+        const validPIds = pIds.filter((id): id is number => id !== null);
+        if (validPIds.length === 0) { return 0; }
+
+        const now = new Date().toISOString();
+        return this._knex(T.edges)
+            .where(C.subject, sId)
+            .whereIn(C.predicate, validPIds)
+            .where(C.isDeleted, false)
+            .update({ [C.isDeleted]: true, [C.deletedAt]: now, [C.updatedAt]: now });
+    }
+
+    // ── Batch read ────────────────────────────────────────────────────────────
+
+    /**
+     * Fetches all active quads for a list of subjects in a single round-trip.
+     * Returns a Map keyed by subject IRI string (or `_:id` for blank nodes).
      */
     async findForSubjects(subjects: readonly (IRI | BlankNode)[]): Promise<Map<string, Quad[]>> {
         if (subjects.length === 0) { return new Map(); }
@@ -252,15 +400,14 @@ export class TripleStore {
         const idToSubject = new Map(validPairs.map(([term, id]) => [id, term]));
         const edges = await this._knex(T.edges)
             .whereIn(C.subject, validPairs.map(([, id]) => id))
+            .where(C.isDeleted, false)
             .select<EdgeRow[]>('*');
 
         if (edges.length === 0) { return new Map(); }
 
         const nodeIds = new Set<number>();
         for (const e of edges) {
-            nodeIds.add(e.subject);
-            nodeIds.add(e.predicate);
-            nodeIds.add(e.object);
+            nodeIds.add(e.subject); nodeIds.add(e.predicate); nodeIds.add(e.object);
             if (e.graph !== null) { nodeIds.add(e.graph); }
         }
         const nodeMap = await this._loadNodes([...nodeIds]);
@@ -273,7 +420,7 @@ export class TripleStore {
             result.get(key)!.push({
                 subject:   nodeMap.get(e.subject)! as IRI | BlankNode,
                 predicate: nodeMap.get(e.predicate)! as IRI,
-                object:    nodeMap.get(e.object)!,
+                object:    nodeMap.get(e.object)! as RdfTerm,
                 graph:     e.graph !== null
                     ? nodeMap.get(e.graph)! as IRI
                     : DEFAULT_GRAPH satisfies DefaultGraph,
@@ -282,43 +429,14 @@ export class TripleStore {
         return result;
     }
 
-    /**
-     * Deletes all edges whose subject is one of the given terms.
-     * Single SQL round-trip — use instead of calling delete() N times.
-     */
-    async deleteSubjects(subjects: readonly (IRI | BlankNode)[]): Promise<number> {
-        if (subjects.length === 0) { return 0; }
-        const ids = await Promise.all(subjects.map(s => this._nodeId(s as RdfTerm)));
-        const validIds = ids.filter((id): id is number => id !== null);
-        if (validIds.length === 0) { return 0; }
-        return this._knex(T.edges).whereIn(C.subject, validIds).delete();
-    }
-
-    /**
-     * Deletes edges matching a subject AND whose predicate is one of the given IRIs.
-     * Single SQL round-trip — use in updateGroup instead of N × delete(predicate).
-     */
-    async deleteBySubjectPredicates(
-        subject:    IRI | BlankNode,
-        predicates: readonly IRI[],
-    ): Promise<number> {
-        if (predicates.length === 0) { return 0; }
-        const sId  = await this._nodeId(subject as RdfTerm);
-        if (sId === null) { return 0; }
-        const pIds = await Promise.all(predicates.map(p => this._nodeId(p as RdfTerm)));
-        const validPIds = pIds.filter((id): id is number => id !== null);
-        if (validPIds.length === 0) { return 0; }
-        return this._knex(T.edges)
-            .where(C.subject, sId)
-            .whereIn(C.predicate, validPIds)
-            .delete();
-    }
+    // ── Stats ─────────────────────────────────────────────────────────────────
 
     async stats(): Promise<StoreStats> {
-        const [ns, na, no, ne] = await Promise.all([
+        const [ns, na, no, ne, net] = await Promise.all([
             this._knex(T.namespaces).count<[{ count: number }]>(`${C.id} as count`),
             this._knex(T.names).count<[{ count: number }]>(`${C.id} as count`),
             this._knex(T.nodes).count<[{ count: number }]>(`${C.id} as count`),
+            this._knex(T.edges).where(C.isDeleted, false).count<[{ count: number }]>(`${C.id} as count`),
             this._knex(T.edges).count<[{ count: number }]>(`${C.id} as count`),
         ]);
         return {
@@ -326,6 +444,7 @@ export class TripleStore {
             names:      Number(na[0].count),
             nodes:      Number(no[0].count),
             edges:      Number(ne[0].count),
+            edgesTotal: Number(net[0].count),
         };
     }
 
@@ -338,7 +457,7 @@ export class TripleStore {
             const node = await this._knex(T.nodes)
                 .where({ [C.kind]: 'iri', [C.nameId]: name.id })
                 .first<NodeRow>();
-            /* v8 ignore next -- name always has a corresponding node (ensureNode maintains this invariant) */
+            /* v8 ignore next */
             return node?.id ?? null;
         }
 
@@ -350,7 +469,7 @@ export class TripleStore {
         }
 
         // Literal
-        /* v8 ignore next -- Literal.datatype is always an IRI via the public API */
+        /* v8 ignore next */
         const dtIri = term.datatype?.value ?? 'http://www.w3.org/2001/XMLSchema#string';
         const node = await this._knex(T.nodes).where({
             [C.kind]:     'literal',
@@ -361,21 +480,91 @@ export class TripleStore {
         return node?.id ?? null;
     }
 
+    /**
+     * Resolves a QuadPattern to concrete node IDs.
+     * Returns null (meaning "no rows can match") if any required node isn't in the store.
+     */
+    private async _patternIds(pattern: QuadPattern): Promise<{
+        subject?:   number;
+        predicate?: number;
+        object?:    number;
+        graphId?:   number | null;  // null = default graph; undefined = no graph filter
+    } | null> {
+        const result: { subject?: number; predicate?: number; object?: number; graphId?: number | null } = {};
+
+        if (pattern.subject !== undefined) {
+            const id = await this._nodeId(pattern.subject);
+            if (id === null) { return null; }
+            result.subject = id;
+        }
+        if (pattern.predicate !== undefined) {
+            const id = await this._nodeId(pattern.predicate);
+            if (id === null) { return null; }
+            result.predicate = id;
+        }
+        if (pattern.object !== undefined) {
+            const id = await this._nodeId(pattern.object);
+            if (id === null) { return null; }
+            result.object = id;
+        }
+        if (pattern.graph !== undefined) {
+            if (pattern.graph === null) {
+                result.graphId = null;
+            } else {
+                const id = await this._nodeId(pattern.graph);
+                if (id === null) { return null; }
+                result.graphId = id;
+            }
+        }
+        return result;
+    }
+
+    /** Applies resolved pattern IDs as WHERE clauses to a query builder. */
+    private _addPatternClauses<R extends object>(
+        q: Knex.QueryBuilder<R>,
+        ids: Exclude<Awaited<ReturnType<TripleStore['_patternIds']>>, null>,
+    ): Knex.QueryBuilder<R> {
+        if (ids.subject   !== undefined) { q = q.where(C.subject,   ids.subject); }
+        if (ids.predicate !== undefined) { q = q.where(C.predicate, ids.predicate); }
+        if (ids.object    !== undefined) { q = q.where(C.object,    ids.object); }
+        if (ids.graphId   !== undefined) {
+            q = ids.graphId === null ? q.whereNull(C.graph) : q.where(C.graph, ids.graphId);
+        }
+        return q;
+    }
+
+    private async _hydrateEdges(edges: EdgeRow[]): Promise<Quad[]> {
+        const nodeIds = new Set<number>();
+        for (const e of edges) {
+            nodeIds.add(e.subject); nodeIds.add(e.predicate); nodeIds.add(e.object);
+            if (e.graph !== null) { nodeIds.add(e.graph); }
+        }
+        const nodeMap = await this._loadNodes([...nodeIds]);
+
+        return edges.map(e => ({
+            subject:   nodeMap.get(e.subject)!   as IRI | BlankNode,
+            predicate: nodeMap.get(e.predicate)! as IRI,
+            object:    nodeMap.get(e.object)!    as RdfTerm,
+            graph:     e.graph !== null
+                ? nodeMap.get(e.graph)! as IRI
+                : DEFAULT_GRAPH satisfies DefaultGraph,
+        }));
+    }
+
     private async _loadNodes(ids: number[]): Promise<Map<number, RdfTerm>> {
-        /* v8 ignore next -- always called with non-empty ids from find() */
+        /* v8 ignore next */
         if (ids.length === 0) { return new Map(); }
 
         const nodes = await this._knex(T.nodes).whereIn(C.id, ids).select<NodeRow[]>('*');
 
-        // Batch-load names for IRI nodes
         const iriNodeIds = nodes.filter(n => n.kind === 'iri' && n.name_id !== null).map(n => n.name_id!);
-        /* v8 ignore next -- valid RDF always has IRI predicates so iriNodeIds is never empty */
+        /* v8 ignore next */
         const names: NameRow[] = iriNodeIds.length > 0
             ? await this._knex(T.names).whereIn(C.id, iriNodeIds).select<NameRow[]>('*')
             : [];
         const nameMap = new Map(names.map(n => [n.id, n.iri]));
 
-        /* v8 ignore next -- blank/literal nodes (name_id=null) branch covered by existing tests */
+        /* v8 ignore next */
         return new Map(nodes.map(n => [n.id, nodeToTerm(n, n.name_id !== null ? (nameMap.get(n.name_id) ?? null) : null)]));
     }
 }

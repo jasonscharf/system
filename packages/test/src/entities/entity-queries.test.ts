@@ -83,6 +83,7 @@ async function makeUserWithSession(
             deviceUserAgent: opts.deviceUserAgent ?? 'TestBrowser/1.0',
             devicePlatform:  'web',
         });
+        // TODO: Move to constants/config
         const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000);
         const session = await es.create(ctx, UserSessionSchema, {
             sessionUser:   user.iri,

@@ -282,6 +282,38 @@ export class TripleStore {
         return result;
     }
 
+    /**
+     * Deletes all edges whose subject is one of the given terms.
+     * Single SQL round-trip — use instead of calling delete() N times.
+     */
+    async deleteSubjects(subjects: readonly (IRI | BlankNode)[]): Promise<number> {
+        if (subjects.length === 0) { return 0; }
+        const ids = await Promise.all(subjects.map(s => this._nodeId(s as RdfTerm)));
+        const validIds = ids.filter((id): id is number => id !== null);
+        if (validIds.length === 0) { return 0; }
+        return this._knex(T.edges).whereIn(C.subject, validIds).delete();
+    }
+
+    /**
+     * Deletes edges matching a subject AND whose predicate is one of the given IRIs.
+     * Single SQL round-trip — use in updateGroup instead of N × delete(predicate).
+     */
+    async deleteBySubjectPredicates(
+        subject:    IRI | BlankNode,
+        predicates: readonly IRI[],
+    ): Promise<number> {
+        if (predicates.length === 0) { return 0; }
+        const sId  = await this._nodeId(subject as RdfTerm);
+        if (sId === null) { return 0; }
+        const pIds = await Promise.all(predicates.map(p => this._nodeId(p as RdfTerm)));
+        const validPIds = pIds.filter((id): id is number => id !== null);
+        if (validPIds.length === 0) { return 0; }
+        return this._knex(T.edges)
+            .where(C.subject, sId)
+            .whereIn(C.predicate, validPIds)
+            .delete();
+    }
+
     async stats(): Promise<StoreStats> {
         const [ns, na, no, ne] = await Promise.all([
             this._knex(T.namespaces).count<[{ count: number }]>(`${C.id} as count`),

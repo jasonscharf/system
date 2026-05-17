@@ -97,13 +97,13 @@ for (const db of providers) {
         beforeEach(async () => {
             ctx    = await setup(db);
             schema = makeGroupSchema();
-            const g = await ctx.es.create(schema, { name: 'Engineering' });
+            const g = await ctx.es.create({}, schema, { name: 'Engineering' });
             groupId = g.id;
         });
         afterEach(() => teardown(ctx));
 
         it('createCollectionView on empty collection returns empty items', async () => {
-            const viewIri = await ctx.es.createCollectionView(schema, groupId, GroupHandle, 'member');
+            const viewIri = await ctx.es.createCollectionView({}, schema, groupId, GroupHandle, 'member');
             const view    = await ctx.cvs.getView(viewIri);
             expect(view).not.toBeNull();
             expect(view!.items).toHaveLength(0);
@@ -112,16 +112,16 @@ for (const db of providers) {
         });
 
         it('createCollectionView on populated collection pre-fills items', async () => {
-            await ctx.es.collectionPush(schema, groupId, GroupHandle, 'member', 'alice', 'bob', 'carol');
-            const viewIri = await ctx.es.createCollectionView(schema, groupId, GroupHandle, 'member');
+            await ctx.es.collectionPush({}, schema, groupId, GroupHandle, 'member', 'alice', 'bob', 'carol');
+            const viewIri = await ctx.es.createCollectionView({}, schema, groupId, GroupHandle, 'member');
             const view    = await ctx.cvs.getView(viewIri);
             expect(view!.items).toHaveLength(3);
             expect(view!.items.map(i => i.ref)).toEqual(['alice', 'bob', 'carol']);
         });
 
         it('getView returns items in position order (ascending)', async () => {
-            await ctx.es.collectionPush(schema, groupId, GroupHandle, 'member', 'z', 'm', 'a');
-            const viewIri = await ctx.es.createCollectionView(schema, groupId, GroupHandle, 'member');
+            await ctx.es.collectionPush({}, schema, groupId, GroupHandle, 'member', 'z', 'm', 'a');
+            const viewIri = await ctx.es.createCollectionView({}, schema, groupId, GroupHandle, 'member');
             const view    = await ctx.cvs.getView(viewIri);
             // Items are in insertion order, not alphabetical
             expect(view!.items.map(i => i.ref)).toEqual(['z', 'm', 'a']);
@@ -145,21 +145,21 @@ for (const db of providers) {
         beforeEach(async () => {
             ctx    = await setup(db);
             schema = makeGroupSchema();
-            const g = await ctx.es.create(schema, { name: 'Dev' });
+            const g = await ctx.es.create({}, schema, { name: 'Dev' });
             groupId = g.id;
-            viewIri = await ctx.es.createCollectionView(schema, groupId, GroupHandle, 'member');
+            viewIri = await ctx.es.createCollectionView({}, schema, groupId, GroupHandle, 'member');
         });
         afterEach(() => teardown(ctx));
 
         it('collectionPush adds item to registered view', async () => {
-            await ctx.es.collectionPush(schema, groupId, GroupHandle, 'member', 'alice');
+            await ctx.es.collectionPush({}, schema, groupId, GroupHandle, 'member', 'alice');
             const view = await ctx.cvs.getView(viewIri);
             expect(view!.items).toHaveLength(1);
             expect(view!.items[0]!.ref).toBe('alice');
         });
 
         it('collectionPush with multiple values adds all items', async () => {
-            await ctx.es.collectionPush(schema, groupId, GroupHandle, 'member', 'alice', 'bob');
+            await ctx.es.collectionPush({}, schema, groupId, GroupHandle, 'member', 'alice', 'bob');
             const view = await ctx.cvs.getView(viewIri);
             expect(view!.items).toHaveLength(2);
             expect(view!.items.map(i => i.ref)).toContain('alice');
@@ -167,15 +167,15 @@ for (const db of providers) {
         });
 
         it('collectionRemove removes item from registered view', async () => {
-            await ctx.es.collectionPush(schema, groupId, GroupHandle, 'member', 'alice', 'bob', 'carol');
-            await ctx.es.collectionRemove(schema, groupId, GroupHandle, 'member', 'bob');
+            await ctx.es.collectionPush({}, schema, groupId, GroupHandle, 'member', 'alice', 'bob', 'carol');
+            await ctx.es.collectionRemove({}, schema, groupId, GroupHandle, 'member', 'bob');
             const view = await ctx.cvs.getView(viewIri);
             expect(view!.items).toHaveLength(2);
             expect(view!.items.map(i => i.ref)).not.toContain('bob');
         });
 
         it('collectionPush is idempotent in view (same ref not added twice)', async () => {
-            await ctx.es.collectionPush(schema, groupId, GroupHandle, 'member', 'alice');
+            await ctx.es.collectionPush({}, schema, groupId, GroupHandle, 'member', 'alice');
             await ctx.cvs.addItem(viewIri, 'alice'); // explicit duplicate attempt
             const view = await ctx.cvs.getView(viewIri);
             expect(view!.items).toHaveLength(1);
@@ -258,21 +258,21 @@ for (const db of providers) {
             schema = makeGroupSchema();
 
             // Create User entities with displayNames in unsorted order
-            const charlie = await ctx.es.create(UserSchema, { email: 'c@test.com', displayName: 'Charlie' });
-            const alice   = await ctx.es.create(UserSchema, { email: 'a@test.com', displayName: 'Alice' });
-            const bob     = await ctx.es.create(UserSchema, { email: 'b@test.com', displayName: 'Bob' });
+            const charlie = await ctx.es.create({}, UserSchema, { email: 'c@test.com', displayName: 'Charlie' });
+            const alice   = await ctx.es.create({}, UserSchema, { email: 'a@test.com', displayName: 'Alice' });
+            const bob     = await ctx.es.create({}, UserSchema, { email: 'b@test.com', displayName: 'Bob' });
 
             // Create a Group and add users by their entity IRIs
-            const g = await ctx.es.create(schema, { name: 'Sorted Group' });
+            const g = await ctx.es.create({}, schema, { name: 'Sorted Group' });
             groupId = g.id;
-            await ctx.es.collectionPush(schema, groupId, GroupHandle, 'member',
+            await ctx.es.collectionPush({}, schema, groupId, GroupHandle, 'member',
                 charlie.iri, alice.iri, bob.iri);
         });
         afterEach(() => teardown(ctx));
 
         it('sortProp asc sorts items by property on referenced entity', async () => {
             const displayNameIRI = new IRI('http://tern.dev/ns/auth/displayName');
-            const viewIri = await ctx.es.createCollectionView(schema, groupId, GroupHandle, 'member', {
+            const viewIri = await ctx.es.createCollectionView({}, schema, groupId, GroupHandle, 'member', {
                 sortProp: displayNameIRI,
                 sortDir:  'asc',
             });
@@ -294,7 +294,7 @@ for (const db of providers) {
 
         it('sortProp desc reverses the sort', async () => {
             const displayNameIRI = new IRI('http://tern.dev/ns/auth/displayName');
-            const viewIri = await ctx.es.createCollectionView(schema, groupId, GroupHandle, 'member', {
+            const viewIri = await ctx.es.createCollectionView({}, schema, groupId, GroupHandle, 'member', {
                 sortProp: displayNameIRI,
                 sortDir:  'desc',
             });
@@ -312,7 +312,7 @@ for (const db of providers) {
 
         it('sortProp stores config on the view', async () => {
             const displayNameIRI = new IRI('http://tern.dev/ns/auth/displayName');
-            const viewIri = await ctx.es.createCollectionView(schema, groupId, GroupHandle, 'member', {
+            const viewIri = await ctx.es.createCollectionView({}, schema, groupId, GroupHandle, 'member', {
                 sortProp: displayNameIRI,
                 sortDir:  'asc',
             });
@@ -335,15 +335,15 @@ for (const db of providers) {
         beforeEach(async () => {
             ctx    = await setup(db);
             schema = makeGroupSchema();
-            const g = await ctx.es.create(schema, { name: 'Multi-View Group' });
+            const g = await ctx.es.create({}, schema, { name: 'Multi-View Group' });
             groupId = g.id;
-            viewA   = await ctx.es.createCollectionView(schema, groupId, GroupHandle, 'member');
-            viewB   = await ctx.es.createCollectionView(schema, groupId, GroupHandle, 'member');
+            viewA   = await ctx.es.createCollectionView({}, schema, groupId, GroupHandle, 'member');
+            viewB   = await ctx.es.createCollectionView({}, schema, groupId, GroupHandle, 'member');
         });
         afterEach(() => teardown(ctx));
 
         it('both views receive the push', async () => {
-            await ctx.es.collectionPush(schema, groupId, GroupHandle, 'member', 'alice');
+            await ctx.es.collectionPush({}, schema, groupId, GroupHandle, 'member', 'alice');
             const va = await ctx.cvs.getView(viewA);
             const vb = await ctx.cvs.getView(viewB);
             expect(va!.items).toHaveLength(1);
@@ -351,8 +351,8 @@ for (const db of providers) {
         });
 
         it('both views lose the item on remove', async () => {
-            await ctx.es.collectionPush(schema, groupId, GroupHandle, 'member', 'alice', 'bob');
-            await ctx.es.collectionRemove(schema, groupId, GroupHandle, 'member', 'alice');
+            await ctx.es.collectionPush({}, schema, groupId, GroupHandle, 'member', 'alice', 'bob');
+            await ctx.es.collectionRemove({}, schema, groupId, GroupHandle, 'member', 'alice');
             const va = await ctx.cvs.getView(viewA);
             const vb = await ctx.cvs.getView(viewB);
             expect(va!.items).toHaveLength(1);
@@ -360,7 +360,7 @@ for (const db of providers) {
         });
 
         it('deleting one view leaves the other intact', async () => {
-            await ctx.es.collectionPush(schema, groupId, GroupHandle, 'member', 'alice');
+            await ctx.es.collectionPush({}, schema, groupId, GroupHandle, 'member', 'alice');
             await ctx.cvs.delete(viewA);
             expect(await ctx.cvs.getView(viewA)).toBeNull();
             const vb = await ctx.cvs.getView(viewB);
@@ -382,11 +382,11 @@ for (const db of providers) {
         afterEach(() => teardown(ctx));
 
         it('returns all view IRIs watching a given source + prop', async () => {
-            const g1 = await ctx.es.create(schema, { name: 'G1' });
-            const g2 = await ctx.es.create(schema, { name: 'G2' });
-            const v1 = await ctx.es.createCollectionView(schema, g1.id, GroupHandle, 'member');
-            const v2 = await ctx.es.createCollectionView(schema, g1.id, GroupHandle, 'member');
-            const v3 = await ctx.es.createCollectionView(schema, g2.id, GroupHandle, 'member');
+            const g1 = await ctx.es.create({}, schema, { name: 'G1' });
+            const g2 = await ctx.es.create({}, schema, { name: 'G2' });
+            const v1 = await ctx.es.createCollectionView({}, schema, g1.id, GroupHandle, 'member');
+            const v2 = await ctx.es.createCollectionView({}, schema, g1.id, GroupHandle, 'member');
+            const v3 = await ctx.es.createCollectionView({}, schema, g2.id, GroupHandle, 'member');
 
             // Read back v1's metadata so we get the exact sourcePg + prop the view stored
             const v1Record = await ctx.cvs.getView(v1);

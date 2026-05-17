@@ -43,8 +43,9 @@ function parseCookies(header: string): Record<string, string> {
     );
 }
 
-function cookieSet(name: string, value: string, maxAge: number): string {
-    return `${name}=${encodeURIComponent(value)}; HttpOnly; SameSite=Lax; Max-Age=${maxAge}; Path=/`;
+function cookieSet(name: string, value: string, maxAge: number, secure: boolean): string {
+    const securePart = secure ? '; Secure' : '';
+    return `${name}=${encodeURIComponent(value)}; HttpOnly; SameSite=Lax; Max-Age=${maxAge}; Path=/${securePart}`;
 }
 
 function cookieClear(name: string): string {
@@ -91,6 +92,8 @@ export class AuthRouterComponent extends FlowComponent {
     private readonly _baseUrl: string;
     private readonly _success: string;
     private readonly _failure: string;
+    /** Set automatically when baseUrl starts with https:// — adds Secure to session cookies. */
+    private readonly _secure:  boolean;
 
     constructor(options: AuthRouterOptions) {
         super(options);
@@ -100,6 +103,7 @@ export class AuthRouterComponent extends FlowComponent {
         this._baseUrl  = options.baseUrl.replace(/\/$/, '');
         this._success  = options.loginSuccess ?? '/';
         this._failure  = options.loginFailure ?? '/auth/error';
+        this._secure   = this._baseUrl.startsWith('https://');
 
         this._service = new AuthService({
             providers:    options.providers,
@@ -193,25 +197,25 @@ export class AuthRouterComponent extends FlowComponent {
 
         // ── GET /auth/:provider ───────────────────────────────────────────────
         this.httpRouter.get('/auth/:provider', async ctx => {
-            const prov = ctx.params['provider'] as OAuthProvider;
-            if (prov !== 'google' && prov !== 'github') {
+            const prov = ctx.params['provider'] ?? '';
+            if (!this._service.hasProvider(prov)) {
                 ctx.notFound(`Unknown provider: ${prov}`); return;
             }
 
             const redirectUri = `${this._baseUrl}/auth/${prov}/callback`;
-            const { url, state } = this._service.buildAuthUrl(prov, redirectUri);
+            const { url, state } = this._service.buildAuthUrl(prov as OAuthProvider, redirectUri);
 
             ctx.status                = 302;
             ctx.headers['location']   = url;
-            ctx.headers['set-cookie'] = cookieSet(OAUTH_STATE_COOKIE, state, 600);
+            ctx.headers['set-cookie'] = cookieSet(OAUTH_STATE_COOKIE, state, 600, this._secure);
             ctx.body                  = null;
         });
 
         // ── GET /auth/:provider/callback ──────────────────────────────────────
         this.httpRouter.get('/auth/:provider/callback', async ctx => {
-            const prov      = ctx.params['provider'] as OAuthProvider;
-            const code      = ctx.query.get('code')  ?? '';
-            const state     = ctx.query.get('state') ?? '';
+            const prov       = ctx.params['provider'] as OAuthProvider;
+            const code       = ctx.query.get('code')  ?? '';
+            const state      = ctx.query.get('state') ?? '';
             const savedState = getCookie(ctx.req.headers as Record<string, string | undefined>, OAUTH_STATE_COOKIE);
 
             if (!code || !savedState || savedState !== state) {
@@ -220,13 +224,13 @@ export class AuthRouterComponent extends FlowComponent {
 
             const ua = (() => {
                 const h = ctx.req.headers['user-agent'];
-                return Array.isArray(h) ? h[0] : h;
+                return Array.isArray(h) ? h[0] : (h ?? undefined);
             })();
 
             const ip = (() => {
                 const h = ctx.req.headers['x-forwarded-for'];
                 const s = Array.isArray(h) ? h[0] : h;
-                return s ? s.split(',')[0].trim() : undefined;
+                return s ? s.split(',')[0]!.trim() : undefined;
             })();
 
             try {
@@ -241,7 +245,7 @@ export class AuthRouterComponent extends FlowComponent {
                 ctx.status = 302;
                 ctx.headers['location']   = this._success;
                 ctx.headers['set-cookie'] = [
-                    cookieSet(SESSION_COOKIE, session.sessionToken, SESSION_TTL_SECS),
+                    cookieSet(SESSION_COOKIE, session.sessionToken, SESSION_TTL_SECS, this._secure),
                     cookieClear(OAUTH_STATE_COOKIE),
                 ];
                 ctx.body = null;
@@ -250,14 +254,34 @@ export class AuthRouterComponent extends FlowComponent {
             }
         });
 
-        // ── POST /auth/logout ─────────────────────────────────────────────────
+        // ── POST /auth/logout — revoke current session ────────────────────────
         this.httpRouter.post('/auth/logout', async ctx => {
-            const token = getCookie(ctx.req.headers as Record<string, string | undefined>, SESSION_COOKIE);
+            // Accept both cookie (browser) and Bearer (mobile / API)
+            const token = getCookie(ctx.req.headers as Record<string, string | undefined>, SESSION_COOKIE)
+                ?? getBearer(ctx.req.headers as Record<string, string | undefined>);
+
             if (token) { await this._service.revokeToken(token); }
 
-            ctx.status = 200;
+            ctx.status                = 200;
             ctx.headers['set-cookie'] = cookieClear(SESSION_COOKIE);
-            ctx.body = { ok: true };
+            ctx.body                  = { ok: true };
+        });
+
+        // ── POST /auth/logout/all — revoke every session for this user ────────
+        this.httpRouter.post('/auth/logout/all', async ctx => {
+            const token = getCookie(ctx.req.headers as Record<string, string | undefined>, SESSION_COOKIE)
+                ?? getBearer(ctx.req.headers as Record<string, string | undefined>);
+
+            if (!token) { ctx.unauthorized(); return; }
+
+            const user = await this._service.validateToken(token);
+            if (!user) { ctx.unauthorized(); return; }
+
+            const revoked = await this._service.revokeAllSessions(user.id);
+
+            ctx.status                = 200;
+            ctx.headers['set-cookie'] = cookieClear(SESSION_COOKIE);
+            ctx.body                  = { ok: true, revoked };
         });
 
         // ── GET /auth/me ──────────────────────────────────────────────────────
@@ -276,6 +300,26 @@ export class AuthRouterComponent extends FlowComponent {
                 displayName: user.displayName ?? null,
                 avatarUrl:   user.avatarUrl   ?? null,
             };
+        });
+
+        // ── GET /auth/sessions — list this user's sessions ────────────────────
+        this.httpRouter.get('/auth/sessions', async ctx => {
+            const token = getCookie(ctx.req.headers as Record<string, string | undefined>, SESSION_COOKIE)
+                ?? getBearer(ctx.req.headers as Record<string, string | undefined>);
+
+            if (!token) { ctx.unauthorized(); return; }
+
+            const user = await this._service.validateToken(token);
+            if (!user) { ctx.unauthorized(); return; }
+
+            const sessions = await this._service.listSessions(user.id);
+            ctx.body = sessions.map(s => ({
+                id:        s.id,
+                isActive:  s.isActive,
+                expiresAt: s.expiresAt,
+                createdAt: s.createdAt,
+                ipAddress: s.ipAddress ?? null,
+            }));
         });
     }
 }

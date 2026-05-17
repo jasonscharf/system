@@ -4,11 +4,11 @@ import type { EntityHandle } from './Handle.js';
 import type { EntitySchema } from './EntitySchema.js';
 import type { EntityRecord } from './EntityStore.js';
 import { EntityStore } from './EntityStore.js';
-import { RDF_TYPE, TERN_PROP_GROUP, TERN_HANDLE } from './constants.js';
-import { entityIri, localName, pgIri, idFromIri, toLiteral } from './util.js';
+import { RDF_TYPE, TERN_PROP_GROUP } from './constants.js';
+import { toLiteral } from './util.js';
 
 
-type FilterOp = '=' | '!=' | '<' | '<=' | '>' | '>=' | 'LIKE' | 'ILIKE';
+export type FilterOp = '=' | '!=' | '<' | '<=' | '>' | '>=' | 'LIKE' | 'ILIKE';
 
 interface Filter {
     handle: EntityHandle;

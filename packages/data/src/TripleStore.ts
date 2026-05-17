@@ -165,8 +165,6 @@ export class TripleStore {
     }
 
     async ensureNode(term: RdfTerm): Promise<number> {
-        const now = new Date().toISOString();
-
         if (isIRI(term)) {
             const nameId = await this.ensureName(term.value);
             const row = await this._knex(T.nodes)
@@ -174,10 +172,8 @@ export class TripleStore {
                 .first<NodeRow>();
             if (row) { return row.id; }
             const [id] = await this._knex(T.nodes).insert({
-                [C.kind]:      'iri',
-                [C.nameId]:    nameId,
-                [C.createdAt]: now,
-                [C.updatedAt]: now,
+                [C.kind]:   'iri',
+                [C.nameId]: nameId,
             });
             return id as number;
         }
@@ -188,10 +184,8 @@ export class TripleStore {
                 .first<NodeRow>();
             if (row) { return row.id; }
             const [id] = await this._knex(T.nodes).insert({
-                [C.kind]:      'blank',
-                [C.blank]:     term.id,
-                [C.createdAt]: now,
-                [C.updatedAt]: now,
+                [C.kind]:  'blank',
+                [C.blank]: term.id,
             });
             return id as number;
         }
@@ -214,8 +208,6 @@ export class TripleStore {
             [C.datatype]:  dtIri,
             [C.lang]:      term.language ?? null,
             [C.valueJson]: JSON.stringify(jsonPayload),
-            [C.createdAt]: now,
-            [C.updatedAt]: now,
         });
         return id as number;
     }
@@ -246,14 +238,11 @@ export class TripleStore {
         const existing = await existsQ.first<{ id: number }>();
         if (existing) { return; }
 
-        const now = new Date().toISOString();
         await this._knex(T.edges).insert({
             [C.subject]:   sId,
             [C.predicate]: pId,
             [C.object]:    oId,
             [C.graph]:     gId,
-            [C.createdAt]: now,
-            [C.updatedAt]: now,
             [C.isDeleted]: false,
         });
     }
@@ -335,12 +324,11 @@ export class TripleStore {
      * No data is physically removed.
      */
     async delete(pattern: QuadPattern): Promise<number> {
-        const now  = new Date().toISOString();
-        const ids  = await this._patternIds(pattern);
+        const ids = await this._patternIds(pattern);
         if (ids === null) { return 0; }
         let q = this._knex(T.edges).where(C.isDeleted, false);
         q = this._addPatternClauses(q, ids);
-        return q.update({ [C.isDeleted]: true, [C.deletedAt]: now, [C.updatedAt]: now });
+        return q.update({ [C.isDeleted]: true });
     }
 
     /**
@@ -353,11 +341,10 @@ export class TripleStore {
         const validIds = ids.filter((id): id is number => id !== null);
         if (validIds.length === 0) { return 0; }
 
-        const now = new Date().toISOString();
         return this._knex(T.edges)
             .whereIn(C.subject, validIds)
             .where(C.isDeleted, false)
-            .update({ [C.isDeleted]: true, [C.deletedAt]: now, [C.updatedAt]: now });
+            .update({ [C.isDeleted]: true });
     }
 
     /**
@@ -376,12 +363,11 @@ export class TripleStore {
         const validPIds = pIds.filter((id): id is number => id !== null);
         if (validPIds.length === 0) { return 0; }
 
-        const now = new Date().toISOString();
         return this._knex(T.edges)
             .where(C.subject, sId)
             .whereIn(C.predicate, validPIds)
             .where(C.isDeleted, false)
-            .update({ [C.isDeleted]: true, [C.deletedAt]: now, [C.updatedAt]: now });
+            .update({ [C.isDeleted]: true });
     }
 
     // ── Batch read ────────────────────────────────────────────────────────────

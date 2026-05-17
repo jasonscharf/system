@@ -1,6 +1,7 @@
 import type { Knex } from 'knex';
 import { up as migrate001 } from './migrations/001_init.js';
 import { up as migrate002 } from './migrations/002_time_series.js';
+import { up as migrate003 } from './migrations/003_timestamps.js';
 
 
 export type DbClient = 'sqlite' | 'pg';
@@ -52,5 +53,6 @@ export async function createDataContext(config: DataConfig): Promise<Knex> {
 
     await migrate001(knex);
     await migrate002(knex);
+    await migrate003(knex);
     return knex;
 }

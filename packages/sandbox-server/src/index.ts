@@ -28,7 +28,7 @@ import {
     UserSessionRepository,
     UserDeviceRepository,
 } from '@system/auth';
-import { SecretsManager } from '@system/secrets';
+import { SecretsManager } from '@system/vaults';
 import { MessageDecoder } from './components/MessageDecoder.js';
 import { MessageEncoder } from './components/MessageEncoder.js';
 import { MessageRouter } from './components/MessageRouter.js';

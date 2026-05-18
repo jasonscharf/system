@@ -31,7 +31,7 @@
     "@system/entities": "workspace:^",
     "@system/flow": "workspace:^",
     "@system/gen": "workspace:^",
-    "@system/secrets": "workspace:^",
+    "@system/vaults": "workspace:^",
     "@system/worker": "workspace:^",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"

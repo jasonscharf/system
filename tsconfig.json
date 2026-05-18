@@ -8,7 +8,7 @@
       "path": "packages/auth"
     },
     {
-      "path": "packages/secrets"
+      "path": "packages/vaults"
     },
     {
       "path": "packages/gen"

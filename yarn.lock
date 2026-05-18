@@ -1651,7 +1651,7 @@ __metadata:
     "@system/core": "workspace:^"
     "@system/data": "workspace:^"
     "@system/flow": "workspace:^"
-    "@system/secrets": "workspace:^"
+    "@system/vaults": "workspace:^"
     better-sqlite3: "npm:^11.10.0"
     ioredis: "npm:^5.6.1"
     pg: "npm:^8.16.0"
@@ -1673,24 +1673,6 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@system/secrets@workspace:^, @system/secrets@workspace:packages/secrets":
-  version: 0.0.0-use.local
-  resolution: "@system/secrets@workspace:packages/secrets"
-  dependencies:
-    "@azure/identity": "npm:^4.4.1"
-    "@azure/keyvault-secrets": "npm:^4.8.0"
-    "@types/node": "npm:^22.0.0"
-  peerDependencies:
-    "@azure/identity": ^4.0.0
-    "@azure/keyvault-secrets": ^4.0.0
-  peerDependenciesMeta:
-    "@azure/identity":
-      optional: true
-    "@azure/keyvault-secrets":
-      optional: true
-  languageName: unknown
-  linkType: soft
-
 "@system/test@workspace:packages/test":
   version: 0.0.0-use.local
   resolution: "@system/test@workspace:packages/test"
@@ -1705,7 +1687,7 @@ __metadata:
     "@system/entities": "workspace:^"
     "@system/flow": "workspace:^"
     "@system/gen": "workspace:^"
-    "@system/secrets": "workspace:^"
+    "@system/vaults": "workspace:^"
     "@system/worker": "workspace:^"
     "@testing-library/dom": "npm:^10.4.1"
     "@testing-library/jest-dom": "npm:^6.9.1"
@@ -1720,6 +1702,24 @@ __metadata:
     react: "npm:^19.2.3"
     react-dom: "npm:^19.2.3"
     vitest: "npm:^4.0.16"
+  languageName: unknown
+  linkType: soft
+
+"@system/vaults@workspace:^, @system/vaults@workspace:packages/vaults":
+  version: 0.0.0-use.local
+  resolution: "@system/vaults@workspace:packages/vaults"
+  dependencies:
+    "@azure/identity": "npm:^4.4.1"
+    "@azure/keyvault-secrets": "npm:^4.8.0"
+    "@types/node": "npm:^22.0.0"
+  peerDependencies:
+    "@azure/identity": ^4.0.0
+    "@azure/keyvault-secrets": ^4.0.0
+  peerDependenciesMeta:
+    "@azure/identity":
+      optional: true
+    "@azure/keyvault-secrets":
+      optional: true
   languageName: unknown
   linkType: soft
 

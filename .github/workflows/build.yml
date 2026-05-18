@@ -171,7 +171,7 @@ jobs:
         # expansion produces the correct scoped names in published manifests.
         run: |
           OWNER="${{ github.repository_owner }}"
-          for pkg in api auth core data entities flow gen secrets; do
+          for pkg in api auth core data entities flow gen vaults; do
             tmp=$(mktemp)
             # Replace all "@system/ occurrences in JSON string values (they
             # are always double-quoted in valid JSON, so this is safe).
@@ -186,7 +186,7 @@ jobs:
         # affects the transient copies used inside this job.
         run: |
           SHORT="${GITHUB_SHA::7}"
-          for pkg in api auth core data entities flow gen secrets; do
+          for pkg in api auth core data entities flow gen vaults; do
             node -e "
               const fs = require('fs');
               const p  = JSON.parse(fs.readFileSync('packages/$pkg/package.json', 'utf8'));
@@ -240,7 +240,7 @@ jobs:
 
           # Layer 0 — no @{owner} deps
           publish_pkg core
-          publish_pkg secrets
+          publish_pkg vaults
 
           # Layer 1 — depend only on @{owner}/core
           publish_pkg data
@@ -269,7 +269,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [api, auth, core, data, entities, flow, gen, secrets]
+        package: [api, auth, core, data, entities, flow, gen, vaults]
 
     steps:
       - name: Prune old pre-release versions of @${{ github.repository_owner }}/${{ matrix.package }}

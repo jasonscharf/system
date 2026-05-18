@@ -12,6 +12,7 @@
       "@system/entities": ["../entities/src/index.ts"],
       "@system/flow":     ["../flow/src/index.ts"],
       "@system/gen":      ["../gen/src/index.ts"],
+      "@system/vaults":   ["../vaults/src/index.ts"],
       "@system/worker":   ["../worker/src/index.ts"]
     }
   },
@@ -24,6 +25,7 @@
     { "path": "../entities" },
     { "path": "../flow"     },
     { "path": "../gen"      },
+    { "path": "../vaults"   },
     { "path": "../worker"   }
   ],
   "include": [

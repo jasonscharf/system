@@ -16,7 +16,7 @@ import { resolve } from 'node:path';
 import { FlowApp, HttpServer, HttpDecoder, HttpEncoder, HttpRouter } from '@system/flow';
 import { WebSocketServer } from '@system/flow';
 import { TernApp } from '@system/app';
-import { createDataContext, TripleStore } from '@system/data';
+import { createDataContext, TripleStore, noCtx } from '@system/data';
 import {
     AuthRouterComponent,
     GoogleProvider,
@@ -75,10 +75,10 @@ async function main(): Promise<void> {
     }
 
     const store = new TripleStore(knex);
-    await store.ensureNamespace('tern', 'http://tern.dev/ns/');
-    await store.ensureNamespace('rdf',  'http://www.w3.org/1999/02/22-rdf-syntax-ns#');
-    await store.ensureNamespace('rdfs', 'http://www.w3.org/2000/01/rdf-schema#');
-    await store.ensureNamespace('auth', 'http://tern.dev/ns/auth/');
+    await store.ensureNamespace(noCtx, 'tern', 'http://tern.dev/ns/');
+    await store.ensureNamespace(noCtx, 'rdf',  'http://www.w3.org/1999/02/22-rdf-syntax-ns#');
+    await store.ensureNamespace(noCtx, 'rdfs', 'http://www.w3.org/2000/01/rdf-schema#');
+    await store.ensureNamespace(noCtx, 'auth', 'http://tern.dev/ns/auth/');
 
     // ── Session store ─────────────────────────────────────────────────────────
     const redisUrl = await secrets.getWithDefault('REDIS_URL', process.env['REDIS_URL'] ?? '');

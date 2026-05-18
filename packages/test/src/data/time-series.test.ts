@@ -556,26 +556,29 @@ for (const db of providers) {
     // ── EntityStore integration (soft-delete through higher-level API) ─────────
 
     describe(`EntityStore — soft-delete integration (${db.name})`, () => {
-        let knex: Knex;
-        let trx:  Knex.Transaction;
+        let knex:  Knex;
+        let trx:   Knex.Transaction;
         let store: TripleStore;
+        let es:    import('@system/entities').EntityStore;
+        let ctx:   { trx: Knex.Transaction };
 
         beforeEach(async () => {
             knex  = await db.create();
             trx   = await knex.transaction();
             store = new TripleStore(trx as unknown as Knex);
+            const { EntityStore } = await import('@system/entities');
+            es  = new EntityStore(store);
+            ctx = { trx };
         });
         afterEach(async () => { await trx.rollback(); await knex.destroy(); });
 
         it('EntityStore.updateGroup produces two history rows for the changed predicate', async () => {
-            const { EntityStore }  = await import('@system/entities');
             const { UserSchema, CoreHandle } = await import('@system/auth');
 
-            const es   = new EntityStore(store);
-            const user = await es.create({}, UserSchema, { email: 'test@example.com', displayName: 'Old' });
+            const user = await es.create(ctx, UserSchema, { email: 'test@example.com', displayName: 'Old' });
 
             // Update displayName — this should soft-delete the old edge and create a new one
-            await es.updateGroup({}, UserSchema, user.id, CoreHandle, { displayName: 'New' });
+            await es.updateGroup(ctx, UserSchema, user.id, CoreHandle, { displayName: 'New' });
 
             const iri = `http://tern.dev/ns/auth/displayName`;
             const history = await store.findHistory();
@@ -591,14 +594,12 @@ for (const db of providers) {
         });
 
         it('EntityStore.delete soft-deletes all entity edges', async () => {
-            const { EntityStore } = await import('@system/entities');
-            const { UserSchema }  = await import('@system/auth');
+            const { UserSchema } = await import('@system/auth');
 
-            const es   = new EntityStore(store);
-            const user = await es.create({}, UserSchema, { email: 'del@example.com' });
+            const user = await es.create(ctx, UserSchema, { email: 'del@example.com' });
 
             const totalBefore = (await store.stats()).edgesTotal;
-            await es.delete({}, UserSchema, user.id);
+            await es.delete(ctx, UserSchema, user.id);
             const totalAfter  = (await store.stats()).edgesTotal;
 
             // findById returns null (active edges are soft-deleted)

@@ -22,7 +22,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Knex } from 'knex';
 import { IRI, DEFAULT_GRAPH, type Literal, type BlankNode } from '@system/core';
-import { createDataContext, TripleStore, type TrxContext } from '@system/data';
+import { createDataContext, TripleStore, type ApplicationContext } from '@system/data';
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -121,7 +121,7 @@ for (const db of providers) {
         let knex: Knex;
         let trx:  Knex.Transaction;
         let store: TripleStore;
-        let ctx: TrxContext;
+        let ctx: ApplicationContext;
 
         beforeEach(async () => {
             knex  = await db.create();
@@ -170,7 +170,7 @@ for (const db of providers) {
         let knex: Knex;
         let trx:  Knex.Transaction;
         let store: TripleStore;
-        let ctx: TrxContext;
+        let ctx: ApplicationContext;
 
         beforeEach(async () => {
             knex  = await db.create();
@@ -259,7 +259,7 @@ for (const db of providers) {
         let knex: Knex;
         let trx:  Knex.Transaction;
         let store: TripleStore;
-        let ctx: TrxContext;
+        let ctx: ApplicationContext;
 
         beforeEach(async () => {
             knex  = await db.create();
@@ -298,7 +298,7 @@ for (const db of providers) {
         let knex: Knex;
         let trx:  Knex.Transaction;
         let store: TripleStore;
-        let ctx: TrxContext;
+        let ctx: ApplicationContext;
 
         beforeEach(async () => {
             knex  = await db.create();
@@ -376,7 +376,7 @@ for (const db of providers) {
         let knex: Knex;
         let trx:  Knex.Transaction;
         let store: TripleStore;
-        let ctx: TrxContext;
+        let ctx: ApplicationContext;
 
         beforeEach(async () => {
             knex  = await db.create();
@@ -452,7 +452,7 @@ for (const db of providers) {
         let knex: Knex;
         let trx:  Knex.Transaction;
         let store: TripleStore;
-        let ctx: TrxContext;
+        let ctx: ApplicationContext;
 
         beforeEach(async () => {
             knex  = await db.create();
@@ -502,7 +502,7 @@ for (const db of providers) {
         let knex: Knex;
         let trx:  Knex.Transaction;
         let store: TripleStore;
-        let ctx: TrxContext;
+        let ctx: ApplicationContext;
 
         beforeEach(async () => {
             knex  = await db.create();
@@ -632,7 +632,7 @@ for (const db of providers) {
         let knex:  Knex;
         let trx:   Knex.Transaction;
         let store: TripleStore;
-        let ctx: TrxContext;
+        let ctx: ApplicationContext;
 
         beforeEach(async () => {
             knex  = await db.create();

@@ -26,6 +26,7 @@ export default defineConfig({
                 '**/*.tests.*',
                 '**/*.spec.*',
                 '**/*.d.ts',
+                '**/sandbox*',
                 '**/dist/**',
                 '**/node_modules/**',
                 '**/playwright/**',

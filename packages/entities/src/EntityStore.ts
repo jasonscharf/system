@@ -1,7 +1,6 @@
 import type { IRI } from '@system/core';
 import { DEFAULT_GRAPH } from '@system/core';
-import type { Knex } from '@system/data';
-import { TripleStore } from '@system/data';
+import { TripleStore, type ApplicationContext, type Logger, noCtx } from '@system/data';
 import { validate } from '@system/gen';
 import type { EntityHandle } from './Handle.js';
 import type { EntitySchema, PropGroupDef } from './EntitySchema.js';
@@ -14,62 +13,8 @@ import {
 import { CollectionViewStore } from './CollectionView.js';
 import type { CollectionViewOpts } from './CollectionView.js';
 
-
-// ── Application context ───────────────────────────────────────────────────────
-
-/**
- * Minimal logger interface.  Any logger satisfying this shape (pino, winston,
- * console-based, etc.) can be placed on ApplicationContext.
- */
-export interface Logger {
-    debug(msg: string, meta?: Record<string, unknown>): void;
-    info(msg: string, meta?: Record<string, unknown>): void;
-    warn(msg: string, meta?: Record<string, unknown>): void;
-    error(msg: string, meta?: Record<string, unknown>): void;
-}
-
-/**
- * Platform-wide application context passed to every entity write operation.
- *
- * `trx`    — an active Knex transaction; EntityStore creates + commits one
- *             automatically when absent.  Pass one from `es.inTransaction()`
- *             to chain multiple writes atomically.
- *
- * `logger` — optional structured logger.  EntityStore logs warnings here when
- *             they are relevant (e.g. missing PropGroup during delete).
- *
- * `config` — arbitrary application configuration.  Downstream consumers and
- *             extensions may read well-known keys from here (e.g. feature
- *             flags, tenant IDs, rate-limit settings).  Use module augmentation
- *             to extend this type in your application:
- *
- *             declare module '@system/entities' {
- *               interface ApplicationContext {
- *                 config?: { tenantId: string; analyticsEnabled: boolean };
- *               }
- *             }
- *
- * Usage:
- *
- *   // No explicit transaction — EntityStore creates + commits one per call:
- *   await es.create({}, UserSchema, { email: 'alice@example.com' });
- *
- *   // Shared transaction — commit/rollback controlled by the caller:
- *   await es.inTransaction(async ctx => {
- *       const user    = await es.create(ctx, UserSchema, { email: 'alice@example.com' });
- *       const device  = await es.create(ctx, UserDeviceSchema, { deviceUser: user.iri });
- *       const session = await es.create(ctx, UserSessionSchema, { sessionUser: user.iri });
- *       return { user, device, session };
- *   });
- */
-export interface ApplicationContext {
-    trx?:    Knex.Transaction;
-    logger?: Logger;
-    config?: Record<string, unknown>;
-}
-
-/** Convenience empty context — no transaction, no logger, no config. */
-export const noCtx: ApplicationContext = Object.freeze({});
+export type { ApplicationContext, Logger };
+export { noCtx };
 
 // ── Internal row types (mirror @system/data/schema.ts) ─────────────────────
 
@@ -107,8 +52,8 @@ export function groupOf<Props extends Record<string, unknown>>(
  *     EntityStore will create, use, and commit a transaction automatically.
  *   - Pass a ctx obtained from `es.inTransaction()` to chain multiple writes.
  *
- * Read methods (findById, collectionGet, hydrateMany) are always executed
- * against the base store and don't require a context.
+ * Read methods (findById, collectionGet, hydrateMany) also accept ctx as the
+ * first argument so they can participate in the same transaction.
  */
 export class EntityStore {
     private _cvsInstance: CollectionViewStore | null = null;
@@ -126,28 +71,19 @@ export class EntityStore {
      * On success the transaction is committed; on error it is rolled back.
      */
     async inTransaction<T>(fn: (ctx: ApplicationContext) => Promise<T>): Promise<T> {
-        return this._store.knex.transaction(async trx => {
-            return fn({ trx: trx as unknown as Knex.Transaction });
-        });
+        return this._store.knex.transaction(async trx => fn({ trx }));
     }
 
     /**
-     * Core helper: runs `fn` with a transactional TripleStore.
+     * Core helper: runs `fn` with a transactional context.
      * If ctx already contains a transaction the existing one is reused.
      * Otherwise a new transaction is created and auto-committed.
      */
     private async _withTrx<T>(
         ctx: ApplicationContext,
-        fn:  (store: TripleStore, cvs: CollectionViewStore) => Promise<T>,
+        fn:  (ctx: ApplicationContext) => Promise<T>,
     ): Promise<T> {
-        if (ctx.trx) {
-            const store = new TripleStore(ctx.trx as unknown as Knex);
-            return fn(store, new CollectionViewStore(store));
-        }
-        return this._store.knex.transaction(async trx => {
-            const store = new TripleStore(trx as unknown as Knex);
-            return fn(store, new CollectionViewStore(store));
-        });
+        return this._store.withTransaction(ctx, fn);
     }
 
     // ── Create ────────────────────────────────────────────────────────────────
@@ -165,8 +101,8 @@ export class EntityStore {
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
         const pg  = pgIri(ent.value, coreGroup.handle);
 
-        return this._withTrx(ctx, async (store) => {
-            await store.insertMany([
+        return this._withTrx(ctx, async txCtx => {
+            await this._store.insertMany(txCtx, [
                 { subject: ent, predicate: RDF_TYPE,        object: schema.typeIRI,                         graph: DEFAULT_GRAPH },
                 { subject: ent, predicate: TERN_PROP_GROUP, object: pg,                                     graph: DEFAULT_GRAPH },
                 { subject: pg,  predicate: TERN_HANDLE,     object: toLiteral(coreGroup.handle.toString()), graph: DEFAULT_GRAPH },
@@ -192,8 +128,8 @@ export class EntityStore {
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
         const pg  = pgIri(ent.value, h);
 
-        return this._withTrx(ctx, async (store) => {
-            await store.insertMany([
+        return this._withTrx(ctx, async txCtx => {
+            await this._store.insertMany(txCtx, [
                 { subject: ent, predicate: TERN_PROP_GROUP, object: pg,                             graph: DEFAULT_GRAPH },
                 { subject: pg,  predicate: TERN_HANDLE,     object: toLiteral(h.toString()),         graph: DEFAULT_GRAPH },
                 ...this._propQuads(pg, groupDef, withDefs),
@@ -204,14 +140,15 @@ export class EntityStore {
     // ── Read ──────────────────────────────────────────────────────────────────
 
     async findById(
+        ctx:     ApplicationContext,
         schema:  EntitySchema<any>,
         id:      string,
         handles: EntityHandle[] | '*',
     ): Promise<EntityRecord | null> {
         const ent   = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-        const typeQ = await this._store.find({ subject: ent, predicate: RDF_TYPE });
+        const typeQ = await this._store.find(ctx, { subject: ent, predicate: RDF_TYPE });
         if (typeQ.length === 0) { return null; }
-        return this._hydrate(schema, id, ent.value, handles);
+        return this._hydrate(ctx, schema, id, ent.value, handles);
     }
 
     // ── Update ────────────────────────────────────────────────────────────────
@@ -238,10 +175,10 @@ export class EntityStore {
             .map(([propName]) => (groupDef.properties as Record<string, IRI>)[propName]!)
             .filter(Boolean);
 
-        return this._withTrx(ctx, async (store) => {
+        return this._withTrx(ctx, async txCtx => {
             // One DELETE for all patched predicates
             if (predIris.length > 0) {
-                await store.deleteBySubjectPredicates(pg, predIris);
+                await this._store.deleteBySubjectPredicates(txCtx, pg, predIris);
             }
             // One insertMany for all new values
             const quads = patchEntries
@@ -250,7 +187,7 @@ export class EntityStore {
                     const propIri = (groupDef.properties as Record<string, IRI>)[propName]!;
                     return [{ subject: pg, predicate: propIri, object: toLiteral(value), graph: DEFAULT_GRAPH }];
                 });
-            if (quads.length > 0) { await store.insertMany(quads); }
+            if (quads.length > 0) { await this._store.insertMany(txCtx, quads); }
         });
     }
 
@@ -259,20 +196,21 @@ export class EntityStore {
     /** Hard-deletes the entity and all its PropGroup nodes in one transaction. */
     async delete(ctx: ApplicationContext, schema: EntitySchema<any>, id: string): Promise<void> {
         const ent     = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-        const pgLinks = await this._store.find({ subject: ent, predicate: TERN_PROP_GROUP });
+        const pgLinks = await this._store.find(ctx, { subject: ent, predicate: TERN_PROP_GROUP });
         const pgNodes = pgLinks.map(q => q.object as IRI);
 
-        return this._withTrx(ctx, async (store) => {
+        return this._withTrx(ctx, async txCtx => {
             // Batch-delete all PropGroup nodes in one SQL query
-            if (pgNodes.length > 0) { await store.deleteSubjects(pgNodes); }
+            if (pgNodes.length > 0) { await this._store.deleteSubjects(txCtx, pgNodes); }
             // Delete the entity node itself
-            await store.delete({ subject: ent });
+            await this._store.delete(txCtx, { subject: ent });
         });
     }
 
     // ── Collection API ────────────────────────────────────────────────────────
 
     async collectionGet(
+        ctx:    ApplicationContext,
         schema: EntitySchema<any>,
         id:     string,
         h:      EntityHandle,
@@ -284,7 +222,7 @@ export class EntityStore {
 
         const ent      = entityIri(schema.ns, localName(schema.typeIRI.value), id);
         const pg       = pgIri(ent.value, h);
-        const quads = await this._store.findOrdered({ subject: pg, predicate: propIri });
+        const quads = await this._store.findOrdered(ctx, { subject: pg, predicate: propIri });
         return quads.map(q => fromLiteral(q.object)).filter(v => v !== undefined);
     }
 
@@ -304,14 +242,14 @@ export class EntityStore {
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
         const pg  = pgIri(ent.value, h);
 
-        return this._withTrx(ctx, async (store, cvs) => {
+        return this._withTrx(ctx, async txCtx => {
             // Find views once before the values loop — the registered views don't
             // change between iterations.
-            const viewIris = await cvs.findViewsForSource(pg.value, propIri.value);
+            const viewIris = await this._cvs().findViewsForSource(txCtx, pg.value, propIri.value);
 
             for (const v of values) {
-                await store.insert({ subject: pg, predicate: propIri, object: toLiteral(v), graph: DEFAULT_GRAPH });
-                for (const vIri of viewIris) { await cvs.addItem(vIri, String(v)); }
+                await this._store.insert(txCtx, { subject: pg, predicate: propIri, object: toLiteral(v), graph: DEFAULT_GRAPH });
+                for (const vIri of viewIris) { await this._cvs().addItem(txCtx, vIri, String(v)); }
             }
         });
     }
@@ -333,12 +271,12 @@ export class EntityStore {
         const pg  = pgIri(ent.value, h);
 
         let deleted = false;
-        await this._withTrx(ctx, async (store, cvs) => {
-            const count = await store.delete({ subject: pg, predicate: propIri, object: toLiteral(value) });
+        await this._withTrx(ctx, async txCtx => {
+            const count = await this._store.delete(txCtx, { subject: pg, predicate: propIri, object: toLiteral(value) });
             deleted = count > 0;
             if (deleted) {
-                const viewIris = await cvs.findViewsForSource(pg.value, propIri.value);
-                for (const vIri of viewIris) { await cvs.removeItem(vIri, String(value)); }
+                const viewIris = await this._cvs().findViewsForSource(txCtx, pg.value, propIri.value);
+                for (const vIri of viewIris) { await this._cvs().removeItem(txCtx, vIri, String(value)); }
             }
         });
         return deleted;
@@ -352,7 +290,7 @@ export class EntityStore {
         h:      EntityHandle,
         prop:   string,
     ): Promise<unknown> {
-        const items = await this.collectionGet(schema, id, h, prop);
+        const items = await this.collectionGet(ctx, schema, id, h, prop);
         if (items.length === 0) { return undefined; }
         const last = items[items.length - 1];
         await this.collectionRemove(ctx, schema, id, h, prop, last);
@@ -375,17 +313,17 @@ export class EntityStore {
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
         const pg  = pgIri(ent.value, h);
 
-        return this._withTrx(ctx, async (store, cvs) => {
+        return this._withTrx(ctx, async txCtx => {
             // Delete all current values for the property in one query
-            await store.delete({ subject: pg, predicate: propIri });
+            await this._store.delete(txCtx, { subject: pg, predicate: propIri });
             // Re-insert in order
             for (const v of values) {
-                await store.insert({ subject: pg, predicate: propIri, object: toLiteral(v), graph: DEFAULT_GRAPH });
+                await this._store.insert(txCtx, { subject: pg, predicate: propIri, object: toLiteral(v), graph: DEFAULT_GRAPH });
             }
             // Sync any registered CollectionViews
-            const viewIris = await cvs.findViewsForSource(pg.value, propIri.value);
+            const viewIris = await this._cvs().findViewsForSource(txCtx, pg.value, propIri.value);
             for (const vIri of viewIris) {
-                await cvs.sync(vIri, values.map(String));
+                await this._cvs().sync(txCtx, vIri, values.map(String));
             }
         });
     }
@@ -400,7 +338,7 @@ export class EntityStore {
         index:  number,
         value:  unknown,
     ): Promise<void> {
-        const current = await this.collectionGet(schema, id, h, prop);
+        const current = await this.collectionGet(ctx, schema, id, h, prop);
         const clamped = Math.max(0, Math.min(index, current.length));
         current.splice(clamped, 0, value);
         await this.collectionSet(ctx, schema, id, h, prop, current);
@@ -426,10 +364,10 @@ export class EntityStore {
 
         const ent         = entityIri(schema.ns, localName(schema.typeIRI.value), id);
         const pg          = pgIri(ent.value, h);
-        const currentRefs = (await this.collectionGet(schema, id, h, prop)).map(String);
+        const currentRefs = (await this.collectionGet(ctx, schema, id, h, prop)).map(String);
 
-        return this._withTrx(ctx, async (_store, cvs) => {
-            return cvs.create(pg.value, propIri.value, currentRefs, opts);
+        return this._withTrx(ctx, async txCtx => {
+            return this._cvs().create(txCtx, pg.value, propIri.value, currentRefs, opts);
         });
     }
 
@@ -439,13 +377,14 @@ export class EntityStore {
     // ── Batch helpers used by EntityQuery ─────────────────────────────────────
 
     async hydrateMany(
+        ctx:     ApplicationContext,
         schema:  EntitySchema<any>,
         iris:    string[],
         handles: EntityHandle[] | '*',
     ): Promise<EntityRecord[]> {
         return Promise.all(iris.map(iri => {
             const id = idFromIri(iri);
-            return this._hydrate(schema, id, iri, handles);
+            return this._hydrate(ctx, schema, id, iri, handles);
         }));
     }
 
@@ -457,6 +396,7 @@ export class EntityStore {
     }
 
     private async _hydrate(
+        ctx:     ApplicationContext,
         schema:  EntitySchema<any>,
         id:      string,
         entIri:  string,
@@ -466,7 +406,7 @@ export class EntityStore {
         const defs   = schema.resolveGroups(handles);
 
         const pgNodes  = defs.map(def => pgIri(entIri, def.handle));
-        const allQuads = await this._store.findForSubjects(pgNodes);
+        const allQuads = await this._store.findForSubjects(ctx, pgNodes);
 
         for (const def of defs) {
             const pg    = pgIri(entIri, def.handle);
@@ -493,7 +433,7 @@ export class EntityStore {
     }
 
     private _propQuads(pg: IRI, def: PropGroupDef, data: Record<string, unknown>) {
-        const results: Parameters<TripleStore['insert']>[0][] = [];
+        const results: Parameters<TripleStore['insert']>[1][] = [];
         for (const [propName, propIri] of Object.entries(def.properties)) {
             const value = data[propName];
             if (value === undefined || value === null) { continue; }

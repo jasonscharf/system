@@ -60,7 +60,9 @@ if (process.env['TERN_PG_URL']) {
 async function setup(db: DbProvider) {
     const knex  = await db.create();
     const trx   = await knex.transaction();
-    const store = new TripleStore(trx as unknown as Knex);
+    // Use trx as the knex instance so es.inTransaction() creates savepoints
+    // rather than new connection-level transactions (avoids SQLite deadlock).
+    const store = new TripleStore(trx as unknown as import('knex').Knex);
     const es    = new EntityStore(store);
     return { knex, trx, es };
 }
@@ -109,7 +111,7 @@ for (const db of providers) {
         afterEach(async ()  => { await teardown(ctx); });
 
         it('returns empty array when no users exist', async () => {
-            const users = await listUsers(es);
+            const users = await listUsers(ctx, es);
             expect(users).toHaveLength(0);
         });
 
@@ -117,13 +119,13 @@ for (const db of providers) {
             await es.create(ctx, UserSchema, { email: 'a@test.com' });
             await es.create(ctx, UserSchema, { email: 'b@test.com' });
             await es.create(ctx, UserSchema, { email: 'c@test.com' });
-            const users = await listUsers(es);
+            const users = await listUsers(ctx, es);
             expect(users).toHaveLength(3);
         });
 
         it('each user record has id, iri, and core group', async () => {
             await es.create(ctx, UserSchema, { email: 'alice@test.com', displayName: 'Alice' });
-            const [user] = await listUsers(es);
+            const [user] = await listUsers(ctx, es);
             expect(user!.id).toBeTruthy();
             expect(user!.iri).toContain('http://tern.dev/ns/auth/user/');
             expect(user!.groups[CoreHandle.id]!['email']).toBe('alice@test.com');
@@ -141,7 +143,7 @@ for (const db of providers) {
         afterEach(async ()  => { await teardown(ctx); });
 
         it('returns empty array when no devices exist', async () => {
-            expect(await listUserDevices(es)).toHaveLength(0);
+            expect(await listUserDevices(ctx, es)).toHaveLength(0);
         });
 
         it('returns all devices across all users', async () => {
@@ -150,7 +152,7 @@ for (const db of providers) {
             await es.create(ctx, UserDeviceSchema, { deviceUser: alice.iri, devicePlatform: 'web' });
             await es.create(ctx, UserDeviceSchema, { deviceUser: alice.iri, devicePlatform: 'ios' });
             await es.create(ctx, UserDeviceSchema, { deviceUser: bob.iri,   devicePlatform: 'android' });
-            const devices = await listUserDevices(es);
+            const devices = await listUserDevices(ctx, es);
             expect(devices).toHaveLength(3);
         });
 
@@ -161,7 +163,7 @@ for (const db of providers) {
                 deviceUserAgent: 'Chrome/120',
                 devicePlatform:  'web',
             });
-            const [device] = await listUserDevices(es);
+            const [device] = await listUserDevices(ctx, es);
             const deviceUserIri = device!.groups[DeviceCoreHandle.id]!['deviceUser'] as string;
             expect(deviceUserIri).toBe(user.iri);
         });
@@ -183,8 +185,8 @@ for (const db of providers) {
                 expiresAt: new Date(Date.now() + 3600_000), isActive: false,
             });
 
-            const active   = await listActiveSessions(es);
-            const inactive = await listInactiveSessions(es);
+            const active   = await listActiveSessions(ctx, es);
+            const inactive = await listInactiveSessions(ctx, es);
 
             expect(active.every(s => s.groups[SessionCoreHandle.id]!['isActive'] === true)).toBe(true);
             expect(inactive.every(s => s.groups[SessionCoreHandle.id]!['isActive'] === false)).toBe(true);
@@ -193,13 +195,13 @@ for (const db of providers) {
 
         it('listActiveSessions returns empty when all sessions revoked', async () => {
             const { user, device } = await makeUserWithSession(es, 'y@test.com', { isActive: false });
-            expect(await listActiveSessions(es)).toHaveLength(0);
-            expect(await listInactiveSessions(es)).toHaveLength(1);
+            expect(await listActiveSessions(ctx, es)).toHaveLength(0);
+            expect(await listInactiveSessions(ctx, es)).toHaveLength(1);
         });
 
         it('active session record has isActive = true and sessionUser IRI', async () => {
             const { user } = await makeUserWithSession(es, 'z@test.com');
-            const [sess] = await listActiveSessions(es);
+            const [sess] = await listActiveSessions(ctx, es);
             expect(sess!.groups[SessionCoreHandle.id]!['isActive']).toBe(true);
             expect(sess!.groups[SessionCoreHandle.id]!['sessionUser']).toBe(user.iri);
         });
@@ -215,13 +217,13 @@ for (const db of providers) {
         afterEach(async ()  => { await teardown(ctx); });
 
         it('returns null for unknown userId', async () => {
-            const result = await findUserWithRecentActivity(es, 'no-such-id');
+            const result = await findUserWithRecentActivity(ctx, es, 'no-such-id');
             expect(result).toBeNull();
         });
 
         it('returns user with null session and device when user has no sessions', async () => {
             const user = await es.create(ctx, UserSchema, { email: 'a@test.com' });
-            const result = await findUserWithRecentActivity(es, user.id);
+            const result = await findUserWithRecentActivity(ctx, es, user.id);
             expect(result).not.toBeNull();
             expect(result!.user.id).toBe(user.id);
             expect(result!.session).toBeNull();
@@ -230,7 +232,7 @@ for (const db of providers) {
 
         it('joins session and device onto the user record', async () => {
             const { user, device, session } = await makeUserWithSession(es, 'b@test.com');
-            const result = await findUserWithRecentActivity(es, user.id);
+            const result = await findUserWithRecentActivity(ctx, es, user.id);
 
             expect(result!.user.iri).toBe(user.iri);
             expect(result!.session!.id).toBe(session.id);
@@ -247,7 +249,7 @@ for (const db of providers) {
                 expiresAt:     new Date(Date.now() + 7 * 24 * 3600 * 1000),
             });
 
-            const result = await findUserWithRecentActivity(es, user.id);
+            const result = await findUserWithRecentActivity(ctx, es, user.id);
             expect(result!.session!.id).toBe(laterSession.id);
         });
 
@@ -266,7 +268,7 @@ for (const db of providers) {
                 expiresAt: new Date(Date.now() + 7 * 24 * 3600_000),
             });
 
-            const result = await findUserWithRecentActivity(es, user.id);
+            const result = await findUserWithRecentActivity(ctx, es, user.id);
             expect(result!.session!.id).toBe(newerSession.id);
             expect(result!.device!.id).toBe(device2.id);
             const platform = result!.device!.groups[DeviceCoreHandle.id]!['devicePlatform'];
@@ -284,7 +286,7 @@ for (const db of providers) {
         afterEach(async ()  => { await teardown(ctx); });
 
         it('returns empty array for unknown tokens', async () => {
-            const results = await findSessionsByTokens(es, ['bad-token-1', 'bad-token-2']);
+            const results = await findSessionsByTokens(ctx, es, ['bad-token-1', 'bad-token-2']);
             expect(results).toHaveLength(0);
         });
 
@@ -292,7 +294,7 @@ for (const db of providers) {
             const { session } = await makeUserWithSession(es, 'e@test.com');
             const token = session.groups[SessionCoreHandle.id]!['sessionToken'] as string;
 
-            const results = await findSessionsByTokens(es, [token]);
+            const results = await findSessionsByTokens(ctx, es, [token]);
             expect(results).toHaveLength(1);
             expect(results[0]!.id).toBe(session.id);
         });
@@ -303,7 +305,7 @@ for (const db of providers) {
             const t1 = s1.groups[SessionCoreHandle.id]!['sessionToken'] as string;
             const t2 = s2.groups[SessionCoreHandle.id]!['sessionToken'] as string;
 
-            const results = await findSessionsByTokens(es, [t1, t2]);
+            const results = await findSessionsByTokens(ctx, es, [t1, t2]);
             expect(results).toHaveLength(2);
             const ids = results.map(r => r.id);
             expect(ids).toContain(s1.id);
@@ -314,7 +316,7 @@ for (const db of providers) {
             const { session } = await makeUserWithSession(es, 'g@test.com');
             const token = session.groups[SessionCoreHandle.id]!['sessionToken'] as string;
 
-            const results = await findSessionsByTokens(es, [token, 'ghost-token']);
+            const results = await findSessionsByTokens(ctx, es, [token, 'ghost-token']);
             expect(results).toHaveLength(1);
             expect(results[0]!.id).toBe(session.id);
         });
@@ -323,7 +325,7 @@ for (const db of providers) {
             const { user, session } = await makeUserWithSession(es, 'h@test.com');
             const token = session.groups[SessionCoreHandle.id]!['sessionToken'] as string;
 
-            const [found] = await findSessionsByTokens(es, [token]);
+            const [found] = await findSessionsByTokens(ctx, es, [token]);
             expect(found!.groups[SessionCoreHandle.id]!['isActive']).toBe(true);
             expect(found!.groups[SessionCoreHandle.id]!['sessionUser']).toBe(user.iri);
         });
@@ -339,7 +341,7 @@ for (const db of providers) {
         afterEach(async ()  => { await teardown(ctx); });
 
         it('returns null for an unknown token', async () => {
-            const user = await findUserBySession(es, 'ghost-token');
+            const user = await findUserBySession(ctx, es, 'ghost-token');
             expect(user).toBeNull();
         });
 
@@ -347,7 +349,7 @@ for (const db of providers) {
             const { user, session } = await makeUserWithSession(es, 'i@test.com');
             const token = session.groups[SessionCoreHandle.id]!['sessionToken'] as string;
 
-            const found = await findUserBySession(es, token);
+            const found = await findUserBySession(ctx, es, token);
             expect(found).not.toBeNull();
             expect(found!.id).toBe(user.id);
             expect(found!.groups[CoreHandle.id]!['email']).toBe('i@test.com');
@@ -358,7 +360,7 @@ for (const db of providers) {
             const { user: u2, session: s2 } = await makeUserWithSession(es, 'j2@test.com');
 
             const token = s2.groups[SessionCoreHandle.id]!['sessionToken'] as string;
-            const found = await findUserBySession(es, token);
+            const found = await findUserBySession(ctx, es, token);
             expect(found!.id).toBe(u2.id);
             expect(found!.groups[CoreHandle.id]!['email']).toBe('j2@test.com');
         });
@@ -367,7 +369,7 @@ for (const db of providers) {
             const { user, session } = await makeUserWithSession(es, 'k@test.com', { isActive: false });
             const token = session.groups[SessionCoreHandle.id]!['sessionToken'] as string;
 
-            const found = await findUserBySession(es, token);
+            const found = await findUserBySession(ctx, es, token);
             expect(found!.id).toBe(user.id);
         });
     });

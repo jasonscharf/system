@@ -1,15 +1,15 @@
 /**
  * Higher-level query functions for auth entities.
  *
- * Each function takes an EntityStore and performs one or more EntityQuery
- * operations.  "Join" queries traverse entity references in-code:
+ * Each function takes an ApplicationContext and EntityStore and performs one or
+ * more EntityQuery operations.  "Join" queries traverse entity references in-code:
  *   session.sessionUser  → User entity IRI  → findById(UserSchema, id)
  *   session.sessionDevice → UserDevice IRI  → findById(UserDeviceSchema, id)
  *
  * All queries run against the single TripleStore backing the EntityStore, so
  * they work transparently with both SQLite and PostgreSQL.
  */
-import type { EntityRecord, EntityStore } from '@system/entities';
+import type { EntityRecord, EntityStore, ApplicationContext } from '@system/entities';
 import { entities } from '@system/entities';
 import { UserSchema, CoreHandle }               from './entities/UserSchema.js';
 import { UserDeviceSchema, DeviceCoreHandle }   from './entities/UserDeviceSchema.js';
@@ -36,29 +36,29 @@ function strProp(record: EntityRecord, handle: string, prop: string): string | u
 // ── Simple list queries ───────────────────────────────────────────────────────
 
 /** Returns all User entities in insertion order. */
-export function listUsers(es: EntityStore): Promise<EntityRecord[]> {
-    return entities(es.store).find(UserSchema, [CoreHandle]).all();
+export function listUsers(ctx: ApplicationContext, es: EntityStore): Promise<EntityRecord[]> {
+    return entities(es.store).find(UserSchema, [CoreHandle]).all(ctx);
 }
 
 /** Returns all UserDevice entities in insertion order. */
-export function listUserDevices(es: EntityStore): Promise<EntityRecord[]> {
-    return entities(es.store).find(UserDeviceSchema, [DeviceCoreHandle]).all();
+export function listUserDevices(ctx: ApplicationContext, es: EntityStore): Promise<EntityRecord[]> {
+    return entities(es.store).find(UserDeviceSchema, [DeviceCoreHandle]).all(ctx);
 }
 
 /** Returns all UserSession entities where isActive = true. */
-export function listActiveSessions(es: EntityStore): Promise<EntityRecord[]> {
+export function listActiveSessions(ctx: ApplicationContext, es: EntityStore): Promise<EntityRecord[]> {
     return entities(es.store)
         .find(UserSessionSchema, [SessionCoreHandle])
         .where(SessionCoreHandle, 'isActive', '=', true)
-        .all();
+        .all(ctx);
 }
 
 /** Returns all UserSession entities where isActive = false. */
-export function listInactiveSessions(es: EntityStore): Promise<EntityRecord[]> {
+export function listInactiveSessions(ctx: ApplicationContext, es: EntityStore): Promise<EntityRecord[]> {
     return entities(es.store)
         .find(UserSessionSchema, [SessionCoreHandle])
         .where(SessionCoreHandle, 'isActive', '=', false)
-        .all();
+        .all(ctx);
 }
 
 // ── Join queries ──────────────────────────────────────────────────────────────
@@ -73,17 +73,18 @@ export function listInactiveSessions(es: EntityStore): Promise<EntityRecord[]> {
  *   3. From the most-recent session read sessionDevice IRI → fetch UserDevice.
  */
 export async function findUserWithRecentActivity(
+    ctx:    ApplicationContext,
     es:     EntityStore,
     userId: string,
 ): Promise<UserWithActivity | null> {
-    const user = await es.findById(UserSchema, userId, [CoreHandle]);
+    const user = await es.findById(ctx, UserSchema, userId, [CoreHandle]);
     if (!user) { return null; }
 
     const sessions = await entities(es.store)
         .find(UserSessionSchema, [SessionCoreHandle])
         .where(SessionCoreHandle, 'sessionUser', '=', user.iri)
         .orderBy(SessionCoreHandle, 'createdAt', 'desc')
-        .all();
+        .all(ctx);
 
     const session = sessions[0] ?? null;
 
@@ -91,7 +92,7 @@ export async function findUserWithRecentActivity(
     if (session) {
         const deviceIri = strProp(session, SessionCoreHandle.id, 'sessionDevice');
         if (deviceIri) {
-            device = await es.findById(UserDeviceSchema, idOf(deviceIri), [DeviceCoreHandle]);
+            device = await es.findById(ctx, UserDeviceSchema, idOf(deviceIri), [DeviceCoreHandle]);
         }
     }
 
@@ -103,6 +104,7 @@ export async function findUserWithRecentActivity(
  * Returns records in the same order as the input tokens (absent sessions are omitted).
  */
 export async function findSessionsByTokens(
+    ctx:    ApplicationContext,
     es:     EntityStore,
     tokens: string[],
 ): Promise<EntityRecord[]> {
@@ -111,7 +113,7 @@ export async function findSessionsByTokens(
         const found = await entities(es.store)
             .find(UserSessionSchema, [SessionCoreHandle])
             .where(SessionCoreHandle, 'sessionToken', '=', token)
-            .first();
+            .first(ctx);
         if (found) { results.push(found); }
     }
     return results;
@@ -124,18 +126,19 @@ export async function findSessionsByTokens(
  *   session.sessionUser IRI → idOf() → findById(UserSchema)
  */
 export async function findUserBySession(
+    ctx:          ApplicationContext,
     es:           EntityStore,
     sessionToken: string,
 ): Promise<EntityRecord | null> {
     const session = await entities(es.store)
         .find(UserSessionSchema, [SessionCoreHandle])
         .where(SessionCoreHandle, 'sessionToken', '=', sessionToken)
-        .first();
+        .first(ctx);
 
     if (!session) { return null; }
 
     const userIri = strProp(session, SessionCoreHandle.id, 'sessionUser');
     if (!userIri) { return null; }
 
-    return es.findById(UserSchema, idOf(userIri), [CoreHandle]);
+    return es.findById(ctx, UserSchema, idOf(userIri), [CoreHandle]);
 }

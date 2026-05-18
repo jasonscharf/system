@@ -3,7 +3,7 @@ import {
     UserIRI,
     emailIRI, displayNameIRI, avatarUrlIRI, createdAtIRI, updatedAtIRI,
 } from '@system/core';
-import type { TripleStore } from '@system/data';
+import type { TripleStore, ApplicationContext } from '@system/data';
 import { AUTH_GRAPH, RDF_TYPE, XSD_STRING, XSD_DATETIME } from '../constants.js';
 import type { UserEntity } from '../types.js';
 import { newId, iriFor, idFrom } from './util.js';
@@ -16,12 +16,14 @@ export class UserRepository {
         this._store = store;
     }
 
-    async create(input: Pick<UserEntity, 'email' | 'displayName' | 'avatarUrl'>): Promise<UserEntity> {
+    get store(): TripleStore { return this._store; }
+
+    async create(ctx: ApplicationContext, input: Pick<UserEntity, 'email' | 'displayName' | 'avatarUrl'>): Promise<UserEntity> {
         const id  = newId();
         const now = new Date();
         const sub = iriFor('user', id);
 
-        await this._store.insertMany([
+        await this._store.insertMany(ctx, [
             { subject: sub, predicate: RDF_TYPE,       object: UserIRI,                                              graph: AUTH_GRAPH },
             { subject: sub, predicate: emailIRI,       object: literal(input.email, XSD_STRING),                    graph: AUTH_GRAPH },
             { subject: sub, predicate: createdAtIRI,   object: literal(now.toISOString(), XSD_DATETIME),            graph: AUTH_GRAPH },
@@ -33,14 +35,14 @@ export class UserRepository {
         return { id, iri: sub.value, ...input, createdAt: now, updatedAt: now };
     }
 
-    async findById(id: string): Promise<UserEntity | null> {
+    async findById(ctx: ApplicationContext, id: string): Promise<UserEntity | null> {
         const sub   = iriFor('user', id);
-        const quads = await this._store.find({ subject: sub, graph: AUTH_GRAPH });
+        const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
         return quads.length === 0 ? null : this._fromQuads(id, quads);
     }
 
-    async findByEmail(email: string): Promise<UserEntity | null> {
-        const quads = await this._store.find({
+    async findByEmail(ctx: ApplicationContext, email: string): Promise<UserEntity | null> {
+        const quads = await this._store.find(ctx, {
             predicate: emailIRI,
             object:    literal(email, XSD_STRING),
             graph:     AUTH_GRAPH,
@@ -48,36 +50,36 @@ export class UserRepository {
         if (quads.length === 0) { return null; }
         const sub = quads[0].subject as IRI;
         const id  = idFrom(sub.value);
-        return this._fromQuads(id, await this._store.find({ subject: sub, graph: AUTH_GRAPH }));
+        return this._fromQuads(id, await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH }));
     }
 
-    async update(id: string, patch: Partial<Pick<UserEntity, 'displayName' | 'avatarUrl' | 'email'>>): Promise<UserEntity | null> {
-        const existing = await this.findById(id);
+    async update(ctx: ApplicationContext, id: string, patch: Partial<Pick<UserEntity, 'displayName' | 'avatarUrl' | 'email'>>): Promise<UserEntity | null> {
+        const existing = await this.findById(ctx, id);
         if (!existing) { return null; }
 
         const sub = iriFor('user', id);
         const now = new Date();
 
         if (patch.email !== undefined) {
-            await this._store.delete({ subject: sub, predicate: emailIRI, graph: AUTH_GRAPH });
-            await this._store.insert({ subject: sub, predicate: emailIRI, object: literal(patch.email, XSD_STRING), graph: AUTH_GRAPH });
+            await this._store.delete(ctx, { subject: sub, predicate: emailIRI, graph: AUTH_GRAPH });
+            await this._store.insert(ctx, { subject: sub, predicate: emailIRI, object: literal(patch.email, XSD_STRING), graph: AUTH_GRAPH });
         }
         if (patch.displayName !== undefined) {
-            await this._store.delete({ subject: sub, predicate: displayNameIRI, graph: AUTH_GRAPH });
-            await this._store.insert({ subject: sub, predicate: displayNameIRI, object: literal(patch.displayName, XSD_STRING), graph: AUTH_GRAPH });
+            await this._store.delete(ctx, { subject: sub, predicate: displayNameIRI, graph: AUTH_GRAPH });
+            await this._store.insert(ctx, { subject: sub, predicate: displayNameIRI, object: literal(patch.displayName, XSD_STRING), graph: AUTH_GRAPH });
         }
         if (patch.avatarUrl !== undefined) {
-            await this._store.delete({ subject: sub, predicate: avatarUrlIRI, graph: AUTH_GRAPH });
-            await this._store.insert({ subject: sub, predicate: avatarUrlIRI, object: literal(patch.avatarUrl, XSD_STRING), graph: AUTH_GRAPH });
+            await this._store.delete(ctx, { subject: sub, predicate: avatarUrlIRI, graph: AUTH_GRAPH });
+            await this._store.insert(ctx, { subject: sub, predicate: avatarUrlIRI, object: literal(patch.avatarUrl, XSD_STRING), graph: AUTH_GRAPH });
         }
-        await this._store.delete({ subject: sub, predicate: updatedAtIRI, graph: AUTH_GRAPH });
-        await this._store.insert({ subject: sub, predicate: updatedAtIRI, object: literal(now.toISOString(), XSD_DATETIME), graph: AUTH_GRAPH });
+        await this._store.delete(ctx, { subject: sub, predicate: updatedAtIRI, graph: AUTH_GRAPH });
+        await this._store.insert(ctx, { subject: sub, predicate: updatedAtIRI, object: literal(now.toISOString(), XSD_DATETIME), graph: AUTH_GRAPH });
 
-        return this.findById(id);
+        return this.findById(ctx, id);
     }
 
-    async delete(id: string): Promise<void> {
-        await this._store.delete({ subject: iriFor('user', id), graph: AUTH_GRAPH });
+    async delete(ctx: ApplicationContext, id: string): Promise<void> {
+        await this._store.delete(ctx, { subject: iriFor('user', id), graph: AUTH_GRAPH });
     }
 
     private _fromQuads(id: string, quads: Awaited<ReturnType<TripleStore['find']>>): UserEntity {

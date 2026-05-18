@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Knex } from 'knex';
 import { IRI, DEFAULT_GRAPH, type BlankNode, type Literal, type Quad } from '@system/core';
-import { createDataContext, TripleStore, type QuadPattern } from '@system/data';
+import { createDataContext, TripleStore, type QuadPattern, type TrxContext } from '@system/data';
 import { down as migration001Down } from '../../../data/src/migrations/001_init.js';
 
 
@@ -75,11 +75,13 @@ for (const provider of providers) {
         let knex: Knex;
         let store: TripleStore;
         let trx: Knex.Transaction;
+        let ctx: TrxContext;
 
         beforeEach(async () => {
             knex  = await provider.create();
             trx   = await knex.transaction();
-            store = new TripleStore(trx as unknown as Knex);
+            store = new TripleStore(knex);
+            ctx   = { trx };
         });
 
         afterEach(async () => {
@@ -90,55 +92,55 @@ for (const provider of providers) {
         // ── ensureNamespace ───────────────────────────────────────────────────
 
         it('registers a namespace and returns its id', async () => {
-            const id = await store.ensureNamespace('ex', 'http://example.org/');
+            const id = await store.ensureNamespace(ctx, 'ex', 'http://example.org/');
             expect(id).toBeGreaterThan(0);
         });
 
         it('returns the same id for a duplicate namespace', async () => {
-            const a = await store.ensureNamespace('ex', 'http://example.org/');
-            const b = await store.ensureNamespace('ex', 'http://example.org/');
+            const a = await store.ensureNamespace(ctx, 'ex', 'http://example.org/');
+            const b = await store.ensureNamespace(ctx, 'ex', 'http://example.org/');
             expect(a).toBe(b);
         });
 
         // ── ensureName ────────────────────────────────────────────────────────
 
         it('interns an IRI and returns its name id', async () => {
-            const id = await store.ensureName('http://example.org/foo');
+            const id = await store.ensureName(ctx, 'http://example.org/foo');
             expect(id).toBeGreaterThan(0);
         });
 
         it('interns the same IRI idempotently', async () => {
-            const a = await store.ensureName('http://example.org/foo');
-            const b = await store.ensureName('http://example.org/foo');
+            const a = await store.ensureName(ctx, 'http://example.org/foo');
+            const b = await store.ensureName(ctx, 'http://example.org/foo');
             expect(a).toBe(b);
         });
 
         // ── ensureNode ────────────────────────────────────────────────────────
 
         it('interns an IRI node', async () => {
-            const id = await store.ensureNode(EX('subject'));
+            const id = await store.ensureNode(ctx, EX('subject'));
             expect(id).toBeGreaterThan(0);
         });
 
         it('interns the same IRI node idempotently', async () => {
-            const a = await store.ensureNode(EX('subject'));
-            const b = await store.ensureNode(EX('subject'));
+            const a = await store.ensureNode(ctx, EX('subject'));
+            const b = await store.ensureNode(ctx, EX('subject'));
             expect(a).toBe(b);
         });
 
         it('interns a blank node', async () => {
-            const id = await store.ensureNode(blank('b0'));
+            const id = await store.ensureNode(ctx, blank('b0'));
             expect(id).toBeGreaterThan(0);
         });
 
         it('interns a string literal', async () => {
-            const id = await store.ensureNode(literal('hello'));
+            const id = await store.ensureNode(ctx, literal('hello'));
             expect(id).toBeGreaterThan(0);
         });
 
         it('distinguishes literals with different language tags', async () => {
-            const en = await store.ensureNode(literal('cat', undefined, 'en'));
-            const fr = await store.ensureNode(literal('chat', undefined, 'fr'));
+            const en = await store.ensureNode(ctx, literal('cat', undefined, 'en'));
+            const fr = await store.ensureNode(ctx, literal('chat', undefined, 'fr'));
             expect(en).not.toBe(fr);
         });
 
@@ -146,44 +148,44 @@ for (const provider of providers) {
 
         it('inserts a triple and finds it by subject', async () => {
             const q: Quad = { subject: EX('s'), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH };
-            await store.insert(q);
+            await store.insert(ctx, q);
 
-            const found = await store.find({ subject: EX('s') });
+            const found = await store.find(ctx, { subject: EX('s') });
             expect(found).toHaveLength(1);
             expect((found[0].subject as IRI).value).toBe('http://example.org/s');
             expect((found[0].predicate as IRI).value).toBe(RDF_TYPE.value);
         });
 
         it('inserts a triple and finds it by predicate', async () => {
-            await store.insert({ subject: EX('a'), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH });
-            await store.insert({ subject: EX('b'), predicate: RDFS_LABEL, object: literal('B'), graph: GRAPH });
+            await store.insert(ctx, { subject: EX('a'), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH });
+            await store.insert(ctx, { subject: EX('b'), predicate: RDFS_LABEL, object: literal('B'), graph: GRAPH });
 
-            const byType = await store.find({ predicate: RDF_TYPE });
+            const byType = await store.find(ctx, { predicate: RDF_TYPE });
             expect(byType).toHaveLength(1);
             expect((byType[0].subject as IRI).value).toBe('http://example.org/a');
         });
 
         it('inserts a triple and finds it by object IRI', async () => {
-            await store.insert({ subject: EX('a'), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH });
+            await store.insert(ctx, { subject: EX('a'), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH });
 
-            const found = await store.find({ object: OWL_THING });
+            const found = await store.find(ctx, { object: OWL_THING });
             expect(found).toHaveLength(1);
         });
 
         it('inserts a triple and finds it by literal object', async () => {
             const label = literal('hello world');
-            await store.insert({ subject: EX('doc'), predicate: RDFS_LABEL, object: label, graph: GRAPH });
+            await store.insert(ctx, { subject: EX('doc'), predicate: RDFS_LABEL, object: label, graph: GRAPH });
 
-            const found = await store.find({ object: label });
+            const found = await store.find(ctx, { object: label });
             expect(found).toHaveLength(1);
             expect(((found[0].object) as Literal).value).toBe('hello world');
         });
 
         it('inserts a triple with a blank node subject', async () => {
             const b = blank('anon1');
-            await store.insert({ subject: b, predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH });
+            await store.insert(ctx, { subject: b, predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH });
 
-            const found = await store.find({ subject: b });
+            const found = await store.find(ctx, { subject: b });
             expect(found).toHaveLength(1);
             expect((found[0].subject as BlankNode).termType).toBe('BlankNode');
             expect((found[0].subject as BlankNode).id).toBe('anon1');
@@ -191,26 +193,26 @@ for (const provider of providers) {
 
         it('de-duplicates identical quads on insert', async () => {
             const q: Quad = { subject: EX('s'), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH };
-            await store.insert(q);
-            await store.insert(q);  // should be ignored (onConflict ignore)
+            await store.insert(ctx, q);
+            await store.insert(ctx, q);  // should be ignored (onConflict ignore)
 
-            const found = await store.find({ subject: EX('s') });
+            const found = await store.find(ctx, { subject: EX('s') });
             expect(found).toHaveLength(1);
         });
 
         it('finds all triples when no pattern is given', async () => {
-            await store.insertMany([
+            await store.insertMany(ctx, [
                 { subject: EX('a'), predicate: RDF_TYPE,   object: OWL_THING,      graph: GRAPH },
                 { subject: EX('b'), predicate: RDFS_LABEL, object: literal('B'),   graph: GRAPH },
                 { subject: EX('c'), predicate: RDF_TYPE,   object: OWL_THING,      graph: GRAPH },
             ]);
 
-            const all = await store.find();
+            const all = await store.find(ctx);
             expect(all).toHaveLength(3);
         });
 
         it('returns empty array when subject not found', async () => {
-            const found = await store.find({ subject: EX('ghost') });
+            const found = await store.find(ctx, { subject: EX('ghost') });
             expect(found).toHaveLength(0);
         });
 
@@ -219,34 +221,34 @@ for (const provider of providers) {
         it('finds triples scoped to a specific graph', async () => {
             const g1 = EX('g1');
             const g2 = EX('g2');
-            await store.insert({ subject: EX('s'), predicate: RDF_TYPE, object: OWL_THING, graph: g1 });
-            await store.insert({ subject: EX('s'), predicate: RDF_TYPE, object: OWL_THING, graph: g2 });
+            await store.insert(ctx, { subject: EX('s'), predicate: RDF_TYPE, object: OWL_THING, graph: g1 });
+            await store.insert(ctx, { subject: EX('s'), predicate: RDF_TYPE, object: OWL_THING, graph: g2 });
 
-            const inG1 = await store.find({ graph: g1 });
+            const inG1 = await store.find(ctx, { graph: g1 });
             expect(inG1).toHaveLength(1);
         });
 
         // ── delete ────────────────────────────────────────────────────────────
 
         it('deletes triples matching a pattern', async () => {
-            await store.insert({ subject: EX('del'), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH });
-            const deleted = await store.delete({ subject: EX('del') });
+            await store.insert(ctx, { subject: EX('del'), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH });
+            const deleted = await store.delete(ctx, { subject: EX('del') });
             expect(deleted).toBe(1);
-            expect(await store.find({ subject: EX('del') })).toHaveLength(0);
+            expect(await store.find(ctx, { subject: EX('del') })).toHaveLength(0);
         });
 
         it('returns 0 when delete pattern matches nothing', async () => {
-            const deleted = await store.delete({ subject: EX('nobody') });
+            const deleted = await store.delete(ctx, { subject: EX('nobody') });
             expect(deleted).toBe(0);
         });
 
         it('deletes only matching triples, leaving others intact', async () => {
-            await store.insertMany([
+            await store.insertMany(ctx, [
                 { subject: EX('keep'),   predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH },
                 { subject: EX('remove'), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH },
             ]);
-            await store.delete({ subject: EX('remove') });
-            const all = await store.find();
+            await store.delete(ctx, { subject: EX('remove') });
+            const all = await store.find(ctx);
             expect(all).toHaveLength(1);
             expect((all[0].subject as IRI).value).toBe('http://example.org/keep');
         });
@@ -254,57 +256,57 @@ for (const provider of providers) {
         // ── stats ─────────────────────────────────────────────────────────────
 
         it('reports accurate stats after insertions', async () => {
-            await store.insertMany([
+            await store.insertMany(ctx, [
                 { subject: EX('a'), predicate: RDF_TYPE,   object: OWL_THING,    graph: GRAPH },
                 { subject: EX('b'), predicate: RDFS_LABEL, object: literal('B'), graph: GRAPH },
             ]);
-            const s = await store.stats();
+            const s = await store.stats(ctx);
             expect(s.edges).toBe(2);
             expect(s.nodes).toBeGreaterThanOrEqual(4); // a, b, rdf:type, rdfs:label, owl:Thing, lit
             expect(s.names).toBeGreaterThanOrEqual(3);
         });
 
         it('stats reflect deletions', async () => {
-            await store.insert({ subject: EX('x'), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH });
-            await store.delete({ subject: EX('x') });
-            const s = await store.stats();
+            await store.insert(ctx, { subject: EX('x'), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH });
+            await store.delete(ctx, { subject: EX('x') });
+            const s = await store.stats(ctx);
             expect(s.edges).toBe(0);
         });
 
         // ── delete by predicate / object / graph:null ─────────────────────────
 
         it('deletes triples matching a predicate pattern', async () => {
-            await store.insertMany([
+            await store.insertMany(ctx, [
                 { subject: EX('a'), predicate: RDF_TYPE,   object: OWL_THING, graph: GRAPH },
                 { subject: EX('b'), predicate: RDFS_LABEL, object: literal('B'), graph: GRAPH },
             ]);
-            const deleted = await store.delete({ predicate: RDF_TYPE });
+            const deleted = await store.delete(ctx, { predicate: RDF_TYPE });
             expect(deleted).toBe(1);
-            expect(await store.find()).toHaveLength(1);
+            expect(await store.find(ctx)).toHaveLength(1);
         });
 
         it('deletes triples matching an object pattern', async () => {
-            await store.insertMany([
+            await store.insertMany(ctx, [
                 { subject: EX('a'), predicate: RDF_TYPE,   object: OWL_THING, graph: GRAPH },
                 { subject: EX('b'), predicate: RDFS_LABEL, object: literal('B'), graph: GRAPH },
             ]);
-            const deleted = await store.delete({ object: OWL_THING });
+            const deleted = await store.delete(ctx, { object: OWL_THING });
             expect(deleted).toBe(1);
         });
 
         it('deletes triples with graph === null (no graph)', async () => {
             const noGraph = EX('s');
             // Insert a quad with graph = DefaultGraph (null -> gId = null)
-            await store.insert({
+            await store.insert(ctx, {
                 subject: noGraph, predicate: RDF_TYPE, object: OWL_THING,
                 graph: { termType: 'DefaultGraph' },
             });
-            const deleted = await store.delete({ graph: null });
+            const deleted = await store.delete(ctx, { graph: null });
             expect(deleted).toBe(1);
         });
 
         it('delete returns 0 for non-existent predicate', async () => {
-            const deleted = await store.delete({ predicate: EX('no-such-predicate') });
+            const deleted = await store.delete(ctx, { predicate: EX('no-such-predicate') });
             expect(deleted).toBe(0);
         });
     });
@@ -347,11 +349,12 @@ describe('TripleStore: find graph:null + delete with explicit graph', () => {
     it('find({graph:null}) returns quads in the default graph', async () => {
         const knex = await createDataContext({ client: 'sqlite', filename: ':memory:' });
         const store = new TripleStore(knex);
+        const ctx: TrxContext = {};
         const s = iri('http://example.org/s');
         const p = iri('http://example.org/p');
         const o = iri('http://example.org/o');
-        await store.insert({ subject: s, predicate: p, object: o, graph: { termType: 'DefaultGraph' } });
-        const found = await store.find({ graph: null });
+        await store.insert(ctx, { subject: s, predicate: p, object: o, graph: { termType: 'DefaultGraph' } });
+        const found = await store.find(ctx, { graph: null });
         expect(found).toHaveLength(1);
         await knex.destroy();
     });
@@ -359,9 +362,10 @@ describe('TripleStore: find graph:null + delete with explicit graph', () => {
     it('delete({graph: iri}) deletes quads in a named graph', async () => {
         const knex = await createDataContext({ client: 'sqlite', filename: ':memory:' });
         const store = new TripleStore(knex);
+        const ctx: TrxContext = {};
         const g = iri('http://example.org/g');
-        await store.insert({ subject: iri('http://s'), predicate: iri('http://p'), object: iri('http://o'), graph: g });
-        const deleted = await store.delete({ graph: g });
+        await store.insert(ctx, { subject: iri('http://s'), predicate: iri('http://p'), object: iri('http://o'), graph: g });
+        const deleted = await store.delete(ctx, { graph: g });
         expect(deleted).toBe(1);
         await knex.destroy();
     });
@@ -377,78 +381,80 @@ describe('TripleStore: find/delete with non-existent nodes return early', () => 
         describe(`TripleStore — ${provider.name}`, () => {
             let knex: Knex;
             let store: TripleStore;
+            let ctx: TrxContext;
 
             beforeEach(async () => {
                 knex = await provider.factory();
                 store = new TripleStore(knex);
+                ctx = {};
             });
 
             afterEach(async () => { await knex.destroy(); });
 
             it('find() returns [] when predicate IRI not in store (line 161 null id branch)', async () => {
-                const result = await store.find({ predicate: iri('http://nonexistent/p') });
+                const result = await store.find(ctx, { predicate: iri('http://nonexistent/p') });
                 expect(result).toHaveLength(0);
             });
 
             it('find() returns [] when object IRI not in store (line 166 null id branch)', async () => {
-                const result = await store.find({ object: iri('http://nonexistent/o') });
+                const result = await store.find(ctx, { object: iri('http://nonexistent/o') });
                 expect(result).toHaveLength(0);
             });
 
             it('find() returns [] when graph IRI not in store (line 174 null id branch)', async () => {
-                const result = await store.find({ graph: iri('http://nonexistent/g') });
+                const result = await store.find(ctx, { graph: iri('http://nonexistent/g') });
                 expect(result).toHaveLength(0);
             });
 
             it('delete() returns 0 when predicate IRI not in store (line 220 null id)', async () => {
-                const count = await store.delete({ predicate: iri('http://nonexistent/p') });
+                const count = await store.delete(ctx, { predicate: iri('http://nonexistent/p') });
                 expect(count).toBe(0);
             });
 
             it('delete() returns 0 when object IRI not in store (null id branch)', async () => {
-                const count = await store.delete({ object: iri('http://nonexistent/o') });
+                const count = await store.delete(ctx, { object: iri('http://nonexistent/o') });
                 expect(count).toBe(0);
             });
 
             it('delete() returns 0 when graph IRI not in store (line 228 null id branch)', async () => {
-                const count = await store.delete({ graph: iri('http://nonexistent/g') });
+                const count = await store.delete(ctx, { graph: iri('http://nonexistent/g') });
                 expect(count).toBe(0);
             });
 
             it('find() returns [] when blank node object not in store (line 271 null id)', async () => {
-                const result = await store.find({ object: blank('no-such-blank') });
+                const result = await store.find(ctx, { object: blank('no-such-blank') });
                 expect(result).toHaveLength(0);
             });
 
             it('find() returns [] when literal object not in store (_nodeId literal null)', async () => {
-                const result = await store.find({ object: literal('nonexistent-value') });
+                const result = await store.find(ctx, { object: literal('nonexistent-value') });
                 expect(result).toHaveLength(0);
             });
 
             it('_loadNodes handles result with only IRI nodes (iriNodeIds.length > 0, line 288)', async () => {
                 // Triple with IRI subject, IRI predicate, IRI object → all nodes are IRIs
                 // _loadNodes gets called with those IRI node IDs → iriNodeIds.length > 0
-                await store.insert({ subject: iri('http://s2'), predicate: iri('http://p2'), object: iri('http://o2'), graph: DEFAULT_GRAPH });
-                const results = await store.find({ subject: iri('http://s2') });
+                await store.insert(ctx, { subject: iri('http://s2'), predicate: iri('http://p2'), object: iri('http://o2'), graph: DEFAULT_GRAPH });
+                const results = await store.find(ctx, { subject: iri('http://s2') });
                 expect(results).toHaveLength(1);
             });
 
             it('ensureNode for blank node is idempotent (line 102 existing row branch)', async () => {
                 const b = blank('idempotent-blank');
-                await store.ensureNode(b);
-                const id2 = await store.ensureNode(b);
+                await store.ensureNode(ctx, b);
+                const id2 = await store.ensureNode(ctx, b);
                 expect(id2).toBeGreaterThan(0);
             });
 
             it('ensureNode for literal is idempotent (line 115 existing row branch)', async () => {
                 const lit = literal('hello', 'http://www.w3.org/2001/XMLSchema#string');
-                await store.ensureNode(lit);
-                const id2 = await store.ensureNode(lit);
+                await store.ensureNode(ctx, lit);
+                const id2 = await store.ensureNode(ctx, lit);
                 expect(id2).toBeGreaterThan(0);
             });
 
             it('find() with blank node object not in store returns [] (_nodeId blank null)', async () => {
-                const result = await store.find({ object: blank('no-such-blank') });
+                const result = await store.find(ctx, { object: blank('no-such-blank') });
                 expect(result).toHaveLength(0);
             });
 
@@ -458,8 +464,8 @@ describe('TripleStore: find/delete with non-existent nodes return early', () => 
                 const b = blank('bsub');
                 const p = iri('http://p');
                 const lit = literal('val');
-                await store.insert({ subject: b, predicate: p, object: lit, graph: DEFAULT_GRAPH });
-                const results = await store.find({ subject: b });
+                await store.insert(ctx, { subject: b, predicate: p, object: lit, graph: DEFAULT_GRAPH });
+                const results = await store.find(ctx, { subject: b });
                 // Results exist — _loadNodes was called with nodes including b (blank) and p (IRI)
                 expect(results.length).toBe(1);
             });

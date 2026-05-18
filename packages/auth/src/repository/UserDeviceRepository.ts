@@ -4,7 +4,7 @@ import {
     deviceNameIRI, devicePlatformIRI, deviceUserAgentIRI,
     deviceUserIRI, createdAtIRI,
 } from '@system/core';
-import type { TripleStore } from '@system/data';
+import type { TripleStore, ApplicationContext } from '@system/data';
 import { AUTH_GRAPH, RDF_TYPE, XSD_STRING, XSD_DATETIME } from '../constants.js';
 import type { UserDeviceEntity, DeviceInfo } from '../types.js';
 import { newId, iriFor, idFrom } from './util.js';
@@ -17,15 +17,15 @@ export class UserDeviceRepository {
         this._store = store;
     }
 
-    async findOrCreate(userId: string, info: DeviceInfo): Promise<UserDeviceEntity> {
-        const existing = await this._findByUserAndAgent(userId, info.userAgent);
+    async findOrCreate(ctx: ApplicationContext, userId: string, info: DeviceInfo): Promise<UserDeviceEntity> {
+        const existing = await this._findByUserAndAgent(ctx, userId, info.userAgent);
         if (existing) { return existing; }
 
         const id  = newId();
         const now = new Date();
         const sub = iriFor('device', id);
 
-        await this._store.insertMany([
+        await this._store.insertMany(ctx, [
             { subject: sub, predicate: RDF_TYPE,           object: UserDeviceIRI,                             graph: AUTH_GRAPH },
             { subject: sub, predicate: deviceUserIRI,      object: iriFor('user', userId),                    graph: AUTH_GRAPH },
             { subject: sub, predicate: createdAtIRI,       object: literal(now.toISOString(), XSD_DATETIME),  graph: AUTH_GRAPH },
@@ -45,31 +45,31 @@ export class UserDeviceRepository {
         };
     }
 
-    async findById(id: string): Promise<UserDeviceEntity | null> {
+    async findById(ctx: ApplicationContext, id: string): Promise<UserDeviceEntity | null> {
         const sub   = iriFor('device', id);
-        const quads = await this._store.find({ subject: sub, graph: AUTH_GRAPH });
+        const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
         return quads.length === 0 ? null : this._fromQuads(id, quads);
     }
 
-    async findByUserId(userId: string): Promise<UserDeviceEntity[]> {
+    async findByUserId(ctx: ApplicationContext, userId: string): Promise<UserDeviceEntity[]> {
         const userIri = iriFor('user', userId);
-        const byUser  = await this._store.find({ predicate: deviceUserIRI, object: userIri, graph: AUTH_GRAPH });
+        const byUser  = await this._store.find(ctx, { predicate: deviceUserIRI, object: userIri, graph: AUTH_GRAPH });
         const results: UserDeviceEntity[] = [];
 
         for (const q of byUser) {
             const sub   = q.subject as IRI;
-            const quads = await this._store.find({ subject: sub, graph: AUTH_GRAPH });
+            const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
             results.push(this._fromQuads(idFrom(sub.value), quads));
         }
         return results;
     }
 
-    private async _findByUserAndAgent(userId: string, userAgent?: string): Promise<UserDeviceEntity | null> {
+    private async _findByUserAndAgent(ctx: ApplicationContext, userId: string, userAgent?: string): Promise<UserDeviceEntity | null> {
         // No User-Agent → always create a new device record.
         // Falling back to the first registered device would silently associate a
         // headless / unknown client with an existing named device (e.g. a phone).
         if (!userAgent) { return null; }
-        const devices = await this.findByUserId(userId);
+        const devices = await this.findByUserId(ctx, userId);
         return devices.find(d => d.deviceUserAgent === userAgent) ?? null;
     }
 

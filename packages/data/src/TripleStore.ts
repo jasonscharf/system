@@ -2,6 +2,7 @@ import type { Knex } from 'knex';
 import { DEFAULT_GRAPH, type BlankNode, type DefaultGraph, type IRI, type Literal, type Quad } from '@system/core';
 import { C, T, type NodeKind, type LiteralJson } from './schema.js';
 import { coerceLiteralValue } from './migrations/002_time_series.js';
+import type { ApplicationContext } from './ApplicationContext.js';
 
 
 // ── Internal row types ────────────────────────────────────────────────────────
@@ -146,32 +147,44 @@ export class TripleStore {
     /** Direct access to the underlying Knex instance for advanced queries. */
     get knex(): Knex { return this._knex; }
 
+    /** Returns the Knex instance to use: the transaction if present, else the base knex. */
+    private _db(ctx: ApplicationContext): Knex {
+        return (ctx.trx as Knex | undefined) ?? this._knex;
+    }
+
+    // ── Transaction ───────────────────────────────────────────────────────────
+
+    async withTransaction<T>(ctx: ApplicationContext, fn: (ctx: ApplicationContext) => Promise<T>): Promise<T> {
+        if (ctx.trx) { return fn(ctx); }
+        return this._knex.transaction(async trx => fn({ ...ctx, trx }));
+    }
+
     // ── Namespace registry ────────────────────────────────────────────────────
 
-    async ensureNamespace(prefix: string, iriStr: string): Promise<number> {
-        const row = await this._knex(T.namespaces).where(C.prefix, prefix).first<{ id: number }>();
+    async ensureNamespace(ctx: ApplicationContext, prefix: string, iriStr: string): Promise<number> {
+        const row = await this._db(ctx)(T.namespaces).where(C.prefix, prefix).first<{ id: number }>();
         if (row) { return row.id; }
-        const [id] = await this._knex(T.namespaces).insert({ [C.prefix]: prefix, [C.iri]: iriStr });
+        const [id] = await this._db(ctx)(T.namespaces).insert({ [C.prefix]: prefix, [C.iri]: iriStr });
         return id as number;
     }
 
     // ── Term internment ───────────────────────────────────────────────────────
 
-    async ensureName(iriStr: string): Promise<number> {
-        const row = await this._knex(T.names).where(C.iri, iriStr).first<NameRow>();
+    async ensureName(ctx: ApplicationContext, iriStr: string): Promise<number> {
+        const row = await this._db(ctx)(T.names).where(C.iri, iriStr).first<NameRow>();
         if (row) { return row.id; }
-        const [id] = await this._knex(T.names).insert({ [C.iri]: iriStr });
+        const [id] = await this._db(ctx)(T.names).insert({ [C.iri]: iriStr });
         return id as number;
     }
 
-    async ensureNode(term: RdfTerm): Promise<number> {
+    async ensureNode(ctx: ApplicationContext, term: RdfTerm): Promise<number> {
         if (isIRI(term)) {
-            const nameId = await this.ensureName(term.value);
-            const row = await this._knex(T.nodes)
+            const nameId = await this.ensureName(ctx, term.value);
+            const row = await this._db(ctx)(T.nodes)
                 .where({ [C.kind]: 'iri', [C.nameId]: nameId })
                 .first<NodeRow>();
             if (row) { return row.id; }
-            const [id] = await this._knex(T.nodes).insert({
+            const [id] = await this._db(ctx)(T.nodes).insert({
                 [C.kind]:   'iri',
                 [C.nameId]: nameId,
             });
@@ -179,11 +192,11 @@ export class TripleStore {
         }
 
         if (term.termType === 'BlankNode') {
-            const row = await this._knex(T.nodes)
+            const row = await this._db(ctx)(T.nodes)
                 .where({ [C.kind]: 'blank', [C.blank]: term.id })
                 .first<NodeRow>();
             if (row) { return row.id; }
-            const [id] = await this._knex(T.nodes).insert({
+            const [id] = await this._db(ctx)(T.nodes).insert({
                 [C.kind]:  'blank',
                 [C.blank]: term.id,
             });
@@ -193,7 +206,7 @@ export class TripleStore {
         // Literal node — deduplicate by (value, datatype, lang), populate value_json
         /* v8 ignore next */
         const dtIri = term.datatype?.value ?? 'http://www.w3.org/2001/XMLSchema#string';
-        const row = await this._knex(T.nodes).where({
+        const row = await this._db(ctx)(T.nodes).where({
             [C.kind]:     'literal',
             [C.value]:    term.value,
             [C.datatype]: dtIri,
@@ -202,7 +215,7 @@ export class TripleStore {
         if (row) { return row.id; }
 
         const jsonPayload = makeLiteralJson(term.value, dtIri, term.language);
-        const [id] = await this._knex(T.nodes).insert({
+        const [id] = await this._db(ctx)(T.nodes).insert({
             [C.kind]:      'literal',
             [C.value]:     term.value,
             [C.datatype]:  dtIri,
@@ -219,18 +232,18 @@ export class TripleStore {
      * nothing is written.  Restores a previously soft-deleted quad by creating
      * a fresh edge row (the soft-deleted row is left as history).
      */
-    async insert(quad: Quad): Promise<void> {
+    async insert(ctx: ApplicationContext, quad: Quad): Promise<void> {
         const [sId, pId, oId] = await Promise.all([
-            this.ensureNode(quad.subject as RdfTerm),
-            this.ensureNode(quad.predicate as IRI),
-            this.ensureNode(quad.object as RdfTerm),
+            this.ensureNode(ctx, quad.subject as RdfTerm),
+            this.ensureNode(ctx, quad.predicate as IRI),
+            this.ensureNode(ctx, quad.object as RdfTerm),
         ]);
 
         const gIsDefault = !quad.graph || ('termType' in quad.graph && quad.graph.termType === 'DefaultGraph');
-        const gId = gIsDefault ? null : await this.ensureNode(quad.graph as IRI);
+        const gId = gIsDefault ? null : await this.ensureNode(ctx, quad.graph as IRI);
 
         // Deduplication: skip if an active edge with exactly this quad already exists
-        const existsQ = this._knex(T.edges)
+        const existsQ = this._db(ctx)(T.edges)
             .where({ [C.subject]: sId, [C.predicate]: pId, [C.object]: oId })
             .where(C.isDeleted, false);
         if (gId === null) { existsQ.whereNull(C.graph); } else { existsQ.where(C.graph, gId); }
@@ -238,7 +251,7 @@ export class TripleStore {
         const existing = await existsQ.first<{ id: number }>();
         if (existing) { return; }
 
-        await this._knex(T.edges).insert({
+        await this._db(ctx)(T.edges).insert({
             [C.subject]:   sId,
             [C.predicate]: pId,
             [C.object]:    oId,
@@ -247,8 +260,8 @@ export class TripleStore {
         });
     }
 
-    async insertMany(quads: readonly Quad[]): Promise<void> {
-        for (const q of quads) { await this.insert(q); }
+    async insertMany(ctx: ApplicationContext, quads: readonly Quad[]): Promise<void> {
+        for (const q of quads) { await this.insert(ctx, q); }
     }
 
     // ── Read ──────────────────────────────────────────────────────────────────
@@ -257,37 +270,37 @@ export class TripleStore {
      * Finds all active (non-deleted) quads matching the pattern.
      * To include historical (soft-deleted) quads, use findHistory().
      */
-    async find(pattern: QuadPattern = {}): Promise<Quad[]> {
-        let q = this._knex(T.edges).where(C.isDeleted, false).select<EdgeRow[]>('*');
-        const ids = await this._patternIds(pattern);
+    async find(ctx: ApplicationContext, pattern: QuadPattern = {}): Promise<Quad[]> {
+        let q = this._db(ctx)(T.edges).where(C.isDeleted, false).select<EdgeRow[]>('*');
+        const ids = await this._patternIds(ctx, pattern);
         if (ids === null) { return []; }
         q = this._addPatternClauses(q, ids);
         const edges = await q;
         if (edges.length === 0) { return []; }
-        return this._hydrateEdges(edges);
+        return this._hydrateEdges(ctx, edges);
     }
 
     /**
      * Like find(), but returns edges sorted by insertion order (edge id ascending).
      * Use this when the order of results is semantically meaningful (e.g. ordered collections).
      */
-    async findOrdered(pattern: QuadPattern): Promise<Quad[]> {
-        let q = this._knex(T.edges).where(C.isDeleted, false).orderBy(C.id, 'asc').select<EdgeRow[]>('*');
-        const ids = await this._patternIds(pattern);
+    async findOrdered(ctx: ApplicationContext, pattern: QuadPattern): Promise<Quad[]> {
+        let q = this._db(ctx)(T.edges).where(C.isDeleted, false).orderBy(C.id, 'asc').select<EdgeRow[]>('*');
+        const ids = await this._patternIds(ctx, pattern);
         if (ids === null) { return []; }
         q = this._addPatternClauses(q, ids);
         const edges = await q;
         if (edges.length === 0) { return []; }
-        return this._hydrateEdges(edges);
+        return this._hydrateEdges(ctx, edges);
     }
 
     /**
      * Returns ALL versions of quads matching the pattern, including soft-deleted
      * ones, in ascending creation order.  Each result is annotated with temporal metadata.
      */
-    async findHistory(pattern: QuadPattern = {}): Promise<QuadHistory[]> {
-        let q = this._knex(T.edges).orderBy(C.createdAt, 'asc').select<EdgeRow[]>('*');
-        const ids = await this._patternIds(pattern);
+    async findHistory(ctx: ApplicationContext, pattern: QuadPattern = {}): Promise<QuadHistory[]> {
+        let q = this._db(ctx)(T.edges).orderBy(C.createdAt, 'asc').select<EdgeRow[]>('*');
+        const ids = await this._patternIds(ctx, pattern);
         if (ids === null) { return []; }
         q = this._addPatternClauses(q, ids);
         const edges = await q;
@@ -300,7 +313,7 @@ export class TripleStore {
             nodeIds.add(e.object);
             if (e.graph !== null) { nodeIds.add(e.graph); }
         }
-        const nodeMap = await this._loadNodes([...nodeIds]);
+        const nodeMap = await this._loadNodes(ctx, [...nodeIds]);
 
         return edges.map(e => ({
             subject:   nodeMap.get(e.subject)!   as IRI | BlankNode,
@@ -323,10 +336,10 @@ export class TripleStore {
      * Returns the count of edges marked as deleted.
      * No data is physically removed.
      */
-    async delete(pattern: QuadPattern): Promise<number> {
-        const ids = await this._patternIds(pattern);
+    async delete(ctx: ApplicationContext, pattern: QuadPattern): Promise<number> {
+        const ids = await this._patternIds(ctx, pattern);
         if (ids === null) { return 0; }
-        let q = this._knex(T.edges).where(C.isDeleted, false);
+        let q = this._db(ctx)(T.edges).where(C.isDeleted, false);
         q = this._addPatternClauses(q, ids);
         return q.update({ [C.isDeleted]: true });
     }
@@ -335,13 +348,13 @@ export class TripleStore {
      * Soft-deletes all active edges whose subject is one of the given terms.
      * Single SQL round-trip — use instead of calling delete() N times.
      */
-    async deleteSubjects(subjects: readonly (IRI | BlankNode)[]): Promise<number> {
+    async deleteSubjects(ctx: ApplicationContext, subjects: readonly (IRI | BlankNode)[]): Promise<number> {
         if (subjects.length === 0) { return 0; }
-        const ids = await Promise.all(subjects.map(s => this._nodeId(s as RdfTerm)));
+        const ids = await Promise.all(subjects.map(s => this._nodeId(ctx, s as RdfTerm)));
         const validIds = ids.filter((id): id is number => id !== null);
         if (validIds.length === 0) { return 0; }
 
-        return this._knex(T.edges)
+        return this._db(ctx)(T.edges)
             .whereIn(C.subject, validIds)
             .where(C.isDeleted, false)
             .update({ [C.isDeleted]: true });
@@ -353,17 +366,18 @@ export class TripleStore {
      * of N × delete(predicate).
      */
     async deleteBySubjectPredicates(
+        ctx:        ApplicationContext,
         subject:    IRI | BlankNode,
         predicates: readonly IRI[],
     ): Promise<number> {
         if (predicates.length === 0) { return 0; }
-        const sId  = await this._nodeId(subject as RdfTerm);
+        const sId  = await this._nodeId(ctx, subject as RdfTerm);
         if (sId === null) { return 0; }
-        const pIds = await Promise.all(predicates.map(p => this._nodeId(p as RdfTerm)));
+        const pIds = await Promise.all(predicates.map(p => this._nodeId(ctx, p as RdfTerm)));
         const validPIds = pIds.filter((id): id is number => id !== null);
         if (validPIds.length === 0) { return 0; }
 
-        return this._knex(T.edges)
+        return this._db(ctx)(T.edges)
             .where(C.subject, sId)
             .whereIn(C.predicate, validPIds)
             .where(C.isDeleted, false)
@@ -376,15 +390,15 @@ export class TripleStore {
      * Fetches all active quads for a list of subjects in a single round-trip.
      * Returns a Map keyed by subject IRI string (or `_:id` for blank nodes).
      */
-    async findForSubjects(subjects: readonly (IRI | BlankNode)[]): Promise<Map<string, Quad[]>> {
+    async findForSubjects(ctx: ApplicationContext, subjects: readonly (IRI | BlankNode)[]): Promise<Map<string, Quad[]>> {
         if (subjects.length === 0) { return new Map(); }
 
-        const pairs = await Promise.all(subjects.map(async s => [s, await this._nodeId(s as RdfTerm)] as const));
+        const pairs = await Promise.all(subjects.map(async s => [s, await this._nodeId(ctx, s as RdfTerm)] as const));
         const validPairs = pairs.filter((p): p is [IRI | BlankNode, number] => p[1] !== null);
         if (validPairs.length === 0) { return new Map(); }
 
         const idToSubject = new Map(validPairs.map(([term, id]) => [id, term]));
-        const edges = await this._knex(T.edges)
+        const edges = await this._db(ctx)(T.edges)
             .whereIn(C.subject, validPairs.map(([, id]) => id))
             .where(C.isDeleted, false)
             .select<EdgeRow[]>('*');
@@ -396,7 +410,7 @@ export class TripleStore {
             nodeIds.add(e.subject); nodeIds.add(e.predicate); nodeIds.add(e.object);
             if (e.graph !== null) { nodeIds.add(e.graph); }
         }
-        const nodeMap = await this._loadNodes([...nodeIds]);
+        const nodeMap = await this._loadNodes(ctx, [...nodeIds]);
 
         const result = new Map<string, Quad[]>();
         for (const e of edges) {
@@ -417,13 +431,13 @@ export class TripleStore {
 
     // ── Stats ─────────────────────────────────────────────────────────────────
 
-    async stats(): Promise<StoreStats> {
+    async stats(ctx: ApplicationContext): Promise<StoreStats> {
         const [ns, na, no, ne, net] = await Promise.all([
-            this._knex(T.namespaces).count<[{ count: number }]>(`${C.id} as count`),
-            this._knex(T.names).count<[{ count: number }]>(`${C.id} as count`),
-            this._knex(T.nodes).count<[{ count: number }]>(`${C.id} as count`),
-            this._knex(T.edges).where(C.isDeleted, false).count<[{ count: number }]>(`${C.id} as count`),
-            this._knex(T.edges).count<[{ count: number }]>(`${C.id} as count`),
+            this._db(ctx)(T.namespaces).count<[{ count: number }]>(`${C.id} as count`),
+            this._db(ctx)(T.names).count<[{ count: number }]>(`${C.id} as count`),
+            this._db(ctx)(T.nodes).count<[{ count: number }]>(`${C.id} as count`),
+            this._db(ctx)(T.edges).where(C.isDeleted, false).count<[{ count: number }]>(`${C.id} as count`),
+            this._db(ctx)(T.edges).count<[{ count: number }]>(`${C.id} as count`),
         ]);
         return {
             namespaces: Number(ns[0].count),
@@ -436,11 +450,11 @@ export class TripleStore {
 
     // ── Private ───────────────────────────────────────────────────────────────
 
-    private async _nodeId(term: RdfTerm): Promise<number | null> {
+    private async _nodeId(ctx: ApplicationContext, term: RdfTerm): Promise<number | null> {
         if (isIRI(term)) {
-            const name = await this._knex(T.names).where(C.iri, term.value).first<NameRow>();
+            const name = await this._db(ctx)(T.names).where(C.iri, term.value).first<NameRow>();
             if (!name) { return null; }
-            const node = await this._knex(T.nodes)
+            const node = await this._db(ctx)(T.nodes)
                 .where({ [C.kind]: 'iri', [C.nameId]: name.id })
                 .first<NodeRow>();
             /* v8 ignore next */
@@ -448,7 +462,7 @@ export class TripleStore {
         }
 
         if (term.termType === 'BlankNode') {
-            const node = await this._knex(T.nodes)
+            const node = await this._db(ctx)(T.nodes)
                 .where({ [C.kind]: 'blank', [C.blank]: term.id })
                 .first<NodeRow>();
             return node?.id ?? null;
@@ -457,7 +471,7 @@ export class TripleStore {
         // Literal
         /* v8 ignore next */
         const dtIri = term.datatype?.value ?? 'http://www.w3.org/2001/XMLSchema#string';
-        const node = await this._knex(T.nodes).where({
+        const node = await this._db(ctx)(T.nodes).where({
             [C.kind]:     'literal',
             [C.value]:    term.value,
             [C.datatype]: dtIri,
@@ -470,7 +484,7 @@ export class TripleStore {
      * Resolves a QuadPattern to concrete node IDs.
      * Returns null (meaning "no rows can match") if any required node isn't in the store.
      */
-    private async _patternIds(pattern: QuadPattern): Promise<{
+    private async _patternIds(ctx: ApplicationContext, pattern: QuadPattern): Promise<{
         subject?:   number;
         predicate?: number;
         object?:    number;
@@ -479,17 +493,17 @@ export class TripleStore {
         const result: { subject?: number; predicate?: number; object?: number; graphId?: number | null } = {};
 
         if (pattern.subject !== undefined) {
-            const id = await this._nodeId(pattern.subject);
+            const id = await this._nodeId(ctx, pattern.subject);
             if (id === null) { return null; }
             result.subject = id;
         }
         if (pattern.predicate !== undefined) {
-            const id = await this._nodeId(pattern.predicate);
+            const id = await this._nodeId(ctx, pattern.predicate);
             if (id === null) { return null; }
             result.predicate = id;
         }
         if (pattern.object !== undefined) {
-            const id = await this._nodeId(pattern.object);
+            const id = await this._nodeId(ctx, pattern.object);
             if (id === null) { return null; }
             result.object = id;
         }
@@ -497,7 +511,7 @@ export class TripleStore {
             if (pattern.graph === null) {
                 result.graphId = null;
             } else {
-                const id = await this._nodeId(pattern.graph);
+                const id = await this._nodeId(ctx, pattern.graph);
                 if (id === null) { return null; }
                 result.graphId = id;
             }
@@ -519,13 +533,13 @@ export class TripleStore {
         return q;
     }
 
-    private async _hydrateEdges(edges: EdgeRow[]): Promise<Quad[]> {
+    private async _hydrateEdges(ctx: ApplicationContext, edges: EdgeRow[]): Promise<Quad[]> {
         const nodeIds = new Set<number>();
         for (const e of edges) {
             nodeIds.add(e.subject); nodeIds.add(e.predicate); nodeIds.add(e.object);
             if (e.graph !== null) { nodeIds.add(e.graph); }
         }
-        const nodeMap = await this._loadNodes([...nodeIds]);
+        const nodeMap = await this._loadNodes(ctx, [...nodeIds]);
 
         return edges.map(e => ({
             subject:   nodeMap.get(e.subject)!   as IRI | BlankNode,
@@ -537,16 +551,16 @@ export class TripleStore {
         }));
     }
 
-    private async _loadNodes(ids: number[]): Promise<Map<number, RdfTerm>> {
+    private async _loadNodes(ctx: ApplicationContext, ids: number[]): Promise<Map<number, RdfTerm>> {
         /* v8 ignore next */
         if (ids.length === 0) { return new Map(); }
 
-        const nodes = await this._knex(T.nodes).whereIn(C.id, ids).select<NodeRow[]>('*');
+        const nodes = await this._db(ctx)(T.nodes).whereIn(C.id, ids).select<NodeRow[]>('*');
 
         const iriNodeIds = nodes.filter(n => n.kind === 'iri' && n.name_id !== null).map(n => n.name_id!);
         /* v8 ignore next */
         const names: NameRow[] = iriNodeIds.length > 0
-            ? await this._knex(T.names).whereIn(C.id, iriNodeIds).select<NameRow[]>('*')
+            ? await this._db(ctx)(T.names).whereIn(C.id, iriNodeIds).select<NameRow[]>('*')
             : [];
         const nameMap = new Map(names.map(n => [n.id, n.iri]));
 

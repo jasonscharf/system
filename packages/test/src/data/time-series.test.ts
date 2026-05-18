@@ -22,7 +22,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Knex } from 'knex';
 import { IRI, DEFAULT_GRAPH, type Literal, type BlankNode } from '@system/core';
-import { createDataContext, TripleStore } from '@system/data';
+import { createDataContext, TripleStore, type TrxContext } from '@system/data';
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -121,17 +121,19 @@ for (const db of providers) {
         let knex: Knex;
         let trx:  Knex.Transaction;
         let store: TripleStore;
+        let ctx: TrxContext;
 
         beforeEach(async () => {
             knex  = await db.create();
             trx   = await knex.transaction();
-            store = new TripleStore(trx as unknown as Knex);
+            store = new TripleStore(knex);
+            ctx   = { trx };
         });
         afterEach(async () => { await trx.rollback(); await knex.destroy(); });
 
         it('IRI nodes have created_at and updated_at in UTC', async () => {
             const before = Date.now();
-            await store.ensureNode(EX('foo'));
+            await store.ensureNode(ctx, EX('foo'));
             const after  = Date.now();
 
             const row = await trx('tern_nodes')
@@ -147,14 +149,14 @@ for (const db of providers) {
         });
 
         it('literal nodes have created_at', async () => {
-            await store.ensureNode(literal('hello'));
+            await store.ensureNode(ctx, literal('hello'));
             const row = await getLiteralNode(trx as unknown as Knex, 'hello');
             expect(row).toBeDefined();
             expect(row!.created_at).toBeTruthy();
         });
 
         it('blank nodes have created_at', async () => {
-            await store.ensureNode(blank('b1'));
+            await store.ensureNode(ctx, blank('b1'));
             const row = await trx('tern_nodes').where({ kind: 'blank', blank: 'b1' })
                 .first<{ created_at: string }>();
             expect(row!.created_at).toBeTruthy();
@@ -168,16 +170,18 @@ for (const db of providers) {
         let knex: Knex;
         let trx:  Knex.Transaction;
         let store: TripleStore;
+        let ctx: TrxContext;
 
         beforeEach(async () => {
             knex  = await db.create();
             trx   = await knex.transaction();
-            store = new TripleStore(trx as unknown as Knex);
+            store = new TripleStore(knex);
+            ctx   = { trx };
         });
         afterEach(async () => { await trx.rollback(); await knex.destroy(); });
 
         it('stores a string literal in value_json with string v', async () => {
-            await store.ensureNode(literal('alice@example.com', `${XSD}string`));
+            await store.ensureNode(ctx, literal('alice@example.com', `${XSD}string`));
             const row = await getLiteralNode(trx as unknown as Knex, 'alice@example.com');
             const json = JSON.parse(row!.value_json!);
             expect(json.v).toBe('alice@example.com');
@@ -185,7 +189,7 @@ for (const db of providers) {
         });
 
         it('stores a boolean literal with native boolean v=true', async () => {
-            await store.ensureNode(literal('true', `${XSD}boolean`));
+            await store.ensureNode(ctx, literal('true', `${XSD}boolean`));
             const row  = await getLiteralNode(trx as unknown as Knex, 'true');
             const json = JSON.parse(row!.value_json!);
             expect(json.v).toBe(true);
@@ -193,14 +197,14 @@ for (const db of providers) {
         });
 
         it('stores a boolean literal with native boolean v=false', async () => {
-            await store.ensureNode(literal('false', `${XSD}boolean`));
+            await store.ensureNode(ctx, literal('false', `${XSD}boolean`));
             const row  = await getLiteralNode(trx as unknown as Knex, 'false');
             const json = JSON.parse(row!.value_json!);
             expect(json.v).toBe(false);
         });
 
         it('stores an integer literal with native number v', async () => {
-            await store.ensureNode(literal('42', `${XSD}integer`));
+            await store.ensureNode(ctx, literal('42', `${XSD}integer`));
             const row  = await getLiteralNode(trx as unknown as Knex, '42');
             const json = JSON.parse(row!.value_json!);
             expect(json.v).toBe(42);
@@ -208,7 +212,7 @@ for (const db of providers) {
         });
 
         it('stores a decimal literal with native number v', async () => {
-            await store.ensureNode(literal('3.14', `${XSD}decimal`));
+            await store.ensureNode(ctx, literal('3.14', `${XSD}decimal`));
             const row  = await getLiteralNode(trx as unknown as Knex, '3.14');
             const json = JSON.parse(row!.value_json!);
             expect(json.v).toBeCloseTo(3.14);
@@ -216,7 +220,7 @@ for (const db of providers) {
 
         it('stores a dateTime literal as string v', async () => {
             const dt = '2024-01-15T12:00:00Z';
-            await store.ensureNode(literal(dt, `${XSD}dateTime`));
+            await store.ensureNode(ctx, literal(dt, `${XSD}dateTime`));
             const row  = await getLiteralNode(trx as unknown as Knex, dt);
             const json = JSON.parse(row!.value_json!);
             expect(json.v).toBe(dt);
@@ -230,7 +234,7 @@ for (const db of providers) {
                 datatype: iri(`${RDF}langString`),
                 language: 'en',
             };
-            await store.ensureNode(term);
+            await store.ensureNode(ctx, term);
             const row  = await getLiteralNode(trx as unknown as Knex, 'hello');
             const json = JSON.parse(row!.value_json!);
             expect(json.v).toBe('hello');
@@ -238,8 +242,8 @@ for (const db of providers) {
         });
 
         it('round-trips value_json through find()', async () => {
-            await store.insert({ subject: EX('s'), predicate: AGE, object: literal('99', `${XSD}integer`), graph: GRAPH });
-            const quads = await store.find({ subject: EX('s') });
+            await store.insert(ctx, { subject: EX('s'), predicate: AGE, object: literal('99', `${XSD}integer`), graph: GRAPH });
+            const quads = await store.find(ctx, { subject: EX('s') });
             expect(quads).toHaveLength(1);
             const obj = quads[0]!.object as Literal;
             expect(obj.termType).toBe('Literal');
@@ -255,17 +259,19 @@ for (const db of providers) {
         let knex: Knex;
         let trx:  Knex.Transaction;
         let store: TripleStore;
+        let ctx: TrxContext;
 
         beforeEach(async () => {
             knex  = await db.create();
             trx   = await knex.transaction();
-            store = new TripleStore(trx as unknown as Knex);
+            store = new TripleStore(knex);
+            ctx   = { trx };
         });
         afterEach(async () => { await trx.rollback(); await knex.destroy(); });
 
         it('insert sets created_at and updated_at', async () => {
             const before = Date.now();
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
             const after  = Date.now();
 
             const rows = await getEdgeById(trx as unknown as Knex, 'http://example.org/s');
@@ -279,8 +285,8 @@ for (const db of providers) {
         });
 
         it('insert is idempotent: duplicate active quad is not written twice', async () => {
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
             expect(await countEdges(trx as unknown as Knex)).toBe(1);
         });
     });
@@ -292,18 +298,20 @@ for (const db of providers) {
         let knex: Knex;
         let trx:  Knex.Transaction;
         let store: TripleStore;
+        let ctx: TrxContext;
 
         beforeEach(async () => {
             knex  = await db.create();
             trx   = await knex.transaction();
-            store = new TripleStore(trx as unknown as Knex);
+            store = new TripleStore(knex);
+            ctx   = { trx };
         });
         afterEach(async () => { await trx.rollback(); await knex.destroy(); });
 
         it('delete() marks the edge is_deleted=true and sets deleted_at', async () => {
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
             const before = Date.now();
-            const count  = await store.delete({ subject: EX('s') });
+            const count  = await store.delete(ctx, { subject: EX('s') });
             const after  = Date.now();
 
             expect(count).toBe(1);
@@ -318,18 +326,18 @@ for (const db of providers) {
         });
 
         it('find() does not return soft-deleted edges', async () => {
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
-            await store.delete({ subject: EX('s') });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.delete(ctx, { subject: EX('s') });
 
-            const quads = await store.find({ subject: EX('s') });
+            const quads = await store.find(ctx, { subject: EX('s') });
             expect(quads).toHaveLength(0);
         });
 
         it('the node row is still present after soft-delete (no hard deletion)', async () => {
             const nodesBefore = await countNodes(trx as unknown as Knex);
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
             const nodesAfterInsert = await countNodes(trx as unknown as Knex);
-            await store.delete({ subject: EX('s') });
+            await store.delete(ctx, { subject: EX('s') });
             const nodesAfterDelete = await countNodes(trx as unknown as Knex);
 
             // Nodes never decrease
@@ -338,24 +346,24 @@ for (const db of providers) {
         });
 
         it('stats().edges counts only active edges; edgesTotal includes deleted', async () => {
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
-            await store.insert({ subject: EX('u'), predicate: TYPE, object: EX('T'), graph: GRAPH });
-            await store.delete({ subject: EX('s') });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.insert(ctx, { subject: EX('u'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.delete(ctx, { subject: EX('s') });
 
-            const s = await store.stats();
+            const s = await store.stats(ctx);
             expect(s.edges).toBe(1);       // only EX('u') is active
             expect(s.edgesTotal).toBe(2);  // both rows exist in the table
         });
 
         it('delete returns 0 when no active edge matches', async () => {
-            const count = await store.delete({ subject: EX('ghost') });
+            const count = await store.delete(ctx, { subject: EX('ghost') });
             expect(count).toBe(0);
         });
 
         it('soft-deleting already-deleted edges does not double-count', async () => {
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
-            await store.delete({ subject: EX('s') });
-            const count2 = await store.delete({ subject: EX('s') });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.delete(ctx, { subject: EX('s') });
+            const count2 = await store.delete(ctx, { subject: EX('s') });
             expect(count2).toBe(0);  // already deleted, no active edges remain
             expect(await countEdges(trx as unknown as Knex, true)).toBe(1); // still only one row total
         });
@@ -368,17 +376,19 @@ for (const db of providers) {
         let knex: Knex;
         let trx:  Knex.Transaction;
         let store: TripleStore;
+        let ctx: TrxContext;
 
         beforeEach(async () => {
             knex  = await db.create();
             trx   = await knex.transaction();
-            store = new TripleStore(trx as unknown as Knex);
+            store = new TripleStore(knex);
+            ctx   = { trx };
         });
         afterEach(async () => { await trx.rollback(); await knex.destroy(); });
 
         it('returns active edges with isDeleted=false', async () => {
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
-            const history = await store.findHistory({ subject: EX('s') });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            const history = await store.findHistory(ctx, { subject: EX('s') });
             expect(history).toHaveLength(1);
             expect(history[0]!.isDeleted).toBe(false);
             expect(history[0]!.deletedAt).toBeNull();
@@ -386,9 +396,9 @@ for (const db of providers) {
         });
 
         it('returns soft-deleted edges with isDeleted=true and a deletedAt Date', async () => {
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
-            await store.delete({ subject: EX('s') });
-            const history = await store.findHistory({ subject: EX('s') });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.delete(ctx, { subject: EX('s') });
+            const history = await store.findHistory(ctx, { subject: EX('s') });
             expect(history).toHaveLength(1);
             expect(history[0]!.isDeleted).toBe(true);
             expect(history[0]!.deletedAt).toBeInstanceOf(Date);
@@ -396,12 +406,12 @@ for (const db of providers) {
 
         it('attribute update produces two history rows: one deleted, one active', async () => {
             // Assert initial value
-            await store.insert({ subject: EX('person'), predicate: NAME, object: literal('Alice'), graph: GRAPH });
+            await store.insert(ctx, { subject: EX('person'), predicate: NAME, object: literal('Alice'), graph: GRAPH });
             // Update: soft-delete old, insert new
-            await store.delete({ subject: EX('person'), predicate: NAME });
-            await store.insert({ subject: EX('person'), predicate: NAME, object: literal('Alice B.'), graph: GRAPH });
+            await store.delete(ctx, { subject: EX('person'), predicate: NAME });
+            await store.insert(ctx, { subject: EX('person'), predicate: NAME, object: literal('Alice B.'), graph: GRAPH });
 
-            const history = await store.findHistory({ subject: EX('person'), predicate: NAME });
+            const history = await store.findHistory(ctx, { subject: EX('person'), predicate: NAME });
             expect(history).toHaveLength(2);
 
             const [old, current] = history.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
@@ -412,12 +422,12 @@ for (const db of providers) {
         });
 
         it('re-inserting a previously deleted quad adds a new active row (history preserved)', async () => {
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
-            await store.delete({ subject: EX('s') });
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH }); // re-assert
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.delete(ctx, { subject: EX('s') });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH }); // re-assert
 
-            const active  = await store.find({ subject: EX('s') });
-            const history = await store.findHistory({ subject: EX('s') });
+            const active  = await store.find(ctx, { subject: EX('s') });
+            const history = await store.findHistory(ctx, { subject: EX('s') });
 
             expect(active).toHaveLength(1);  // one active edge
             expect(history).toHaveLength(2); // one deleted + one active
@@ -426,11 +436,11 @@ for (const db of providers) {
         });
 
         it('findHistory with no pattern returns all edges across history', async () => {
-            await store.insert({ subject: EX('a'), predicate: TYPE, object: EX('T'), graph: GRAPH });
-            await store.insert({ subject: EX('b'), predicate: TYPE, object: EX('T'), graph: GRAPH });
-            await store.delete({ subject: EX('a') });
+            await store.insert(ctx, { subject: EX('a'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.insert(ctx, { subject: EX('b'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.delete(ctx, { subject: EX('a') });
 
-            const history = await store.findHistory();
+            const history = await store.findHistory(ctx);
             expect(history).toHaveLength(2);
         });
     });
@@ -442,23 +452,25 @@ for (const db of providers) {
         let knex: Knex;
         let trx:  Knex.Transaction;
         let store: TripleStore;
+        let ctx: TrxContext;
 
         beforeEach(async () => {
             knex  = await db.create();
             trx   = await knex.transaction();
-            store = new TripleStore(trx as unknown as Knex);
+            store = new TripleStore(knex);
+            ctx   = { trx };
         });
         afterEach(async () => { await trx.rollback(); await knex.destroy(); });
 
         it('deleteSubjects soft-deletes all edges for a list of subjects', async () => {
-            await store.insert({ subject: EX('p1'), predicate: NAME, object: literal('P1'), graph: DEFAULT_GRAPH });
-            await store.insert({ subject: EX('p2'), predicate: NAME, object: literal('P2'), graph: DEFAULT_GRAPH });
-            await store.insert({ subject: EX('p3'), predicate: NAME, object: literal('P3'), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: EX('p1'), predicate: NAME, object: literal('P1'), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: EX('p2'), predicate: NAME, object: literal('P2'), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: EX('p3'), predicate: NAME, object: literal('P3'), graph: DEFAULT_GRAPH });
 
-            await store.deleteSubjects([EX('p1'), EX('p2')]);
+            await store.deleteSubjects(ctx, [EX('p1'), EX('p2')]);
 
-            const active  = await store.find();
-            const history = await store.findHistory();
+            const active  = await store.find(ctx);
+            const history = await store.findHistory(ctx);
 
             expect(active).toHaveLength(1); // only p3 survives
             expect(history).toHaveLength(3); // all rows still in DB
@@ -467,15 +479,15 @@ for (const db of providers) {
 
         it('deleteBySubjectPredicates soft-deletes matching predicate edges', async () => {
             const s = EX('s');
-            await store.insert({ subject: s, predicate: NAME, object: literal('N'), graph: DEFAULT_GRAPH });
-            await store.insert({ subject: s, predicate: AGE,  object: literal('30', `${XSD}integer`), graph: DEFAULT_GRAPH });
-            await store.insert({ subject: s, predicate: TYPE, object: EX('T'), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: s, predicate: NAME, object: literal('N'), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: s, predicate: AGE,  object: literal('30', `${XSD}integer`), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: s, predicate: TYPE, object: EX('T'), graph: DEFAULT_GRAPH });
 
             // Delete only NAME and AGE, preserve TYPE
-            await store.deleteBySubjectPredicates(s, [NAME, AGE]);
+            await store.deleteBySubjectPredicates(ctx, s, [NAME, AGE]);
 
-            const active  = await store.find({ subject: s });
-            const history = await store.findHistory({ subject: s });
+            const active  = await store.find(ctx, { subject: s });
+            const history = await store.findHistory(ctx, { subject: s });
 
             expect(active).toHaveLength(1);
             expect((active[0]!.predicate as IRI).value).toBe(TYPE.value);
@@ -490,17 +502,19 @@ for (const db of providers) {
         let knex: Knex;
         let trx:  Knex.Transaction;
         let store: TripleStore;
+        let ctx: TrxContext;
 
         beforeEach(async () => {
             knex  = await db.create();
             trx   = await knex.transaction();
-            store = new TripleStore(trx as unknown as Knex);
+            store = new TripleStore(knex);
+            ctx   = { trx };
         });
         afterEach(async () => { await trx.rollback(); await knex.destroy(); });
 
         it('deleted_at >= created_at always', async () => {
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
-            await store.delete({ subject: EX('s') });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.delete(ctx, { subject: EX('s') });
 
             const rows = await getEdgeById(trx as unknown as Knex, 'http://example.org/s');
             const row  = rows[0]!;
@@ -510,8 +524,8 @@ for (const db of providers) {
         });
 
         it('updated_at = deleted_at when soft-deleted', async () => {
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
-            await store.delete({ subject: EX('s') });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.delete(ctx, { subject: EX('s') });
 
             const rows = await getEdgeById(trx as unknown as Knex, 'http://example.org/s');
             const row  = rows[0]!;
@@ -519,13 +533,13 @@ for (const db of providers) {
         });
 
         it('findHistory edges are returned in ascending created_at order', async () => {
-            await store.insert({ subject: EX('x'), predicate: NAME, object: literal('v1'), graph: DEFAULT_GRAPH });
-            await store.delete({ subject: EX('x'), predicate: NAME });
-            await store.insert({ subject: EX('x'), predicate: NAME, object: literal('v2'), graph: DEFAULT_GRAPH });
-            await store.delete({ subject: EX('x'), predicate: NAME });
-            await store.insert({ subject: EX('x'), predicate: NAME, object: literal('v3'), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: EX('x'), predicate: NAME, object: literal('v1'), graph: DEFAULT_GRAPH });
+            await store.delete(ctx, { subject: EX('x'), predicate: NAME });
+            await store.insert(ctx, { subject: EX('x'), predicate: NAME, object: literal('v2'), graph: DEFAULT_GRAPH });
+            await store.delete(ctx, { subject: EX('x'), predicate: NAME });
+            await store.insert(ctx, { subject: EX('x'), predicate: NAME, object: literal('v3'), graph: DEFAULT_GRAPH });
 
-            const history = await store.findHistory({ subject: EX('x'), predicate: NAME });
+            const history = await store.findHistory(ctx, { subject: EX('x'), predicate: NAME });
             expect(history).toHaveLength(3);
 
             const values = history.map(h => (h.object as Literal).value);
@@ -537,18 +551,18 @@ for (const db of providers) {
         });
 
         it('total edge count only grows — physical rows are never removed', async () => {
-            let total = (await store.stats()).edgesTotal;
+            let total = (await store.stats(ctx)).edgesTotal;
 
-            await store.insert({ subject: EX('a'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.insert(ctx, { subject: EX('a'), predicate: TYPE, object: EX('T'), graph: GRAPH });
             total++;
-            expect((await store.stats()).edgesTotal).toBe(total);
+            expect((await store.stats(ctx)).edgesTotal).toBe(total);
 
-            await store.delete({ subject: EX('a') });
-            expect((await store.stats()).edgesTotal).toBe(total); // no decrease
+            await store.delete(ctx, { subject: EX('a') });
+            expect((await store.stats(ctx)).edgesTotal).toBe(total); // no decrease
 
-            await store.insert({ subject: EX('a'), predicate: TYPE, object: EX('T'), graph: GRAPH });
+            await store.insert(ctx, { subject: EX('a'), predicate: TYPE, object: EX('T'), graph: GRAPH });
             total++;
-            expect((await store.stats()).edgesTotal).toBe(total); // new row, not updated
+            expect((await store.stats(ctx)).edgesTotal).toBe(total); // new row, not updated
         });
     });
 
@@ -565,7 +579,7 @@ for (const db of providers) {
         beforeEach(async () => {
             knex  = await db.create();
             trx   = await knex.transaction();
-            store = new TripleStore(trx as unknown as Knex);
+            store = new TripleStore(knex);
             const { EntityStore } = await import('@system/entities');
             es  = new EntityStore(store);
             ctx = { trx };
@@ -581,7 +595,7 @@ for (const db of providers) {
             await es.updateGroup(ctx, UserSchema, user.id, CoreHandle, { displayName: 'New' });
 
             const iri = `http://tern.dev/ns/auth/displayName`;
-            const history = await store.findHistory();
+            const history = await store.findHistory(ctx);
             const displayNameHistory = history.filter(h => (h.predicate as IRI).value === iri);
 
             expect(displayNameHistory).toHaveLength(2); // one deleted, one active
@@ -598,12 +612,12 @@ for (const db of providers) {
 
             const user = await es.create(ctx, UserSchema, { email: 'del@example.com' });
 
-            const totalBefore = (await store.stats()).edgesTotal;
+            const totalBefore = (await store.stats(ctx)).edgesTotal;
             await es.delete(ctx, UserSchema, user.id);
-            const totalAfter  = (await store.stats()).edgesTotal;
+            const totalAfter  = (await store.stats(ctx)).edgesTotal;
 
             // findById returns null (active edges are soft-deleted)
-            expect(await es.findById(UserSchema, user.id, '*')).toBeNull();
+            expect(await es.findById(ctx, UserSchema, user.id, '*')).toBeNull();
             // But total edge count stays the same (no hard deletes)
             expect(totalAfter).toBe(totalBefore);
         });
@@ -618,16 +632,18 @@ for (const db of providers) {
         let knex:  Knex;
         let trx:   Knex.Transaction;
         let store: TripleStore;
+        let ctx: TrxContext;
 
         beforeEach(async () => {
             knex  = await db.create();
             trx   = await knex.transaction();
-            store = new TripleStore(trx as unknown as Knex);
+            store = new TripleStore(knex);
+            ctx   = { trx };
         });
         afterEach(async () => { await trx.rollback(); await knex.destroy(); });
 
         it('trigger sets created_at and updated_at on node insert without app providing them', async () => {
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: DEFAULT_GRAPH });
 
             const name = await (trx as unknown as Knex)('tern_names').where('iri', 'http://example.org/s').first<{ id: number }>();
             const node = await (trx as unknown as Knex)('tern_nodes').where({ kind: 'iri', name_id: name!.id }).first<{ created_at: string; updated_at: string }>();
@@ -638,7 +654,7 @@ for (const db of providers) {
         });
 
         it('trigger sets created_at and updated_at on edge insert without app providing them', async () => {
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: DEFAULT_GRAPH });
 
             const edges = await getEdgeById(trx as unknown as Knex, 'http://example.org/s');
             const edge  = edges[0]!;
@@ -649,8 +665,8 @@ for (const db of providers) {
         });
 
         it('trigger sets updated_at and deleted_at on soft-delete without app providing them', async () => {
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: DEFAULT_GRAPH });
-            await store.delete({ subject: EX('s') });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: DEFAULT_GRAPH });
+            await store.delete(ctx, { subject: EX('s') });
 
             const edges = await getEdgeById(trx as unknown as Knex, 'http://example.org/s');
             const edge  = edges[0]!;
@@ -662,10 +678,10 @@ for (const db of providers) {
         });
 
         it('trigger preserves created_at across a soft-delete update', async () => {
-            await store.insert({ subject: EX('s'), predicate: TYPE, object: EX('T'), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: EX('s'), predicate: TYPE, object: EX('T'), graph: DEFAULT_GRAPH });
             const before = (await getEdgeById(trx as unknown as Knex, 'http://example.org/s'))[0]!;
 
-            await store.delete({ subject: EX('s') });
+            await store.delete(ctx, { subject: EX('s') });
             const after = (await getEdgeById(trx as unknown as Knex, 'http://example.org/s'))[0]!;
 
             expect(after.created_at).toBe(before.created_at);

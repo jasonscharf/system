@@ -87,7 +87,7 @@ function makeTestSchema() {
 async function setup(db: DbProvider) {
     const knex  = await db.create();
     const trx   = await knex.transaction();
-    const store = new TripleStore(trx as unknown as Knex);
+    const store = new TripleStore(knex);
     const es    = new EntityStore(store);
     return { knex, trx, store, es };
 }
@@ -129,20 +129,20 @@ for (const db of providers) {
 
         it('findById returns the entity with correct props', async () => {
             const created = await es.create(ctx, UserSchema, { email: 'carol@example.com', displayName: 'Carol' });
-            const found   = await es.findById(UserSchema, created.id, [CoreHandle]);
+            const found   = await es.findById(ctx, UserSchema, created.id, [CoreHandle]);
             const core    = found!.groups[CoreHandle.id]!;
             expect(core['email']).toBe('carol@example.com');
             expect(core['displayName']).toBe('Carol');
         });
 
         it('findById returns null for unknown id', async () => {
-            expect(await es.findById(UserSchema, 'no-such-id', '*')).toBeNull();
+            expect(await es.findById(ctx, UserSchema, 'no-such-id', '*')).toBeNull();
         });
 
         it('updateGroup patches specific fields', async () => {
             const rec = await es.create(ctx, UserSchema, { email: 'd@example.com', displayName: 'Old' });
             await es.updateGroup(ctx, UserSchema, rec.id, CoreHandle, { displayName: 'New' });
-            const updated = await es.findById(UserSchema, rec.id, [CoreHandle]);
+            const updated = await es.findById(ctx, UserSchema, rec.id, [CoreHandle]);
             expect(updated!.groups[CoreHandle.id]!['displayName']).toBe('New');
             expect(updated!.groups[CoreHandle.id]!['email']).toBe('d@example.com'); // unchanged
         });
@@ -150,7 +150,7 @@ for (const db of providers) {
         it('delete removes the entity and all PropGroups', async () => {
             const rec = await es.create(ctx, UserSchema, { email: 'e@example.com' });
             await es.delete(ctx, UserSchema, rec.id);
-            expect(await es.findById(UserSchema, rec.id, '*')).toBeNull();
+            expect(await es.findById(ctx, UserSchema, rec.id, '*')).toBeNull();
         });
 
         it('addGroup attaches an extension PropGroup', async () => {
@@ -161,7 +161,7 @@ for (const db of providers) {
             const rec = await es.create(ctx, UserSchema, { email: 'f@example.com' });
             await es.addGroup(ctx, UserSchema, rec.id, ExtHandle, { role: 'admin' });
 
-            const full = await es.findById(UserSchema, rec.id, '*');
+            const full = await es.findById(ctx, UserSchema, rec.id, '*');
             expect(full!.groups[ExtHandle.id]!['role']).toBe('admin');
 
             // Clean up — unregister is not supported, but the schema is shared so
@@ -171,7 +171,7 @@ for (const db of providers) {
 
         it('groupOf() helper narrows the type', async () => {
             const rec  = await es.create(ctx, UserSchema, { email: 'g@example.com' });
-            const found = await es.findById(UserSchema, rec.id, [CoreHandle]);
+            const found = await es.findById(ctx, UserSchema, rec.id, [CoreHandle]);
             const core  = groupOf(found!, UserSchema.allGroups()[0]!);
             expect(core).toBeDefined();
             expect(core!['email']).toBe('g@example.com');
@@ -203,7 +203,7 @@ for (const db of providers) {
             const schema = makeTestSchema();
             const rec    = await es.create(ctx, schema, { name: 'Widget' });
             await es.addGroup(ctx, schema, rec.id, TestExtHandle, { rank: 5 });
-            const found  = await es.findById(schema, rec.id, [TestExtHandle]);
+            const found  = await es.findById(ctx, schema, rec.id, [TestExtHandle]);
             expect(found!.groups[TestExtHandle.id]!['active']).toBe(true);
             expect(found!.groups[TestExtHandle.id]!['rank']).toBe(5);
         });
@@ -241,7 +241,7 @@ for (const db of providers) {
             const results = await entities(ctx.store)
                 .find(schema, [TestCoreHandle])
                 .where(TestCoreHandle, 'email', '=', 'beta@example.com')
-                .all();
+                .all(ctx);
             expect(results).toHaveLength(1);
             expect(results[0]!.groups[TestCoreHandle.id]!['name']).toBe('Beta');
         });
@@ -250,7 +250,7 @@ for (const db of providers) {
             const results = await entities(ctx.store)
                 .find(schema, [TestCoreHandle])
                 .where(TestCoreHandle, 'email', '=', 'nobody@example.com')
-                .all();
+                .all(ctx);
             expect(results).toHaveLength(0);
         });
 
@@ -258,7 +258,7 @@ for (const db of providers) {
             const n = await entities(ctx.store)
                 .find(schema, [TestCoreHandle])
                 .where(TestCoreHandle, 'email', '=', 'alpha@example.com')
-                .count();
+                .count(ctx);
             expect(n).toBe(1);
         });
 
@@ -266,7 +266,7 @@ for (const db of providers) {
             const found = await entities(ctx.store)
                 .find(schema, [TestCoreHandle])
                 .where(TestCoreHandle, 'name', '=', 'Gamma')
-                .first();
+                .first(ctx);
             expect(found).not.toBeNull();
             expect(found!.groups[TestCoreHandle.id]!['name']).toBe('Gamma');
         });
@@ -275,13 +275,13 @@ for (const db of providers) {
             const page = await entities(ctx.store)
                 .find(schema, [TestCoreHandle])
                 .limit(2)
-                .all();
+                .all(ctx);
             expect(page).toHaveLength(2);
 
             const rest = await entities(ctx.store)
                 .find(schema, [TestCoreHandle])
                 .offset(2)
-                .all();
+                .all(ctx);
             expect(rest).toHaveLength(1);
         });
     });
@@ -310,7 +310,7 @@ for (const db of providers) {
                 .find(schema, [TestCoreHandle, TestExtHandle])
                 .where(TestCoreHandle, 'name',   '=', 'Alice')
                 .where(TestExtHandle,  'active', '=', true)
-                .all();
+                .all(ctx);
             expect(results).toHaveLength(1);
             expect(results[0]!.groups[TestCoreHandle.id]!['name']).toBe('Alice');
         });
@@ -320,7 +320,7 @@ for (const db of providers) {
                 .find(schema, [TestCoreHandle, TestExtHandle])
                 .where(TestCoreHandle, 'name',   '=', 'Alice')
                 .where(TestExtHandle,  'active', '=', false)  // Alice is active:true
-                .all();
+                .all(ctx);
             expect(results).toHaveLength(0);
         });
     });
@@ -358,7 +358,7 @@ for (const db of providers) {
                 .where(TestCoreHandle, 'name',   '=', 'P3')
                 .where(TestCoreHandle, 'score',  '=', 30)
                 .where(TestExtHandle,  'active', '=', true)
-                .all();
+                .all(ctx);
             expect(results).toHaveLength(1);
             expect(results[0]!.groups[TestCoreHandle.id]!['name']).toBe('P3');
         });
@@ -369,7 +369,7 @@ for (const db of providers) {
                 .where(TestCoreHandle, 'score',  '=', 20)   // only P2
                 .where(TestExtHandle,  'active', '=', true)  // P2 is inactive
                 .where(TestExtHandle,  'rank',   '=', 2)
-                .all();
+                .all(ctx);
             expect(results).toHaveLength(0);
         });
     });
@@ -396,7 +396,7 @@ for (const db of providers) {
             const results = await entities(ctx.store)
                 .find(schema, [TestCoreHandle])
                 .orderBy(TestCoreHandle, 'name', 'asc')
-                .all();
+                .all(ctx);
             const names = results.map(r => r.groups[TestCoreHandle.id]!['name']);
             expect(names).toEqual(['Alice', 'Bob', 'Charlie']);
         });
@@ -405,7 +405,7 @@ for (const db of providers) {
             const results = await entities(ctx.store)
                 .find(schema, [TestCoreHandle])
                 .orderBy(TestCoreHandle, 'name', 'desc')
-                .all();
+                .all(ctx);
             const names = results.map(r => r.groups[TestCoreHandle.id]!['name']);
             expect(names).toEqual(['Charlie', 'Bob', 'Alice']);
         });
@@ -414,7 +414,7 @@ for (const db of providers) {
             const results = await entities(ctx.store)
                 .find(schema, [TestCoreHandle])
                 .orderBy(TestCoreHandle, 'score', 'asc')
-                .all();
+                .all(ctx);
             const scores = results.map(r => r.groups[TestCoreHandle.id]!['score']);
             expect(scores).toEqual([10, 20, 30]);
         });
@@ -425,7 +425,7 @@ for (const db of providers) {
                 .find(schema, [TestCoreHandle])
                 .where(TestCoreHandle, 'score', '=', 10)
                 .orderBy(TestCoreHandle, 'name', 'asc')
-                .all();
+                .all(ctx);
             const names = results.map(r => r.groups[TestCoreHandle.id]!['name']);
             expect(names).toEqual(['Alice', 'Dave']);
         });
@@ -450,13 +450,13 @@ for (const db of providers) {
         afterEach(async () => { await teardown(ctx); });
 
         it('collectionGet returns empty array before any push', async () => {
-            const tags = await es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
+            const tags = await es.collectionGet(ctx, schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual([]);
         });
 
         it('collectionPush appends values in insertion order', async () => {
             await es.collectionPush(ctx, schema, itemId, TestCoreHandle, 'tags', 'alpha', 'beta', 'gamma');
-            const tags = await es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
+            const tags = await es.collectionGet(ctx, schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual(['alpha', 'beta', 'gamma']);
         });
 
@@ -464,7 +464,7 @@ for (const db of providers) {
             await es.collectionPush(ctx, schema, itemId, TestCoreHandle, 'tags', 'a', 'b', 'c');
             const removed = await es.collectionRemove(ctx, schema, itemId, TestCoreHandle, 'tags', 'b');
             expect(removed).toBe(true);
-            const tags = await es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
+            const tags = await es.collectionGet(ctx, schema, itemId, TestCoreHandle, 'tags');
             expect(tags).not.toContain('b');
             expect(tags).toContain('a');
             expect(tags).toContain('c');
@@ -479,7 +479,7 @@ for (const db of providers) {
             await es.collectionPush(ctx, schema, itemId, TestCoreHandle, 'tags', 'first', 'second', 'third');
             const last = await es.collectionPop(ctx, schema, itemId, TestCoreHandle, 'tags');
             expect(last).toBe('third');
-            const tags = await es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
+            const tags = await es.collectionGet(ctx, schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual(['first', 'second']);
         });
 
@@ -491,50 +491,50 @@ for (const db of providers) {
         it('collectionSet replaces entire collection', async () => {
             await es.collectionPush(ctx, schema, itemId, TestCoreHandle, 'tags', 'x', 'y');
             await es.collectionSet(ctx, schema, itemId, TestCoreHandle, 'tags', ['p', 'q', 'r']);
-            const tags = await es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
+            const tags = await es.collectionGet(ctx, schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual(['p', 'q', 'r']);
         });
 
         it('collectionSet with empty array clears the collection', async () => {
             await es.collectionPush(ctx, schema, itemId, TestCoreHandle, 'tags', 'tag1');
             await es.collectionSet(ctx, schema, itemId, TestCoreHandle, 'tags', []);
-            const tags = await es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
+            const tags = await es.collectionGet(ctx, schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual([]);
         });
 
         it('collectionInsertAt inserts at the beginning', async () => {
             await es.collectionPush(ctx, schema, itemId, TestCoreHandle, 'tags', 'b', 'c');
             await es.collectionInsertAt(ctx, schema, itemId, TestCoreHandle, 'tags', 0, 'a');
-            const tags = await es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
+            const tags = await es.collectionGet(ctx, schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual(['a', 'b', 'c']);
         });
 
         it('collectionInsertAt inserts in the middle', async () => {
             await es.collectionPush(ctx, schema, itemId, TestCoreHandle, 'tags', 'a', 'c');
             await es.collectionInsertAt(ctx, schema, itemId, TestCoreHandle, 'tags', 1, 'b');
-            const tags = await es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
+            const tags = await es.collectionGet(ctx, schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual(['a', 'b', 'c']);
         });
 
         it('collectionInsertAt appends when index exceeds length', async () => {
             await es.collectionPush(ctx, schema, itemId, TestCoreHandle, 'tags', 'one', 'two');
             await es.collectionInsertAt(ctx, schema, itemId, TestCoreHandle, 'tags', 99, 'three');
-            const tags = await es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
+            const tags = await es.collectionGet(ctx, schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual(['one', 'two', 'three']);
         });
 
         it('sorting a collection via collectionSet', async () => {
             await es.collectionPush(ctx, schema, itemId, TestCoreHandle, 'tags', 'gamma', 'alpha', 'beta');
-            const current = (await es.collectionGet(schema, itemId, TestCoreHandle, 'tags')) as string[];
+            const current = (await es.collectionGet(ctx, schema, itemId, TestCoreHandle, 'tags')) as string[];
             const sorted  = [...current].sort();
             await es.collectionSet(ctx, schema, itemId, TestCoreHandle, 'tags', sorted);
-            const tags = await es.collectionGet(schema, itemId, TestCoreHandle, 'tags');
+            const tags = await es.collectionGet(ctx, schema, itemId, TestCoreHandle, 'tags');
             expect(tags).toEqual(['alpha', 'beta', 'gamma']);
         });
 
         it('hydrated findById returns collection as array', async () => {
             await es.collectionPush(ctx, schema, itemId, TestCoreHandle, 'tags', 'x', 'y', 'z');
-            const found = await es.findById(schema, itemId, [TestCoreHandle]);
+            const found = await es.findById(ctx, schema, itemId, [TestCoreHandle]);
             expect(found!.groups[TestCoreHandle.id]!['tags']).toEqual(['x', 'y', 'z']);
         });
     });

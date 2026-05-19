@@ -469,6 +469,38 @@ describe('TripleStore: find/delete with non-existent nodes return early', () => 
                 // Results exist — _loadNodes was called with nodes including b (blank) and p (IRI)
                 expect(results.length).toBe(1);
             });
+
+            it('nodeToTerm falls back to legacy columns when value_json is NULL', async () => {
+                // Insert a literal quad normally
+                const sub = EX('legacySubj');
+                const pred = EX('legacyPred');
+                const obj = literal('legacy-value', 'http://www.w3.org/2001/XMLSchema#string');
+                await store.insert(ctx, { subject: sub, predicate: pred, object: obj, graph: GRAPH });
+
+                // Manually NULL-out value_json to simulate a pre-migration (legacy) row
+                await store.knex('tern_nodes').update({ value_json: null }).where({ kind: 'literal' });
+
+                // find() should still reconstruct the literal from legacy columns
+                const found = await store.find(ctx, { subject: sub, predicate: pred });
+                expect(found).toHaveLength(1);
+                const foundObj = found[0].object as { termType: string; value: string };
+                expect(foundObj.termType).toBe('Literal');
+                expect(foundObj.value).toBe('legacy-value');
+            });
+
+            it('nodeToTerm returns a language-tagged literal correctly', async () => {
+                const sub = EX('langSubj');
+                const pred = EX('langPred');
+                const langLit = literal('bonjour', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#langString', 'fr');
+                await store.insert(ctx, { subject: sub, predicate: pred, object: langLit, graph: GRAPH });
+
+                const found = await store.find(ctx, { subject: sub });
+                expect(found).toHaveLength(1);
+                const foundObj = found[0].object as { termType: string; value: string; language?: string };
+                expect(foundObj.termType).toBe('Literal');
+                expect(foundObj.value).toBe('bonjour');
+                expect(foundObj.language).toBe('fr');
+            });
         });
     }
 });

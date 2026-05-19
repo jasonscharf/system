@@ -19,12 +19,15 @@ import { createDataContext, TripleStore } from '@system/data';
 import { UserSchema, CoreHandle } from '@system/auth';
 import {
     handle,
+    handleSlug,
     EntitySchema,
     EntityStore,
     entities,
     groupOf,
     EntityValidationError,
 } from '@system/entities';
+import { invertPropertyMap, propertyMapFor, fromLiteral } from '../../../entities/src/util.js';
+import type { ShaclNodeShape } from '@system/gen';
 
 
 // ── Provider matrix (mirrors the pattern in triples.test.ts) ─────────────────
@@ -429,6 +432,33 @@ for (const db of providers) {
             const names = results.map(r => r.groups[TestCoreHandle.id]!['name']);
             expect(names).toEqual(['Alice', 'Dave']);
         });
+
+        it('orderBy handles equal values (av === bv branch returns 0)', async () => {
+            // Two entities with the same score — sort is stable; av===bv branch returns 0
+            await es.create(ctx, schema, { name: 'Extra', score: 10 });
+            const results = await entities(ctx.store)
+                .find(schema, [TestCoreHandle])
+                .orderBy(TestCoreHandle, 'score', 'asc')
+                .all(ctx);
+            // Three records exist (Alice=10, Bob=20, Charlie=30) plus Extra=10
+            const scores = results.map(r => r.groups[TestCoreHandle.id]!['score']);
+            expect(scores.filter(s => s === 10)).toHaveLength(2);
+        });
+
+        it('orderBy: bv==null when one record has no value for the sort prop', async () => {
+            // Create an entity WITHOUT email — sort by email so one record has null bv
+            await es.create(ctx, schema, { name: 'HasEmail', email: 'z@test.com', score: 99 });
+            // Alice/Bob/Charlie have no email (not set in beforeEach)
+            const results = await entities(ctx.store)
+                .find(schema, [TestCoreHandle])
+                .orderBy(TestCoreHandle, 'email', 'asc')
+                .all(ctx);
+            // HasEmail (z@test.com) should sort after null-email records;
+            // the comparison av='z@test.com', bv=null hits the `bv==null ? 1` branch
+            expect(results.length).toBeGreaterThanOrEqual(4);
+            const emails = results.map(r => r.groups[TestCoreHandle.id]!['email']);
+            expect(emails[emails.length - 1]).toBe('z@test.com');
+        });
     });
 
 
@@ -448,6 +478,13 @@ for (const db of providers) {
             itemId = rec.id;
         });
         afterEach(async () => { await teardown(ctx); });
+
+        it('create() with an array property value populates collection via _propQuads', async () => {
+            // Passing an array for a collection property hits the Array.isArray branch in _propQuads
+            const rec = await es.create(ctx, schema, { name: 'WithTags', tags: ['x', 'y', 'z'] });
+            const found = await es.findById(ctx, schema, rec.id, [TestCoreHandle]);
+            expect(found!.groups[TestCoreHandle.id]!['tags']).toEqual(['x', 'y', 'z']);
+        });
 
         it('collectionGet returns empty array before any push', async () => {
             const tags = await es.collectionGet(ctx, schema, itemId, TestCoreHandle, 'tags');
@@ -565,3 +602,329 @@ for (const db of providers) {
         });
     });
 }
+
+
+// ── Non-DB tests (handle utilities, EntitySchema, util helpers) ───────────────
+
+describe('handleSlug', () => {
+    it('replaces colons with underscores and appends version', () => {
+        const h = handle('test:core');
+        expect(handleSlug(h)).toBe('test_core_v1');
+    });
+
+    it('works for handles with dots', () => {
+        const h = handle('com.acme.billing', 2);
+        expect(handleSlug(h)).toBe('com.acme.billing_v2');
+    });
+});
+
+
+describe('EntitySchema — resolveGroups', () => {
+    it('returns all groups when handle is *', () => {
+        const schema = makeTestSchema();
+        const groups = schema.resolveGroups('*');
+        expect(groups.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('returns empty array for unregistered handle', () => {
+        const schema  = makeTestSchema();
+        const unknown = handle('totally:unknown');
+        const groups  = schema.resolveGroups([unknown]);
+        expect(groups).toEqual([]);
+    });
+
+    it('returns subset for a list of known handles', () => {
+        const schema = makeTestSchema();
+        const groups = schema.resolveGroups([TestCoreHandle]);
+        expect(groups).toHaveLength(1);
+        expect(groups[0]!.handle.id).toBe(TestCoreHandle.id);
+    });
+});
+
+
+describe('EntityStore — defensive throw paths', () => {
+    let knex: import('knex').Knex;
+    let es: EntityStore;
+    let schema: EntitySchema;
+    let itemId: string;
+
+    beforeEach(async () => {
+        knex   = await createDataContext({ client: 'sqlite', filename: ':memory:' });
+        es     = new EntityStore(new TripleStore(knex));
+        schema = makeTestSchema();
+        const rec = await es.create({}, schema, { name: 'Item' });
+        itemId = rec.id;
+    });
+    afterEach(async () => { await knex.destroy(); });
+
+    it('collectionSet throws when prop not in schema (line 311)', async () => {
+        await expect(es.collectionSet({}, schema, itemId, TestCoreHandle, 'nonExistentProp', ['x']))
+            .rejects.toThrow();
+    });
+
+    it('createCollectionView throws when prop not in schema (line 363)', async () => {
+        await expect(es.createCollectionView({}, schema, itemId, TestCoreHandle, 'nonExistentProp'))
+            .rejects.toThrow();
+    });
+
+    it('collectionPush throws when handle not registered on schema (line 466)', async () => {
+        const ghostHandle = handle('ghost:handle');
+        await expect(es.collectionPush({}, schema, itemId, ghostHandle, 'member', 'val'))
+            .rejects.toThrow('PropGroup not registered on schema');
+    });
+});
+
+
+describe('EntityStore — views getter', () => {
+    it('es.views returns a CollectionViewStore instance', async () => {
+        const knex  = await createDataContext({ client: 'sqlite', filename: ':memory:' });
+        const store = new TripleStore(knex);
+        const es    = new EntityStore(store);
+        expect(es.views).toBeDefined();
+        await knex.destroy();
+    });
+});
+
+
+describe('EntityStore._validate — schema with shape', () => {
+    const nameIRI = new IRI('http://test.dev/name');
+    const schemaWithShape = new EntitySchema({
+        typeIRI:   new IRI('http://test.dev/ValidatedItem'),
+        ns:        'http://test.dev/',
+        coreGroup: {
+            handle:     handle('test:validated'),
+            properties: { name: nameIRI },
+            shape: {
+                iri:         'http://test.dev/ValidatedItemShape',
+                targetClass: 'http://test.dev/ValidatedItem',
+                closed:      false,
+                properties:  [
+                    { path: 'http://test.dev/name', minCount: 1 },
+                ],
+            } satisfies ShaclNodeShape,
+        },
+    });
+
+    it('validates successfully when required prop is present (covers line 472-473 valid=true)', async () => {
+        const knex  = await createDataContext({ client: 'sqlite', filename: ':memory:' });
+        const store = new TripleStore(knex);
+        const es    = new EntityStore(store);
+        // Should NOT throw — name is provided
+        const rec = await es.create({}, schemaWithShape, { name: 'ValidName' });
+        expect(rec.id).toBeTruthy();
+        await knex.destroy();
+    });
+
+    it('throws EntityValidationError when required prop missing (covers line 473 throw branch)', async () => {
+        const knex  = await createDataContext({ client: 'sqlite', filename: ':memory:' });
+        const store = new TripleStore(knex);
+        const es    = new EntityStore(store);
+        // Should throw — name is missing and minCount=1
+        await expect(es.create({}, schemaWithShape, {})).rejects.toBeInstanceOf(EntityValidationError);
+        await knex.destroy();
+    });
+});
+
+
+describe('fromLiteral — utility branches', () => {
+    it('returns the value for a BlankNode term', () => {
+        const result = fromLiteral({ termType: 'BlankNode', id: 'b0', value: 'b0' });
+        expect(result).toBe('b0');
+    });
+
+    it('returns undefined for unknown term shape', () => {
+        expect(fromLiteral(null)).toBeUndefined();
+        expect(fromLiteral(42)).toBeUndefined();
+    });
+});
+
+
+describe('invertPropertyMap / propertyMapFor', () => {
+    const props = { name: new IRI('http://x/name'), score: new IRI('http://x/score') };
+
+    it('invertPropertyMap maps IRI string → property name', () => {
+        const inv = invertPropertyMap(props);
+        expect(inv.get('http://x/name')).toBe('name');
+        expect(inv.get('http://x/score')).toBe('score');
+    });
+
+    it('propertyMapFor maps property name → IRI string', () => {
+        const map = propertyMapFor(props);
+        expect(map['name']).toBe('http://x/name');
+        expect(map['score']).toBe('http://x/score');
+    });
+});
+
+
+// ── EntityQuery filter operators (non-equality) — runs per DB provider ─────────
+
+for (const db of providers) {
+    describe(`EntityQuery — filter operators (${db.name})`, () => {
+        let ctx: Awaited<ReturnType<typeof setup>>;
+        let es: EntityStore;
+        let schema: EntitySchema;
+
+        beforeEach(async () => {
+            ctx    = await setup(db);
+            ({ es } = ctx);
+            schema = makeTestSchema();
+            // Create three entities with known scores and names
+            await es.create(ctx, schema, { name: 'Alice',   score: 10 });
+            await es.create(ctx, schema, { name: 'Bob',     score: 20 });
+            await es.create(ctx, schema, { name: 'Charlie', score: 30 });
+        });
+        afterEach(async () => { await teardown(ctx); });
+
+        it('!= excludes the matching record', async () => {
+            const results = await entities(ctx.store)
+                .find(schema, [TestCoreHandle])
+                .where(TestCoreHandle, 'score', '!=', 20)
+                .all(ctx);
+            const scores = results.map(r => r.groups[TestCoreHandle.id]!['score']);
+            expect(scores).not.toContain(20);
+            expect(scores).toHaveLength(2);
+        });
+
+        it('< returns records below the threshold', async () => {
+            const results = await entities(ctx.store)
+                .find(schema, [TestCoreHandle])
+                .where(TestCoreHandle, 'score', '<', 20)
+                .all(ctx);
+            const scores = results.map(r => r.groups[TestCoreHandle.id]!['score']);
+            expect(scores).toEqual([10]);
+        });
+
+        it('<= returns records at or below the threshold', async () => {
+            const results = await entities(ctx.store)
+                .find(schema, [TestCoreHandle])
+                .where(TestCoreHandle, 'score', '<=', 20)
+                .all(ctx);
+            const scores = results.map(r => r.groups[TestCoreHandle.id]!['score']);
+            expect(scores).toContain(10);
+            expect(scores).toContain(20);
+            expect(scores).not.toContain(30);
+        });
+
+        it('> returns records above the threshold', async () => {
+            const results = await entities(ctx.store)
+                .find(schema, [TestCoreHandle])
+                .where(TestCoreHandle, 'score', '>', 10)
+                .all(ctx);
+            const scores = results.map(r => r.groups[TestCoreHandle.id]!['score']);
+            expect(scores).toContain(20);
+            expect(scores).toContain(30);
+            expect(scores).not.toContain(10);
+        });
+
+        it('>= returns records at or above the threshold', async () => {
+            const results = await entities(ctx.store)
+                .find(schema, [TestCoreHandle])
+                .where(TestCoreHandle, 'score', '>=', 20)
+                .all(ctx);
+            const scores = results.map(r => r.groups[TestCoreHandle.id]!['score']);
+            expect(scores).toContain(20);
+            expect(scores).toContain(30);
+            expect(scores).not.toContain(10);
+        });
+
+        it('LIKE pattern matches names starting with prefix', async () => {
+            const results = await entities(ctx.store)
+                .find(schema, [TestCoreHandle])
+                .where(TestCoreHandle, 'name', 'LIKE', 'Ali%')
+                .all(ctx);
+            expect(results).toHaveLength(1);
+            expect(results[0]!.groups[TestCoreHandle.id]!['name']).toBe('Alice');
+        });
+
+        it('ILIKE pattern is case-insensitive', async () => {
+            const results = await entities(ctx.store)
+                .find(schema, [TestCoreHandle])
+                .where(TestCoreHandle, 'name', 'ILIKE', 'ali%')
+                .all(ctx);
+            expect(results).toHaveLength(1);
+            expect(results[0]!.groups[TestCoreHandle.id]!['name']).toBe('Alice');
+        });
+
+        it('.store getter returns a TripleStore', () => {
+            const q = entities(ctx.store).find(schema, '*');
+            expect(q.store).toBe(ctx.store);
+        });
+
+        it('where() with an unknown handle returns all entities (no filtering)', async () => {
+            const unknownHandle = handle('totally:unknown');
+            const results = await entities(ctx.store)
+                .find(schema, [TestCoreHandle])
+                .where(unknownHandle, 'score', '=', 10)
+                .all(ctx);
+            // unknown handle → group not found → early return iris as-is
+            expect(results.length).toBe(3);
+        });
+
+        it('_matchFilter default branch: unknown operator returns false', async () => {
+            // Force the unreachable `default` branch by casting a bad operator via `any`
+            const results = await entities(ctx.store)
+                .find(schema, [TestCoreHandle])
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .where(TestCoreHandle, 'score', 'BOGUS' as any, 10)
+                .all(ctx);
+            // default returns false → no records match → filtered to 0
+            expect(results.length).toBe(0);
+        });
+
+        it('Handle Symbol.toPrimitive is exercised in template literals', () => {
+            const str = `${TestCoreHandle}`;
+            expect(str).toContain('test:core');
+        });
+
+        it('_applyEqFilter: unknown prop on a known handle skips filtering', async () => {
+            // The handle is known but the prop name doesn't exist → propIri is undefined
+            const results = await entities(ctx.store)
+                .find(schema, [TestCoreHandle])
+                .where(TestCoreHandle, 'nonexistentProp', '=', 'anything')
+                .all(ctx);
+            // No propIri → returns all iris unchanged
+            expect(results.length).toBe(3);
+        });
+
+        it('_matchFilter: record missing the filter handle returns false', async () => {
+            // Use a non-equality filter with a handle not in the record's groups
+            // The record has TestCoreHandle but not TestExtHandle
+            const results = await entities(ctx.store)
+                .find(schema, [TestCoreHandle])
+                .where(TestExtHandle, 'active', '!=', false)
+                .all(ctx);
+            // _matchFilter returns false (groupData undefined) → no records pass
+            expect(results.length).toBe(0);
+        });
+    });
+
+    // Dedicated sort-branch test with a fresh describe to control insertion order
+    describe(`EntityQuery — orderBy bv==null branch (${db.name})`, () => {
+        let ctx: Awaited<ReturnType<typeof setup>>;
+        let es: EntityStore;
+        let schema: EntitySchema;
+
+        beforeEach(async () => {
+            ctx    = await setup(db);
+            ({ es } = ctx);
+            schema = makeTestSchema();
+            // Insert entity WITH email FIRST so it's element[0] in the sort input,
+            // forcing the comparator to see av='a@test' and bv=null
+            await es.create(ctx, schema, { name: 'HasEmail', email: 'a@test.com', score: 1 });
+            await es.create(ctx, schema, { name: 'NoEmail',  score: 2 });
+        });
+        afterEach(async () => { await teardown(ctx); });
+
+        it('bv==null: element-with-value appears before element-without → cmp=1 branch', async () => {
+            const results = await entities(ctx.store)
+                .find(schema, [TestCoreHandle])
+                .orderBy(TestCoreHandle, 'email', 'asc')
+                .all(ctx);
+            expect(results).toHaveLength(2);
+            // NoEmail should come first in ascending sort (null < any value)
+            expect(results[0]!.groups[TestCoreHandle.id]!['name']).toBe('NoEmail');
+            expect(results[1]!.groups[TestCoreHandle.id]!['name']).toBe('HasEmail');
+        });
+    });
+}
+

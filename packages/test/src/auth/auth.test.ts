@@ -14,6 +14,7 @@ import {
     UserSessionRepository,
     UserDeviceRepository,
     MemorySessionStore,
+    RedisSessionStore,
     GoogleProvider,
     GitHubProvider,
     AuthService,
@@ -21,7 +22,18 @@ import {
     CallbackComponent,
     SessionComponent,
     AuthRouterComponent,
+    findUserWithRecentActivity,
+    findUserBySession,
+    listUsers,
+    listUserDevices,
+    listActiveSessions,
+    listInactiveSessions,
+    findSessionsByTokens,
+    UserSchema, CoreHandle,
+    UserDeviceSchema, DeviceCoreHandle,
+    UserSessionSchema, SessionCoreHandle,
 } from '@system/auth';
+import { EntityStore } from '@system/entities';
 import { FlowContext, PushScheduler } from '@system/flow';
 
 
@@ -726,3 +738,287 @@ describe('AuthRouterComponent.sessionMiddleware()', () => {
         await knex.destroy();
     });
 });
+
+
+// ── RedisSessionStore ─────────────────────────────────────────────────────────
+
+describe('RedisSessionStore', () => {
+    it('set() / get() round-trips a value', async () => {
+        const mockRedis = {
+            set: vi.fn().mockResolvedValue('OK'),
+            get: vi.fn().mockResolvedValue('my-value'),
+            del: vi.fn().mockResolvedValue(1),
+        };
+        const store = new RedisSessionStore(mockRedis as any);
+        await store.set('k', 'my-value', 60);
+        expect(mockRedis.set).toHaveBeenCalledWith('k', 'my-value', 'EX', 60);
+        const v = await store.get('k');
+        expect(v).toBe('my-value');
+        expect(mockRedis.get).toHaveBeenCalledWith('k');
+    });
+
+    it('get() returns null when Redis returns null', async () => {
+        const mockRedis = {
+            set: vi.fn(),
+            get: vi.fn().mockResolvedValue(null),
+            del: vi.fn(),
+        };
+        const store = new RedisSessionStore(mockRedis as any);
+        expect(await store.get('missing')).toBeNull();
+    });
+
+    it('del() calls redis.del with the key', async () => {
+        const mockRedis = {
+            set: vi.fn(),
+            get: vi.fn(),
+            del: vi.fn().mockResolvedValue(1),
+        };
+        const store = new RedisSessionStore(mockRedis as any);
+        await store.del('k');
+        expect(mockRedis.del).toHaveBeenCalledWith('k');
+    });
+});
+
+
+// ── AuthService.validateToken — cache hit path ────────────────────────────────
+
+describe('AuthService.validateToken — cache hit', () => {
+    it('returns user from fast-path cache without hitting the DB', async () => {
+        const knex    = await createDataContext({ client: 'sqlite', filename: ':memory:' });
+        const store   = new TripleStore(knex);
+        const memStore = new MemorySessionStore();
+        const users   = new UserRepository(store);
+
+        // Create a real user so findById can resolve it
+        vi.stubGlobal('fetch',
+            vi.fn()
+                .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'at', expires_in: 3600 }) } as Response)
+                .mockResolvedValueOnce({ ok: true, json: async () => ({ sub: 'cache-sub', email: 'cache@test.com', name: 'Cache User' }) } as Response),
+        );
+
+        const svc = new AuthService({
+            providers:    [new GoogleProvider('c', 's')],
+            sessionStore: memStore,
+            users,
+            identities:   new UserIdentityRepository(store),
+            sessions:     new UserSessionRepository(store),
+            devices:      new UserDeviceRepository(store),
+        });
+
+        const { user, session } = await svc.handleCallback({
+            provider: 'google', code: 'c', redirectUri: 'http://localhost/cb', device: {},
+        });
+
+        // Token is already cached from handleCallback — validateToken should use the cache
+        const validated = await svc.validateToken(session.sessionToken);
+        expect(validated?.email).toBe('cache@test.com');
+        expect(validated?.id).toBe(user.id);
+
+        vi.unstubAllGlobals();
+        await knex.destroy();
+    });
+
+    it('evicts expired session from cache and falls through to DB path', async () => {
+        const knex     = await createDataContext({ client: 'sqlite', filename: ':memory:' });
+        const store    = new TripleStore(knex);
+        const memStore = new MemorySessionStore();
+
+        const svc = new AuthService({
+            providers:    [new GoogleProvider('c', 's')],
+            sessionStore: memStore,
+            users:        new UserRepository(store),
+            identities:   new UserIdentityRepository(store),
+            sessions:     new UserSessionRepository(store),
+            devices:      new UserDeviceRepository(store),
+        });
+
+        // Manually prime the cache with an already-expired entry
+        const fakeToken = 'expired-token-xyz';
+        await memStore.set(
+            `tern:session:${fakeToken}`,
+            JSON.stringify({ userId: 'some-id', expiresAt: Date.now() - 1000 }), // in the past
+            1,
+        );
+
+        // validateToken should detect the expiry, delete it from cache, and return null
+        const result = await svc.validateToken(fakeToken);
+        expect(result).toBeNull();
+
+        await knex.destroy();
+    });
+});
+
+
+// ── queries.ts — join helpers ─────────────────────────────────────────────────
+
+for (const db of dbProviders) {
+    describe(`Auth queries — ${db.name}`, () => {
+        let knex:     Knex;
+        let trx:      Knex.Transaction;
+        let store:    TripleStore;
+        let userRepo: UserRepository;
+        let devRepo:  UserDeviceRepository;
+        let sessRepo: UserSessionRepository;
+        let es:       EntityStore;
+
+        beforeEach(async () => {
+            knex     = await db.create();
+            trx      = await knex.transaction();
+            store    = new TripleStore(knex);
+            userRepo = new UserRepository(store);
+            devRepo  = new UserDeviceRepository(store);
+            sessRepo = new UserSessionRepository(store);
+            es       = new EntityStore(store);
+        });
+        afterEach(async () => { await trx.rollback(); await knex.destroy(); });
+
+        it('listUsers returns all created users', async () => {
+            await userRepo.create({ trx }, { email: 'lu1@test.com' });
+            await userRepo.create({ trx }, { email: 'lu2@test.com' });
+            const result = await listUsers({ trx }, es);
+            expect(result.length).toBeGreaterThanOrEqual(2);
+        });
+
+        it('listUserDevices returns all created devices', async () => {
+            const user = await userRepo.create({ trx }, { email: 'lud@test.com' });
+            await devRepo.findOrCreate({ trx }, user.id, { userAgent: 'Chrome' });
+            const result = await listUserDevices({ trx }, es);
+            expect(result.length).toBeGreaterThanOrEqual(1);
+        });
+
+        it('listActiveSessions returns only active sessions', async () => {
+            const user   = await userRepo.create({ trx }, { email: 'las@test.com' });
+            const device = await devRepo.findOrCreate({ trx }, user.id, {});
+            const expiresAt = new Date(Date.now() + 3600_000);
+            const sess = await sessRepo.create({ trx }, { userId: user.id, deviceId: device.id, expiresAt });
+            await sessRepo.revoke({ trx }, sess.sessionToken);
+
+            const active = await listActiveSessions({ trx }, es);
+            const activeIds = active.map(r => r.id);
+            expect(activeIds).not.toContain(sess.id);
+        });
+
+        it('listInactiveSessions returns only inactive sessions', async () => {
+            const ctx = { trx };
+            const userRec = await es.create(ctx, UserSchema, { email: 'lis@test.com' });
+            const devRec  = await es.create(ctx, UserDeviceSchema, { deviceUser: userRec.iri, devicePlatform: 'web' });
+            const sess    = await es.create(ctx, UserSessionSchema, {
+                sessionUser: userRec.iri, sessionDevice: devRec.iri,
+                expiresAt: new Date(Date.now() + 3600_000), isActive: false,
+            });
+
+            const inactive = await listInactiveSessions(ctx, es);
+            expect(inactive.map(r => r.id)).toContain(sess.id);
+        });
+
+        it('findUserWithRecentActivity returns user + session + device', async () => {
+            const ctx     = { trx };
+            const userRec = await es.create(ctx, UserSchema, { email: 'fwa@test.com' });
+            const devRec  = await es.create(ctx, UserDeviceSchema, { deviceUser: userRec.iri, devicePlatform: 'web' });
+            await es.create(ctx, UserSessionSchema, {
+                sessionUser: userRec.iri, sessionDevice: devRec.iri,
+                expiresAt: new Date(Date.now() + 3600_000),
+            });
+
+            const result = await findUserWithRecentActivity(ctx, es, userRec.id);
+            expect(result).not.toBeNull();
+            expect(result!.session).not.toBeNull();
+            expect(result!.device).not.toBeNull();
+        });
+
+        it('findUserWithRecentActivity returns null for unknown user', async () => {
+            const result = await findUserWithRecentActivity({ trx }, es, 'no-such-id');
+            expect(result).toBeNull();
+        });
+
+        it('findUserWithRecentActivity returns null device when session references non-existent device', async () => {
+            const ctx     = { trx };
+            const userRec = await es.create(ctx, UserSchema, { email: 'fwanod@test.com' });
+            // Store a session whose sessionDevice IRI points to a non-existent entity
+            await es.create(ctx, UserSessionSchema, {
+                sessionUser:   userRec.iri,
+                sessionDevice: 'http://tern.dev/ns/auth/device/ghost',
+                expiresAt:     new Date(Date.now() + 3600_000),
+            });
+
+            const result = await findUserWithRecentActivity(ctx, es, userRec.id);
+            expect(result).not.toBeNull();
+            expect(result!.session).not.toBeNull();
+            expect(result!.device).toBeNull();
+        });
+
+        it('findUserWithRecentActivity returns null session when user has no sessions', async () => {
+            const ctx     = { trx };
+            const userRec = await es.create(ctx, UserSchema, { email: 'nosess@test.com' });
+            const result  = await findUserWithRecentActivity(ctx, es, userRec.id);
+            expect(result!.session).toBeNull();
+            expect(result!.device).toBeNull();
+        });
+
+        it('findSessionsByTokens returns sessions in order', async () => {
+            const ctx     = { trx };
+            const userRec = await es.create(ctx, UserSchema, { email: 'fst@test.com' });
+            const devRec  = await es.create(ctx, UserDeviceSchema, { deviceUser: userRec.iri, devicePlatform: 'web' });
+            const expiresAt = new Date(Date.now() + 3600_000);
+            const s1 = await es.create(ctx, UserSessionSchema, { sessionUser: userRec.iri, sessionDevice: devRec.iri, expiresAt });
+            const s2 = await es.create(ctx, UserSessionSchema, { sessionUser: userRec.iri, sessionDevice: devRec.iri, expiresAt });
+            const t1 = s1.groups[SessionCoreHandle.id]!['sessionToken'] as string;
+            const t2 = s2.groups[SessionCoreHandle.id]!['sessionToken'] as string;
+
+            const results = await findSessionsByTokens(ctx, es, [t2, t1]);
+            expect(results).toHaveLength(2);
+            expect(results[0]!.id).toBe(s2.id);
+            expect(results[1]!.id).toBe(s1.id);
+        });
+
+        it('findSessionsByTokens omits unknown tokens', async () => {
+            const results = await findSessionsByTokens({ trx }, es, ['ghost-token']);
+            expect(results).toHaveLength(0);
+        });
+
+        it('findUserBySession returns null for unknown token', async () => {
+            const result = await findUserBySession({ trx }, es, 'no-such-token');
+            expect(result).toBeNull();
+        });
+
+        it('findUserBySession returns user for valid token', async () => {
+            const ctx     = { trx };
+            const userRec = await es.create(ctx, UserSchema, { email: 'fubs@test.com' });
+            const devRec  = await es.create(ctx, UserDeviceSchema, { deviceUser: userRec.iri, devicePlatform: 'web' });
+            const sess    = await es.create(ctx, UserSessionSchema, {
+                sessionUser: userRec.iri, sessionDevice: devRec.iri,
+                expiresAt: new Date(Date.now() + 3600_000),
+            });
+            const token = sess.groups[SessionCoreHandle.id]!['sessionToken'] as string;
+
+            const result = await findUserBySession(ctx, es, token);
+            expect(result).not.toBeNull();
+            expect(result!.id).toBe(userRec.id);
+        });
+
+        it('findUserWithRecentActivity: session with no sessionDevice → device is null (line 94 false branch)', async () => {
+            const ctx     = { trx };
+            const userRec = await es.create(ctx, UserSchema, { email: 'nodev@test.com' });
+            // Create session without sessionDevice — strProp returns undefined, deviceIri is falsy
+            await es.create(ctx, UserSessionSchema, {
+                sessionUser: userRec.iri,
+                expiresAt:   new Date(Date.now() + 3600_000),
+            });
+            const result = await findUserWithRecentActivity(ctx, es, userRec.id);
+            expect(result).not.toBeNull();
+            expect(result!.session).not.toBeNull();
+            expect(result!.device).toBeNull();
+        });
+
+        it('findUserBySession: session with no sessionUser → returns null (line 141 branch)', async () => {
+            const ctx  = { trx };
+            // Create a session without sessionUser — strProp will return undefined
+            const sess = await es.create(ctx, UserSessionSchema, {
+                expiresAt: new Date(Date.now() + 3600_000),
+            });
+            const token = sess.groups[SessionCoreHandle.id]!['sessionToken'] as string;
+            const result = await findUserBySession(ctx, es, token);
+            expect(result).toBeNull();
+        });
+    });
+}

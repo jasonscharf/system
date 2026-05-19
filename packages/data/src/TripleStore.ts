@@ -46,6 +46,7 @@ function makeLiteralJson(value: string, datatypeIri: string, language?: string):
 function parseLiteralJson(raw: LiteralJson | string | null): LiteralJson | null {
     if (!raw) { return null; }
     if (typeof raw === 'string') { return JSON.parse(raw) as LiteralJson; }
+    /* c8 ignore next -- Postgres returns JSONB as a pre-parsed object; SQLite always returns a string */
     return raw;
 }
 

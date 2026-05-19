@@ -1,14 +1,19 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { IRI } from '@system/core';
 import { blankNode, literal } from '@system/core';
-import { generate } from '@system/gen';
+import { generate, generateFromConfig } from '@system/gen';
 import { parseNTriples } from '@system/gen';
+import { parseTurtle } from '@system/gen';
 import { readOntology } from '@system/gen';
-import { generateTypes } from '@system/gen';
+import { generateTypes, generateAugmentedTypes } from '@system/gen';
+import { readShaclShapes, mergeShapes } from '@system/gen';
+import { generateShapesDescriptor } from '@system/gen';
+import { validate } from '@system/gen';
 import type { Triple } from '@system/core';
+import type { ShaclShapes } from '@system/gen';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -383,5 +388,731 @@ describe('generateTypes', () => {
         ];
         const output = generateTypes(readOntology(withClassComment), 'schema.nt');
         expect(output).toContain('/** A system user. */');
+    });
+});
+
+
+// ── parseTurtle ───────────────────────────────────────────────────────────────
+
+async function collectTurtle(content: string): Promise<Triple[]> {
+    const result: Triple[] = [];
+    for await (const t of parseTurtle(content)) result.push(t);
+    return result;
+}
+
+describe('parseTurtle', () => {
+    it('parses @prefix declarations and prefixed names', async () => {
+        const ttl = `
+@prefix ex: <http://example.org/> .
+ex:User a <http://www.w3.org/2002/07/owl#Class> .
+`;
+        const triples = await collectTurtle(ttl);
+        expect(triples.length).toBeGreaterThanOrEqual(1);
+        expect((triples[0].subject as IRI).value).toBe('http://example.org/User');
+    });
+
+    it('parses SPARQL-style PREFIX declaration', async () => {
+        const ttl = `
+PREFIX ex: <http://example.org/>
+ex:Foo a <http://www.w3.org/2002/07/owl#Class> .
+`;
+        const triples = await collectTurtle(ttl);
+        expect(triples.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('parses keyword "a" as rdf:type', async () => {
+        const ttl = `
+@prefix ex: <http://example.org/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+ex:User a owl:Class .
+`;
+        const triples = await collectTurtle(ttl);
+        expect(triples[0].predicate.value).toBe('http://www.w3.org/1999/02/22-rdf-syntax-ns#type');
+    });
+
+    it('parses predicate lists separated by semicolons', async () => {
+        const ttl = `
+@prefix ex: <http://example.org/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+ex:User rdf:type ex:Class ; ex:name "Alice" .
+`;
+        const triples = await collectTurtle(ttl);
+        expect(triples).toHaveLength(2);
+    });
+
+    it('parses object lists separated by commas', async () => {
+        const ttl = `
+@prefix ex: <http://example.org/> .
+ex:User ex:tag "a", "b", "c" .
+`;
+        const triples = await collectTurtle(ttl);
+        expect(triples).toHaveLength(3);
+    });
+
+    it('parses string literals', async () => {
+        const ttl = `
+@prefix ex: <http://example.org/> .
+ex:User ex:name "Alice" .
+`;
+        const triples = await collectTurtle(ttl);
+        const obj = triples[0].object as any;
+        expect(obj.termType).toBe('Literal');
+        expect(obj.value).toBe('Alice');
+    });
+
+    it('parses language-tagged literals', async () => {
+        const ttl = `
+@prefix ex: <http://example.org/> .
+ex:User ex:name "Bonjour"@fr .
+`;
+        const triples = await collectTurtle(ttl);
+        const obj = triples[0].object as any;
+        expect(obj.language).toBe('fr');
+    });
+
+    it('parses datatype literals', async () => {
+        const ttl = `
+@prefix ex: <http://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+ex:User ex:score "42"^^xsd:integer .
+`;
+        const triples = await collectTurtle(ttl);
+        const obj = triples[0].object as any;
+        expect(obj.termType).toBe('Literal');
+        expect(obj.value).toBe('42');
+        expect(obj.datatype.value).toContain('integer');
+    });
+
+    it('parses integer shorthand literals', async () => {
+        const ttl = `
+@prefix ex: <http://example.org/> .
+ex:User ex:count 42 .
+`;
+        const triples = await collectTurtle(ttl);
+        const obj = triples[0].object as any;
+        expect(obj.termType).toBe('Literal');
+        expect(obj.value).toBe('42');
+    });
+
+    it('parses decimal shorthand literals', async () => {
+        const ttl = `
+@prefix ex: <http://example.org/> .
+ex:User ex:ratio 3.14 .
+`;
+        const triples = await collectTurtle(ttl);
+        const obj = triples[0].object as any;
+        expect(obj.termType).toBe('Literal');
+        expect(obj.value).toBe('3.14');
+    });
+
+    it('parses boolean true literal', async () => {
+        const ttl = `
+@prefix ex: <http://example.org/> .
+ex:User ex:active true .
+`;
+        const triples = await collectTurtle(ttl);
+        const obj = triples[0].object as any;
+        expect(obj.value).toBe('true');
+    });
+
+    it('parses boolean false literal', async () => {
+        const ttl = `
+@prefix ex: <http://example.org/> .
+ex:User ex:active false .
+`;
+        const triples = await collectTurtle(ttl);
+        const obj = triples[0].object as any;
+        expect(obj.value).toBe('false');
+    });
+
+    it('parses named blank nodes', async () => {
+        const ttl = `
+@prefix ex: <http://example.org/> .
+_:b0 ex:name "Alice" .
+`;
+        const triples = await collectTurtle(ttl);
+        expect(triples[0].subject).toMatchObject({ termType: 'BlankNode' });
+    });
+
+    it('parses anonymous blank nodes with inline property lists', async () => {
+        const ttl = `
+@prefix ex: <http://example.org/> .
+ex:User ex:address [ ex:city "London" ] .
+`;
+        const triples = await collectTurtle(ttl);
+        // 2 triples: one for ex:address pointing to blank, one for ex:city on blank
+        expect(triples.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('parses triple-quoted string literals', async () => {
+        const ttl = `
+@prefix ex: <http://example.org/> .
+ex:User ex:desc """Hello
+World""" .
+`;
+        const triples = await collectTurtle(ttl);
+        const obj = triples[0].object as any;
+        expect(obj.value).toContain('Hello');
+        expect(obj.value).toContain('World');
+    });
+
+    it('skips comments in Turtle', async () => {
+        const ttl = `
+# This is a comment
+@prefix ex: <http://example.org/> .
+# Another comment
+ex:User a ex:Class . # trailing comment
+`;
+        const triples = await collectTurtle(ttl);
+        expect(triples).toHaveLength(1);
+    });
+
+    it('throws on unknown prefix', async () => {
+        await expect(collectTurtle('unknown:Foo a <http://x/Class> .\n')).rejects.toThrow();
+    });
+
+    it('parses negative numeric literals', async () => {
+        const ttl = `
+@prefix ex: <http://example.org/> .
+ex:User ex:delta -5 .
+`;
+        const triples = await collectTurtle(ttl);
+        const obj = triples[0].object as any;
+        expect(obj.value).toBe('-5');
+    });
+});
+
+
+// ── readShaclShapes / mergeShapes ─────────────────────────────────────────────
+
+const SH = 'http://www.w3.org/ns/shacl#';
+const RDF_T = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
+
+function shacl_iri(local: string): IRI { return new IRI(`${SH}${local}`); }
+function ex_iri(local: string): IRI { return new IRI(`http://example.org/${local}`); }
+function lit(v: string): { termType: 'Literal'; value: string; datatype: IRI; language?: string } {
+    return { termType: 'Literal', value: v, datatype: new IRI('http://www.w3.org/2001/XMLSchema#string') };
+}
+
+function shaclTriples(): Triple[] {
+    const shapeIri  = ex_iri('UserShape');
+    const propBlank = blankNode('ps1');
+    return [
+        { subject: shapeIri,  predicate: new IRI(RDF_T),            object: shacl_iri('NodeShape') },
+        { subject: shapeIri,  predicate: shacl_iri('targetClass'),   object: ex_iri('User') },
+        { subject: shapeIri,  predicate: shacl_iri('property'),      object: propBlank },
+        { subject: propBlank, predicate: shacl_iri('path'),          object: ex_iri('email') },
+        { subject: propBlank, predicate: shacl_iri('minCount'),      object: lit('1') },
+        { subject: propBlank, predicate: shacl_iri('maxCount'),      object: lit('1') },
+        { subject: propBlank, predicate: shacl_iri('datatype'),      object: new IRI('http://www.w3.org/2001/XMLSchema#string') },
+        { subject: propBlank, predicate: shacl_iri('pattern'),       object: lit('.+@.+') },
+        { subject: propBlank, predicate: shacl_iri('message'),       object: lit('Valid email required') },
+    ];
+}
+
+describe('readShaclShapes', () => {
+    it('parses a NodeShape from triples', () => {
+        const shapes = readShaclShapes(shaclTriples());
+        expect(shapes.nodeShapes.size).toBe(1);
+        const shape = shapes.nodeShapes.get('http://example.org/UserShape');
+        expect(shape).toBeDefined();
+        expect(shape!.targetClass).toBe('http://example.org/User');
+    });
+
+    it('parses property shapes correctly', () => {
+        const shapes = readShaclShapes(shaclTriples());
+        const shape = shapes.byTargetClass.get('http://example.org/User')!;
+        expect(shape.properties).toHaveLength(1);
+        const ps = shape.properties[0]!;
+        expect(ps.path).toBe('http://example.org/email');
+        expect(ps.minCount).toBe(1);
+        expect(ps.maxCount).toBe(1);
+        expect(ps.pattern).toBe('.+@.+');
+        expect(ps.message).toBe('Valid email required');
+    });
+
+    it('parses sh:datatype on property shapes', () => {
+        const shapes = readShaclShapes(shaclTriples());
+        const shape  = shapes.byTargetClass.get('http://example.org/User')!;
+        expect(shape.properties[0]!.datatype).toContain('string');
+    });
+
+    it('parses sh:class constraint', () => {
+        const shapeIri  = ex_iri('OrgShape');
+        const propBlank = blankNode('ps2');
+        const triples: Triple[] = [
+            { subject: shapeIri,  predicate: new IRI(RDF_T),           object: shacl_iri('NodeShape') },
+            { subject: shapeIri,  predicate: shacl_iri('targetClass'),  object: ex_iri('Org') },
+            { subject: shapeIri,  predicate: shacl_iri('property'),     object: propBlank },
+            { subject: propBlank, predicate: shacl_iri('path'),         object: ex_iri('member') },
+            { subject: propBlank, predicate: shacl_iri('class'),        object: ex_iri('User') },
+        ];
+        const shapes = readShaclShapes(triples);
+        const ps = shapes.byTargetClass.get('http://example.org/Org')!.properties[0]!;
+        expect(ps.classConstraint).toBe('http://example.org/User');
+    });
+
+    it('parses sh:closed = true', () => {
+        const shapeIri = ex_iri('ClosedShape');
+        const triples: Triple[] = [
+            { subject: shapeIri, predicate: new IRI(RDF_T),          object: shacl_iri('NodeShape') },
+            { subject: shapeIri, predicate: shacl_iri('targetClass'), object: ex_iri('Item') },
+            { subject: shapeIri, predicate: shacl_iri('closed'),      object: lit('true') },
+        ];
+        const shapes = readShaclShapes(triples);
+        const shape  = shapes.nodeShapes.get('http://example.org/ClosedShape')!;
+        expect(shape.closed).toBe(true);
+    });
+
+    it('mergeShapes combines two shape sets', () => {
+        const a = readShaclShapes(shaclTriples());
+        const shapeIri  = ex_iri('OtherShape');
+        const propBlank = blankNode('ps3');
+        const bTriples: Triple[] = [
+            { subject: shapeIri,  predicate: new IRI(RDF_T),           object: shacl_iri('NodeShape') },
+            { subject: shapeIri,  predicate: shacl_iri('targetClass'),  object: ex_iri('Other') },
+            { subject: shapeIri,  predicate: shacl_iri('property'),     object: propBlank },
+            { subject: propBlank, predicate: shacl_iri('path'),         object: ex_iri('foo') },
+        ];
+        const b = readShaclShapes(bTriples);
+        const merged = mergeShapes(a, b);
+        expect(merged.nodeShapes.size).toBe(2);
+        expect(merged.byTargetClass.size).toBe(2);
+    });
+});
+
+
+// ── generateAugmentedTypes ────────────────────────────────────────────────────
+
+describe('generateAugmentedTypes', () => {
+    const LOCAL_NS = 'http://local.example.org/';
+    const BASE_NS  = 'http://example.org/';
+
+    const baseTriples: Triple[] = [
+        t(`${BASE_NS}User`,   `${RDF}type`, `${OWL}Class`),
+        t(`${BASE_NS}email`,  `${RDF}type`, `${OWL}DatatypeProperty`),
+        t(`${BASE_NS}email`,  `${RDFS}domain`, `${BASE_NS}User`),
+        t(`${BASE_NS}email`,  `${RDFS}range`, `${XSD}string`),
+    ];
+
+    const localTriples: Triple[] = [
+        t(`${LOCAL_NS}Project`, `${RDF}type`, `${OWL}Class`),
+        t(`${LOCAL_NS}title`,   `${RDF}type`, `${OWL}DatatypeProperty`),
+        t(`${LOCAL_NS}title`,   `${RDFS}domain`, `${LOCAL_NS}Project`),
+        t(`${LOCAL_NS}title`,   `${RDFS}range`, `${XSD}string`),
+        // Extension property on base class
+        t(`${LOCAL_NS}score`,   `${RDF}type`, `${OWL}DatatypeProperty`),
+        t(`${LOCAL_NS}score`,   `${RDFS}domain`, `${BASE_NS}User`),
+        t(`${LOCAL_NS}score`,   `${RDFS}range`, `${XSD}integer`),
+    ];
+
+    const emptyShapes: ShaclShapes = { nodeShapes: new Map(), byTargetClass: new Map() };
+
+    it('generates exported interfaces for local classes', () => {
+        const ontology = readOntology([...baseTriples, ...localTriples]);
+        const externalClasses = new Map([[`${BASE_NS}User`, '@system/auth']]);
+        const output = generateAugmentedTypes(ontology, emptyShapes, {
+            externalClasses,
+            localNamespace: LOCAL_NS,
+        });
+        expect(output).toContain('export interface Project');
+        expect(output).toContain('title?:');
+    });
+
+    it('generates module augmentation for external classes with local properties', () => {
+        const ontology = readOntology([...baseTriples, ...localTriples]);
+        const externalClasses = new Map([[`${BASE_NS}User`, '@system/auth']]);
+        const output = generateAugmentedTypes(ontology, emptyShapes, {
+            externalClasses,
+            localNamespace: LOCAL_NS,
+        });
+        expect(output).toContain("declare module '@system/auth'");
+        expect(output).toContain('score?:');
+    });
+
+    it('uses custom iriImport when specified', () => {
+        const ontology = readOntology(localTriples);
+        const output = generateAugmentedTypes(ontology, emptyShapes, {
+            externalClasses: new Map(),
+            localNamespace:  LOCAL_NS,
+            iriImport: '../semantics/IRI.js',
+        });
+        expect(output).toContain("from '../semantics/IRI.js'");
+    });
+
+    it('marks required fields when SHACL minCount >= 1', () => {
+        const shapeIri  = new IRI(`${LOCAL_NS}ProjectShape`);
+        const propBlank = blankNode('reqps');
+        const shaclTrips: Triple[] = [
+            { subject: shapeIri,  predicate: new IRI(RDF_T),              object: shacl_iri('NodeShape') },
+            { subject: shapeIri,  predicate: shacl_iri('targetClass'),     object: new IRI(`${LOCAL_NS}Project`) },
+            { subject: shapeIri,  predicate: shacl_iri('property'),        object: propBlank },
+            { subject: propBlank, predicate: shacl_iri('path'),            object: new IRI(`${LOCAL_NS}title`) },
+            { subject: propBlank, predicate: shacl_iri('minCount'),        object: lit('1') },
+        ];
+        const shapes   = readShaclShapes(shaclTrips);
+        const ontology = readOntology(localTriples);
+        const output   = generateAugmentedTypes(ontology, shapes, {
+            externalClasses: new Map(),
+            localNamespace: LOCAL_NS,
+        });
+        // Required field should NOT have '?'
+        expect(output).toContain('title:');
+        expect(output).not.toContain('title?: ');
+    });
+
+    it('emits import for external type used as range', () => {
+        const ontology = readOntology([...baseTriples, ...localTriples]);
+        const externalClasses = new Map([[`${BASE_NS}User`, '@system/auth']]);
+        const output = generateAugmentedTypes(ontology, emptyShapes, {
+            externalClasses,
+            localNamespace: LOCAL_NS,
+        });
+        expect(output).toContain("import type { User } from '@system/auth'");
+    });
+
+    it('skips external classes that have no local-namespace properties', () => {
+        const ontology = readOntology(baseTriples);
+        const externalClasses = new Map([[`${BASE_NS}User`, '@system/auth']]);
+        const output = generateAugmentedTypes(ontology, emptyShapes, {
+            externalClasses,
+            localNamespace: LOCAL_NS,
+        });
+        // No local properties → no module augmentation block
+        expect(output).not.toContain("declare module '@system/auth'");
+    });
+});
+
+
+// ── generateShapesDescriptor ──────────────────────────────────────────────────
+
+describe('generateShapesDescriptor', () => {
+    it('generates a shapes descriptor with the shape list', () => {
+        const shapes = readShaclShapes(shaclTriples());
+        const output = generateShapesDescriptor(shapes);
+        expect(output).toContain('auto-generated shapes descriptor');
+        expect(output).toContain('UserShape');
+        expect(output).toContain('http://example.org/User');
+        expect(output).toContain('export const shapes:');
+    });
+
+    it('includes all PropertyShape fields in the output', () => {
+        const shapes = readShaclShapes(shaclTriples());
+        const output = generateShapesDescriptor(shapes);
+        expect(output).toContain('minCount:');
+        expect(output).toContain('maxCount:');
+        expect(output).toContain('datatype:');
+        expect(output).toContain('pattern:');
+        expect(output).toContain('message:');
+    });
+
+    it('generates valid output for empty shapes', () => {
+        const empty: ShaclShapes = { nodeShapes: new Map(), byTargetClass: new Map() };
+        const output = generateShapesDescriptor(empty);
+        expect(output).toContain('const list: ShaclNodeShape[]');
+        expect(output).toContain('export const shapes:');
+    });
+});
+
+
+// ── generateFromConfig ────────────────────────────────────────────────────────
+
+describe('generateFromConfig', () => {
+    let tmpDir: string;
+
+    beforeEach(async () => { tmpDir = await mkdtemp(join(tmpdir(), 'tern-cfg-')); });
+    afterEach(async () => { await rm(tmpDir, { recursive: true }); vi.restoreAllMocks(); });
+
+    it('generates a types file from a minimal config', async () => {
+        const ntPath = join(tmpDir, 'base.nt');
+        await writeFile(ntPath,
+            `<http://base.example.org/User> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .\n`,
+        );
+
+        const extPath = join(tmpDir, 'ext.nt');
+        await writeFile(extPath,
+            `<http://local.example.org/Project> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .\n`,
+        );
+
+        const outPath = join(tmpDir, 'out', 'types.ts');
+
+        const config = {
+            bases:          [{ ontology: 'base.nt', package: '@system/auth' }],
+            extensions:     ['ext.nt'],
+            localNamespace: 'http://local.example.org/',
+            out:            'out/types.ts',
+        };
+        const configPath = join(tmpDir, 'tern-gen.json');
+        await writeFile(configPath, JSON.stringify(config));
+
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        await generateFromConfig(configPath);
+
+        const output = await readFile(outPath, 'utf-8');
+        expect(output).toContain('export interface Project');
+    });
+
+    it('generates a shapes descriptor when shapesOut is set', async () => {
+        const extPath = join(tmpDir, 'ext.nt');
+        await writeFile(extPath,
+            `<http://local.example.org/Task> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .\n`,
+        );
+
+        const shaclPath = join(tmpDir, 'shapes.nt');
+        const taskShapeIri  = 'http://local.example.org/TaskShape';
+        const propBlankId   = 'shps1';
+        await writeFile(shaclPath, [
+            `<${taskShapeIri}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/shacl#NodeShape> .`,
+            `<${taskShapeIri}> <http://www.w3.org/ns/shacl#targetClass> <http://local.example.org/Task> .`,
+            `<${taskShapeIri}> <http://www.w3.org/ns/shacl#property> _:${propBlankId} .`,
+            `_:${propBlankId} <http://www.w3.org/ns/shacl#path> <http://local.example.org/title> .`,
+            `_:${propBlankId} <http://www.w3.org/ns/shacl#minCount> "1" .`,
+        ].join('\n') + '\n');
+
+        const config = {
+            bases:          [],
+            extensions:     ['ext.nt'],
+            shapes:         ['shapes.nt'],
+            localNamespace: 'http://local.example.org/',
+            out:            'types.ts',
+            shapesOut:      'shapes.generated.ts',
+        };
+        const configPath = join(tmpDir, 'tern-gen.json');
+        await writeFile(configPath, JSON.stringify(config));
+
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        await generateFromConfig(configPath);
+
+        const shapesOut = await readFile(join(tmpDir, 'shapes.generated.ts'), 'utf-8');
+        expect(shapesOut).toContain('TaskShape');
+    });
+
+    it('generates from Turtle extension files when shapesOut not set', async () => {
+        const ttlPath = join(tmpDir, 'ext.ttl');
+        await writeFile(ttlPath, [
+            '@prefix owl: <http://www.w3.org/2002/07/owl#> .',
+            '@prefix local: <http://local.example.org/> .',
+            'local:Widget a owl:Class .',
+        ].join('\n'));
+
+        const config = {
+            bases:          [],
+            extensions:     ['ext.ttl'],
+            localNamespace: 'http://local.example.org/',
+            out:            'types.ts',
+        };
+        const configPath = join(tmpDir, 'tern-gen.json');
+        await writeFile(configPath, JSON.stringify(config));
+
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        await generateFromConfig(configPath);
+
+        const output = await readFile(join(tmpDir, 'types.ts'), 'utf-8');
+        expect(output).toContain('Widget');
+    });
+
+    it('uses base.importPath when explicitly provided (left branch of ?? at importPath)', async () => {
+        const ntPath = join(tmpDir, 'base.nt');
+        await writeFile(ntPath,
+            `<http://base.example.org/User> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .\n`,
+        );
+        const config = {
+            bases:          [{ ontology: 'base.nt', package: '@system/auth', importPath: '@system/auth/types' }],
+            extensions:     [],
+            localNamespace: 'http://local.example.org/',
+            out:            'out/types.ts',
+        };
+        const configPath = join(tmpDir, 'tern-gen.json');
+        await writeFile(configPath, JSON.stringify(config));
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        await generateFromConfig(configPath);
+        const output = await readFile(join(tmpDir, 'out', 'types.ts'), 'utf-8');
+        expect(output).toContain('@system/auth/types');
+    });
+
+    it('handles config with no extensions array (uses ?? [] fallback)', async () => {
+        const ntPath = join(tmpDir, 'base.nt');
+        await writeFile(ntPath,
+            `<http://base.example.org/User> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .\n`,
+        );
+        const configPath = join(tmpDir, 'tern-gen.json');
+        // Note: no "extensions" key → config.extensions is undefined → ?? [] fallback
+        await writeFile(configPath, JSON.stringify({
+            bases:          [{ ontology: 'base.nt', package: '@system/auth' }],
+            localNamespace: 'http://base.example.org/',
+            out:            'types.ts',
+        }));
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        await generateFromConfig(configPath);
+        const output = await readFile(join(tmpDir, 'types.ts'), 'utf-8');
+        expect(output).toContain('// auto-generated');
+    });
+});
+
+
+// ── ShaclValidator (validate) ─────────────────────────────────────────────────
+
+describe('validate', () => {
+    const xsd = 'http://www.w3.org/2001/XMLSchema#';
+
+    function makeShape(props: Array<{
+        path: string;
+        minCount?: number;
+        maxCount?: number;
+        datatype?: string;
+        pattern?: string;
+        message?: string;
+    }>) {
+        return {
+            iri:         'http://example.org/TestShape',
+            targetClass: 'http://example.org/Test',
+            closed:      false,
+            properties:  props.map(({ path: propPath, ...rest }) => ({ path: `http://example.org/${propPath}`, ...rest })),
+        };
+    }
+
+    const propMap = (names: string[]) =>
+        Object.fromEntries(names.map(n => [n, `http://example.org/${n}`]));
+
+    it('returns valid when all required fields are present', () => {
+        const shape = makeShape([{ path: 'email', minCount: 1 }]);
+        const result = validate({ email: 'alice@test.com' }, shape, propMap(['email']));
+        expect(result.valid).toBe(true);
+        expect(result.violations).toHaveLength(0);
+    });
+
+    it('reports violation when required field is missing', () => {
+        const shape = makeShape([{ path: 'email', minCount: 1 }]);
+        const result = validate({}, shape, propMap(['email']));
+        expect(result.valid).toBe(false);
+        expect(result.violations[0]!.property).toBe('email');
+    });
+
+    it('reports violation when maxCount is exceeded', () => {
+        const shape = makeShape([{ path: 'tag', maxCount: 1 }]);
+        const result = validate({ tag: ['a', 'b'] }, shape, propMap(['tag']));
+        expect(result.valid).toBe(false);
+        expect(result.violations[0]!.message).toContain('at most');
+    });
+
+    it('reports violation when pattern does not match', () => {
+        const shape = makeShape([{ path: 'email', pattern: '.+@.+' }]);
+        const result = validate({ email: 'not-an-email' }, shape, propMap(['email']));
+        expect(result.valid).toBe(false);
+        expect(result.violations[0]!.property).toBe('email');
+    });
+
+    it('does not report pattern violation when value matches', () => {
+        const shape = makeShape([{ path: 'email', pattern: '.+@.+' }]);
+        const result = validate({ email: 'alice@test.com' }, shape, propMap(['email']));
+        expect(result.valid).toBe(true);
+    });
+
+    it('reports datatype violation for string field with non-string value', () => {
+        const shape = makeShape([{ path: 'name', datatype: `${xsd}string` }]);
+        const result = validate({ name: 42 }, shape, propMap(['name']));
+        expect(result.valid).toBe(false);
+    });
+
+    it('passes datatype check for correct string value', () => {
+        const shape = makeShape([{ path: 'name', datatype: `${xsd}string` }]);
+        const result = validate({ name: 'hello' }, shape, propMap(['name']));
+        expect(result.valid).toBe(true);
+    });
+
+    it('reports datatype violation for boolean field with wrong type', () => {
+        const shape = makeShape([{ path: 'active', datatype: `${xsd}boolean` }]);
+        const result = validate({ active: 'yes' }, shape, propMap(['active']));
+        expect(result.valid).toBe(false);
+    });
+
+    it('passes datatype check for correct boolean', () => {
+        const shape = makeShape([{ path: 'active', datatype: `${xsd}boolean` }]);
+        const result = validate({ active: true }, shape, propMap(['active']));
+        expect(result.valid).toBe(true);
+    });
+
+    it('reports datatype violation for integer field with non-number', () => {
+        const shape = makeShape([{ path: 'count', datatype: `${xsd}integer` }]);
+        const result = validate({ count: 'five' }, shape, propMap(['count']));
+        expect(result.valid).toBe(false);
+    });
+
+    it('passes datatype check for correct integer', () => {
+        const shape = makeShape([{ path: 'count', datatype: `${xsd}integer` }]);
+        const result = validate({ count: 5 }, shape, propMap(['count']));
+        expect(result.valid).toBe(true);
+    });
+
+    it('reports datatype violation for dateTime field with wrong type', () => {
+        const shape = makeShape([{ path: 'createdAt', datatype: `${xsd}dateTime` }]);
+        const result = validate({ createdAt: 12345 }, shape, propMap(['createdAt']));
+        expect(result.valid).toBe(false);
+    });
+
+    it('passes dateTime check for Date objects', () => {
+        const shape = makeShape([{ path: 'createdAt', datatype: `${xsd}dateTime` }]);
+        const result = validate({ createdAt: new Date() }, shape, propMap(['createdAt']));
+        expect(result.valid).toBe(true);
+    });
+
+    it('passes dateTime check for ISO date strings', () => {
+        const shape = makeShape([{ path: 'createdAt', datatype: `${xsd}dateTime` }]);
+        const result = validate({ createdAt: new Date().toISOString() }, shape, propMap(['createdAt']));
+        expect(result.valid).toBe(true);
+    });
+
+    it('uses custom message from sh:message when set', () => {
+        const shape = makeShape([{ path: 'email', minCount: 1, message: 'Email is required.' }]);
+        const result = validate({}, shape, propMap(['email']));
+        expect(result.violations[0]!.message).toBe('Email is required.');
+    });
+
+    it('uses IRI path as property name when not in propertyMap', () => {
+        const shape = makeShape([{ path: 'unknownProp', minCount: 1 }]);
+        const result = validate({}, shape, {});
+        // Property name falls back to the IRI path
+        expect(result.violations[0]!.property).toContain('unknownProp');
+    });
+
+    it('handles array values for maxCount check', () => {
+        const shape = makeShape([{ path: 'tags', maxCount: 2 }]);
+        const result = validate({ tags: ['a', 'b', 'c'] }, shape, propMap(['tags']));
+        expect(result.valid).toBe(false);
+    });
+
+    it('handles array values within maxCount limit', () => {
+        const shape = makeShape([{ path: 'tags', maxCount: 3 }]);
+        const result = validate({ tags: ['a', 'b'] }, shape, propMap(['tags']));
+        expect(result.valid).toBe(true);
+    });
+
+    it('validates decimal datatype', () => {
+        const shape = makeShape([{ path: 'price', datatype: `${xsd}decimal` }]);
+        expect(validate({ price: 9.99 }, shape, propMap(['price'])).valid).toBe(true);
+        expect(validate({ price: 'nine' }, shape, propMap(['price'])).valid).toBe(false);
+    });
+
+    it('validates float datatype', () => {
+        const shape = makeShape([{ path: 'ratio', datatype: `${xsd}float` }]);
+        expect(validate({ ratio: 0.5 }, shape, propMap(['ratio'])).valid).toBe(true);
+        expect(validate({ ratio: false }, shape, propMap(['ratio'])).valid).toBe(false);
+    });
+
+    it('validates double datatype', () => {
+        const shape = makeShape([{ path: 'val', datatype: `${xsd}double` }]);
+        expect(validate({ val: 3.14 }, shape, propMap(['val'])).valid).toBe(true);
+    });
+
+    it('validates date datatype (string)', () => {
+        const shape = makeShape([{ path: 'dob', datatype: `${xsd}date` }]);
+        expect(validate({ dob: '2000-01-01' }, shape, propMap(['dob'])).valid).toBe(true);
+    });
+
+    it('skips pattern check for non-string values', () => {
+        const shape = makeShape([{ path: 'count', pattern: '^\\d+$' }]);
+        // Non-string values are not pattern-checked per the implementation
+        const result = validate({ count: 42 }, shape, propMap(['count']));
+        expect(result.violations).toHaveLength(0);
     });
 });

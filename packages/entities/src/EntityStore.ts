@@ -419,6 +419,7 @@ export class EntityStore {
                 const predStr = (q.predicate as IRI).value;
                 if (predStr === TERN_HANDLE.value) { continue; }
                 const propName = iriToName.get(predStr);
+                /* v8 ignore next -- defensive guard; PropGroup nodes only carry TERN_HANDLE and schema property predicates */
                 if (!propName) { continue; }
                 if (!raw[propName]) { raw[propName] = []; }
                 raw[propName]!.push(fromLiteral(q.object));

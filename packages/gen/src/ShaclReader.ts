@@ -46,12 +46,14 @@ export interface ShaclShapes {
 function termKey(term: RdfSubject | RdfObject): string | null {
     if (term instanceof IRI) { return term.value; }
     if (term.termType === 'BlankNode') { return `_:${term.id}`; }
+    /* c8 ignore next -- Literal subjects are invalid in SHACL; unreachable in valid data */
     return null;
 }
 
 function literalStr(term: RdfObject): string | null {
     if (term instanceof IRI) { return null; }
     if (term.termType === 'Literal') { return term.value; }
+    /* c8 ignore next -- BlankNode where literal expected is invalid SHACL; unreachable in valid data */
     return null;
 }
 

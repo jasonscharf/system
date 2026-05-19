@@ -32,6 +32,7 @@ export default defineConfig({
             '@system/auth':    path.resolve(__dirname, '../auth/src'),
             '@system/core':    path.resolve(__dirname, '../core/src'),
             '@system/data':    path.resolve(__dirname, '../data/src'),
+            '@system/entities': path.resolve(__dirname, '../entities/src'),
             '@system/flow':    path.resolve(__dirname, '../flow/src'),
             '@system/gen':     path.resolve(__dirname, '../gen/src'),
             '@system/vaults':  path.resolve(__dirname, '../vaults/src'),

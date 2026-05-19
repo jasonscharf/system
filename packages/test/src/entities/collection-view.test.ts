@@ -186,6 +186,17 @@ for (const db of providers) {
             const view = await cvs.getView(ctx, viewIri);
             expect(view!.items).toHaveLength(1);
         });
+
+        it('collectionSet syncs registered views (covers EntityStore line 326)', async () => {
+            await es.collectionPush(ctx, schema, groupId, GroupHandle, 'member', 'alice', 'bob', 'carol');
+            // Replace the whole collection — the registered view should sync
+            await es.collectionSet(ctx, schema, groupId, GroupHandle, 'member', ['dave', 'eve']);
+            const view = await cvs.getView(ctx, viewIri);
+            const refs = view!.items.map(i => i.ref);
+            expect(refs).toContain('dave');
+            expect(refs).toContain('eve');
+            expect(refs).not.toContain('alice');
+        });
     });
 
 

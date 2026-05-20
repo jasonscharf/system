@@ -1175,9 +1175,7 @@ __metadata:
   resolution: "@jasonscharf/entities@workspace:packages/entities"
   dependencies:
     "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/data": "workspace:^"
     "@jasonscharf/gen": "workspace:^"
-    "@jasonscharf/server": "workspace:^"
   languageName: unknown
   linkType: soft
 
@@ -1261,6 +1259,9 @@ __metadata:
   resolution: "@jasonscharf/server@workspace:packages/server"
   dependencies:
     "@jasonscharf/core": "workspace:^"
+    "@jasonscharf/data": "workspace:^"
+    "@jasonscharf/entities": "workspace:^"
+    "@jasonscharf/gen": "workspace:^"
     knex: "npm:^3.1.0"
   languageName: unknown
   linkType: soft

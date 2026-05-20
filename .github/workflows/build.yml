@@ -179,18 +179,19 @@ jobs:
             mv "$tmp" "packages/${pkg}/package.json"
           done
 
-      - name: Append short SHA to package versions
-        # Every merge to main produces a unique pre-release version
-        # e.g. 0.1.0 → 0.1.0-abc1234  so re-runs never hit a 409.
+      - name: Bump patch version for each package
+        # Replaces the patch segment with the total git commit count so every
+        # merge to main produces a unique, clean semver: 0.1.0 → 0.1.<count>.
         # The workspace package.json files are not committed; this only
         # affects the transient copies used inside this job.
         run: |
-          SHORT="${GITHUB_SHA::7}"
+          PATCH=$(git rev-list --count HEAD)
           for pkg in api app auth core data entities flow gen vaults; do
             node -e "
               const fs = require('fs');
               const p  = JSON.parse(fs.readFileSync('packages/$pkg/package.json', 'utf8'));
-              p.version = p.version + '-' + '$SHORT';
+              const [major, minor] = p.version.split('.');
+              p.version = major + '.' + minor + '.' + '$PATCH';
               fs.writeFileSync('packages/$pkg/package.json', JSON.stringify(p, null, 2) + '\n');
             "
             echo "  $pkg → $(node -e "process.stdout.write(require('./packages/$pkg/package.json').version)")"
@@ -259,7 +260,7 @@ jobs:
         env:
           YARN_NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ── 3. Prune stale pre-release versions ──────────────────────────────────────
+  # ── 3. Prune old patch versions (keep last 10) ───────────────────────────────
   cleanup:
     needs: publish
     if: github.ref == 'refs/heads/main'
@@ -273,7 +274,7 @@ jobs:
         package: [api, app, auth, core, data, entities, flow, gen, vaults]
 
     steps:
-      - name: Prune old pre-release versions of @${{ github.repository_owner }}/${{ matrix.package }}
+      - name: Prune old versions of @${{ github.repository_owner }}/${{ matrix.package }}
         # continue-on-error: package may not exist yet on first publish
         continue-on-error: true
         uses: actions/delete-package-versions@v5
@@ -281,4 +282,3 @@ jobs:
           package-name: ${{ matrix.package }}
           package-type: npm
           min-versions-to-keep: 10
-          delete-only-pre-release-versions: true

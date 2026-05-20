@@ -1,7 +1,7 @@
 /**
  * Higher-level query functions for auth entities.
  *
- * Each function takes an ApplicationContext and EntityStore and performs one or
+ * Each function takes an ServerContext and EntityStore and performs one or
  * more EntityQuery operations.  "Join" queries traverse entity references in-code:
  *   session.sessionUser  → User entity IRI  → findById(UserSchema, id)
  *   session.sessionDevice → UserDevice IRI  → findById(UserDeviceSchema, id)
@@ -9,7 +9,7 @@
  * All queries run against the single TripleStore backing the EntityStore, so
  * they work transparently with both SQLite and PostgreSQL.
  */
-import type { EntityRecord, EntityStore, ApplicationContext } from '@system/entities';
+import type { EntityRecord, EntityStore, ServerContext } from '@system/entities';
 import { entities } from '@system/entities';
 import { UserSchema, CoreHandle }               from './entities/UserSchema.js';
 import { UserDeviceSchema, DeviceCoreHandle }   from './entities/UserDeviceSchema.js';
@@ -36,17 +36,17 @@ function strProp(record: EntityRecord, handle: string, prop: string): string | u
 // ── Simple list queries ───────────────────────────────────────────────────────
 
 /** Returns all User entities in insertion order. */
-export function listUsers(ctx: ApplicationContext, es: EntityStore): Promise<EntityRecord[]> {
+export function listUsers(ctx: ServerContext, es: EntityStore): Promise<EntityRecord[]> {
     return entities(es.store).find(UserSchema, [CoreHandle]).all(ctx);
 }
 
 /** Returns all UserDevice entities in insertion order. */
-export function listUserDevices(ctx: ApplicationContext, es: EntityStore): Promise<EntityRecord[]> {
+export function listUserDevices(ctx: ServerContext, es: EntityStore): Promise<EntityRecord[]> {
     return entities(es.store).find(UserDeviceSchema, [DeviceCoreHandle]).all(ctx);
 }
 
 /** Returns all UserSession entities where isActive = true. */
-export function listActiveSessions(ctx: ApplicationContext, es: EntityStore): Promise<EntityRecord[]> {
+export function listActiveSessions(ctx: ServerContext, es: EntityStore): Promise<EntityRecord[]> {
     return entities(es.store)
         .find(UserSessionSchema, [SessionCoreHandle])
         .where(SessionCoreHandle, 'isActive', '=', true)
@@ -54,7 +54,7 @@ export function listActiveSessions(ctx: ApplicationContext, es: EntityStore): Pr
 }
 
 /** Returns all UserSession entities where isActive = false. */
-export function listInactiveSessions(ctx: ApplicationContext, es: EntityStore): Promise<EntityRecord[]> {
+export function listInactiveSessions(ctx: ServerContext, es: EntityStore): Promise<EntityRecord[]> {
     return entities(es.store)
         .find(UserSessionSchema, [SessionCoreHandle])
         .where(SessionCoreHandle, 'isActive', '=', false)
@@ -73,7 +73,7 @@ export function listInactiveSessions(ctx: ApplicationContext, es: EntityStore): 
  *   3. From the most-recent session read sessionDevice IRI → fetch UserDevice.
  */
 export async function findUserWithRecentActivity(
-    ctx:    ApplicationContext,
+    ctx:    ServerContext,
     es:     EntityStore,
     userId: string,
 ): Promise<UserWithActivity | null> {
@@ -104,7 +104,7 @@ export async function findUserWithRecentActivity(
  * Returns records in the same order as the input tokens (absent sessions are omitted).
  */
 export async function findSessionsByTokens(
-    ctx:    ApplicationContext,
+    ctx:    ServerContext,
     es:     EntityStore,
     tokens: string[],
 ): Promise<EntityRecord[]> {
@@ -126,7 +126,7 @@ export async function findSessionsByTokens(
  *   session.sessionUser IRI → idOf() → findById(UserSchema)
  */
 export async function findUserBySession(
-    ctx:          ApplicationContext,
+    ctx:          ServerContext,
     es:           EntityStore,
     sessionToken: string,
 ): Promise<EntityRecord | null> {

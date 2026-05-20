@@ -1,4 +1,4 @@
-import { noCtx } from '@system/data';
+import { defaultCtx } from '@system/data';
 import { FlowComponent, type FlowComponentOptions } from '@system/flow';
 import { FlowPort } from '@system/flow';
 import type { ISessionStore } from '../session/ISessionStore.js';
@@ -83,9 +83,9 @@ export class SessionComponent extends FlowComponent {
             const data    = JSON.parse(cached) as SessionData;
             const expired = Date.now() > data.expiresAt;
             if (!expired) {
-                const user = await this._users.findById(noCtx, data.userId);
+                const user = await this._users.findById(defaultCtx, data.userId);
                 if (user) {
-                    const session = await this._sessions.findByToken(noCtx, req.token);
+                    const session = await this._sessions.findByToken(defaultCtx, req.token);
                     this.validateOut.put({ valid: true, user, session: session ?? undefined, requestId: req.requestId });
                     return;
                 }
@@ -94,9 +94,9 @@ export class SessionComponent extends FlowComponent {
         }
 
         // Slow path: TripleStore
-        const session = await this._sessions.findByToken(noCtx, req.token);
+        const session = await this._sessions.findByToken(defaultCtx, req.token);
         if (session && session.isActive && session.expiresAt.getTime() > Date.now()) {
-            const user = await this._users.findById(noCtx, session.userId);
+            const user = await this._users.findById(defaultCtx, session.userId);
             if (user) {
                 this.validateOut.put({ valid: true, user, session, requestId: req.requestId });
                 return;
@@ -109,7 +109,7 @@ export class SessionComponent extends FlowComponent {
     private async _revoke(req: RevokeRequest): Promise<void> {
         const [storeOk, dbOk] = await Promise.all([
             this._store.del(`tern:session:${req.token}`).then(() => true).catch(() => false),
-            this._sessions.revoke(noCtx, req.token),
+            this._sessions.revoke(defaultCtx, req.token),
         ]);
         this.revokeOut.put({ success: storeOk && dbOk, requestId: req.requestId });
     }

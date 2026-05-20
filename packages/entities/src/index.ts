@@ -4,8 +4,8 @@ export type { EntityHandle } from './Handle.js';
 export { EntitySchema } from './EntitySchema.js';
 export type { PropGroupDef } from './EntitySchema.js';
 
-export { EntityStore, groupOf, noCtx } from './EntityStore.js';
-export type { EntityRecord, ApplicationContext, Logger } from './EntityStore.js';
+export { EntityStore, groupOf, noCtx, noServerCtx } from './EntityStore.js';
+export type { EntityRecord, ServerContext, ApplicationContext, Logger } from './EntityStore.js';
 
 export { CollectionViewStore } from './CollectionView.js';
 export type { CollectionViewOpts, CollectionViewRecord, CollectionViewItemRecord } from './CollectionView.js';

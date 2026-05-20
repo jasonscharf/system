@@ -2,7 +2,7 @@ import type { IRI } from '@system/core';
 import type { TripleStore } from '@system/data';
 import type { EntityHandle } from './Handle.js';
 import type { EntitySchema } from './EntitySchema.js';
-import type { EntityRecord, ApplicationContext } from './EntityStore.js';
+import type { EntityRecord, ServerContext } from './EntityStore.js';
 import { EntityStore } from './EntityStore.js';
 import { RDF_TYPE, TERN_PROP_GROUP } from './constants.js';
 import { toLiteral } from './util.js';
@@ -71,7 +71,7 @@ export class EntityQuery<H extends EntityHandle[]> {
     limit(n: number):  this { this._limit  = n; return this; }
     offset(n: number): this { this._offset = n; return this; }
 
-    async all(ctx: ApplicationContext): Promise<EntityRecord[]> {
+    async all(ctx: ServerContext): Promise<EntityRecord[]> {
         // Step 1: collect candidate entity IRIs (start with all, then narrow by filters)
         let candidateIris = await this._allEntityIris(ctx);
 
@@ -109,12 +109,12 @@ export class EntityQuery<H extends EntityHandle[]> {
         return records.slice(start, end);
     }
 
-    async first(ctx: ApplicationContext): Promise<EntityRecord | null> {
+    async first(ctx: ServerContext): Promise<EntityRecord | null> {
         const results = await this.limit(1).all(ctx);
         return results[0] ?? null;
     }
 
-    async count(ctx: ApplicationContext): Promise<number> {
+    async count(ctx: ServerContext): Promise<number> {
         // For count-only, skip hydration — just count matching entity IRIs
         let iris = await this._allEntityIris(ctx);
         for (const f of this._filters.filter(ff => ff.op === '=')) {
@@ -131,12 +131,12 @@ export class EntityQuery<H extends EntityHandle[]> {
 
     // ── Private ───────────────────────────────────────────────────────────────
 
-    private async _allEntityIris(ctx: ApplicationContext): Promise<string[]> {
+    private async _allEntityIris(ctx: ServerContext): Promise<string[]> {
         const quads = await this._store.find(ctx, { predicate: RDF_TYPE, object: this._schema.typeIRI });
         return quads.map(q => (q.subject as IRI).value);
     }
 
-    private async _applyEqFilter(ctx: ApplicationContext, iris: string[], f: Filter): Promise<string[]> {
+    private async _applyEqFilter(ctx: ServerContext, iris: string[], f: Filter): Promise<string[]> {
         const groupDef = this._schema.group(f.handle);
         if (!groupDef) { return iris; }
         const propIri = (groupDef.properties as Record<string, IRI>)[f.prop];

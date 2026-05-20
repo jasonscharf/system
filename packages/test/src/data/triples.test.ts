@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Knex } from 'knex';
 import { IRI, DEFAULT_GRAPH, type BlankNode, type Literal, type Quad } from '@system/core';
-import { createDataContext, TripleStore, noCtx, type QuadPattern, type ApplicationContext } from '@system/data';
+import { createDataContext, TripleStore, noCtx, type QuadPattern, type ServerContext } from '@system/data';
 import { down as migration001Down } from '../../../data/src/migrations/001_init.js';
 
 
@@ -75,7 +75,7 @@ for (const provider of providers) {
         let knex: Knex;
         let store: TripleStore;
         let trx: Knex.Transaction;
-        let ctx: ApplicationContext;
+        let ctx: ServerContext;
 
         beforeEach(async () => {
             knex  = await provider.create();
@@ -381,7 +381,7 @@ describe('TripleStore: find/delete with non-existent nodes return early', () => 
         describe(`TripleStore — ${provider.name}`, () => {
             let knex: Knex;
             let store: TripleStore;
-            let ctx: ApplicationContext;
+            let ctx: ServerContext;
 
             beforeEach(async () => {
                 knex = await provider.factory();

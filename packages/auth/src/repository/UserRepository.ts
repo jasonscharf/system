@@ -3,7 +3,7 @@ import {
     UserIRI,
     emailIRI, displayNameIRI, avatarUrlIRI, createdAtIRI, updatedAtIRI,
 } from '@system/core';
-import type { TripleStore, ApplicationContext } from '@system/data';
+import type { TripleStore, ServerContext } from '@system/data';
 import { AUTH_GRAPH, RDF_TYPE, XSD_STRING, XSD_DATETIME } from '../constants.js';
 import type { UserEntity } from '../types.js';
 import { newId, iriFor, idFrom } from './util.js';
@@ -18,7 +18,7 @@ export class UserRepository {
 
     get store(): TripleStore { return this._store; }
 
-    async create(ctx: ApplicationContext, input: Pick<UserEntity, 'email' | 'displayName' | 'avatarUrl'>): Promise<UserEntity> {
+    async create(ctx: ServerContext, input: Pick<UserEntity, 'email' | 'displayName' | 'avatarUrl'>): Promise<UserEntity> {
         const id  = newId();
         const now = new Date();
         const sub = iriFor('user', id);
@@ -35,13 +35,13 @@ export class UserRepository {
         return { id, iri: sub.value, ...input, createdAt: now, updatedAt: now };
     }
 
-    async findById(ctx: ApplicationContext, id: string): Promise<UserEntity | null> {
+    async findById(ctx: ServerContext, id: string): Promise<UserEntity | null> {
         const sub   = iriFor('user', id);
         const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
         return quads.length === 0 ? null : this._fromQuads(id, quads);
     }
 
-    async findByEmail(ctx: ApplicationContext, email: string): Promise<UserEntity | null> {
+    async findByEmail(ctx: ServerContext, email: string): Promise<UserEntity | null> {
         const quads = await this._store.find(ctx, {
             predicate: emailIRI,
             object:    literal(email, XSD_STRING),
@@ -53,7 +53,7 @@ export class UserRepository {
         return this._fromQuads(id, await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH }));
     }
 
-    async update(ctx: ApplicationContext, id: string, patch: Partial<Pick<UserEntity, 'displayName' | 'avatarUrl' | 'email'>>): Promise<UserEntity | null> {
+    async update(ctx: ServerContext, id: string, patch: Partial<Pick<UserEntity, 'displayName' | 'avatarUrl' | 'email'>>): Promise<UserEntity | null> {
         const existing = await this.findById(ctx, id);
         if (!existing) { return null; }
 
@@ -78,7 +78,7 @@ export class UserRepository {
         return this.findById(ctx, id);
     }
 
-    async delete(ctx: ApplicationContext, id: string): Promise<void> {
+    async delete(ctx: ServerContext, id: string): Promise<void> {
         await this._store.delete(ctx, { subject: iriFor('user', id), graph: AUTH_GRAPH });
     }
 

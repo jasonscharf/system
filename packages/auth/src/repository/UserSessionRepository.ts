@@ -4,7 +4,7 @@ import {
     sessionTokenIRI, expiresAtIRI, isActiveIRI, ipAddressIRI,
     sessionUserIRI, sessionDeviceIRI, createdAtIRI,
 } from '@system/core';
-import type { TripleStore, ApplicationContext } from '@system/data';
+import type { TripleStore, ServerContext } from '@system/data';
 import { AUTH_GRAPH, RDF_TYPE, XSD_STRING, XSD_BOOLEAN, XSD_DATETIME } from '../constants.js';
 import type { UserSessionEntity } from '../types.js';
 import { newId, iriFor, idFrom, newSessionToken } from './util.js';
@@ -17,7 +17,7 @@ export class UserSessionRepository {
         this._store = store;
     }
 
-    async create(ctx: ApplicationContext, input: {
+    async create(ctx: ServerContext, input: {
         userId:    string;
         deviceId:  string;
         expiresAt: Date;
@@ -52,7 +52,7 @@ export class UserSessionRepository {
         };
     }
 
-    async findByToken(ctx: ApplicationContext, token: string): Promise<UserSessionEntity | null> {
+    async findByToken(ctx: ServerContext, token: string): Promise<UserSessionEntity | null> {
         const quads = await this._store.find(ctx, {
             predicate: sessionTokenIRI,
             object:    literal(token, XSD_STRING),
@@ -65,7 +65,7 @@ export class UserSessionRepository {
         return this._fromQuads(idFrom(sub.value), allQuads);
     }
 
-    async findByUserId(ctx: ApplicationContext, userId: string): Promise<UserSessionEntity[]> {
+    async findByUserId(ctx: ServerContext, userId: string): Promise<UserSessionEntity[]> {
         const userIri = iriFor('user', userId);
         const byUser  = await this._store.find(ctx, { predicate: sessionUserIRI, object: userIri, graph: AUTH_GRAPH });
         const results: UserSessionEntity[] = [];
@@ -78,7 +78,7 @@ export class UserSessionRepository {
         return results;
     }
 
-    async revoke(ctx: ApplicationContext, token: string): Promise<boolean> {
+    async revoke(ctx: ServerContext, token: string): Promise<boolean> {
         const session = await this.findByToken(ctx, token);
         if (!session) { return false; }
 
@@ -88,7 +88,7 @@ export class UserSessionRepository {
         return true;
     }
 
-    async revokeAllForUser(ctx: ApplicationContext, userId: string): Promise<number> {
+    async revokeAllForUser(ctx: ServerContext, userId: string): Promise<number> {
         const sessions = await this.findByUserId(ctx, userId);
         let count = 0;
         for (const s of sessions) {
@@ -100,7 +100,7 @@ export class UserSessionRepository {
         return count;
     }
 
-    async deleteExpired(ctx: ApplicationContext): Promise<number> {
+    async deleteExpired(ctx: ServerContext): Promise<number> {
         const allByToken = await this._store.find(ctx, { predicate: sessionTokenIRI, graph: AUTH_GRAPH });
         let count = 0;
         const now = Date.now();

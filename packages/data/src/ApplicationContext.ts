@@ -1,40 +1,19 @@
 import type { Knex } from 'knex';
+import type { ApplicationContext, Logger } from '@system/core';
 
-
-/**
- * Minimal logger interface.  Any logger satisfying this shape (pino, winston,
- * console-based, etc.) can be placed on ApplicationContext.
- */
-export interface Logger {
-    debug(msg: string, meta?: Record<string, unknown>): void;
-    info(msg: string, meta?: Record<string, unknown>): void;
-    warn(msg: string, meta?: Record<string, unknown>): void;
-    error(msg: string, meta?: Record<string, unknown>): void;
-}
+// Re-export core types so callers can import everything from @system/data
+export type { ApplicationContext, Logger };
+export { noCtx } from '@system/core';
 
 /**
- * Platform-wide application context passed to every database write operation.
- *
- * `trx`    — an active Knex transaction; the store creates + commits one
- *             automatically when absent.  Pass one from `store.withTransaction()`
- *             to chain multiple writes atomically.
- *
- * `logger` — optional structured logger.
- *
- * `config` — arbitrary application configuration.  Use module augmentation
- *             to extend this type in your application:
- *
- *             declare module '@system/data' {
- *               interface ApplicationContext {
- *                 config?: { tenantId: string; analyticsEnabled: boolean };
- *               }
- *             }
+ * Server-side context — extends ApplicationContext with an optional Knex
+ * transaction.  Pass one from `store.withTransaction()` to chain multiple
+ * DB writes atomically.  When absent, each call creates + commits its own
+ * transaction automatically.
  */
-export interface ApplicationContext {
-    trx?:    Knex.Transaction;
-    logger?: Logger;
-    config?: Record<string, unknown>;
+export interface ServerContext extends ApplicationContext {
+    trx?: Knex.Transaction;
 }
 
-/** Named empty context — no transaction, no logger, no config. */
-export const noCtx: ApplicationContext = Object.freeze({});
+/** Named empty server context — no transaction, no logger, no config. */
+export const defaultCtx: ServerContext = Object.freeze({});

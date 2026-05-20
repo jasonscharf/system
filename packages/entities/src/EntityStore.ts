@@ -1,6 +1,6 @@
 import type { IRI } from '@system/core';
 import { DEFAULT_GRAPH } from '@system/core';
-import { TripleStore, type ApplicationContext, type Logger, noCtx } from '@system/data';
+import { TripleStore, type ServerContext, type ApplicationContext, type Logger, noCtx, defaultCtx } from '@system/data';
 import { validate } from '@system/gen';
 import type { EntityHandle } from './Handle.js';
 import type { EntitySchema, PropGroupDef } from './EntitySchema.js';
@@ -13,8 +13,8 @@ import {
 import { CollectionViewStore } from './CollectionView.js';
 import type { CollectionViewOpts } from './CollectionView.js';
 
-export type { ApplicationContext, Logger };
-export { noCtx };
+export type { ServerContext, ApplicationContext, Logger };
+export { noCtx, defaultCtx as noServerCtx };
 
 // ── Internal row types (mirror @system/data/schema.ts) ─────────────────────
 
@@ -70,7 +70,7 @@ export class EntityStore {
      * carries the transaction so every entity write inside chains atomically.
      * On success the transaction is committed; on error it is rolled back.
      */
-    async inTransaction<T>(fn: (ctx: ApplicationContext) => Promise<T>): Promise<T> {
+    async inTransaction<T>(fn: (ctx: ServerContext) => Promise<T>): Promise<T> {
         return this._store.knex.transaction(async trx => fn({ trx }));
     }
 
@@ -80,8 +80,8 @@ export class EntityStore {
      * Otherwise a new transaction is created and auto-committed.
      */
     private async _withTrx<T>(
-        ctx: ApplicationContext,
-        fn:  (ctx: ApplicationContext) => Promise<T>,
+        ctx: ServerContext,
+        fn:  (ctx: ServerContext) => Promise<T>,
     ): Promise<T> {
         return this._store.withTransaction(ctx, fn);
     }
@@ -89,7 +89,7 @@ export class EntityStore {
     // ── Create ────────────────────────────────────────────────────────────────
 
     async create<CoreProps extends Record<string, unknown>>(
-        ctx:    ApplicationContext,
+        ctx:    ServerContext,
         schema: EntitySchema<CoreProps>,
         data:   Partial<CoreProps>,
     ): Promise<EntityRecord> {
@@ -115,7 +115,7 @@ export class EntityStore {
     // ── PropGroup management ─────────────────────────────────────────────────
 
     async addGroup<Props extends Record<string, unknown>>(
-        ctx:    ApplicationContext,
+        ctx:    ServerContext,
         schema: EntitySchema<any>,
         id:     string,
         h:      EntityHandle,
@@ -140,7 +140,7 @@ export class EntityStore {
     // ── Read ──────────────────────────────────────────────────────────────────
 
     async findById(
-        ctx:     ApplicationContext,
+        ctx:     ServerContext,
         schema:  EntitySchema<any>,
         id:      string,
         handles: EntityHandle[] | '*',
@@ -154,7 +154,7 @@ export class EntityStore {
     // ── Update ────────────────────────────────────────────────────────────────
 
     async updateGroup<Props extends Record<string, unknown>>(
-        ctx:    ApplicationContext,
+        ctx:    ServerContext,
         schema: EntitySchema<any>,
         id:     string,
         h:      EntityHandle,
@@ -194,7 +194,7 @@ export class EntityStore {
     // ── Delete ────────────────────────────────────────────────────────────────
 
     /** Hard-deletes the entity and all its PropGroup nodes in one transaction. */
-    async delete(ctx: ApplicationContext, schema: EntitySchema<any>, id: string): Promise<void> {
+    async delete(ctx: ServerContext, schema: EntitySchema<any>, id: string): Promise<void> {
         const ent     = entityIri(schema.ns, localName(schema.typeIRI.value), id);
         const pgLinks = await this._store.find(ctx, { subject: ent, predicate: TERN_PROP_GROUP });
         const pgNodes = pgLinks.map(q => q.object as IRI);
@@ -210,7 +210,7 @@ export class EntityStore {
     // ── Collection API ────────────────────────────────────────────────────────
 
     async collectionGet(
-        ctx:    ApplicationContext,
+        ctx:    ServerContext,
         schema: EntitySchema<any>,
         id:     string,
         h:      EntityHandle,
@@ -228,7 +228,7 @@ export class EntityStore {
 
     /** Appends one or more values to a collection property. Registered CollectionViews update automatically. */
     async collectionPush(
-        ctx:    ApplicationContext,
+        ctx:    ServerContext,
         schema: EntitySchema<any>,
         id:     string,
         h:      EntityHandle,
@@ -256,7 +256,7 @@ export class EntityStore {
 
     /** Removes the first occurrence of a specific value from a collection. CollectionViews update automatically. */
     async collectionRemove(
-        ctx:    ApplicationContext,
+        ctx:    ServerContext,
         schema: EntitySchema<any>,
         id:     string,
         h:      EntityHandle,
@@ -284,7 +284,7 @@ export class EntityStore {
 
     /** Removes and returns the last-inserted value of a collection property. */
     async collectionPop(
-        ctx:    ApplicationContext,
+        ctx:    ServerContext,
         schema: EntitySchema<any>,
         id:     string,
         h:      EntityHandle,
@@ -299,7 +299,7 @@ export class EntityStore {
 
     /** Replaces the entire collection.  Use this for sorting: `collectionSet(ctx, …, sorted)`. */
     async collectionSet(
-        ctx:     ApplicationContext,
+        ctx:     ServerContext,
         schema:  EntitySchema<any>,
         id:      string,
         h:       EntityHandle,
@@ -330,7 +330,7 @@ export class EntityStore {
 
     /** Inserts a value at a specific position (0-based). */
     async collectionInsertAt(
-        ctx:    ApplicationContext,
+        ctx:    ServerContext,
         schema: EntitySchema<any>,
         id:     string,
         h:      EntityHandle,
@@ -351,7 +351,7 @@ export class EntityStore {
      * current items.  Future collectionPush / collectionRemove calls auto-update it.
      */
     async createCollectionView(
-        ctx:    ApplicationContext,
+        ctx:    ServerContext,
         schema: EntitySchema<any>,
         id:     string,
         h:      EntityHandle,
@@ -377,7 +377,7 @@ export class EntityStore {
     // ── Batch helpers used by EntityQuery ─────────────────────────────────────
 
     async hydrateMany(
-        ctx:     ApplicationContext,
+        ctx:     ServerContext,
         schema:  EntitySchema<any>,
         iris:    string[],
         handles: EntityHandle[] | '*',
@@ -396,7 +396,7 @@ export class EntityStore {
     }
 
     private async _hydrate(
-        ctx:     ApplicationContext,
+        ctx:     ServerContext,
         schema:  EntitySchema<any>,
         id:      string,
         entIri:  string,

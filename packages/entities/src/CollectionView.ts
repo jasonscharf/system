@@ -1,5 +1,5 @@
 import { IRI, DEFAULT_GRAPH } from '@system/core';
-import type { TripleStore, ApplicationContext } from '@system/data';
+import type { TripleStore, ServerContext } from '@system/data';
 import {
     RDF_TYPE, TERN_PROP_GROUP,
     TERN_VIEW_NS,
@@ -72,7 +72,7 @@ export class CollectionViewStore {
      * @returns The IRI string of the new CollectionView node.
      */
     async create(
-        ctx:           ApplicationContext,
+        ctx:           ServerContext,
         sourcePgIri:   string,
         sourcePropIri: string,
         currentRefs:   string[],
@@ -102,7 +102,7 @@ export class CollectionViewStore {
      * Appends a CollectionViewItem for a new value. Idempotent — ignored if
      * the ref is already present in the view.
      */
-    async addItem(ctx: ApplicationContext, viewIriStr: string, ref: string): Promise<void> {
+    async addItem(ctx: ServerContext, viewIriStr: string, ref: string): Promise<void> {
         const items = await this._getItems(ctx, viewIriStr);
         if (items.some(i => i.ref === ref)) { return; }
         await this._createItem(ctx, viewIriStr, ref, items.length);
@@ -112,7 +112,7 @@ export class CollectionViewStore {
      * Removes the CollectionViewItem for the given ref.
      * Returns true if something was removed.
      */
-    async removeItem(ctx: ApplicationContext, viewIriStr: string, ref: string): Promise<boolean> {
+    async removeItem(ctx: ServerContext, viewIriStr: string, ref: string): Promise<boolean> {
         const items = await this._getItems(ctx, viewIriStr);
         const item  = items.find(i => i.ref === ref);
         if (!item) { return false; }
@@ -134,7 +134,7 @@ export class CollectionViewStore {
      * resolving that property on each referenced entity — first checking
      * direct quads on the ref IRI, then the entity's PropGroup nodes.
      */
-    async getView(ctx: ApplicationContext, viewIriStr: string): Promise<CollectionViewRecord | null> {
+    async getView(ctx: ServerContext, viewIriStr: string): Promise<CollectionViewRecord | null> {
         const vNode = new IRI(viewIriStr);
         const quads = await this._store.find(ctx, { subject: vNode });
         if (quads.length === 0) { return null; }
@@ -165,7 +165,7 @@ export class CollectionViewStore {
      * Replaces the explicit position ordering of items.
      * `orderedRefs` must contain the same values as the current item set.
      */
-    async reorder(ctx: ApplicationContext, viewIriStr: string, orderedRefs: string[]): Promise<void> {
+    async reorder(ctx: ServerContext, viewIriStr: string, orderedRefs: string[]): Promise<void> {
         const items = await this._getItems(ctx, viewIriStr);
         for (const [newPos, ref] of orderedRefs.entries()) {
             const item = items.find(i => i.ref === ref);
@@ -181,7 +181,7 @@ export class CollectionViewStore {
      * Adds items for refs not yet in the view; removes items whose refs are
      * no longer in `currentRefs`.
      */
-    async sync(ctx: ApplicationContext, viewIriStr: string, currentRefs: string[]): Promise<void> {
+    async sync(ctx: ServerContext, viewIriStr: string, currentRefs: string[]): Promise<void> {
         const items    = await this._getItems(ctx, viewIriStr);
         const existing = new Set(items.map(i => i.ref));
         const current  = new Set(currentRefs);
@@ -195,7 +195,7 @@ export class CollectionViewStore {
     }
 
     /** Deletes the CollectionView and all its CollectionViewItem nodes. */
-    async delete(ctx: ApplicationContext, viewIriStr: string): Promise<void> {
+    async delete(ctx: ServerContext, viewIriStr: string): Promise<void> {
         const items    = await this._getItems(ctx, viewIriStr);
         const viewNode = new IRI(viewIriStr);
 
@@ -214,7 +214,7 @@ export class CollectionViewStore {
      * (sourcePgIri, propIri) pair.  Called by EntityStore after every
      * `collectionPush` / `collectionRemove` to propagate changes.
      */
-    async findViewsForSource(ctx: ApplicationContext, sourcePgIri: string, propIri: string): Promise<string[]> {
+    async findViewsForSource(ctx: ServerContext, sourcePgIri: string, propIri: string): Promise<string[]> {
         // Find all views with matching source PropGroup
         const bySource = await this._store.find(ctx, {
             predicate: TERN_CV_SOURCE,
@@ -238,7 +238,7 @@ export class CollectionViewStore {
 
     // ── Private ───────────────────────────────────────────────────────────────
 
-    private async _createItem(ctx: ApplicationContext, viewIriStr: string, ref: string, pos: number): Promise<void> {
+    private async _createItem(ctx: ServerContext, viewIriStr: string, ref: string, pos: number): Promise<void> {
         const itemId   = newId();
         const itemNode = viewItemIri(itemId);
         const viewNode = new IRI(viewIriStr);
@@ -252,7 +252,7 @@ export class CollectionViewStore {
         ]);
     }
 
-    private async _getItems(ctx: ApplicationContext, viewIriStr: string): Promise<CollectionViewItemRecord[]> {
+    private async _getItems(ctx: ServerContext, viewIriStr: string): Promise<CollectionViewItemRecord[]> {
         const viewNode  = new IRI(viewIriStr);
         const itemLinks = await this._store.find(ctx, { subject: viewNode, predicate: TERN_CV_ITEM });
         if (itemLinks.length === 0) { return []; }
@@ -282,7 +282,7 @@ export class CollectionViewStore {
      *      — handles the standard EntityStore two-hop architecture.
      */
     private async _sortByProp(
-        ctx:      ApplicationContext,
+        ctx:      ServerContext,
         items:    CollectionViewItemRecord[],
         sortProp: string,
         sortDir:  'asc' | 'desc',

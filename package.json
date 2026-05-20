@@ -27,9 +27,9 @@
     "core": "yarn workspace @system/core",
     "tests": "yarn workspace @system/test",
     "worker": "yarn workspace @system/worker",
-    "sb-web": "yarn workspace @system/sandbox-web",
-    "sb-server": "yarn workspace @system/sandbox-server",
-    "sb-cli": "yarn workspace @system/sandbox-cli"
+    "sb-web": "yarn workspace @jasonscharf/sandbox-web",
+    "sb-server": "yarn workspace @jasonscharf/sandbox-server",
+    "sb-cli": "yarn workspace @jasonscharf/sandbox-cli"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",

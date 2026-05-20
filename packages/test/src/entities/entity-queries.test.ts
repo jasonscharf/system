@@ -20,7 +20,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Knex } from 'knex';
 import { createDataContext, TripleStore } from '@jasonscharf/data';
-import { EntityStore } from '@jasonscharf/entities';
+import { EntityStore } from '@jasonscharf/server';
 import {
     UserSchema,        CoreHandle,
     UserDeviceSchema,  DeviceCoreHandle,

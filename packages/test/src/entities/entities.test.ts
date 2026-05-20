@@ -21,11 +21,9 @@ import {
     handle,
     handleSlug,
     EntitySchema,
-    EntityStore,
-    entities,
     groupOf,
-    EntityValidationError,
 } from '@jasonscharf/entities';
+import { EntityStore, entities, EntityValidationError } from '@jasonscharf/server';
 import { invertPropertyMap, propertyMapFor, fromLiteral } from '../../../entities/src/util.js';
 import type { ShaclNodeShape } from '@jasonscharf/gen';
 

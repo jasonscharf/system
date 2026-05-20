@@ -7,9 +7,7 @@
   },
   "references": [
     { "path": "../core" },
-    { "path": "../data"   },
-    { "path": "../gen"    },
-    { "path": "../server" }
+    { "path": "../gen"  }
   ],
   "include": ["src"]
 }

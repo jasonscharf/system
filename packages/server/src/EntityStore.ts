@@ -1,60 +1,21 @@
-import type { IRI, ApplicationContext, Logger } from '@jasonscharf/core';
+import type { IRI } from '@jasonscharf/core';
 import { DEFAULT_GRAPH } from '@jasonscharf/core';
 import { TripleStore } from '@jasonscharf/data';
-import type { ServerContext } from '@jasonscharf/server';
 import { validate } from '@jasonscharf/gen';
-import type { EntityHandle } from './Handle.js';
-import type { EntitySchema, PropGroupDef } from './EntitySchema.js';
-import { EntityValidationError } from './EntityValidationError.js';
-import { RDF_TYPE, TERN_PROP_GROUP, TERN_HANDLE } from './constants.js';
+import type { EntityHandle, EntitySchema, PropGroupDef, EntityRecord } from '@jasonscharf/entities';
 import {
-    newId, entityIri, localName, pgIri, idFromIri,
+    RDF_TYPE, TERN_PROP_GROUP, TERN_HANDLE,
+    entityIri, localName, pgIri, idFromIri,
     toLiteral, fromLiteral, invertPropertyMap, propertyMapFor,
-} from './util.js';
+} from '@jasonscharf/entities';
+import type { ServerContext } from './ServerContext.js';
+import { EntityValidationError } from './EntityValidationError.js';
 import { CollectionViewStore } from './CollectionView.js';
 import type { CollectionViewOpts } from './CollectionView.js';
 
-export type { ServerContext, ApplicationContext, Logger };
-
-// ── Internal row types (mirror @system/data/schema.ts) ─────────────────────
-
-// ── Return types ──────────────────────────────────────────────────────────────
-
-export interface EntityRecord {
-    id:     string;
-    iri:    string;
-    /**
-     * Groups keyed by handle.id string.  Each value is the hydrated prop object.
-     * Collection properties (multiple quads for the same predicate) are returned
-     * as arrays; scalar properties as plain values.
-     */
-    groups: Record<string, Record<string, unknown>>;
-}
-
-/**
- * Returns the data for a single PropGroup from an EntityRecord, narrowed to
- * the TypeScript type declared in the PropGroupDef.
- */
-export function groupOf<Props extends Record<string, unknown>>(
-    record: EntityRecord,
-    def:    PropGroupDef<Props>,
-): Props | undefined {
-    return record.groups[def.handle.id] as Props | undefined;
-}
 
 // ── EntityStore ───────────────────────────────────────────────────────────────
 
-/**
- * Entity-level CRUD on top of TripleStore.
- *
- * All write methods accept an `ApplicationContext` as the first argument:
- *   - Pass `defaultCtx` (from `@jasonscharf/core`) when you don't need to chain the operation with others.
- *     EntityStore will create, use, and commit a transaction automatically.
- *   - Pass a ctx obtained from `es.inTransaction()` to chain multiple writes.
- *
- * Read methods (findById, collectionGet, hydrateMany) also accept ctx as the
- * first argument so they can participate in the same transaction.
- */
 export class EntityStore {
     private _cvsInstance: CollectionViewStore | null = null;
 
@@ -65,20 +26,10 @@ export class EntityStore {
 
     // ── Transaction helpers ───────────────────────────────────────────────────
 
-    /**
-     * Runs `fn` inside a single Knex transaction.  The ApplicationContext passed to `fn`
-     * carries the transaction so every entity write inside chains atomically.
-     * On success the transaction is committed; on error it is rolled back.
-     */
     async inTransaction<T>(fn: (ctx: ServerContext) => Promise<T>): Promise<T> {
         return this._store.knex.transaction(async trx => fn({ trx }));
     }
 
-    /**
-     * Core helper: runs `fn` with a transactional context.
-     * If ctx already contains a transaction the existing one is reused.
-     * Otherwise a new transaction is created and auto-committed.
-     */
     private async _withTrx<T>(
         ctx: ServerContext,
         fn:  (ctx: ServerContext) => Promise<T>,
@@ -97,7 +48,7 @@ export class EntityStore {
         const withDefs  = this._applyDefaults(coreGroup, data);
         this._validate(coreGroup, withDefs);
 
-        const id  = newId();
+        const id  = _newId();
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
         const pg  = pgIri(ent.value, coreGroup.handle);
 
@@ -166,8 +117,6 @@ export class EntityStore {
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
         const pg  = pgIri(ent.value, h);
 
-        // Collect the IRI for each patched property and batch-delete them in one
-        // SQL round-trip, then re-insert the new values.
         const patchEntries = Object.entries(patch).filter(([propName]) =>
             !!(groupDef.properties as Record<string, IRI>)[propName],
         );
@@ -176,11 +125,9 @@ export class EntityStore {
             .filter(Boolean);
 
         return this._withTrx(ctx, async txCtx => {
-            // One DELETE for all patched predicates
             if (predIris.length > 0) {
                 await this._store.deleteBySubjectPredicates(txCtx, pg, predIris);
             }
-            // One insertMany for all new values
             const quads = patchEntries
                 .filter(([, value]) => value !== undefined)
                 .flatMap(([propName, value]) => {
@@ -193,16 +140,13 @@ export class EntityStore {
 
     // ── Delete ────────────────────────────────────────────────────────────────
 
-    /** Hard-deletes the entity and all its PropGroup nodes in one transaction. */
     async delete(ctx: ServerContext, schema: EntitySchema<any>, id: string): Promise<void> {
         const ent     = entityIri(schema.ns, localName(schema.typeIRI.value), id);
         const pgLinks = await this._store.find(ctx, { subject: ent, predicate: TERN_PROP_GROUP });
         const pgNodes = pgLinks.map(q => q.object as IRI);
 
         return this._withTrx(ctx, async txCtx => {
-            // Batch-delete all PropGroup nodes in one SQL query
             if (pgNodes.length > 0) { await this._store.deleteSubjects(txCtx, pgNodes); }
-            // Delete the entity node itself
             await this._store.delete(txCtx, { subject: ent });
         });
     }
@@ -220,13 +164,12 @@ export class EntityStore {
         const propIri  = (groupDef.properties as Record<string, IRI>)[prop];
         if (!propIri) { return []; }
 
-        const ent      = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-        const pg       = pgIri(ent.value, h);
+        const ent   = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+        const pg    = pgIri(ent.value, h);
         const quads = await this._store.findOrdered(ctx, { subject: pg, predicate: propIri });
         return quads.map(q => fromLiteral(q.object)).filter(v => v !== undefined);
     }
 
-    /** Appends one or more values to a collection property. Registered CollectionViews update automatically. */
     async collectionPush(
         ctx:    ServerContext,
         schema: EntitySchema<any>,
@@ -243,8 +186,6 @@ export class EntityStore {
         const pg  = pgIri(ent.value, h);
 
         return this._withTrx(ctx, async txCtx => {
-            // Find views once before the values loop — the registered views don't
-            // change between iterations.
             const viewIris = await this._cvs().findViewsForSource(txCtx, pg.value, propIri.value);
 
             for (const v of values) {
@@ -254,7 +195,6 @@ export class EntityStore {
         });
     }
 
-    /** Removes the first occurrence of a specific value from a collection. CollectionViews update automatically. */
     async collectionRemove(
         ctx:    ServerContext,
         schema: EntitySchema<any>,
@@ -282,7 +222,6 @@ export class EntityStore {
         return deleted;
     }
 
-    /** Removes and returns the last-inserted value of a collection property. */
     async collectionPop(
         ctx:    ServerContext,
         schema: EntitySchema<any>,
@@ -297,7 +236,6 @@ export class EntityStore {
         return last;
     }
 
-    /** Replaces the entire collection.  Use this for sorting: `collectionSet(ctx, …, sorted)`. */
     async collectionSet(
         ctx:     ServerContext,
         schema:  EntitySchema<any>,
@@ -314,13 +252,10 @@ export class EntityStore {
         const pg  = pgIri(ent.value, h);
 
         return this._withTrx(ctx, async txCtx => {
-            // Delete all current values for the property in one query
             await this._store.delete(txCtx, { subject: pg, predicate: propIri });
-            // Re-insert in order
             for (const v of values) {
                 await this._store.insert(txCtx, { subject: pg, predicate: propIri, object: toLiteral(v), graph: DEFAULT_GRAPH });
             }
-            // Sync any registered CollectionViews
             const viewIris = await this._cvs().findViewsForSource(txCtx, pg.value, propIri.value);
             for (const vIri of viewIris) {
                 await this._cvs().sync(txCtx, vIri, values.map(String));
@@ -328,7 +263,6 @@ export class EntityStore {
         });
     }
 
-    /** Inserts a value at a specific position (0-based). */
     async collectionInsertAt(
         ctx:    ServerContext,
         schema: EntitySchema<any>,
@@ -346,10 +280,6 @@ export class EntityStore {
 
     // ── CollectionView convenience ────────────────────────────────────────────
 
-    /**
-     * Creates a CollectionView over a collection property, pre-populated with
-     * current items.  Future collectionPush / collectionRemove calls auto-update it.
-     */
     async createCollectionView(
         ctx:    ServerContext,
         schema: EntitySchema<any>,
@@ -371,7 +301,6 @@ export class EntityStore {
         });
     }
 
-    /** Direct access to the CollectionViewStore for advanced view operations. */
     get views(): CollectionViewStore { return this._cvs(); }
 
     // ── Batch helpers used by EntityQuery ─────────────────────────────────────
@@ -473,5 +402,9 @@ export class EntityStore {
         const result = validate(data, def.shape, propertyMapFor(def.properties as Record<string, IRI>));
         if (!result.valid) { throw new EntityValidationError(result.violations); }
     }
-
 }
+
+// ── Private helpers ───────────────────────────────────────────────────────────
+
+import { randomBytes } from 'node:crypto';
+function _newId(): string { return randomBytes(16).toString('hex'); }

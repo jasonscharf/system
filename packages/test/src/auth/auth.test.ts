@@ -33,7 +33,7 @@ import {
     UserDeviceSchema, DeviceCoreHandle,
     UserSessionSchema, SessionCoreHandle,
 } from '@jasonscharf/auth';
-import { EntityStore } from '@jasonscharf/entities';
+import { EntityStore } from '@jasonscharf/server';
 import { FlowContext, PushScheduler } from '@jasonscharf/flow';
 
 

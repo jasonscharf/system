@@ -1,9 +1,15 @@
 #
 # Build, test, and publish all Tern packages to GitHub Packages (npm).
 #
-# Publish runs only on pushes to main / release/* after tests pass.
-# Packages are published in dependency order so consumers never see a package
-# before its transitive dependencies are available.
+# Publish triggers:
+#   - Push to main          → clean release, e.g. 0.1.87
+#   - Push to release/*     → pre-release with branch suffix, e.g. 0.1.88-release-1-2
+#   - Push of v{M}.{N} tag  → overrides major.minor for all packages, e.g. 1.2.89
+#
+# Versioning (scripts/version.mjs):
+#   patch       = GITHUB_RUN_NUMBER (monotonically increasing, unique per run)
+#   major.minor = from a v{M}.{N}[.*] git tag on HEAD; falls back to package.json
+#   suffix      = -<sanitized-branch> on non-main branch builds; none on main or tags
 #
 # Required secrets: none — the automatic GITHUB_TOKEN has packages:write.
 #
@@ -25,6 +31,9 @@ on:
     branches:
       - main
       - 'release/*'
+    tags:
+      - 'v[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
   pull_request:
 
 env:
@@ -63,9 +72,6 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Stamp version info
-        run: yarn stamp
-
       - name: Build all packages
         run: yarn build
 
@@ -75,7 +81,10 @@ jobs:
   # ── 2. Build and push Docker images to GHCR ──────────────────────────────────
   docker:
     needs: build-and-test
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
+    if: |
+      github.ref == 'refs/heads/main' ||
+      startsWith(github.ref, 'refs/heads/release/') ||
+      startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -129,7 +138,10 @@ jobs:
   # ── 3. Publish npm packages to GitHub Packages ────────────────────────────────
   publish:
     needs: build-and-test
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
+    if: |
+      github.ref == 'refs/heads/main' ||
+      startsWith(github.ref, 'refs/heads/release/') ||
+      startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -155,14 +167,6 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Stamp version info
-        run: yarn stamp
-
-      - name: Build all packages
-        # Full build required so compiled artefacts exist for packing.
-        # TypeScript project references enforce correct dependency order.
-        run: yarn build
-
       - name: Scope packages to repository owner
         # GitHub Packages for npm requires the package scope to match the
         # repository owner.  Patch every publishable package.json in-place:
@@ -171,39 +175,31 @@ jobs:
         # expansion produces the correct scoped names in published manifests.
         run: |
           OWNER="${{ github.repository_owner }}"
-          for pkg in api app auth core data entities flow gen vaults; do
+          for pkg in api app auth core data entities flow gen server vaults; do
             tmp=$(mktemp)
-            # Replace all "@system/ occurrences in JSON string values (they
-            # are always double-quoted in valid JSON, so this is safe).
             sed "s|\"@system/|\"@${OWNER}/|g" "packages/${pkg}/package.json" > "$tmp"
             mv "$tmp" "packages/${pkg}/package.json"
           done
 
-      - name: Bump patch version for each package
-        # Replaces the patch segment with the total git commit count so every
-        # merge to main produces a unique, clean semver: 0.1.0 → 0.1.<count>.
-        # The workspace package.json files are not committed; this only
-        # affects the transient copies used inside this job.
-        run: |
-          PATCH=$(git rev-list --count HEAD)
-          for pkg in api app auth core data entities flow gen vaults; do
-            node -e "
-              const fs = require('fs');
-              const p  = JSON.parse(fs.readFileSync('packages/$pkg/package.json', 'utf8'));
-              const [major, minor] = p.version.split('.');
-              p.version = major + '.' + minor + '.' + '$PATCH';
-              fs.writeFileSync('packages/$pkg/package.json', JSON.stringify(p, null, 2) + '\n');
-            "
-            echo "  $pkg → $(node -e "process.stdout.write(require('./packages/$pkg/package.json').version)")"
-          done
+      - name: Compute versions
+        # scripts/version.mjs sets the version for every publishable package:
+        #   patch       = GITHUB_RUN_NUMBER (unique per run, always increasing)
+        #   major.minor = git tag v{M}.{N} on HEAD if present; else package.json
+        #   suffix      = -<branch> for non-main branch builds; none otherwise
+        # Runs before `yarn build` so version.json (written by stamp.mjs) and
+        # the compiled output both carry the final version.
+        run: node scripts/version.mjs
+
+      - name: Build all packages
+        # Full rebuild after versioning so stamp.mjs writes the correct version
+        # into version.json and compiled artefacts exist for packing.
+        # TypeScript project references enforce correct dependency order.
+        run: yarn build
 
       - name: Publish packages
         # Publishes in dependency order so consumers never see a package whose
         # deps are not yet in the registry.
         # Yarn converts workspace:^ → ^<version> automatically when packing.
-        # A 409 or "already published" response is treated as success so
-        # re-runs are safe.  All other non-zero exits (including 403 scope
-        # errors) surface as real failures.
         run: |
           set -euo pipefail
           OWNER="${{ github.repository_owner }}"
@@ -223,17 +219,6 @@ jobs:
               return 0
             }
 
-            # 409 / "already published" → idempotent skip (not an error).
-            # Matches both the legacy npm E409 code and Yarn 4's YN0035 format:
-            #   YN0035: Cannot publish over existing version
-            # 403 is intentionally NOT in this list — a scope/permission
-            # mismatch must surface as a real failure.
-            if echo "$out" | grep -qiE "already exists|already been published|E409|YN0035|Cannot publish over existing"; then
-              echo "$out"
-              echo "  ↳ version already in registry — skipping"
-              return 0
-            fi
-
             echo "$out"
             echo "  ✗ @${OWNER}/${pkg} failed"
             fail=1
@@ -243,7 +228,7 @@ jobs:
           publish_pkg core
           publish_pkg vaults
 
-          # Layer 1 — depend only on @{owner}/core (or core + flow)
+          # Layer 1 — depend only on core (or core + flow)
           publish_pkg data
           publish_pkg flow
           publish_pkg gen
@@ -254,16 +239,17 @@ jobs:
           publish_pkg entities
 
           # Layer 3 — depends on core + data + entities + flow
+          publish_pkg server
           publish_pkg auth
 
           exit $fail
         env:
           YARN_NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ── 3. Prune old patch versions (keep last 10) ───────────────────────────────
+  # ── 4. Prune old patch versions (keep last 10) ───────────────────────────────
   cleanup:
     needs: publish
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -271,11 +257,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [api, app, auth, core, data, entities, flow, gen, vaults]
+        package: [api, app, auth, core, data, entities, flow, gen, server, vaults]
 
     steps:
       - name: Prune old versions of @${{ github.repository_owner }}/${{ matrix.package }}
-        # continue-on-error: package may not exist yet on first publish
         continue-on-error: true
         uses: actions/delete-package-versions@v5
         with:

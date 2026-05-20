@@ -7,286 +7,220 @@ import {
     TERN_COLLECTION_VIEW, TERN_COLLECTION_VIEW_ITEM,
     TERN_CV_SOURCE, TERN_CV_PROP, TERN_CV_SORT_PROP, TERN_CV_SORT_DIR, TERN_CV_ITEM,
     TERN_CVI_VIEW, TERN_CVI_REF, TERN_CVI_POS,
+    newId, toLiteral, fromLiteral,
 } from '@jasonscharf/entities';
-import { toLiteral, fromLiteral, newId } from '@jasonscharf/entities';
+import type { CollectionViewOpts, CollectionViewItemRecord, CollectionViewRecord } from '@jasonscharf/entities';
 
-
-export interface CollectionViewOpts {
-    /**
-     * IRI of a property to sort by on each referenced entity.
-     * When set, `getView()` resolves this property's value on each ref and
-     * sorts accordingly (asc/desc).  Works with the two-hop PropGroup model:
-     * if the property is not found directly on the ref IRI, the entity's
-     * PropGroup nodes are searched automatically.
-     */
-    sortProp?: IRI;
-    sortDir?:  'asc' | 'desc';
-}
-
-export interface CollectionViewItemRecord {
-    /** IRI of the CollectionViewItem node. */
-    iri: string;
-    /** String representation of the referenced item (entity IRI or plain value). */
-    ref: string;
-    /** Zero-based position within the view. */
-    pos: number;
-}
-
-export interface CollectionViewRecord {
-    iri:       string;
-    /** PropGroup node IRI that owns the source collection. */
-    sourcePg:  string;
-    /** Property IRI string on the source PropGroup. */
-    prop:      string;
-    sortProp?: string;
-    sortDir?:  'asc' | 'desc';
-    items:     CollectionViewItemRecord[];
-}
+export type { CollectionViewOpts, CollectionViewItemRecord, CollectionViewRecord };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function viewIri(id: string):     IRI { return new IRI(`${TERN_VIEW_NS}${id}`); }
 function viewItemIri(id: string): IRI { return new IRI(`${TERN_VIEW_NS}item/${id}`); }
+function str(term: unknown): string { return String(fromLiteral(term) ?? ''); }
 
 // ── CollectionViewStore ───────────────────────────────────────────────────────
 
 export class CollectionViewStore {
     constructor(private readonly _store: TripleStore) {}
 
-    /**
-     * Creates a CollectionView over a source PropGroup + property pair.
-     * Pre-populates the view with `initialRefs` (entity IRI strings or plain values).
-     * Returns the view IRI string (stable identifier for subsequent operations).
-     */
+    // ── Create ────────────────────────────────────────────────────────────────
+
     async create(
-        ctx:         ServerContext,
-        sourcePgIri: string,
-        propIri:     string,
-        initialRefs: string[],
-        opts:        CollectionViewOpts = {},
+        ctx:          ServerContext,
+        sourcePgIri:  string,
+        sourcePropIri: string,
+        currentRefs:  string[],
+        opts:         CollectionViewOpts = {},
     ): Promise<string> {
-        const id      = newId();
-        const viewIRI = viewIri(id);
+        const id   = newId();
+        const vIri = viewIri(id);
 
-        const quads: Parameters<TripleStore['insert']>[1][] = [
-            { subject: viewIRI, predicate: RDF_TYPE,       object: TERN_COLLECTION_VIEW,          graph: DEFAULT_GRAPH },
-            { subject: viewIRI, predicate: TERN_CV_SOURCE, object: toLiteral(sourcePgIri),         graph: DEFAULT_GRAPH },
-            { subject: viewIRI, predicate: TERN_CV_PROP,   object: toLiteral(propIri),             graph: DEFAULT_GRAPH },
-        ];
-        if (opts.sortProp) {
-            quads.push({ subject: viewIRI, predicate: TERN_CV_SORT_PROP, object: toLiteral(opts.sortProp.value), graph: DEFAULT_GRAPH });
-        }
-        if (opts.sortDir) {
-            quads.push({ subject: viewIRI, predicate: TERN_CV_SORT_DIR, object: toLiteral(opts.sortDir), graph: DEFAULT_GRAPH });
-        }
+        await this._store.insertMany(ctx, [
+            { subject: vIri, predicate: RDF_TYPE,       object: TERN_COLLECTION_VIEW,          graph: DEFAULT_GRAPH },
+            { subject: vIri, predicate: TERN_CV_SOURCE, object: toLiteral(sourcePgIri),         graph: DEFAULT_GRAPH },
+            { subject: vIri, predicate: TERN_CV_PROP,   object: toLiteral(sourcePropIri),       graph: DEFAULT_GRAPH },
+            ...(opts.sortProp ? [{ subject: vIri, predicate: TERN_CV_SORT_PROP, object: toLiteral(opts.sortProp.value), graph: DEFAULT_GRAPH }] : []),
+            ...(opts.sortDir  ? [{ subject: vIri, predicate: TERN_CV_SORT_DIR,  object: toLiteral(opts.sortDir),        graph: DEFAULT_GRAPH }] : []),
+        ]);
 
-        // Add initial items in order
-        for (let i = 0; i < initialRefs.length; i++) {
-            const itemIRI = viewItemIri(newId());
-            quads.push(
-                { subject: viewIRI,  predicate: TERN_CV_ITEM,  object: itemIRI,              graph: DEFAULT_GRAPH },
-                { subject: itemIRI,  predicate: RDF_TYPE,      object: TERN_COLLECTION_VIEW_ITEM, graph: DEFAULT_GRAPH },
-                { subject: itemIRI,  predicate: TERN_CVI_VIEW, object: viewIRI,              graph: DEFAULT_GRAPH },
-                { subject: itemIRI,  predicate: TERN_CVI_REF,  object: toLiteral(initialRefs[i]!), graph: DEFAULT_GRAPH },
-                { subject: itemIRI,  predicate: TERN_CVI_POS,  object: toLiteral(i),         graph: DEFAULT_GRAPH },
-            );
+        for (const [pos, ref] of currentRefs.entries()) {
+            await this._createItem(ctx, vIri.value, ref, pos);
         }
 
-        await this._store.insertMany(ctx, quads);
-        return viewIRI.value;
+        return vIri.value;
     }
 
-    /** Fetches the full CollectionView including ordered items. */
+    // ── Item management ───────────────────────────────────────────────────────
+
+    /** Appends a CollectionViewItem for a new value. Idempotent — no-op if the ref is already present. */
+    async addItem(ctx: ServerContext, viewIriStr: string, ref: string): Promise<void> {
+        const items = await this._getItems(ctx, viewIriStr);
+        if (items.some(i => i.ref === ref)) { return; }
+        await this._createItem(ctx, viewIriStr, ref, items.length);
+    }
+
+    /** Removes the CollectionViewItem for the given ref. Returns true if something was removed. */
+    async removeItem(ctx: ServerContext, viewIriStr: string, ref: string): Promise<boolean> {
+        const items = await this._getItems(ctx, viewIriStr);
+        const item  = items.find(i => i.ref === ref);
+        if (!item) { return false; }
+
+        const itemNode = new IRI(item.iri);
+        const viewNode = new IRI(viewIriStr);
+        await this._store.delete(ctx, { subject: viewNode, predicate: TERN_CV_ITEM, object: itemNode });
+        await this._store.delete(ctx, { subject: itemNode });
+        return true;
+    }
+
+    // ── Read ──────────────────────────────────────────────────────────────────
+
     async getView(ctx: ServerContext, viewIriStr: string): Promise<CollectionViewRecord | null> {
-        const viewIRI = new IRI(viewIriStr);
-        const meta    = await this._store.find(ctx, { subject: viewIRI });
-        if (meta.length === 0) { return null; }
+        const vNode = new IRI(viewIriStr);
+        const quads = await this._store.find(ctx, { subject: vNode });
+        if (quads.length === 0) { return null; }
 
         let sourcePg = '';
         let prop     = '';
         let sortProp: string | undefined;
         let sortDir:  'asc' | 'desc' | undefined;
 
-        for (const q of meta) {
+        for (const q of quads) {
             const pred = (q.predicate as IRI).value;
-            if (pred === TERN_CV_SOURCE.value) { sourcePg = String(fromLiteral(q.object)); }
-            if (pred === TERN_CV_PROP.value)   { prop     = String(fromLiteral(q.object)); }
-            if (pred === TERN_CV_SORT_PROP.value) { sortProp = String(fromLiteral(q.object)); }
-            if (pred === TERN_CV_SORT_DIR.value)  { sortDir  = String(fromLiteral(q.object)) as 'asc' | 'desc'; }
+            const val  = str(q.object);
+            if (pred === TERN_CV_SOURCE.value)   { sourcePg = val; }
+            if (pred === TERN_CV_PROP.value)     { prop     = val; }
+            if (pred === TERN_CV_SORT_PROP.value) { sortProp = val; }
+            if (pred === TERN_CV_SORT_DIR.value)  { sortDir  = val as 'asc' | 'desc'; }
         }
 
-        // Collect item IRIs from TERN_CV_ITEM links
-        const itemIriStrs = meta
-            .filter(q => (q.predicate as IRI).value === TERN_CV_ITEM.value)
-            .map(q => (q.object as IRI).value);
+        let items = await this._getItems(ctx, viewIriStr);
+        items.sort((a, b) => a.pos - b.pos);
+        if (sortProp) { items = await this._sortByProp(ctx, items, sortProp, sortDir ?? 'asc'); }
 
-        if (itemIriStrs.length === 0) {
-            return { iri: viewIriStr, sourcePg, prop, sortProp, sortDir, items: [] };
+        return { iri: viewIriStr, sourcePg, prop, sortProp, sortDir, items };
+    }
+
+    // ── Mutation ──────────────────────────────────────────────────────────────
+
+    async reorder(ctx: ServerContext, viewIriStr: string, orderedRefs: string[]): Promise<void> {
+        const items = await this._getItems(ctx, viewIriStr);
+        for (const [newPos, ref] of orderedRefs.entries()) {
+            const item = items.find(i => i.ref === ref);
+            if (!item) { continue; }
+            const itemNode = new IRI(item.iri);
+            await this._store.delete(ctx, { subject: itemNode, predicate: TERN_CVI_POS });
+            await this._store.insert(ctx, { subject: itemNode, predicate: TERN_CVI_POS, object: toLiteral(newPos), graph: DEFAULT_GRAPH });
         }
+    }
 
-        // Fetch all item quads in one call
-        const itemNodes  = itemIriStrs.map(s => new IRI(s));
-        const allItemQ   = await this._store.findForSubjects(ctx, itemNodes);
+    /** Syncs the view to match a fresh snapshot of the source collection. Adds missing refs; removes stale ones. */
+    async sync(ctx: ServerContext, viewIriStr: string, currentRefs: string[]): Promise<void> {
+        const items    = await this._getItems(ctx, viewIriStr);
+        const existing = new Set(items.map(i => i.ref));
+        const current  = new Set(currentRefs);
 
-        const rawItems: { iri: string; ref: string; pos: number; sortVal?: unknown }[] = [];
-        for (const itemIriStr of itemIriStrs) {
-            const quads = allItemQ.get(itemIriStr) ?? [];
+        for (const ref of currentRefs) {
+            if (!existing.has(ref)) { await this.addItem(ctx, viewIriStr, ref); }
+        }
+        for (const item of items) {
+            if (!current.has(item.ref)) { await this.removeItem(ctx, viewIriStr, item.ref); }
+        }
+    }
+
+    async delete(ctx: ServerContext, viewIriStr: string): Promise<void> {
+        const items    = await this._getItems(ctx, viewIriStr);
+        const viewNode = new IRI(viewIriStr);
+        for (const item of items) {
+            const itemNode = new IRI(item.iri);
+            await this._store.delete(ctx, { subject: viewNode, predicate: TERN_CV_ITEM, object: itemNode });
+            await this._store.delete(ctx, { subject: itemNode });
+        }
+        await this._store.delete(ctx, { subject: viewNode });
+    }
+
+    // ── Lookup (used by EntityStore auto-update) ──────────────────────────────
+
+    async findViewsForSource(ctx: ServerContext, sourcePgIri: string, propIri: string): Promise<string[]> {
+        const bySource = await this._store.find(ctx, { predicate: TERN_CV_SOURCE, object: toLiteral(sourcePgIri) });
+        if (bySource.length === 0) { return []; }
+
+        const result: string[] = [];
+        for (const q of bySource) {
+            const viewNode = q.subject as IRI;
+            const propQ    = await this._store.find(ctx, { subject: viewNode, predicate: TERN_CV_PROP, object: toLiteral(propIri) });
+            if (propQ.length > 0) { result.push(viewNode.value); }
+        }
+        return result;
+    }
+
+    // ── Private ───────────────────────────────────────────────────────────────
+
+    private async _createItem(ctx: ServerContext, viewIriStr: string, ref: string, pos: number): Promise<void> {
+        const itemNode = viewItemIri(newId());
+        const viewNode = new IRI(viewIriStr);
+        await this._store.insertMany(ctx, [
+            { subject: itemNode, predicate: RDF_TYPE,      object: TERN_COLLECTION_VIEW_ITEM, graph: DEFAULT_GRAPH },
+            { subject: itemNode, predicate: TERN_CVI_VIEW, object: viewNode,                  graph: DEFAULT_GRAPH },
+            { subject: itemNode, predicate: TERN_CVI_REF,  object: toLiteral(ref),            graph: DEFAULT_GRAPH },
+            { subject: itemNode, predicate: TERN_CVI_POS,  object: toLiteral(pos),            graph: DEFAULT_GRAPH },
+            { subject: viewNode, predicate: TERN_CV_ITEM,  object: itemNode,                  graph: DEFAULT_GRAPH },
+        ]);
+    }
+
+    private async _getItems(ctx: ServerContext, viewIriStr: string): Promise<CollectionViewItemRecord[]> {
+        const viewNode  = new IRI(viewIriStr);
+        const itemLinks = await this._store.find(ctx, { subject: viewNode, predicate: TERN_CV_ITEM });
+        if (itemLinks.length === 0) { return []; }
+
+        const itemIris = itemLinks.map(q => q.object as IRI);
+        const allQuads = await this._store.findForSubjects(ctx, itemIris);
+
+        return itemLinks.map(link => {
+            const itemIriStr = (link.object as IRI).value;
+            const quads      = allQuads.get(itemIriStr) ?? [];
             let ref = '';
             let pos = 0;
             for (const q of quads) {
                 const pred = (q.predicate as IRI).value;
-                if (pred === TERN_CVI_REF.value) { ref = String(fromLiteral(q.object)); }
-                if (pred === TERN_CVI_POS.value) { pos = Number(fromLiteral(q.object)); }
+                if (pred === TERN_CVI_REF.value) { ref = str(q.object); }
+                if (pred === TERN_CVI_POS.value) { pos = Number(fromLiteral(q.object) ?? 0); }
             }
-            rawItems.push({ iri: itemIriStr, ref, pos });
-        }
+            return { iri: itemIriStr, ref, pos };
+        });
+    }
 
-        // If sortProp is set, resolve it via the two-hop PropGroup model
-        if (sortProp) {
-            const sortPropIRI = new IRI(sortProp);
-            for (const item of rawItems) {
-                // Try direct lookup first
-                const directQ = await this._store.find(ctx, { subject: new IRI(item.ref), predicate: sortPropIRI });
-                if (directQ.length > 0) {
-                    item.sortVal = fromLiteral(directQ[0]!.object);
+    private async _sortByProp(
+        ctx:     ServerContext,
+        items:   CollectionViewItemRecord[],
+        sortProp: string,
+        sortDir:  'asc' | 'desc',
+    ): Promise<CollectionViewItemRecord[]> {
+        const propIri = new IRI(sortProp);
+        const withValues = await Promise.all(items.map(async item => {
+            let sortVal: unknown;
+            try {
+                const refIri = new IRI(item.ref);
+                const direct = await this._store.find(ctx, { subject: refIri, predicate: propIri });
+                if (direct.length > 0) {
+                    sortVal = fromLiteral(direct[0]!.object);
                 } else {
-                    // Two-hop: find PropGroup nodes for the ref entity, then look up the property
-                    const pgLinks = await this._store.find(ctx, { subject: new IRI(item.ref), predicate: TERN_PROP_GROUP });
-                    for (const pgLink of pgLinks) {
-                        const propQ = await this._store.find(ctx, { subject: pgLink.object as IRI, predicate: sortPropIRI });
-                        if (propQ.length > 0) {
-                            item.sortVal = fromLiteral(propQ[0]!.object);
-                            break;
-                        }
+                    const pgLinks = await this._store.find(ctx, { subject: refIri, predicate: TERN_PROP_GROUP });
+                    for (const pg of pgLinks) {
+                        const propQ = await this._store.find(ctx, { subject: pg.object as IRI, predicate: propIri });
+                        if (propQ.length > 0) { sortVal = fromLiteral(propQ[0]!.object); break; }
                     }
                 }
-            }
-            rawItems.sort((a, b) => {
-                const av = a.sortVal;
-                const bv = b.sortVal;
-                if (av === bv) { return 0; }
-                const cmp = av == null ? -1 : bv == null ? 1 : (av < bv ? -1 : 1);
-                return sortDir === 'desc' ? -cmp : cmp;
-            });
-        } else {
-            rawItems.sort((a, b) => a.pos - b.pos);
-        }
+            } catch { /* non-IRI ref — skip */ }
+            return { item, sortVal };
+        }));
 
-        return {
-            iri: viewIriStr,
-            sourcePg,
-            prop,
-            sortProp,
-            sortDir,
-            items: rawItems.map(({ iri, ref, pos }) => ({ iri, ref, pos })),
-        };
-    }
-
-    /** Returns IRIs of all CollectionViews that watch a given source PropGroup + property. */
-    async findViewsForSource(
-        ctx:         ServerContext,
-        sourcePgIri: string,
-        propIri:     string,
-    ): Promise<string[]> {
-        const sourceQ = await this._store.find(ctx, { predicate: TERN_CV_SOURCE, object: toLiteral(sourcePgIri) });
-        const propQ   = await this._store.find(ctx, { predicate: TERN_CV_PROP,   object: toLiteral(propIri) });
-
-        const sourceViews = new Set(sourceQ.map(q => (q.subject as IRI).value));
-        return propQ
-            .map(q => (q.subject as IRI).value)
-            .filter(v => sourceViews.has(v));
-    }
-
-    /** Appends a new item to a CollectionView at the next position. */
-    async addItem(ctx: ServerContext, viewIriStr: string, ref: string): Promise<void> {
-        const viewIRI  = new IRI(viewIriStr);
-        const itemsQ   = await this._store.find(ctx, { subject: viewIRI, predicate: TERN_CV_ITEM });
-        const nextPos  = itemsQ.length;
-        const itemIRI  = viewItemIri(newId());
-
-        await this._store.insertMany(ctx, [
-            { subject: viewIRI,  predicate: TERN_CV_ITEM,  object: itemIRI,                   graph: DEFAULT_GRAPH },
-            { subject: itemIRI,  predicate: RDF_TYPE,      object: TERN_COLLECTION_VIEW_ITEM,  graph: DEFAULT_GRAPH },
-            { subject: itemIRI,  predicate: TERN_CVI_VIEW, object: viewIRI,                   graph: DEFAULT_GRAPH },
-            { subject: itemIRI,  predicate: TERN_CVI_REF,  object: toLiteral(ref),            graph: DEFAULT_GRAPH },
-            { subject: itemIRI,  predicate: TERN_CVI_POS,  object: toLiteral(nextPos),        graph: DEFAULT_GRAPH },
-        ]);
-    }
-
-    /** Removes the first item with the given ref from a CollectionView and compacts positions. */
-    async removeItem(ctx: ServerContext, viewIriStr: string, ref: string): Promise<void> {
-        const view = await this.getView(ctx, viewIriStr);
-        if (!view) { return; }
-
-        const target = view.items.find(i => i.ref === ref);
-        if (!target) { return; }
-
-        // Delete the item node
-        await this._store.delete(ctx, { subject: new IRI(target.iri) });
-        // Remove the cv:item link from the view
-        await this._store.delete(ctx, { subject: new IRI(viewIriStr), predicate: TERN_CV_ITEM, object: new IRI(target.iri) });
-
-        // Compact positions of remaining items
-        const remaining = view.items.filter(i => i.iri !== target.iri);
-        for (let i = 0; i < remaining.length; i++) {
-            const item     = remaining[i]!;
-            const itemNode = new IRI(item.iri);
-            await this._store.delete(ctx, { subject: itemNode, predicate: TERN_CVI_POS });
-            await this._store.insert(ctx, { subject: itemNode, predicate: TERN_CVI_POS, object: toLiteral(i), graph: DEFAULT_GRAPH });
-        }
-    }
-
-    /** Reorders items to match the provided ref sequence. */
-    async reorder(ctx: ServerContext, viewIriStr: string, refs: string[]): Promise<void> {
-        const view = await this.getView(ctx, viewIriStr);
-        if (!view) { return; }
-
-        const byRef = new Map(view.items.map(i => [i.ref, i]));
-        for (let i = 0; i < refs.length; i++) {
-            const item = byRef.get(refs[i]!);
-            if (!item) { continue; }
-            const itemNode = new IRI(item.iri);
-            await this._store.delete(ctx, { subject: itemNode, predicate: TERN_CVI_POS });
-            await this._store.insert(ctx, { subject: itemNode, predicate: TERN_CVI_POS, object: toLiteral(i), graph: DEFAULT_GRAPH });
-        }
-    }
-
-    /** Replaces all items in the view to match `refs` exactly (used for full sync after collectionSet). */
-    async sync(ctx: ServerContext, viewIriStr: string, refs: string[]): Promise<void> {
-        const view = await this.getView(ctx, viewIriStr);
-        if (!view) { return; }
-
-        const viewIRI = new IRI(viewIriStr);
-
-        // Delete all existing items
-        for (const item of view.items) {
-            await this._store.delete(ctx, { subject: new IRI(item.iri) });
-        }
-        await this._store.delete(ctx, { subject: viewIRI, predicate: TERN_CV_ITEM });
-
-        // Re-insert in new order
-        const quads: Parameters<TripleStore['insert']>[1][] = [];
-        for (let i = 0; i < refs.length; i++) {
-            const itemIRI = viewItemIri(newId());
-            quads.push(
-                { subject: viewIRI,  predicate: TERN_CV_ITEM,  object: itemIRI,                   graph: DEFAULT_GRAPH },
-                { subject: itemIRI,  predicate: RDF_TYPE,      object: TERN_COLLECTION_VIEW_ITEM,  graph: DEFAULT_GRAPH },
-                { subject: itemIRI,  predicate: TERN_CVI_VIEW, object: viewIRI,                   graph: DEFAULT_GRAPH },
-                { subject: itemIRI,  predicate: TERN_CVI_REF,  object: toLiteral(refs[i]!),       graph: DEFAULT_GRAPH },
-                { subject: itemIRI,  predicate: TERN_CVI_POS,  object: toLiteral(i),              graph: DEFAULT_GRAPH },
-            );
-        }
-        if (quads.length > 0) { await this._store.insertMany(ctx, quads); }
-    }
-
-    /** Deletes the view and all its item nodes. */
-    async delete(ctx: ServerContext, viewIriStr: string): Promise<void> {
-        const view = await this.getView(ctx, viewIriStr);
-        if (!view) { return; }
-
-        for (const item of view.items) {
-            await this._store.delete(ctx, { subject: new IRI(item.iri) });
-        }
-        await this._store.delete(ctx, { subject: new IRI(viewIriStr) });
+        withValues.sort((a, b) => {
+            const av = a.sortVal ?? '';
+            const bv = b.sortVal ?? '';
+            const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+            return sortDir === 'asc' ? cmp : -cmp;
+        });
+        return withValues.map(x => x.item);
     }
 }

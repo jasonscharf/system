@@ -7,6 +7,16 @@ export type { PropGroupDef } from './EntitySchema.js';
 export { groupOf } from './EntityRecord.js';
 export type { EntityRecord } from './EntityRecord.js';
 
+export { EntityValidationError } from './EntityValidationError.js';
+
+export type { FilterOp } from './FilterOp.js';
+
+export type {
+    CollectionViewOpts,
+    CollectionViewItemRecord,
+    CollectionViewRecord,
+} from './CollectionViewTypes.js';
+
 export {
     RDF_TYPE, TERN_PROP_GROUP, TERN_HANDLE,
     XSD_STRING, XSD_BOOLEAN, XSD_INTEGER, XSD_DECIMAL, XSD_DATETIME,

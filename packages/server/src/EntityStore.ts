@@ -9,7 +9,7 @@ import {
     toLiteral, fromLiteral, invertPropertyMap, propertyMapFor,
 } from '@jasonscharf/entities';
 import type { ServerContext } from './ServerContext.js';
-import { EntityValidationError } from './EntityValidationError.js';
+import { EntityValidationError } from '@jasonscharf/entities';
 import { CollectionViewStore } from './CollectionView.js';
 import type { CollectionViewOpts } from './CollectionView.js';
 
@@ -96,10 +96,12 @@ export class EntityStore {
         id:      string,
         handles: EntityHandle[] | '*',
     ): Promise<EntityRecord | null> {
-        const ent   = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-        const typeQ = await this._store.find(ctx, { subject: ent, predicate: RDF_TYPE });
-        if (typeQ.length === 0) { return null; }
-        return this._hydrate(ctx, schema, id, ent.value, handles);
+        return this._withTrx(ctx, async txCtx => {
+            const ent   = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+            const typeQ = await this._store.find(txCtx, { subject: ent, predicate: RDF_TYPE });
+            if (typeQ.length === 0) { return null; }
+            return this._hydrate(txCtx, schema, id, ent.value, handles);
+        });
     }
 
     // ── Update ────────────────────────────────────────────────────────────────
@@ -160,14 +162,16 @@ export class EntityStore {
         h:      EntityHandle,
         prop:   string,
     ): Promise<unknown[]> {
-        const groupDef = this._requireGroup(schema, h);
-        const propIri  = (groupDef.properties as Record<string, IRI>)[prop];
-        if (!propIri) { return []; }
+        return this._withTrx(ctx, async txCtx => {
+            const groupDef = this._requireGroup(schema, h);
+            const propIri  = (groupDef.properties as Record<string, IRI>)[prop];
+            if (!propIri) { return []; }
 
-        const ent   = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-        const pg    = pgIri(ent.value, h);
-        const quads = await this._store.findOrdered(ctx, { subject: pg, predicate: propIri });
-        return quads.map(q => fromLiteral(q.object)).filter(v => v !== undefined);
+            const ent   = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+            const pg    = pgIri(ent.value, h);
+            const quads = await this._store.findOrdered(txCtx, { subject: pg, predicate: propIri });
+            return quads.map(q => fromLiteral(q.object)).filter(v => v !== undefined);
+        });
     }
 
     async collectionPush(
@@ -311,10 +315,12 @@ export class EntityStore {
         iris:    string[],
         handles: EntityHandle[] | '*',
     ): Promise<EntityRecord[]> {
-        return Promise.all(iris.map(iri => {
-            const id = idFromIri(iri);
-            return this._hydrate(ctx, schema, id, iri, handles);
-        }));
+        return this._withTrx(ctx, async txCtx => {
+            return Promise.all(iris.map(iri => {
+                const id = idFromIri(iri);
+                return this._hydrate(txCtx, schema, id, iri, handles);
+            }));
+        });
     }
 
     // ── Private ───────────────────────────────────────────────────────────────

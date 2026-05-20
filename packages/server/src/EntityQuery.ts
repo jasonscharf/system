@@ -1,12 +1,11 @@
 import type { IRI } from '@jasonscharf/core';
 import type { TripleStore } from '@jasonscharf/data';
-import type { EntityHandle, EntitySchema, EntityRecord } from '@jasonscharf/entities';
+import type { EntityHandle, EntitySchema, EntityRecord, FilterOp } from '@jasonscharf/entities';
 import { RDF_TYPE, TERN_PROP_GROUP, toLiteral } from '@jasonscharf/entities';
 import type { ServerContext } from './ServerContext.js';
 import { EntityStore } from './EntityStore.js';
 
-
-export type FilterOp = '=' | '!=' | '<' | '<=' | '>' | '>=' | 'LIKE' | 'ILIKE';
+export type { FilterOp };
 
 interface Filter {
     handle: EntityHandle;
@@ -50,35 +49,37 @@ export class EntityQuery<H extends EntityHandle[]> {
     offset(n: number): this { this._offset = n; return this; }
 
     async all(ctx: ServerContext): Promise<EntityRecord[]> {
-        let candidateIris = await this._allEntityIris(ctx);
+        return this._store.withTransaction(ctx, async txCtx => {
+            let candidateIris = await this._allEntityIris(txCtx);
 
-        const eqFilters    = this._filters.filter(f => f.op === '=');
-        const otherFilters = this._filters.filter(f => f.op !== '=');
+            const eqFilters    = this._filters.filter(f => f.op === '=');
+            const otherFilters = this._filters.filter(f => f.op !== '=');
 
-        for (const f of eqFilters) {
-            candidateIris = await this._applyEqFilter(ctx, candidateIris, f);
-        }
+            for (const f of eqFilters) {
+                candidateIris = await this._applyEqFilter(txCtx, candidateIris, f);
+            }
 
-        let records = await this._es.hydrateMany(ctx, this._schema, candidateIris, this._handles);
+            let records = await this._es.hydrateMany(txCtx, this._schema, candidateIris, this._handles);
 
-        for (const f of otherFilters) {
-            records = records.filter(r => this._matchFilter(r, f));
-        }
+            for (const f of otherFilters) {
+                records = records.filter(r => this._matchFilter(r, f));
+            }
 
-        if (this._order) {
-            const { handle, prop, dir } = this._order;
-            records.sort((a, b) => {
-                const av = a.groups[handle.id]?.[prop];
-                const bv = b.groups[handle.id]?.[prop];
-                if (av === bv) { return 0; }
-                const cmp = av == null ? -1 : bv == null ? 1 : (av < bv ? -1 : 1);
-                return dir === 'asc' ? cmp : -cmp;
-            });
-        }
+            if (this._order) {
+                const { handle, prop, dir } = this._order;
+                records.sort((a, b) => {
+                    const av = a.groups[handle.id]?.[prop];
+                    const bv = b.groups[handle.id]?.[prop];
+                    if (av === bv) { return 0; }
+                    const cmp = av == null ? -1 : bv == null ? 1 : (av < bv ? -1 : 1);
+                    return dir === 'asc' ? cmp : -cmp;
+                });
+            }
 
-        const start = this._offset ?? 0;
-        const end   = this._limit  !== undefined ? start + this._limit : undefined;
-        return records.slice(start, end);
+            const start = this._offset ?? 0;
+            const end   = this._limit  !== undefined ? start + this._limit : undefined;
+            return records.slice(start, end);
+        });
     }
 
     async first(ctx: ServerContext): Promise<EntityRecord | null> {
@@ -87,11 +88,13 @@ export class EntityQuery<H extends EntityHandle[]> {
     }
 
     async count(ctx: ServerContext): Promise<number> {
-        let iris = await this._allEntityIris(ctx);
-        for (const f of this._filters.filter(ff => ff.op === '=')) {
-            iris = await this._applyEqFilter(ctx, iris, f);
-        }
-        return iris.length;
+        return this._store.withTransaction(ctx, async txCtx => {
+            let iris = await this._allEntityIris(txCtx);
+            for (const f of this._filters.filter(ff => ff.op === '=')) {
+                iris = await this._applyEqFilter(txCtx, iris, f);
+            }
+            return iris.length;
+        });
     }
 
     get store(): TripleStore { return this._store; }

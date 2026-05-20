@@ -763,7 +763,7 @@ describe('generateAugmentedTypes', () => {
 
     it('emits import for external type used as range', () => {
         const ontology = readOntology([...baseTriples, ...localTriples]);
-        const externalClasses = new Map([[`${BASE_NS}User`, '@system/auth']]);
+        const externalClasses = new Map([[`${BASE_NS}User`, '@jasonscharf/auth']]);
         const output = generateAugmentedTypes(ontology, emptyShapes, {
             externalClasses,
             localNamespace: LOCAL_NS,

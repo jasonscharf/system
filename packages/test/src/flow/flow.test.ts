@@ -664,7 +664,7 @@ describe('FlowApp', () => {
 
 describe('FlowLoader', () => {
     it('loads a flow app from JSON', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         const json = JSON.stringify({
             name: 'Test App',
             mode: 'push',
@@ -676,7 +676,7 @@ describe('FlowLoader', () => {
     });
 
     it('loads a flow app from YAML', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         const yaml = `
 name: Test App
 mode: push
@@ -688,7 +688,7 @@ connections: []
     });
 
     it('loads components from a module URI', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         // We mock dynamic import via the module resolver
         const json = JSON.stringify({
             name: 'App',
@@ -738,12 +738,12 @@ describe('FlowComponent.toQuads() with BigInt id', () => {
 
 describe('FlowLoader extras', () => {
     it('fromRDF throws NotImplemented', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         await expect(FlowLoader.fromRDF('anything')).rejects.toThrow('not yet implemented');
     });
 
     it('fromYAML with unknown component in connection throws', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         const json = JSON.stringify({
             name: 'bad', mode: 'push',
             components: [],
@@ -754,7 +754,7 @@ describe('FlowLoader extras', () => {
     });
 
     it('fromYAML with connections wires components via moduleResolver', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         class Src extends FlowComponent {
             readonly out = this.addPort<number>('out', 'out');
             constructor(options: FlowComponentOptions) { super(options); }
@@ -780,7 +780,7 @@ describe('FlowLoader extras', () => {
     });
 
     it('fromJSON with unknown port in connection throws', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         class Simple extends FlowComponent {
             constructor(o: FlowComponentOptions) { super(o); }
             override step(): void {}
@@ -886,7 +886,7 @@ describe('FlowApp topo sort: duplicate edge ignored (line 97-99 false branch)', 
 
 describe('FlowLoader: default module resolver', () => {
     it('fromJSON without moduleResolver uses defaultModuleResolver (fails gracefully)', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         // With a nonexistent module, the defaultModuleResolver will try to import and fail
         await expect(FlowLoader.fromJSON(JSON.stringify({
             name: 'test', mode: 'push',
@@ -896,7 +896,7 @@ describe('FlowLoader: default module resolver', () => {
     });
 
     it('fromYAML with a mapping key having no value and no indented block', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         const yaml = 'name: test\nmode: push\ncomponents: []\nconnections: []';
         const app = await FlowLoader.fromYAML(yaml, {
             moduleResolver: async () => { throw new Error('should not be called'); },
@@ -910,7 +910,7 @@ describe('FlowLoader: default module resolver', () => {
 
 describe('FlowLoader: YAML parser internal branches', () => {
     it('fromYAML: mapping key with no inline value and no indented block → null', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         // "mode:\ncomponents: []" — mode has empty afterColon, next line not indented
         const yaml = 'name: test\nmode:\ncomponents: []\nconnections: []';
         const app = await FlowLoader.fromYAML(yaml, {
@@ -920,7 +920,7 @@ describe('FlowLoader: YAML parser internal branches', () => {
     });
 
     it('fromYAML: mapping key with indented scalar value (scalar block, line 146)', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         // mode has an indented scalar value "push" which triggers the scalar-block path
         const yaml = 'name: test\nmode:\n  push\ncomponents: []\nconnections: []';
         const app = await FlowLoader.fromYAML(yaml, {
@@ -935,7 +935,7 @@ describe('FlowLoader: YAML parser internal branches', () => {
 
 describe('FlowLoader: quoted string value in YAML', () => {
     it('fromYAML with double-quoted name field covers parseScalar quoted branch', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         const yaml = 'name: "My Flow App"\ncomponents: []\nconnections: []';
         const app = await FlowLoader.fromYAML(yaml, {
             moduleResolver: async () => { throw new Error('nope'); },
@@ -944,7 +944,7 @@ describe('FlowLoader: quoted string value in YAML', () => {
     });
 
     it('fromYAML with single-quoted name field also hits quoted branch', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         const yaml = "name: 'My App'\ncomponents: []\nconnections: []";
         const app = await FlowLoader.fromYAML(yaml, {
             moduleResolver: async () => { throw new Error('nope'); },
@@ -958,7 +958,7 @@ describe('FlowLoader: quoted string value in YAML', () => {
 
 describe('FlowLoader: YAML sequence branch', () => {
     it('fromYAML: component list with inline mapping (- id: c1 type: mod) covers line 95', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         // Each "- id: c1\n  type: mod" item has ": " in itemContent → mapping branch
         const yaml = [
             'name: test',
@@ -971,7 +971,7 @@ describe('FlowLoader: YAML sequence branch', () => {
     });
 
     it('fromYAML: bare - item with indented block covers itemContent === "" branch (line 89)', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         // A bare "-" with the mapping on the next line → itemContent === '' branch
         const yaml = [
             'name: test',
@@ -985,7 +985,7 @@ describe('FlowLoader: YAML sequence branch', () => {
     });
 
     it('fromYAML: scalar list items cover parseScalar else branch (lines 110-111)', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         // connections list with plain scalar items — itemContent has no ": " so hits
         // the else branch: arr.push(parseScalar(itemContent)); i++;
         // _build then tries conn.from.split('.') → TypeError, which is expected
@@ -1007,7 +1007,7 @@ describe('FlowLoader: parseScalar boolean/null/numeric branches', () => {
     const noComponents = { moduleResolver: async () => { throw new Error('nope'); } };
 
     it('parses true/false scalar values (lines 50-51)', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         // Extra fields with boolean values cause parseScalar to hit 'true'/'false' branches
         const yaml = 'flag1: true\nflag2: false\nname: t\ncomponents: []\nconnections: []';
         const app = await FlowLoader.fromYAML(yaml, noComponents);
@@ -1015,28 +1015,28 @@ describe('FlowLoader: parseScalar boolean/null/numeric branches', () => {
     });
 
     it('parses null scalar value (line 52)', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         const yaml = 'extra: null\nname: t\ncomponents: []\nconnections: []';
         const app = await FlowLoader.fromYAML(yaml, noComponents);
         expect(app.components.size).toBe(0);
     });
 
     it('parses {} inline empty map scalar (line 54)', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         const yaml = 'meta: {}\nname: t\ncomponents: []\nconnections: []';
         const app = await FlowLoader.fromYAML(yaml, noComponents);
         expect(app.components.size).toBe(0);
     });
 
     it('parses integer scalar (line 55)', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         const yaml = 'count: 42\nname: t\ncomponents: []\nconnections: []';
         const app = await FlowLoader.fromYAML(yaml, noComponents);
         expect(app.components.size).toBe(0);
     });
 
     it('parses float scalar (line 56)', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         const yaml = 'version: 1.5\nname: t\ncomponents: []\nconnections: []';
         const app = await FlowLoader.fromYAML(yaml, noComponents);
         expect(app.components.size).toBe(0);
@@ -1048,13 +1048,13 @@ describe('FlowLoader: parseScalar boolean/null/numeric branches', () => {
 
 describe('FlowLoader: parseBlock edge cases', () => {
     it('fromYAML with empty string hits lines.length === 0 (line 151)', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         // Empty YAML → parseYaml returns null → _build(null) → spec.mode throws TypeError
         await expect(FlowLoader.fromYAML('')).rejects.toThrow();
     });
 
     it('fromYAML with bare - at end triggers start >= lines.length (line 78)', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         // Bare "-" at end → parseBlock(lines, i+1, childIndent) with i+1 >= lines.length
         // connections becomes [null] → _build fails with TypeError (expected)
         const yaml = 'name: t\ncomponents: []\nconnections:\n  -';
@@ -1062,7 +1062,7 @@ describe('FlowLoader: parseBlock edge cases', () => {
     });
 
     it('fromYAML with no-colon line in mapping triggers break (line 124)', async () => {
-        const { FlowLoader } = await import('@system/flow');
+        const { FlowLoader } = await import('@jasonscharf/flow');
         // A line with no colon inside a mapping block → colonIdx === -1 → break
         const yaml = 'name: t\njust a plain line\ncomponents: []\nconnections: []';
         const app = await FlowLoader.fromYAML(yaml, {

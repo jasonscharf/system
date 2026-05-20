@@ -25,6 +25,7 @@
     { "path": "../entities" },
     { "path": "../flow"     },
     { "path": "../gen"      },
+    { "path": "../server"   },
     { "path": "../vaults"   },
     { "path": "../worker"   }
   ],

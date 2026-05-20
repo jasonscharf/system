@@ -1,8 +1,12 @@
 import type { Knex } from 'knex';
-import { DEFAULT_GRAPH, type BlankNode, type DefaultGraph, type IRI, type Literal, type Quad } from '@jasonscharf/core';
+import { DEFAULT_GRAPH, type ApplicationContext, type BlankNode, type DefaultGraph, type IRI, type Literal, type Quad } from '@jasonscharf/core';
 import { C, T, type NodeKind, type LiteralJson } from './schema.js';
 import { coerceLiteralValue } from './migrations/002_time_series.js';
-import type { ServerContext } from './ApplicationContext.js';
+
+interface ServerContext extends ApplicationContext {
+    trx?: Knex.Transaction;
+}
+
 
 
 // ── Internal row types ────────────────────────────────────────────────────────

@@ -22,7 +22,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Knex } from 'knex';
 import { IRI, DEFAULT_GRAPH, type Literal, type BlankNode } from '@jasonscharf/core';
-import { createDataContext, TripleStore, type ServerContext } from '@jasonscharf/data';
+import { createDataContext, TripleStore } from '@jasonscharf/data';
+import type { ServerContext } from '@jasonscharf/server';
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

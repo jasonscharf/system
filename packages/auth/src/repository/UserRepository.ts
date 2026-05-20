@@ -3,7 +3,8 @@ import {
     UserIRI,
     emailIRI, displayNameIRI, avatarUrlIRI, createdAtIRI, updatedAtIRI,
 } from '@jasonscharf/core';
-import type { TripleStore, ServerContext } from '@jasonscharf/data';
+import type { TripleStore } from '@jasonscharf/data';
+import type { ServerContext } from '@jasonscharf/server';
 import { AUTH_GRAPH, RDF_TYPE, XSD_STRING, XSD_DATETIME } from '../constants.js';
 import type { UserEntity } from '../types.js';
 import { newId, iriFor, idFrom } from './util.js';

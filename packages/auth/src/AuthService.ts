@@ -5,7 +5,7 @@ import type { UserRepository } from './repository/UserRepository.js';
 import type { UserIdentityRepository } from './repository/UserIdentityRepository.js';
 import type { UserSessionRepository } from './repository/UserSessionRepository.js';
 import type { UserDeviceRepository } from './repository/UserDeviceRepository.js';
-import { defaultCtx } from '@jasonscharf/data';
+import { defaultServerContext } from '@jasonscharf/server';
 import { SESSION_TTL_SECS } from './constants.js';
 import type {
     DeviceInfo, OAuthProvider,
@@ -67,7 +67,7 @@ export class AuthService {
         const { profile, tokens } = await this.getProvider(opts.provider).exchangeCode(opts.code, opts.redirectUri);
 
         // All DB writes are atomic within a single transaction.
-        const { user, session } = await this._users.store.withTransaction(defaultCtx, async ctx => {
+        const { user, session } = await this._users.store.withTransaction(defaultServerContext, async ctx => {
             // Upsert user
             let user = await this._users.findByEmail(ctx, profile.email);
             if (!user) {
@@ -132,14 +132,14 @@ export class AuthService {
         if (cached) {
             const data = JSON.parse(cached) as { userId: string; expiresAt: number };
             if (Date.now() < data.expiresAt) {
-                return this._users.findById(defaultCtx, data.userId);
+                return this._users.findById(defaultServerContext, data.userId);
             }
             await this._store.del(key);
         }
 
-        const session = await this._sessions.findByToken(defaultCtx, token);
+        const session = await this._sessions.findByToken(defaultServerContext, token);
         if (session && session.isActive && session.expiresAt.getTime() > Date.now()) {
-            return this._users.findById(defaultCtx, session.userId);
+            return this._users.findById(defaultServerContext, session.userId);
         }
         return null;
     }
@@ -147,13 +147,13 @@ export class AuthService {
     async revokeToken(token: string): Promise<void> {
         await Promise.all([
             this._store.del(`tern:session:${token}`),
-            this._sessions.revoke(defaultCtx, token),
+            this._sessions.revoke(defaultServerContext, token),
         ]);
     }
 
     /** Returns all sessions (active and inactive) for a user. */
     async listSessions(userId: string): Promise<import('./types.js').UserSessionEntity[]> {
-        return this._sessions.findByUserId(defaultCtx, userId);
+        return this._sessions.findByUserId(defaultServerContext, userId);
     }
 
     /**
@@ -162,13 +162,13 @@ export class AuthService {
      * Returns the count of sessions that were revoked.
      */
     async revokeAllSessions(userId: string): Promise<number> {
-        const sessions = await this._sessions.findByUserId(defaultCtx, userId);
+        const sessions = await this._sessions.findByUserId(defaultServerContext, userId);
         const active   = sessions.filter(s => s.isActive);
 
         await Promise.all(
             active.map(s => this._store.del(`tern:session:${s.sessionToken}`)),
         );
-        return this._sessions.revokeAllForUser(defaultCtx, userId);
+        return this._sessions.revokeAllForUser(defaultServerContext, userId);
     }
 
     /** Returns true if the provider name is registered. */

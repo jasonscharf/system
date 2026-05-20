@@ -27,4 +27,4 @@ export interface ApplicationContext {
 }
 
 /** Named empty context — no logger, no config. */
-export const noCtx: ApplicationContext = Object.freeze({});
+export const defaultCtx: ApplicationContext = Object.freeze({});

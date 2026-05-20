@@ -1,6 +1,7 @@
-import type { IRI } from '@jasonscharf/core';
+import type { IRI, ApplicationContext, Logger } from '@jasonscharf/core';
 import { DEFAULT_GRAPH } from '@jasonscharf/core';
-import { TripleStore, type ServerContext, type ApplicationContext, type Logger, noCtx, defaultCtx } from '@jasonscharf/data';
+import { TripleStore } from '@jasonscharf/data';
+import type { ServerContext } from '@jasonscharf/server';
 import { validate } from '@jasonscharf/gen';
 import type { EntityHandle } from './Handle.js';
 import type { EntitySchema, PropGroupDef } from './EntitySchema.js';
@@ -14,7 +15,6 @@ import { CollectionViewStore } from './CollectionView.js';
 import type { CollectionViewOpts } from './CollectionView.js';
 
 export type { ServerContext, ApplicationContext, Logger };
-export { noCtx, defaultCtx as noServerCtx };
 
 // ── Internal row types (mirror @system/data/schema.ts) ─────────────────────
 
@@ -48,7 +48,7 @@ export function groupOf<Props extends Record<string, unknown>>(
  * Entity-level CRUD on top of TripleStore.
  *
  * All write methods accept an `ApplicationContext` as the first argument:
- *   - Pass `{}` (or `noCtx`) when you don't need to chain the operation with others.
+ *   - Pass `defaultCtx` (from `@jasonscharf/core`) when you don't need to chain the operation with others.
  *     EntityStore will create, use, and commit a transaction automatically.
  *   - Pass a ctx obtained from `es.inTransaction()` to chain multiple writes.
  *

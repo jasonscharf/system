@@ -4,7 +4,8 @@ import {
     sessionTokenIRI, expiresAtIRI, isActiveIRI, ipAddressIRI,
     sessionUserIRI, sessionDeviceIRI, createdAtIRI,
 } from '@jasonscharf/core';
-import type { TripleStore, ServerContext } from '@jasonscharf/data';
+import type { TripleStore } from '@jasonscharf/data';
+import type { ServerContext } from '@jasonscharf/server';
 import { AUTH_GRAPH, RDF_TYPE, XSD_STRING, XSD_BOOLEAN, XSD_DATETIME } from '../constants.js';
 import type { UserSessionEntity } from '../types.js';
 import { newId, iriFor, idFrom, newSessionToken } from './util.js';

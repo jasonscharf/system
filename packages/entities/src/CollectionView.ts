@@ -1,5 +1,6 @@
 import { IRI, DEFAULT_GRAPH } from '@jasonscharf/core';
-import type { TripleStore, ServerContext } from '@jasonscharf/data';
+import type { TripleStore } from '@jasonscharf/data';
+import type { ServerContext } from '@jasonscharf/server';
 import {
     RDF_TYPE, TERN_PROP_GROUP,
     TERN_VIEW_NS,

@@ -9,7 +9,8 @@
     { "path": "../core"     },
     { "path": "../data"     },
     { "path": "../entities" },
-    { "path": "../flow"     }
+    { "path": "../flow"     },
+    { "path": "../server"   }
   ],
   "include": [
     "src"

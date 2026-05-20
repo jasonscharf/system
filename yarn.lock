@@ -1141,6 +1141,7 @@ __metadata:
     "@jasonscharf/data": "workspace:^"
     "@jasonscharf/entities": "workspace:^"
     "@jasonscharf/flow": "workspace:^"
+    "@jasonscharf/server": "workspace:^"
     "@types/node": "npm:^22.0.0"
     ioredis: "npm:^5.6.1"
   languageName: unknown
@@ -1176,6 +1177,7 @@ __metadata:
     "@jasonscharf/core": "workspace:^"
     "@jasonscharf/data": "workspace:^"
     "@jasonscharf/gen": "workspace:^"
+    "@jasonscharf/server": "workspace:^"
   languageName: unknown
   linkType: soft
 
@@ -1231,6 +1233,7 @@ __metadata:
     "@jasonscharf/core": "workspace:^"
     "@jasonscharf/data": "workspace:^"
     "@jasonscharf/flow": "workspace:^"
+    "@jasonscharf/server": "workspace:^"
     "@jasonscharf/vaults": "workspace:^"
     better-sqlite3: "npm:^11.10.0"
     ioredis: "npm:^5.6.1"
@@ -1253,6 +1256,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@jasonscharf/server@workspace:^, @jasonscharf/server@workspace:packages/server":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/server@workspace:packages/server"
+  dependencies:
+    "@jasonscharf/core": "workspace:^"
+    knex: "npm:^3.1.0"
+  languageName: unknown
+  linkType: soft
+
 "@jasonscharf/test@workspace:packages/test":
   version: 0.0.0-use.local
   resolution: "@jasonscharf/test@workspace:packages/test"
@@ -1266,6 +1278,7 @@ __metadata:
     "@jasonscharf/entities": "workspace:^"
     "@jasonscharf/flow": "workspace:^"
     "@jasonscharf/gen": "workspace:^"
+    "@jasonscharf/server": "workspace:^"
     "@jasonscharf/vaults": "workspace:^"
     "@jasonscharf/worker": "workspace:^"
     "@playwright/test": "npm:^1.57.0"

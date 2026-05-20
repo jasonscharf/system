@@ -1,4 +1,4 @@
-import { defaultCtx } from '@jasonscharf/data';
+import { defaultServerContext } from '@jasonscharf/server';
 import { FlowComponent, type FlowComponentOptions } from '@jasonscharf/flow';
 import { FlowPort } from '@jasonscharf/flow';
 import type { IOAuthProvider } from '../oauth/types.js';
@@ -89,24 +89,24 @@ export class CallbackComponent extends FlowComponent {
             const { profile, tokens } = await provider.exchangeCode(req.code, req.redirectUri);
 
             // Upsert user
-            let user = await this._users.findByEmail(defaultCtx, profile.email);
+            let user = await this._users.findByEmail(defaultServerContext, profile.email);
             if (!user) {
-                user = await this._users.create(defaultCtx, {
+                user = await this._users.create(defaultServerContext, {
                     email:       profile.email,
                     displayName: profile.displayName,
                     avatarUrl:   profile.avatarUrl,
                 });
             } else if (profile.displayName || profile.avatarUrl) {
-                user = (await this._users.update(defaultCtx, user.id, {
+                user = (await this._users.update(defaultServerContext, user.id, {
                     displayName: profile.displayName ?? user.displayName,
                     avatarUrl:   profile.avatarUrl   ?? user.avatarUrl,
                 })) ?? user;
             }
 
             // Upsert identity
-            let identity = await this._identities.findByProvider(defaultCtx, req.provider, profile.providerUserId);
+            let identity = await this._identities.findByProvider(defaultServerContext, req.provider, profile.providerUserId);
             if (!identity) {
-                identity = await this._identities.create(defaultCtx, {
+                identity = await this._identities.create(defaultServerContext, {
                     provider:       req.provider,
                     providerUserId: profile.providerUserId,
                     providerEmail:  profile.email,
@@ -116,7 +116,7 @@ export class CallbackComponent extends FlowComponent {
                     userId:         user.id,
                 });
             } else {
-                await this._identities.updateTokens(defaultCtx, identity.id, {
+                await this._identities.updateTokens(defaultServerContext, identity.id, {
                     accessToken:    tokens.accessToken,
                     refreshToken:   tokens.refreshToken,
                     tokenExpiresAt: tokens.expiresAt,
@@ -124,11 +124,11 @@ export class CallbackComponent extends FlowComponent {
             }
 
             // Upsert device
-            const device = await this._devices.findOrCreate(defaultCtx, user.id, req.device);
+            const device = await this._devices.findOrCreate(defaultServerContext, user.id, req.device);
 
             // Create session (store in both TripleStore and Redis/memory)
             const expiresAt = new Date(Date.now() + SESSION_TTL_SECS * 1000);
-            const session   = await this._sessRepo.create(defaultCtx, {
+            const session   = await this._sessRepo.create(defaultServerContext, {
                 userId:    user.id,
                 deviceId:  device.id,
                 expiresAt,

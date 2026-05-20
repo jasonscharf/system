@@ -11,6 +11,7 @@
     { "path": "../core" },
     { "path": "../data" },
     { "path": "../flow" },
+    { "path": "../server" },
     { "path": "../vaults" }
   ],
   "include": ["src"]

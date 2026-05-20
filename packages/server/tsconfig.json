@@ -6,10 +6,7 @@
     "outDir": "dist"
   },
   "references": [
-    { "path": "../core" },
-    { "path": "../data"   },
-    { "path": "../gen"    },
-    { "path": "../server" }
+    { "path": "../core" }
   ],
   "include": ["src"]
 }

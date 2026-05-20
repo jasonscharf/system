@@ -8,7 +8,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Knex } from 'knex';
 import { IRI, DEFAULT_GRAPH, type BlankNode, type Literal, type Quad } from '@jasonscharf/core';
-import { createDataContext, TripleStore, noCtx, type QuadPattern, type ServerContext } from '@jasonscharf/data';
+import { createDataContext, TripleStore } from '@jasonscharf/data';
+import { defaultServerContext, type ServerContext } from '@jasonscharf/server';
 import { down as migration001Down } from '../../../data/src/migrations/001_init.js';
 
 
@@ -349,7 +350,7 @@ describe('TripleStore: find graph:null + delete with explicit graph', () => {
     it('find({graph:null}) returns quads in the default graph', async () => {
         const knex = await createDataContext({ client: 'sqlite', filename: ':memory:' });
         const store = new TripleStore(knex);
-        const ctx = noCtx;
+        const ctx = defaultServerContext;
         const s = iri('http://example.org/s');
         const p = iri('http://example.org/p');
         const o = iri('http://example.org/o');
@@ -362,7 +363,7 @@ describe('TripleStore: find graph:null + delete with explicit graph', () => {
     it('delete({graph: iri}) deletes quads in a named graph', async () => {
         const knex = await createDataContext({ client: 'sqlite', filename: ':memory:' });
         const store = new TripleStore(knex);
-        const ctx = noCtx;
+        const ctx = defaultServerContext;
         const g = iri('http://example.org/g');
         await store.insert(ctx, { subject: iri('http://s'), predicate: iri('http://p'), object: iri('http://o'), graph: g });
         const deleted = await store.delete(ctx, { graph: g });

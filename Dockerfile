@@ -75,7 +75,8 @@ ENTRYPOINT ["node", "packages/sandbox-server/dist/index.js"]
 #
 FROM base AS web-build
 
-RUN yarn workspace @system/sandbox-web build
+# Note: Cached in GH actions for some reason @jasonscharf @system
+RUN yarn workspace @jasonscharf/sandbox-web build
 
 
 # ── Web  —  nginx static files + reverse proxy ───────────────────────────────

@@ -574,14 +574,14 @@ for (const db of providers) {
         let knex:  Knex;
         let trx:   Knex.Transaction;
         let store: TripleStore;
-        let es:    import('@system/entities').EntityStore;
+        let es:    import('@jasonscharf/server').EntityStore;
         let ctx:   { trx: Knex.Transaction };
 
         beforeEach(async () => {
             knex  = await db.create();
             trx   = await knex.transaction();
             store = new TripleStore(knex);
-            const { EntityStore } = await import('@system/entities');
+            const { EntityStore } = await import('@jasonscharf/server');
             es  = new EntityStore(store);
             ctx = { trx };
         });

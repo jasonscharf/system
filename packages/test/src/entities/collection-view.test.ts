@@ -24,9 +24,8 @@ import { UserSchema, CoreHandle } from '@jasonscharf/auth';
 import {
     handle,
     EntitySchema,
-    EntityStore,
-    CollectionViewStore,
 } from '@jasonscharf/entities';
+import { EntityStore, CollectionViewStore } from '@jasonscharf/server';
 
 
 // ── Provider matrix ───────────────────────────────────────────────────────────

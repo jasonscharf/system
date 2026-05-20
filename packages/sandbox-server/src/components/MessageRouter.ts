@@ -1,5 +1,5 @@
-import { FlowComponent, FlowPort, type FlowComponentOptions } from '@system/flow';
-import { type Dispatcher } from '@system/app';
+import { FlowComponent, FlowPort, type FlowComponentOptions } from '@jasonscharf/flow';
+import { type Dispatcher } from '@jasonscharf/app';
 import type { IncomingMessage } from './MessageDecoder.js';
 import type { OutgoingMessage } from './MessageEncoder.js';
 

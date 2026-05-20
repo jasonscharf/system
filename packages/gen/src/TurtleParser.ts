@@ -1,6 +1,6 @@
-import { IRI } from '@system/core';
-import { blankNode, literal } from '@system/core';
-import type { Triple, RdfSubject, RdfObject } from '@system/core';
+import { IRI } from '@jasonscharf/core';
+import { blankNode, literal } from '@jasonscharf/core';
+import type { Triple, RdfSubject, RdfObject } from '@jasonscharf/core';
 
 
 const RDF_TYPE    = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';

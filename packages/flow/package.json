@@ -1,5 +1,5 @@
 {
-  "name": "@system/flow",
+  "name": "@jasonscharf/flow",
   "version": "0.1.0",
   "type": "module",
   "exports": {
@@ -33,7 +33,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@system/core": "workspace:^",
+    "@jasonscharf/core": "workspace:^",
     "ws": "^8.18.0"
   },
   "devDependencies": {

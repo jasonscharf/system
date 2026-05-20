@@ -1,10 +1,10 @@
 import { randomBytes } from 'node:crypto';
-import { EntitySchema, handle } from '@system/entities';
+import { EntitySchema, handle } from '@jasonscharf/entities';
 import {
     UserSessionIRI,
     sessionTokenIRI, expiresAtIRI, isActiveIRI, ipAddressIRI,
     createdAtIRI, sessionUserIRI, sessionDeviceIRI,
-} from '@system/core';
+} from '@jasonscharf/core';
 import { AUTH_NS } from '../constants.js';
 
 

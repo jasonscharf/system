@@ -1,4 +1,4 @@
-import { IRI } from '@system/core';
+import { IRI } from '@jasonscharf/core';
 import { randomBytes } from 'node:crypto';
 import { AUTH_NS } from '../constants.js';
 

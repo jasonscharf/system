@@ -1,9 +1,9 @@
 import type { Knex } from 'knex';
-import type { ApplicationContext, Logger } from '@system/core';
+import type { ApplicationContext, Logger } from '@jasonscharf/core';
 
 // Re-export core types so callers can import everything from @system/data
 export type { ApplicationContext, Logger };
-export { noCtx } from '@system/core';
+export { noCtx } from '@jasonscharf/core';
 
 /**
  * Server-side context — extends ApplicationContext with an optional Knex

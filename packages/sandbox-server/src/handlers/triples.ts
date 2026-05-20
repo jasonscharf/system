@@ -1,6 +1,6 @@
-import { okResult, errResult, TERN_TYPES, type IRI, type BlankNode, type Literal, type TernRequest, type TernResult } from '@system/core';
-import { TripleStore, noCtx, type QuadPattern } from '@system/data';
-import type { HandlerContext } from '@system/app';
+import { okResult, errResult, TERN_TYPES, type IRI, type BlankNode, type Literal, type TernRequest, type TernResult } from '@jasonscharf/core';
+import { TripleStore, noCtx, type QuadPattern } from '@jasonscharf/data';
+import type { HandlerContext } from '@jasonscharf/app';
 
 
 type RdfTerm = IRI | BlankNode | Literal;

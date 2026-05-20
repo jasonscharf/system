@@ -1,4 +1,4 @@
-import type { ShaclNodeShape, ShaclPropertyShape } from '@system/gen';
+import type { ShaclNodeShape, ShaclPropertyShape } from '@jasonscharf/gen';
 
 
 export interface ValidationViolation {

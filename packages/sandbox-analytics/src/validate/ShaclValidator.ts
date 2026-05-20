@@ -1,2 +1,2 @@
-export { validate } from '@system/gen';
-export type { ValidationResult, ValidationViolation } from '@system/gen';
+export { validate } from '@jasonscharf/gen';
+export type { ValidationResult, ValidationViolation } from '@jasonscharf/gen';

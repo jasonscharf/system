@@ -1,10 +1,10 @@
 import { dirname, resolve } from 'node:path';
-import { FlowApp } from '@system/flow';
+import { FlowApp } from '@jasonscharf/flow';
 import type { HandlerEntry } from './config/types.js';
 import { loadAppConfig, mergeHandlers } from './config/loader.js';
 import { HandlerRegistry, type HandlerContext, type HandlerFn } from './registry/HandlerRegistry.js';
 import type { AppConfig } from './config/types.js';
-import type { TernTypeRef } from '@system/core';
+import type { TernTypeRef } from '@jasonscharf/core';
 
 
 export interface TernAppOptions {

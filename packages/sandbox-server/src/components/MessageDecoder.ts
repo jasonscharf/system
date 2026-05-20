@@ -1,6 +1,6 @@
-import { FlowComponent, FlowPort, type FlowComponentOptions } from '@system/flow';
-import { isTernRequest, type TernRequest } from '@system/core';
-import type { WsMessage } from '@system/flow';
+import { FlowComponent, FlowPort, type FlowComponentOptions } from '@jasonscharf/flow';
+import { isTernRequest, type TernRequest } from '@jasonscharf/core';
+import type { WsMessage } from '@jasonscharf/flow';
 
 
 export interface IncomingMessage {

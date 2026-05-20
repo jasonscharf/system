@@ -1,5 +1,5 @@
-import { IRI, literal, quad, type Quad } from '@system/core';
-import { uuidv4Binary } from '@system/core';
+import { IRI, literal, quad, type Quad } from '@jasonscharf/core';
+import { uuidv4Binary } from '@jasonscharf/core';
 import type { FlowContext } from './FlowContext.js';
 import type { FlowNode } from './FlowNode.js';
 import { FlowPort } from './FlowPort.js';

@@ -1,8 +1,8 @@
-import { IRI } from '@system/core';
-import { blankNode } from '@system/core';
-import { literal } from '@system/core';
-import { DEFAULT_GRAPH } from '@system/core';
-import { triple, quad } from '@system/core';
+import { IRI } from '@jasonscharf/core';
+import { blankNode } from '@jasonscharf/core';
+import { literal } from '@jasonscharf/core';
+import { DEFAULT_GRAPH } from '@jasonscharf/core';
+import { triple, quad } from '@jasonscharf/core';
 
 import { describe, expect, it } from 'vitest';
 

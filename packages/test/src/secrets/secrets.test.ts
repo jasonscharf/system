@@ -6,7 +6,7 @@ import {
     AzureKeyVaultProvider,
     SecretsManager,
     type ISecretsProvider,
-} from '@system/vaults';
+} from '@jasonscharf/vaults';
 
 
 // ── EnvSecretsProvider ────────────────────────────────────────────────────────

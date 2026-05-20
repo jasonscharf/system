@@ -8,7 +8,7 @@ import type { ShaclShapes } from './ShaclReader.js';
 import { generateAugmentedTypes } from './TypeGenerator.js';
 import type { AugmentedGenConfig } from './TypeGenerator.js';
 import { generateShapesDescriptor } from './ShapeGenerator.js';
-import type { Triple } from '@system/core';
+import type { Triple } from '@jasonscharf/core';
 
 
 export interface BaseOntologyConfig {

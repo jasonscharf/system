@@ -1,4 +1,4 @@
-import type { TernRequest, TernResult } from '@system/core';
+import type { TernRequest, TernResult } from '@jasonscharf/core';
 
 
 /**

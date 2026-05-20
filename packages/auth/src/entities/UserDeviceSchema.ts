@@ -1,9 +1,9 @@
-import { EntitySchema, handle } from '@system/entities';
+import { EntitySchema, handle } from '@jasonscharf/entities';
 import {
     UserDeviceIRI,
     deviceNameIRI, devicePlatformIRI, deviceUserAgentIRI,
     createdAtIRI, deviceUserIRI,
-} from '@system/core';
+} from '@jasonscharf/core';
 import { AUTH_NS } from '../constants.js';
 
 

@@ -13,10 +13,10 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { FlowApp, HttpServer, HttpDecoder, HttpEncoder, HttpRouter } from '@system/flow';
-import { WebSocketServer } from '@system/flow';
-import { TernApp } from '@system/app';
-import { createDataContext, TripleStore, defaultCtx } from '@system/data';
+import { FlowApp, HttpServer, HttpDecoder, HttpEncoder, HttpRouter } from '@jasonscharf/flow';
+import { WebSocketServer } from '@jasonscharf/flow';
+import { TernApp } from '@jasonscharf/app';
+import { createDataContext, TripleStore, defaultCtx } from '@jasonscharf/data';
 import {
     AuthRouterComponent,
     GoogleProvider,
@@ -27,8 +27,8 @@ import {
     UserIdentityRepository,
     UserSessionRepository,
     UserDeviceRepository,
-} from '@system/auth';
-import { SecretsManager } from '@system/vaults';
+} from '@jasonscharf/auth';
+import { SecretsManager } from '@jasonscharf/vaults';
 import { MessageDecoder } from './components/MessageDecoder.js';
 import { MessageEncoder } from './components/MessageEncoder.js';
 import { MessageRouter } from './components/MessageRouter.js';

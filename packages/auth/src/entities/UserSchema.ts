@@ -1,9 +1,9 @@
-import { EntitySchema, handle } from '@system/entities';
+import { EntitySchema, handle } from '@jasonscharf/entities';
 import {
     UserIRI,
     emailIRI, displayNameIRI, avatarUrlIRI,
     createdAtIRI, updatedAtIRI,
-} from '@system/core';
+} from '@jasonscharf/core';
 import { AUTH_NS } from '../constants.js';
 
 
@@ -17,7 +17,7 @@ export const CoreHandle = handle('tern:core');
  * EntitySchema for auth:User.
  *
  * Downstream packages extend it at startup:
- *   import { UserSchema } from '@system/auth';
+ *   import { UserSchema } from '@jasonscharf/auth';
  *   UserSchema.register(myPropGroup);
  */
 export const UserSchema = new EntitySchema({

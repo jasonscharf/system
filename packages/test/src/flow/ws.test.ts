@@ -10,7 +10,7 @@ import {
     WebSocketWriter,
     WebSocketServer,
     WebSocketClient,
-} from '@system/flow';
+} from '@jasonscharf/flow';
 
 
 // ── Helper: wait for a port to receive a message ─────────────────────────────

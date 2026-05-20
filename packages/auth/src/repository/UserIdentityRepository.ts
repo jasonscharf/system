@@ -1,11 +1,11 @@
-import { IRI, literal } from '@system/core';
+import { IRI, literal } from '@jasonscharf/core';
 import {
     UserIdentityIRI,
     providerIRI, providerUserIdIRI, providerEmailIRI,
     accessTokenIRI, refreshTokenIRI, tokenExpiresAtIRI,
     identityOfIRI, createdAtIRI, updatedAtIRI,
-} from '@system/core';
-import type { TripleStore, ServerContext } from '@system/data';
+} from '@jasonscharf/core';
+import type { TripleStore, ServerContext } from '@jasonscharf/data';
 import { AUTH_GRAPH, RDF_TYPE, XSD_STRING, XSD_DATETIME } from '../constants.js';
 import type { UserIdentityEntity, OAuthProvider } from '../types.js';
 import { newId, iriFor, idFrom } from './util.js';

@@ -1,4 +1,4 @@
-import { IRI } from '@system/core';
+import { IRI } from '@jasonscharf/core';
 
 
 export const AUTH_NS    = 'http://tern.dev/ns/auth/';

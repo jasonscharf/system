@@ -1,5 +1,5 @@
 {
-  "name": "@system/worker",
+  "name": "@jasonscharf/worker",
   "version": "0.1.0",
   "type": "module",
   "exports": {

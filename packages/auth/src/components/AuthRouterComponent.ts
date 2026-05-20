@@ -1,6 +1,6 @@
-import { FlowComponent, HttpRouter, type FlowComponentOptions, type HttpMiddlewareFn } from '@system/flow';
-import { FlowPort } from '@system/flow';
-import type { ParsedHttpRequest, HttpResponseDraft } from '@system/flow';
+import { FlowComponent, HttpRouter, type FlowComponentOptions, type HttpMiddlewareFn } from '@jasonscharf/flow';
+import { FlowPort } from '@jasonscharf/flow';
+import type { ParsedHttpRequest, HttpResponseDraft } from '@jasonscharf/flow';
 import { AuthService } from '../AuthService.js';
 import { OAuthComponent } from './OAuthComponent.js';
 import { CallbackComponent } from './CallbackComponent.js';

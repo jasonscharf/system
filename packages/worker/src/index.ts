@@ -1,4 +1,4 @@
-import { IRI } from '@system/core';
+import { IRI } from '@jasonscharf/core';
 
 
 console.log('--- Worker start ---')

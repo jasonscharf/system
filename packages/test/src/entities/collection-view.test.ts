@@ -18,15 +18,15 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Knex } from 'knex';
-import { IRI } from '@system/core';
-import { createDataContext, TripleStore } from '@system/data';
-import { UserSchema, CoreHandle } from '@system/auth';
+import { IRI } from '@jasonscharf/core';
+import { createDataContext, TripleStore } from '@jasonscharf/data';
+import { UserSchema, CoreHandle } from '@jasonscharf/auth';
 import {
     handle,
     EntitySchema,
     EntityStore,
     CollectionViewStore,
-} from '@system/entities';
+} from '@jasonscharf/entities';
 
 
 // ── Provider matrix ───────────────────────────────────────────────────────────

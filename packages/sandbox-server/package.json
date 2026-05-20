@@ -1,5 +1,5 @@
 {
-  "name": "@system/sandbox-server",
+  "name": "@jasonscharf/sandbox-server",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -10,12 +10,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@system/app": "workspace:^",
-    "@system/auth": "workspace:^",
-    "@system/core": "workspace:^",
-    "@system/data": "workspace:^",
-    "@system/flow": "workspace:^",
-    "@system/vaults": "workspace:^",
+    "@jasonscharf/app": "workspace:^",
+    "@jasonscharf/auth": "workspace:^",
+    "@jasonscharf/core": "workspace:^",
+    "@jasonscharf/data": "workspace:^",
+    "@jasonscharf/flow": "workspace:^",
+    "@jasonscharf/vaults": "workspace:^",
     "better-sqlite3": "^11.10.0",
     "ioredis": "^5.6.1",
     "pg": "^8.16.0"

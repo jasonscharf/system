@@ -1,5 +1,5 @@
 {
-  "name": "@system/sandbox-web",
+  "name": "@jasonscharf/sandbox-web",
   "version": "0.1.0",
   "type": "module",
   "private": true,
@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@system/core": "workspace:^",
-    "@system/flow": "workspace:^",
+    "@jasonscharf/core": "workspace:^",
+    "@jasonscharf/flow": "workspace:^",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   },

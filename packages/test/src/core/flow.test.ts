@@ -1,4 +1,4 @@
-import { FlowComponent, FlowContext } from '@system/flow';
+import { FlowComponent, FlowContext } from '@jasonscharf/flow';
 
 import { describe, expect, it } from 'vitest';
 

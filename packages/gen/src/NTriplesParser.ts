@@ -1,6 +1,6 @@
-import { IRI } from '@system/core';
-import { blankNode, literal } from '@system/core';
-import type { Triple, RdfSubject, RdfObject } from '@system/core';
+import { IRI } from '@jasonscharf/core';
+import { blankNode, literal } from '@jasonscharf/core';
+import type { Triple, RdfSubject, RdfObject } from '@jasonscharf/core';
 
 
 // XSD string IRI — the implicit datatype for untyped plain literals

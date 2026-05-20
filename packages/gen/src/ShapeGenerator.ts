@@ -43,7 +43,7 @@ export function generateShapesDescriptor(shapes: ShaclShapes): string {
 
     const lines: string[] = [
         `// auto-generated shapes descriptor — do not edit by hand`,
-        `import type { ShaclShapes, ShaclNodeShape } from '@system/gen';`,
+        `import type { ShaclShapes, ShaclNodeShape } from '@jasonscharf/gen';`,
         ``,
         `const list: ShaclNodeShape[] = [`,
         ...shapeList.map(shape => renderNodeShape(shape) + ','),

@@ -1,4 +1,4 @@
-import { deepFreeze, exists, flush, randomUInt8Array, repeat, shannonEntropy, sleep, uint8ToHex, uuidToHex, uuidv4Binary } from '@system/core';
+import { deepFreeze, exists, flush, randomUInt8Array, repeat, shannonEntropy, sleep, uint8ToHex, uuidToHex, uuidv4Binary } from '@jasonscharf/core';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

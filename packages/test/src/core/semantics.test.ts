@@ -1,4 +1,4 @@
-import { IRI, PrefixRegistry } from '@system/core';
+import { IRI, PrefixRegistry } from '@jasonscharf/core';
 
 import { describe, expect, it } from 'vitest';
 

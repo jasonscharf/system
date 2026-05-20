@@ -1,5 +1,5 @@
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
-import { uuidv4Binary } from '@system/core';
+import { uuidv4Binary } from '@jasonscharf/core';
 import { FlowComponent, type FlowComponentOptions } from '../../FlowComponent.js';
 import { FlowPort } from '../../FlowPort.js';
 import { LocalTransport } from '../../FlowTransport.js';

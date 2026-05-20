@@ -21,7 +21,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { Knex } from 'knex';
-import { createDataContext, TripleStore } from '@system/data';
+import { createDataContext, TripleStore } from '@jasonscharf/data';
 import {
     AuthService,
     GoogleProvider,
@@ -30,7 +30,7 @@ import {
     UserIdentityRepository,
     UserSessionRepository,
     UserDeviceRepository,
-} from '@system/auth';
+} from '@jasonscharf/auth';
 
 
 // ── Provider matrix ───────────────────────────────────────────────────────────

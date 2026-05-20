@@ -1,4 +1,4 @@
-import { uuidv4Binary } from '@system/core';
+import { uuidv4Binary } from '@jasonscharf/core';
 
 
 export interface FlowMessage<T = unknown> {

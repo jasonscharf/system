@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { IRI } from '@system/core';
+import { IRI } from '@jasonscharf/core';
 import {
     FlowApp,
     FlowComponent,
@@ -16,7 +16,7 @@ import {
     type IDisposable,
     type PortDirection,
     type ScheduleMode,
-} from '@system/flow';
+} from '@jasonscharf/flow';
 
 
 // ── Test components ────────────────────────────────────────────────────────────

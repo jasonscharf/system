@@ -1,5 +1,5 @@
-import type { IRI } from '@system/core';
-import type { ShaclNodeShape } from '@system/gen';
+import type { IRI } from '@jasonscharf/core';
+import type { ShaclNodeShape } from '@jasonscharf/gen';
 import type { EntityHandle } from './Handle.js';
 
 

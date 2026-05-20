@@ -1,4 +1,4 @@
-import { errResult, type TernRequest, type TernResult, type TernTypeRef } from '@system/core';
+import { errResult, type TernRequest, type TernResult, type TernTypeRef } from '@jasonscharf/core';
 import { compose, type MiddlewareFn, type Next } from './compose.js';
 import type { Dispatcher } from './Dispatcher.js';
 

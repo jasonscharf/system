@@ -14,9 +14,9 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Knex } from 'knex';
-import { IRI } from '@system/core';
-import { createDataContext, TripleStore } from '@system/data';
-import { UserSchema, CoreHandle } from '@system/auth';
+import { IRI } from '@jasonscharf/core';
+import { createDataContext, TripleStore } from '@jasonscharf/data';
+import { UserSchema, CoreHandle } from '@jasonscharf/auth';
 import {
     handle,
     handleSlug,
@@ -25,9 +25,9 @@ import {
     entities,
     groupOf,
     EntityValidationError,
-} from '@system/entities';
+} from '@jasonscharf/entities';
 import { invertPropertyMap, propertyMapFor, fromLiteral } from '../../../entities/src/util.js';
-import type { ShaclNodeShape } from '@system/gen';
+import type { ShaclNodeShape } from '@jasonscharf/gen';
 
 
 // ── Provider matrix (mirrors the pattern in triples.test.ts) ─────────────────

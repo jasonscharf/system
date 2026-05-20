@@ -6,8 +6,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { Knex } from 'knex';
-import { IRI } from '@system/core';
-import { createDataContext, TripleStore } from '@system/data';
+import { IRI } from '@jasonscharf/core';
+import { createDataContext, TripleStore } from '@jasonscharf/data';
 import {
     UserRepository,
     UserIdentityRepository,
@@ -32,9 +32,9 @@ import {
     UserSchema, CoreHandle,
     UserDeviceSchema, DeviceCoreHandle,
     UserSessionSchema, SessionCoreHandle,
-} from '@system/auth';
-import { EntityStore } from '@system/entities';
-import { FlowContext, PushScheduler } from '@system/flow';
+} from '@jasonscharf/auth';
+import { EntityStore } from '@jasonscharf/entities';
+import { FlowContext, PushScheduler } from '@jasonscharf/flow';
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

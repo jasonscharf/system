@@ -5,7 +5,7 @@ import type { UserRepository } from './repository/UserRepository.js';
 import type { UserIdentityRepository } from './repository/UserIdentityRepository.js';
 import type { UserSessionRepository } from './repository/UserSessionRepository.js';
 import type { UserDeviceRepository } from './repository/UserDeviceRepository.js';
-import { defaultCtx } from '@system/data';
+import { defaultCtx } from '@jasonscharf/data';
 import { SESSION_TTL_SECS } from './constants.js';
 import type {
     DeviceInfo, OAuthProvider,

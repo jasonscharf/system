@@ -184,7 +184,7 @@ export function generateAugmentedTypes(
 export function generateTypes(ontology: Ontology, sourceFile: string): string {
     const lines: string[] = [
         `// auto-generated from ${sourceFile} — do not edit by hand`,
-        `import { IRI } from '@system/core';`,
+        `import { IRI } from '@jasonscharf/core';`,
         '',
     ];
 

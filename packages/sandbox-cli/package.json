@@ -1,5 +1,5 @@
 {
-  "name": "@system/sandbox-cli",
+  "name": "@jasonscharf/sandbox-cli",
   "version": "0.1.0",
   "type": "module",
   "bin": {
@@ -13,7 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@system/core": "workspace:^",
-    "@system/flow": "workspace:^"
+    "@jasonscharf/core": "workspace:^",
+    "@jasonscharf/flow": "workspace:^"
   }
 }

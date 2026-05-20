@@ -1,5 +1,5 @@
-import { okResult, errResult, TERN_TYPES, type TernRequest, type TernResult } from '@system/core';
-import type { HandlerContext } from '@system/app';
+import { okResult, errResult, TERN_TYPES, type TernRequest, type TernResult } from '@jasonscharf/core';
+import type { HandlerContext } from '@jasonscharf/app';
 
 
 interface EchoPayload {

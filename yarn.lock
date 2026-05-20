@@ -1111,6 +1111,206 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@jasonscharf/api@workspace:^, @jasonscharf/api@workspace:packages/api":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/api@workspace:packages/api"
+  dependencies:
+    "@jasonscharf/core": "workspace:^"
+    "@types/koa": "npm:^3"
+    "@types/koa-bodyparser": "npm:^4"
+    koa: "npm:^3.1.1"
+    koa-bodyparser: "npm:^4.4.1"
+    koa-router: "npm:^14.0.0"
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/app@workspace:^, @jasonscharf/app@workspace:packages/app":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/app@workspace:packages/app"
+  dependencies:
+    "@jasonscharf/core": "workspace:^"
+    "@jasonscharf/flow": "workspace:^"
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/auth@workspace:^, @jasonscharf/auth@workspace:packages/auth":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/auth@workspace:packages/auth"
+  dependencies:
+    "@jasonscharf/core": "workspace:^"
+    "@jasonscharf/data": "workspace:^"
+    "@jasonscharf/entities": "workspace:^"
+    "@jasonscharf/flow": "workspace:^"
+    "@types/node": "npm:^22.0.0"
+    ioredis: "npm:^5.6.1"
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/core@workspace:^, @jasonscharf/core@workspace:packages/core":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/core@workspace:packages/core"
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/data@workspace:^, @jasonscharf/data@workspace:packages/data":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/data@workspace:packages/data"
+  dependencies:
+    "@jasonscharf/core": "workspace:^"
+    "@types/better-sqlite3": "npm:^7.6.12"
+    better-sqlite3: "npm:^11.10.0"
+    knex: "npm:^3.1.0"
+  peerDependencies:
+    better-sqlite3: ^11.0.0
+    pg: ^8.0.0
+  peerDependenciesMeta:
+    pg:
+      optional: true
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/entities@workspace:^, @jasonscharf/entities@workspace:packages/entities":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/entities@workspace:packages/entities"
+  dependencies:
+    "@jasonscharf/core": "workspace:^"
+    "@jasonscharf/data": "workspace:^"
+    "@jasonscharf/gen": "workspace:^"
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/flow@workspace:^, @jasonscharf/flow@workspace:packages/flow":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/flow@workspace:packages/flow"
+  dependencies:
+    "@jasonscharf/core": "workspace:^"
+    "@types/ws": "npm:^8.5.14"
+    ws: "npm:^8.18.0"
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/gen@workspace:^, @jasonscharf/gen@workspace:packages/gen":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/gen@workspace:packages/gen"
+  dependencies:
+    "@jasonscharf/core": "workspace:^"
+  bin:
+    tern-codegen: ./dist/bin.js
+    tern-gen: ./dist/bin.js
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/sandbox-analytics@workspace:packages/sandbox-analytics":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/sandbox-analytics@workspace:packages/sandbox-analytics"
+  dependencies:
+    "@jasonscharf/auth": "workspace:^"
+    "@jasonscharf/core": "workspace:^"
+    "@jasonscharf/entities": "workspace:^"
+    "@jasonscharf/gen": "workspace:^"
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/sandbox-cli@workspace:packages/sandbox-cli":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/sandbox-cli@workspace:packages/sandbox-cli"
+  dependencies:
+    "@jasonscharf/core": "workspace:^"
+    "@jasonscharf/flow": "workspace:^"
+  bin:
+    sandbox: ./dist/bin.js
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/sandbox-server@workspace:packages/sandbox-server":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/sandbox-server@workspace:packages/sandbox-server"
+  dependencies:
+    "@jasonscharf/app": "workspace:^"
+    "@jasonscharf/auth": "workspace:^"
+    "@jasonscharf/core": "workspace:^"
+    "@jasonscharf/data": "workspace:^"
+    "@jasonscharf/flow": "workspace:^"
+    "@jasonscharf/vaults": "workspace:^"
+    better-sqlite3: "npm:^11.10.0"
+    ioredis: "npm:^5.6.1"
+    pg: "npm:^8.16.0"
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/sandbox-web@workspace:packages/sandbox-web":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/sandbox-web@workspace:packages/sandbox-web"
+  dependencies:
+    "@jasonscharf/core": "workspace:^"
+    "@jasonscharf/flow": "workspace:^"
+    "@types/react": "npm:^19"
+    "@types/react-dom": "npm:^19"
+    "@vitejs/plugin-react": "npm:^4.0.0"
+    react: "npm:^19.2.3"
+    react-dom: "npm:^19.2.3"
+    vite: "npm:^6.0.0"
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/test@workspace:packages/test":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/test@workspace:packages/test"
+  dependencies:
+    "@istanbuljs/nyc-config-typescript": "npm:^1.0.2"
+    "@jasonscharf/api": "workspace:^"
+    "@jasonscharf/app": "workspace:^"
+    "@jasonscharf/auth": "workspace:^"
+    "@jasonscharf/core": "workspace:^"
+    "@jasonscharf/data": "workspace:^"
+    "@jasonscharf/entities": "workspace:^"
+    "@jasonscharf/flow": "workspace:^"
+    "@jasonscharf/gen": "workspace:^"
+    "@jasonscharf/vaults": "workspace:^"
+    "@jasonscharf/worker": "workspace:^"
+    "@playwright/test": "npm:^1.57.0"
+    "@testing-library/dom": "npm:^10.4.1"
+    "@testing-library/jest-dom": "npm:^6.9.1"
+    "@testing-library/react": "npm:^16.3.1"
+    "@types/react": "npm:^19"
+    "@types/react-dom": "npm:^19"
+    "@vitest/coverage-istanbul": "npm:4.0.16"
+    "@vitest/coverage-v8": "npm:^4.0.16"
+    jsdom: "npm:^27.4.0"
+    nyc: "npm:^17.1.0"
+    playwright-coverage: "npm:^0.0.1-security"
+    react: "npm:^19.2.3"
+    react-dom: "npm:^19.2.3"
+    vitest: "npm:^4.0.16"
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/vaults@workspace:^, @jasonscharf/vaults@workspace:packages/vaults":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/vaults@workspace:packages/vaults"
+  dependencies:
+    "@azure/identity": "npm:^4.4.1"
+    "@azure/keyvault-secrets": "npm:^4.8.0"
+    "@types/node": "npm:^22.0.0"
+  peerDependencies:
+    "@azure/identity": ^4.0.0
+    "@azure/keyvault-secrets": ^4.0.0
+  peerDependenciesMeta:
+    "@azure/identity":
+      optional: true
+    "@azure/keyvault-secrets":
+      optional: true
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/worker@workspace:^, @jasonscharf/worker@workspace:packages/worker":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/worker@workspace:packages/worker"
+  dependencies:
+    nodemon: "npm:^3.1.11"
+  languageName: unknown
+  linkType: soft
+
 "@jridgewell/gen-mapping@npm:^0.3.12, @jridgewell/gen-mapping@npm:^0.3.13, @jridgewell/gen-mapping@npm:^0.3.5":
   version: 0.3.13
   resolution: "@jridgewell/gen-mapping@npm:0.3.13"
@@ -1530,206 +1730,6 @@ __metadata:
   checksum: 10c0/d90f55acde4b2deb983529c87e8025fa693de1a5e8b49ecc6eb84d1fd96328add0e03d7d551442156c7432fd78165b2c26ff561b970a9a881f046abb78d6a526
   languageName: node
   linkType: hard
-
-"@system/api@workspace:^, @system/api@workspace:packages/api":
-  version: 0.0.0-use.local
-  resolution: "@system/api@workspace:packages/api"
-  dependencies:
-    "@system/core": "workspace:^"
-    "@types/koa": "npm:^3"
-    "@types/koa-bodyparser": "npm:^4"
-    koa: "npm:^3.1.1"
-    koa-bodyparser: "npm:^4.4.1"
-    koa-router: "npm:^14.0.0"
-  languageName: unknown
-  linkType: soft
-
-"@system/app@workspace:^, @system/app@workspace:packages/app":
-  version: 0.0.0-use.local
-  resolution: "@system/app@workspace:packages/app"
-  dependencies:
-    "@system/core": "workspace:^"
-    "@system/flow": "workspace:^"
-  languageName: unknown
-  linkType: soft
-
-"@system/auth@workspace:^, @system/auth@workspace:packages/auth":
-  version: 0.0.0-use.local
-  resolution: "@system/auth@workspace:packages/auth"
-  dependencies:
-    "@system/core": "workspace:^"
-    "@system/data": "workspace:^"
-    "@system/entities": "workspace:^"
-    "@system/flow": "workspace:^"
-    "@types/node": "npm:^22.0.0"
-    ioredis: "npm:^5.6.1"
-  languageName: unknown
-  linkType: soft
-
-"@system/core@workspace:^, @system/core@workspace:packages/core":
-  version: 0.0.0-use.local
-  resolution: "@system/core@workspace:packages/core"
-  languageName: unknown
-  linkType: soft
-
-"@system/data@workspace:^, @system/data@workspace:packages/data":
-  version: 0.0.0-use.local
-  resolution: "@system/data@workspace:packages/data"
-  dependencies:
-    "@system/core": "workspace:^"
-    "@types/better-sqlite3": "npm:^7.6.12"
-    better-sqlite3: "npm:^11.10.0"
-    knex: "npm:^3.1.0"
-  peerDependencies:
-    better-sqlite3: ^11.0.0
-    pg: ^8.0.0
-  peerDependenciesMeta:
-    pg:
-      optional: true
-  languageName: unknown
-  linkType: soft
-
-"@system/entities@workspace:^, @system/entities@workspace:packages/entities":
-  version: 0.0.0-use.local
-  resolution: "@system/entities@workspace:packages/entities"
-  dependencies:
-    "@system/core": "workspace:^"
-    "@system/data": "workspace:^"
-    "@system/gen": "workspace:^"
-  languageName: unknown
-  linkType: soft
-
-"@system/flow@workspace:^, @system/flow@workspace:packages/flow":
-  version: 0.0.0-use.local
-  resolution: "@system/flow@workspace:packages/flow"
-  dependencies:
-    "@system/core": "workspace:^"
-    "@types/ws": "npm:^8.5.14"
-    ws: "npm:^8.18.0"
-  languageName: unknown
-  linkType: soft
-
-"@system/gen@workspace:^, @system/gen@workspace:packages/gen":
-  version: 0.0.0-use.local
-  resolution: "@system/gen@workspace:packages/gen"
-  dependencies:
-    "@system/core": "workspace:^"
-  bin:
-    tern-codegen: ./dist/bin.js
-    tern-gen: ./dist/bin.js
-  languageName: unknown
-  linkType: soft
-
-"@system/sandbox-analytics@workspace:packages/sandbox-analytics":
-  version: 0.0.0-use.local
-  resolution: "@system/sandbox-analytics@workspace:packages/sandbox-analytics"
-  dependencies:
-    "@system/auth": "workspace:^"
-    "@system/core": "workspace:^"
-    "@system/entities": "workspace:^"
-    "@system/gen": "workspace:^"
-  languageName: unknown
-  linkType: soft
-
-"@system/sandbox-cli@workspace:packages/sandbox-cli":
-  version: 0.0.0-use.local
-  resolution: "@system/sandbox-cli@workspace:packages/sandbox-cli"
-  dependencies:
-    "@system/core": "workspace:^"
-    "@system/flow": "workspace:^"
-  bin:
-    sandbox: ./dist/bin.js
-  languageName: unknown
-  linkType: soft
-
-"@system/sandbox-server@workspace:packages/sandbox-server":
-  version: 0.0.0-use.local
-  resolution: "@system/sandbox-server@workspace:packages/sandbox-server"
-  dependencies:
-    "@system/app": "workspace:^"
-    "@system/auth": "workspace:^"
-    "@system/core": "workspace:^"
-    "@system/data": "workspace:^"
-    "@system/flow": "workspace:^"
-    "@system/vaults": "workspace:^"
-    better-sqlite3: "npm:^11.10.0"
-    ioredis: "npm:^5.6.1"
-    pg: "npm:^8.16.0"
-  languageName: unknown
-  linkType: soft
-
-"@system/sandbox-web@workspace:packages/sandbox-web":
-  version: 0.0.0-use.local
-  resolution: "@system/sandbox-web@workspace:packages/sandbox-web"
-  dependencies:
-    "@system/core": "workspace:^"
-    "@system/flow": "workspace:^"
-    "@types/react": "npm:^19"
-    "@types/react-dom": "npm:^19"
-    "@vitejs/plugin-react": "npm:^4.0.0"
-    react: "npm:^19.2.3"
-    react-dom: "npm:^19.2.3"
-    vite: "npm:^6.0.0"
-  languageName: unknown
-  linkType: soft
-
-"@system/test@workspace:packages/test":
-  version: 0.0.0-use.local
-  resolution: "@system/test@workspace:packages/test"
-  dependencies:
-    "@istanbuljs/nyc-config-typescript": "npm:^1.0.2"
-    "@playwright/test": "npm:^1.57.0"
-    "@system/api": "workspace:^"
-    "@system/app": "workspace:^"
-    "@system/auth": "workspace:^"
-    "@system/core": "workspace:^"
-    "@system/data": "workspace:^"
-    "@system/entities": "workspace:^"
-    "@system/flow": "workspace:^"
-    "@system/gen": "workspace:^"
-    "@system/vaults": "workspace:^"
-    "@system/worker": "workspace:^"
-    "@testing-library/dom": "npm:^10.4.1"
-    "@testing-library/jest-dom": "npm:^6.9.1"
-    "@testing-library/react": "npm:^16.3.1"
-    "@types/react": "npm:^19"
-    "@types/react-dom": "npm:^19"
-    "@vitest/coverage-istanbul": "npm:4.0.16"
-    "@vitest/coverage-v8": "npm:^4.0.16"
-    jsdom: "npm:^27.4.0"
-    nyc: "npm:^17.1.0"
-    playwright-coverage: "npm:^0.0.1-security"
-    react: "npm:^19.2.3"
-    react-dom: "npm:^19.2.3"
-    vitest: "npm:^4.0.16"
-  languageName: unknown
-  linkType: soft
-
-"@system/vaults@workspace:^, @system/vaults@workspace:packages/vaults":
-  version: 0.0.0-use.local
-  resolution: "@system/vaults@workspace:packages/vaults"
-  dependencies:
-    "@azure/identity": "npm:^4.4.1"
-    "@azure/keyvault-secrets": "npm:^4.8.0"
-    "@types/node": "npm:^22.0.0"
-  peerDependencies:
-    "@azure/identity": ^4.0.0
-    "@azure/keyvault-secrets": ^4.0.0
-  peerDependenciesMeta:
-    "@azure/identity":
-      optional: true
-    "@azure/keyvault-secrets":
-      optional: true
-  languageName: unknown
-  linkType: soft
-
-"@system/worker@workspace:^, @system/worker@workspace:packages/worker":
-  version: 0.0.0-use.local
-  resolution: "@system/worker@workspace:packages/worker"
-  dependencies:
-    nodemon: "npm:^3.1.11"
-  languageName: unknown
-  linkType: soft
 
 "@testing-library/dom@npm:^10.4.1":
   version: 10.4.1

@@ -4,8 +4,8 @@
  * Manages a WebSocket connection to the sandbox server and exposes a typed
  * request/response API used by the UI layer.
  */
-import { FlowApp, WebSocketClient } from '@system/flow';
-import { isTernResult, command, query, TERN_TYPES, type TernKind, type TernResult, type TernTypeRef } from '@system/core';
+import { FlowApp, WebSocketClient } from '@jasonscharf/flow';
+import { isTernResult, command, query, TERN_TYPES, type TernKind, type TernResult, type TernTypeRef } from '@jasonscharf/core';
 import type { StoreStats } from './types.js';
 
 

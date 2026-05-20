@@ -1,6 +1,6 @@
 import { resolve, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { errResult, type TernRequest, type TernResult, type TernTypeRef } from '@system/core';
+import { errResult, type TernRequest, type TernResult, type TernTypeRef } from '@jasonscharf/core';
 import type { Dispatcher } from '../routing/Dispatcher.js';
 import type { HandlerEntry } from '../config/types.js';
 

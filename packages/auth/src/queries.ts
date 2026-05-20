@@ -9,8 +9,8 @@
  * All queries run against the single TripleStore backing the EntityStore, so
  * they work transparently with both SQLite and PostgreSQL.
  */
-import type { EntityRecord, EntityStore, ServerContext } from '@system/entities';
-import { entities } from '@system/entities';
+import type { EntityRecord, EntityStore, ServerContext } from '@jasonscharf/entities';
+import { entities } from '@jasonscharf/entities';
 import { UserSchema, CoreHandle }               from './entities/UserSchema.js';
 import { UserDeviceSchema, DeviceCoreHandle }   from './entities/UserDeviceSchema.js';
 import { UserSessionSchema, SessionCoreHandle } from './entities/UserSessionSchema.js';

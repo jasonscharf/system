@@ -7,8 +7,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Knex } from 'knex';
-import { IRI, DEFAULT_GRAPH, type BlankNode, type Literal, type Quad } from '@system/core';
-import { createDataContext, TripleStore, noCtx, type QuadPattern, type ServerContext } from '@system/data';
+import { IRI, DEFAULT_GRAPH, type BlankNode, type Literal, type Quad } from '@jasonscharf/core';
+import { createDataContext, TripleStore, noCtx, type QuadPattern, type ServerContext } from '@jasonscharf/data';
 import { down as migration001Down } from '../../../data/src/migrations/001_init.js';
 
 

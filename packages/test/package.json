@@ -1,5 +1,5 @@
 {
-  "name": "@system/test",
+  "name": "@jasonscharf/test",
   "version": "0.1.0",
   "type": "module",
   "exports": {
@@ -23,16 +23,16 @@
     "watch": "tsc -b -w"
   },
   "dependencies": {
-    "@system/api": "workspace:^",
-    "@system/app": "workspace:^",
-    "@system/auth": "workspace:^",
-    "@system/core": "workspace:^",
-    "@system/data": "workspace:^",
-    "@system/entities": "workspace:^",
-    "@system/flow": "workspace:^",
-    "@system/gen": "workspace:^",
-    "@system/vaults": "workspace:^",
-    "@system/worker": "workspace:^",
+    "@jasonscharf/api": "workspace:^",
+    "@jasonscharf/app": "workspace:^",
+    "@jasonscharf/auth": "workspace:^",
+    "@jasonscharf/core": "workspace:^",
+    "@jasonscharf/data": "workspace:^",
+    "@jasonscharf/entities": "workspace:^",
+    "@jasonscharf/flow": "workspace:^",
+    "@jasonscharf/gen": "workspace:^",
+    "@jasonscharf/vaults": "workspace:^",
+    "@jasonscharf/worker": "workspace:^",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   },

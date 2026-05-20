@@ -2,18 +2,18 @@ import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { IRI } from '@system/core';
-import { blankNode, literal } from '@system/core';
-import { generate, generateFromConfig } from '@system/gen';
-import { parseNTriples } from '@system/gen';
-import { parseTurtle } from '@system/gen';
-import { readOntology } from '@system/gen';
-import { generateTypes, generateAugmentedTypes } from '@system/gen';
-import { readShaclShapes, mergeShapes } from '@system/gen';
-import { generateShapesDescriptor } from '@system/gen';
-import { validate } from '@system/gen';
-import type { Triple } from '@system/core';
-import type { ShaclShapes } from '@system/gen';
+import { IRI } from '@jasonscharf/core';
+import { blankNode, literal } from '@jasonscharf/core';
+import { generate, generateFromConfig } from '@jasonscharf/gen';
+import { parseNTriples } from '@jasonscharf/gen';
+import { parseTurtle } from '@jasonscharf/gen';
+import { readOntology } from '@jasonscharf/gen';
+import { generateTypes, generateAugmentedTypes } from '@jasonscharf/gen';
+import { readShaclShapes, mergeShapes } from '@jasonscharf/gen';
+import { generateShapesDescriptor } from '@jasonscharf/gen';
+import { validate } from '@jasonscharf/gen';
+import type { Triple } from '@jasonscharf/core';
+import type { ShaclShapes } from '@jasonscharf/gen';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -768,7 +768,7 @@ describe('generateAugmentedTypes', () => {
             externalClasses,
             localNamespace: LOCAL_NS,
         });
-        expect(output).toContain("import type { User } from '@system/auth'");
+        expect(output).toContain("import type { User } from '@jasonscharf/auth'");
     });
 
     it('skips external classes that have no local-namespace properties', () => {

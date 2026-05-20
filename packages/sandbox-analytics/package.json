@@ -1,5 +1,5 @@
 {
-  "name": "@system/sandbox-analytics",
+  "name": "@jasonscharf/sandbox-analytics",
   "version": "0.1.0",
   "type": "module",
   "private": true,
@@ -17,9 +17,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@system/auth": "workspace:^",
-    "@system/core": "workspace:^",
-    "@system/entities": "workspace:^",
-    "@system/gen": "workspace:^"
+    "@jasonscharf/auth": "workspace:^",
+    "@jasonscharf/core": "workspace:^",
+    "@jasonscharf/entities": "workspace:^",
+    "@jasonscharf/gen": "workspace:^"
   }
 }

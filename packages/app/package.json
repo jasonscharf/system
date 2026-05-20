@@ -1,5 +1,5 @@
 {
-  "name": "@system/app",
+  "name": "@jasonscharf/app",
   "version": "0.1.0",
   "type": "module",
   "exports": {
@@ -31,7 +31,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@system/core": "workspace:^",
-    "@system/flow": "workspace:^"
+    "@jasonscharf/core": "workspace:^",
+    "@jasonscharf/flow": "workspace:^"
   }
 }

@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { FlowContext, FlowApp } from '@system/flow';
+import { FlowContext, FlowApp } from '@jasonscharf/flow';
 import {
     okResult, errResult, command, query, TERN_TYPES,
     type TernRequest, type TernResult,
-} from '@system/core';
+} from '@jasonscharf/core';
 import {
     TernRouter, type TernCtx,
-} from '@system/app';
+} from '@jasonscharf/app';
 import {
     HttpRouter, HttpCtx,
     type ParsedHttpRequest,
-} from '@system/flow';
+} from '@jasonscharf/flow';
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -376,7 +376,7 @@ describe('HttpRouter', () => {
 
 // ── Additional coverage: compose + TernRouter branches ───────────────────────
 
-import { compose, type Next } from '@system/app';
+import { compose, type Next } from '@jasonscharf/app';
 
 describe('compose: defensive branches', () => {
     it('throws when next() is called a second time', async () => {

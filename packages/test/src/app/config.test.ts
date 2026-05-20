@@ -6,14 +6,14 @@ import { describe, it, expect } from 'vitest';
 import { writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { okResult, errResult, query, TERN_TYPES, type TernRequest, type TernResult } from '@system/core';
+import { okResult, errResult, query, TERN_TYPES, type TernRequest, type TernResult } from '@jasonscharf/core';
 import {
     TernApp, HandlerRegistry,
     mergeHandlers, loadAppConfig,
     parseYaml, parseTurtle,
     type HandlerEntry, type HandlerContext,
-} from '@system/app';
-import { createDataContext } from '@system/data';
+} from '@jasonscharf/app';
+import { createDataContext } from '@jasonscharf/data';
 
 
 describe('parseYaml', () => {

@@ -1,5 +1,5 @@
 {
-  "name": "@system/entities",
+  "name": "@jasonscharf/entities",
   "version": "0.1.0",
   "type": "module",
   "exports": {
@@ -32,8 +32,8 @@
     "watch": "tsc -b -w"
   },
   "dependencies": {
-    "@system/core": "workspace:^",
-    "@system/data": "workspace:^",
-    "@system/gen": "workspace:^"
+    "@jasonscharf/core": "workspace:^",
+    "@jasonscharf/data": "workspace:^",
+    "@jasonscharf/gen": "workspace:^"
   }
 }

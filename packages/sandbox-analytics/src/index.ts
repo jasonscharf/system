@@ -4,8 +4,8 @@
  * Import this package's index (or call registerAnalytics() explicitly) to
  * register the analytics PropGroup on UserSchema before using EntityStore.
  */
-import { UserSchema } from '@system/auth';
-import { handle }     from '@system/entities';
+import { UserSchema } from '@jasonscharf/auth';
+import { handle }     from '@jasonscharf/entities';
 import {
     analyticsRoleIRI,
     lastActiveAtIRI,
@@ -67,11 +67,11 @@ registerAnalytics();
  *
  * Usage example
  * ─────────────
- *   import type { User } from '@system/core';
- *   import type { Project } from '@system/sandbox-analytics';
- *   import { validate } from '@system/sandbox-analytics/validate';
+ *   import type { User } from '@jasonscharf/core';
+ *   import type { Project } from '@jasonscharf/sandbox-analytics';
+ *   import { validate } from '@jasonscharf/sandbox-analytics/validate';
  *   import { shapes, userPropertyMap, projectPropertyMap }
- *       from '@system/sandbox-analytics/analytics/shapes.generated';
+ *       from '@jasonscharf/sandbox-analytics/analytics/shapes.generated';
  *
  *   const user: User = {
  *       email:        'alice@example.com',

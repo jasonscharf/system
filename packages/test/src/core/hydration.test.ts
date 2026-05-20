@@ -2,15 +2,15 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { IRI } from '@system/core';
-import { triple } from '@system/core';
-import { TripleStream } from '@system/core';
-import { FileSource } from '@system/core';
-import { HttpSource } from '@system/core';
-import { SocketSource } from '@system/core';
-import { DatabaseSource } from '@system/core';
-import { flush } from '@system/core';
-import type { Triple, TripleSource } from '@system/core';
+import { IRI } from '@jasonscharf/core';
+import { triple } from '@jasonscharf/core';
+import { TripleStream } from '@jasonscharf/core';
+import { FileSource } from '@jasonscharf/core';
+import { HttpSource } from '@jasonscharf/core';
+import { SocketSource } from '@jasonscharf/core';
+import { DatabaseSource } from '@jasonscharf/core';
+import { flush } from '@jasonscharf/core';
+import type { Triple, TripleSource } from '@jasonscharf/core';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

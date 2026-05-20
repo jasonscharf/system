@@ -1,6 +1,6 @@
 // auto-generated — do not edit by hand
-import { IRI } from '@system/core';
-import type { User, UserDevice, UserIdentity, UserSession } from '@system/core';
+import { IRI } from '@jasonscharf/core';
+import type { User, UserDevice, UserIdentity, UserSession } from '@jasonscharf/core';
 
 /** An analytics workspace scoped to a team or product. */
 export interface Project {
@@ -20,7 +20,7 @@ export interface Project {
 
 export const ProjectIRI = new IRI('http://tern.dev/ns/analytics/Project');
 
-declare module '@system/core' {
+declare module '@jasonscharf/core' {
     interface User {
         /** Platform role: 'owner', 'member', or 'viewer'. */
         analyticsRole: string;

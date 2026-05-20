@@ -1,4 +1,4 @@
-import type { ValidationViolation } from '@system/gen';
+import type { ValidationViolation } from '@jasonscharf/gen';
 
 
 export class EntityValidationError extends Error {

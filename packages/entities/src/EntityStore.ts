@@ -1,7 +1,7 @@
-import type { IRI } from '@system/core';
-import { DEFAULT_GRAPH } from '@system/core';
-import { TripleStore, type ServerContext, type ApplicationContext, type Logger, noCtx, defaultCtx } from '@system/data';
-import { validate } from '@system/gen';
+import type { IRI } from '@jasonscharf/core';
+import { DEFAULT_GRAPH } from '@jasonscharf/core';
+import { TripleStore, type ServerContext, type ApplicationContext, type Logger, noCtx, defaultCtx } from '@jasonscharf/data';
+import { validate } from '@jasonscharf/gen';
 import type { EntityHandle } from './Handle.js';
 import type { EntitySchema, PropGroupDef } from './EntitySchema.js';
 import { EntityValidationError } from './EntityValidationError.js';

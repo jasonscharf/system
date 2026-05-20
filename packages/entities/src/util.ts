@@ -1,5 +1,5 @@
-import { IRI, literal, blankNode } from '@system/core';
-import type { Literal, IRI as IIRI } from '@system/core';
+import { IRI, literal, blankNode } from '@jasonscharf/core';
+import type { Literal, IRI as IIRI } from '@jasonscharf/core';
 import { XSD_STRING, XSD_BOOLEAN, XSD_INTEGER, XSD_DECIMAL, XSD_DATETIME } from './constants.js';
 import type { EntityHandle } from './Handle.js';
 import { handleSlug } from './Handle.js';

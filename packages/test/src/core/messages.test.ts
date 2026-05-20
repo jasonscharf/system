@@ -4,7 +4,7 @@ import {
     isTernRequest, isTernResult,
     typeRef, TERN_TYPES,
     type TernCommand, type TernQuery, type TernEvent, type TernResult,
-} from '@system/core';
+} from '@jasonscharf/core';
 
 
 describe('typeRef', () => {

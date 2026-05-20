@@ -1,5 +1,5 @@
 {
-  "name": "@system/gen",
+  "name": "@jasonscharf/gen",
   "version": "0.1.0",
   "type": "module",
   "exports": {
@@ -36,6 +36,6 @@
     "watch": "tsc -b -w"
   },
   "dependencies": {
-    "@system/core": "workspace:^"
+    "@jasonscharf/core": "workspace:^"
   }
 }

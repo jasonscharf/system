@@ -1,6 +1,6 @@
-import { FlowComponent, FlowPort, type FlowComponentOptions } from '@system/flow';
-import type { TernResult } from '@system/core';
-import type { WsMessage } from '@system/flow';
+import { FlowComponent, FlowPort, type FlowComponentOptions } from '@jasonscharf/flow';
+import type { TernResult } from '@jasonscharf/core';
+import type { WsMessage } from '@jasonscharf/flow';
 
 
 export interface OutgoingMessage {

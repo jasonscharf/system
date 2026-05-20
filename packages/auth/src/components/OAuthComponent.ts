@@ -1,5 +1,5 @@
-import { FlowComponent, type FlowComponentOptions } from '@system/flow';
-import { FlowPort } from '@system/flow';
+import { FlowComponent, type FlowComponentOptions } from '@jasonscharf/flow';
+import { FlowPort } from '@jasonscharf/flow';
 import { randomBytes } from 'node:crypto';
 import type { IOAuthProvider } from '../oauth/types.js';
 import type { OAuthProvider } from '../types.js';

@@ -25,7 +25,7 @@ export async function flowRun(args: string[]): Promise<void> {
     const ext = extname(absPath).toLowerCase();
 
     // Lazy import so the flow package is only loaded when the command is used
-    const { FlowLoader } = await import('@system/flow');
+    const { FlowLoader } = await import('@jasonscharf/flow');
 
     let app;
     if (ext === '.json') {

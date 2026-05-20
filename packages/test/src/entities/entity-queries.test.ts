@@ -19,8 +19,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Knex } from 'knex';
-import { createDataContext, TripleStore } from '@system/data';
-import { EntityStore } from '@system/entities';
+import { createDataContext, TripleStore } from '@jasonscharf/data';
+import { EntityStore } from '@jasonscharf/entities';
 import {
     UserSchema,        CoreHandle,
     UserDeviceSchema,  DeviceCoreHandle,
@@ -32,7 +32,7 @@ import {
     findUserWithRecentActivity,
     findSessionsByTokens,
     findUserBySession,
-} from '@system/auth';
+} from '@jasonscharf/auth';
 
 
 // ── DB provider matrix ────────────────────────────────────────────────────────

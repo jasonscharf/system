@@ -1,5 +1,5 @@
-import type { IRI } from '@system/core';
-import type { TripleStore } from '@system/data';
+import type { IRI } from '@jasonscharf/core';
+import type { TripleStore } from '@jasonscharf/data';
 import type { EntityHandle } from './Handle.js';
 import type { EntitySchema } from './EntitySchema.js';
 import type { EntityRecord, ServerContext } from './EntityStore.js';
@@ -186,7 +186,7 @@ export class EntityQuery<H extends EntityHandle[]> {
 /**
  * Fluent entry point for entity queries.
  *
- *   import { entities } from '@system/entities';
+ *   import { entities } from '@jasonscharf/entities';
  *   const results = await entities(store).find(UserSchema, '*').all(ctx);
  */
 export function entities(store: TripleStore) {

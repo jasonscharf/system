@@ -157,6 +157,17 @@ export class TripleStore {
         return (ctx.trx as Knex | undefined) ?? this._knex;
     }
 
+    /** Inserts a row and returns its auto-increment ID, for both Postgres and SQLite. */
+    private async _insert(ctx: ServerContext, table: string, data: Record<string, unknown>): Promise<number> {
+        const client = (this._knex.client as { config: { client: string } }).config.client;
+        if (client === 'pg' || client === 'postgresql') {
+            const [row] = await this._db(ctx)(table).insert(data).returning('id') as [{ id: number }];
+            return row.id;
+        }
+        const [id] = await this._db(ctx)(table).insert(data) as [number];
+        return id;
+    }
+
     // ── Transaction ───────────────────────────────────────────────────────────
 
     async withTransaction<T>(ctx: ServerContext, fn: (ctx: ServerContext) => Promise<T>): Promise<T> {
@@ -169,8 +180,7 @@ export class TripleStore {
     async ensureNamespace(ctx: ServerContext, prefix: string, iriStr: string): Promise<number> {
         const row = await this._db(ctx)(T.namespaces).where(C.prefix, prefix).first<{ id: number }>();
         if (row) { return row.id; }
-        const [id] = await this._db(ctx)(T.namespaces).insert({ [C.prefix]: prefix, [C.iri]: iriStr });
-        return id as number;
+        return this._insert(ctx, T.namespaces, { [C.prefix]: prefix, [C.iri]: iriStr });
     }
 
     // ── Term internment ───────────────────────────────────────────────────────
@@ -178,8 +188,7 @@ export class TripleStore {
     async ensureName(ctx: ServerContext, iriStr: string): Promise<number> {
         const row = await this._db(ctx)(T.names).where(C.iri, iriStr).first<NameRow>();
         if (row) { return row.id; }
-        const [id] = await this._db(ctx)(T.names).insert({ [C.iri]: iriStr });
-        return id as number;
+        return this._insert(ctx, T.names, { [C.iri]: iriStr });
     }
 
     async ensureNode(ctx: ServerContext, term: RdfTerm): Promise<number> {
@@ -189,11 +198,7 @@ export class TripleStore {
                 .where({ [C.kind]: 'iri', [C.nameId]: nameId })
                 .first<NodeRow>();
             if (row) { return row.id; }
-            const [id] = await this._db(ctx)(T.nodes).insert({
-                [C.kind]:   'iri',
-                [C.nameId]: nameId,
-            });
-            return id as number;
+            return this._insert(ctx, T.nodes, { [C.kind]: 'iri', [C.nameId]: nameId });
         }
 
         if (term.termType === 'BlankNode') {
@@ -201,11 +206,7 @@ export class TripleStore {
                 .where({ [C.kind]: 'blank', [C.blank]: term.id })
                 .first<NodeRow>();
             if (row) { return row.id; }
-            const [id] = await this._db(ctx)(T.nodes).insert({
-                [C.kind]:  'blank',
-                [C.blank]: term.id,
-            });
-            return id as number;
+            return this._insert(ctx, T.nodes, { [C.kind]: 'blank', [C.blank]: term.id });
         }
 
         // Literal node — deduplicate by (value, datatype, lang), populate value_json
@@ -220,14 +221,13 @@ export class TripleStore {
         if (row) { return row.id; }
 
         const jsonPayload = makeLiteralJson(term.value, dtIri, term.language);
-        const [id] = await this._db(ctx)(T.nodes).insert({
+        return this._insert(ctx, T.nodes, {
             [C.kind]:      'literal',
             [C.value]:     term.value,
             [C.datatype]:  dtIri,
             [C.lang]:      term.language ?? null,
             [C.valueJson]: JSON.stringify(jsonPayload),
         });
-        return id as number;
     }
 
     // ── Write ─────────────────────────────────────────────────────────────────

@@ -54,7 +54,7 @@ export interface UserSession {
     /** Creation timestamp. */
     createdAt?: Date;
     /** The user this session belongs to. */
-    sessionUser?: User[];
+    sessionUser?: User;
     /** The device this session was created on. */
     sessionDevice?: UserDevice[];
 }

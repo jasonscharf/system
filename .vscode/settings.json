@@ -19,5 +19,11 @@
         "**/bower_components": true,
         "**/*.code-search": true,
         "**/dist": true,
-    }
+    },
+    // TypeScript: use the workspace version and watch via project references.
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": false,
+    // Run tsc --build on save via the default build task (tasks.json).
+    "editor.formatOnSave": true,
+    "typescript.tsc.autoDetect": "off"
 }

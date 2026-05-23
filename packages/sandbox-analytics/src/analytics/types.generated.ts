@@ -1,6 +1,7 @@
 // auto-generated — do not edit by hand
-import { IRI } from '@jasonscharf/core';
-import type { User, UserDevice, UserIdentity, UserSession } from '@jasonscharf/core';
+
+import type { User } from "@jasonscharf/core";
+import { IRI } from "@jasonscharf/core";
 
 /** An analytics workspace scoped to a team or product. */
 export interface Project {
@@ -18,9 +19,9 @@ export interface Project {
     projectMember?: User[];
 }
 
-export const ProjectIRI = new IRI('http://tern.dev/ns/analytics/Project');
+export const ProjectIRI = new IRI("http://tern.dev/ns/analytics/Project");
 
-declare module '@jasonscharf/core' {
+declare module "@jasonscharf/core" {
     interface User {
         /** Platform role: 'owner', 'member', or 'viewer'. */
         analyticsRole: string;
@@ -31,12 +32,12 @@ declare module '@jasonscharf/core' {
     }
 }
 
-export const analyticsRoleIRI = new IRI('http://tern.dev/ns/analytics/analyticsRole');
-export const lastActiveAtIRI = new IRI('http://tern.dev/ns/analytics/lastActiveAt');
-export const consentedToTrackingIRI = new IRI('http://tern.dev/ns/analytics/consentedToTracking');
-export const projectNameIRI = new IRI('http://tern.dev/ns/analytics/projectName');
-export const projectSlugIRI = new IRI('http://tern.dev/ns/analytics/projectSlug');
-export const isActiveIRI = new IRI('http://tern.dev/ns/analytics/isActive');
-export const projectCreatedAtIRI = new IRI('http://tern.dev/ns/analytics/projectCreatedAt');
-export const projectOwnerIRI = new IRI('http://tern.dev/ns/analytics/projectOwner');
-export const projectMemberIRI = new IRI('http://tern.dev/ns/analytics/projectMember');
+export const analyticsRoleIRI = new IRI("http://tern.dev/ns/analytics/analyticsRole");
+export const lastActiveAtIRI = new IRI("http://tern.dev/ns/analytics/lastActiveAt");
+export const consentedToTrackingIRI = new IRI("http://tern.dev/ns/analytics/consentedToTracking");
+export const projectNameIRI = new IRI("http://tern.dev/ns/analytics/projectName");
+export const projectSlugIRI = new IRI("http://tern.dev/ns/analytics/projectSlug");
+export const isActiveIRI = new IRI("http://tern.dev/ns/analytics/isActive");
+export const projectCreatedAtIRI = new IRI("http://tern.dev/ns/analytics/projectCreatedAt");
+export const projectOwnerIRI = new IRI("http://tern.dev/ns/analytics/projectOwner");
+export const projectMemberIRI = new IRI("http://tern.dev/ns/analytics/projectMember");

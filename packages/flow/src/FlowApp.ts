@@ -1,10 +1,9 @@
-import type { FlowComponent } from './FlowComponent.js';
-import { FlowContext } from './FlowContext.js';
-import type { FlowPort } from './FlowPort.js';
-import { FlowScheduler, PullScheduler, PushScheduler } from './FlowScheduler.js';
-import { LocalTransport, type FlowTransport } from './FlowTransport.js';
-import type { ScheduleMode } from './types.js';
-
+import type { FlowComponent } from "./FlowComponent.js";
+import { FlowContext } from "./FlowContext.js";
+import type { FlowPort } from "./FlowPort.js";
+import { type FlowScheduler, PullScheduler, PushScheduler } from "./FlowScheduler.js";
+import { type FlowTransport, LocalTransport } from "./FlowTransport.js";
+import type { ScheduleMode } from "./types.js";
 
 export interface FlowAppOptions {
     mode?: ScheduleMode;
@@ -26,11 +25,9 @@ export class FlowApp {
 
     constructor(options: FlowAppOptions = {}) {
         this.context = new FlowContext();
-        this.scheduler = options.scheduler ?? (
-            (options.mode ?? 'push') === 'pull'
-                ? new PullScheduler()
-                : new PushScheduler()
-        );
+        this.scheduler =
+            options.scheduler ??
+            ((options.mode ?? "push") === "pull" ? new PullScheduler() : new PushScheduler());
         this.context._setScheduler(this.scheduler);
     }
 
@@ -44,11 +41,7 @@ export class FlowApp {
         return this;
     }
 
-    connect<T>(
-        from: FlowPort<T>,
-        to: FlowPort<T>,
-        transport?: FlowTransport<T>,
-    ): this {
+    connect<T>(from: FlowPort<T>, to: FlowPort<T>, transport?: FlowTransport<T>): this {
         const t = transport ?? new LocalTransport(from, to);
         from._addTransport(t);
         this._components.add(from.owner);
@@ -78,7 +71,9 @@ export class FlowApp {
     }
 
     private _updatePullOrder(): void {
-        if (!(this.scheduler instanceof PullScheduler)) return;
+        if (!(this.scheduler instanceof PullScheduler)) {
+            return;
+        }
         this.scheduler._setPullOrder(this._topoSort());
     }
 
@@ -92,7 +87,9 @@ export class FlowApp {
         }
 
         for (const { fromOwner, toOwner } of this._connections) {
-            if (fromOwner === toOwner) continue;
+            if (fromOwner === toOwner) {
+                continue;
+            }
             const neighbors = adj.get(fromOwner)!;
             if (!neighbors.has(toOwner)) {
                 neighbors.add(toOwner);
@@ -102,7 +99,9 @@ export class FlowApp {
 
         const queue: FlowComponent[] = [];
         for (const [c, deg] of inDegree) {
-            if (deg === 0) queue.push(c);
+            if (deg === 0) {
+                queue.push(c);
+            }
         }
 
         const sorted: FlowComponent[] = [];
@@ -112,7 +111,9 @@ export class FlowApp {
             for (const neighbor of adj.get(node)!) {
                 const deg = inDegree.get(neighbor)! - 1;
                 inDegree.set(neighbor, deg);
-                if (deg === 0) queue.push(neighbor);
+                if (deg === 0) {
+                    queue.push(neighbor);
+                }
             }
         }
 

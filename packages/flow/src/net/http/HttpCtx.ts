@@ -1,5 +1,4 @@
-import type { HttpHeaders, HttpMethod, ParsedHttpRequest } from './HttpTypes.js';
-
+import type { HttpHeaders, HttpMethod, ParsedHttpRequest } from "./HttpTypes.js";
 
 /**
  * Request/response context for HttpRouter middleware — modelled after Koa's ctx.
@@ -36,12 +35,12 @@ export class HttpCtx implements Record<string, any> {
     body: unknown;
 
     constructor(req: ParsedHttpRequest, extras: Record<string, unknown> = {}) {
-        this.req     = req;
-        this.params  = {};
-        this.query   = req.searchParams;
-        this.status  = 200;
+        this.req = req;
+        this.params = {};
+        this.query = req.searchParams;
+        this.status = 200;
         this.headers = {};
-        this.body    = undefined;
+        this.body = undefined;
         // Merge app extras (store, logger, etc.) directly onto ctx
         Object.assign(this, extras);
     }
@@ -49,29 +48,33 @@ export class HttpCtx implements Record<string, any> {
     /** Shorthand: set status and body together. */
     send(status: number, body: unknown): void {
         this.status = status;
-        this.body   = body;
+        this.body = body;
     }
 
     /** Shorthand: 400 Bad Request. */
-    badRequest(message = 'Bad Request'): void {
+    badRequest(message = "Bad Request"): void {
         this.send(400, { error: message });
     }
 
     /** Shorthand: 401 Unauthorized. */
-    unauthorized(message = 'Unauthorized'): void {
+    unauthorized(message = "Unauthorized"): void {
         this.send(401, { error: message });
     }
 
     /** Shorthand: 403 Forbidden. */
-    forbidden(message = 'Forbidden'): void {
+    forbidden(message = "Forbidden"): void {
         this.send(403, { error: message });
     }
 
     /** Shorthand: 404 Not Found. */
-    notFound(message = 'Not Found'): void {
+    notFound(message = "Not Found"): void {
         this.send(404, { error: message });
     }
 
-    get method(): HttpMethod { return this.req.method; }
-    get pathname(): string   { return this.req.pathname; }
+    get method(): HttpMethod {
+        return this.req.method;
+    }
+    get pathname(): string {
+        return this.req.pathname;
+    }
 }

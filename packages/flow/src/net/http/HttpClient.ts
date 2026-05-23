@@ -1,7 +1,6 @@
-import { FlowComponent, type FlowComponentOptions } from '../../FlowComponent.js';
-import { FlowPort } from '../../FlowPort.js';
-import type { HttpHeaders, HttpRequest, HttpResponse } from './HttpTypes.js';
-
+import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
+import type { FlowPort } from "../../FlowPort.js";
+import type { HttpHeaders, HttpRequest, HttpResponse } from "./HttpTypes.js";
 
 /**
  * Flow component that makes HTTP requests via the platform-native Fetch API
@@ -23,15 +22,15 @@ export class HttpClient extends FlowComponent {
 
     constructor(options: FlowComponentOptions) {
         super(options);
-        this.requests = this.addPort<HttpRequest>('requests', 'in');
-        this.responses = this.addPort<HttpResponse>('responses', 'out');
+        this.requests = this.addPort<HttpRequest>("requests", "in");
+        this.responses = this.addPort<HttpResponse>("responses", "out");
     }
 
     protected override async onInit(): Promise<void> {
-        if (typeof globalThis.fetch !== 'function') {
+        if (typeof globalThis.fetch !== "function") {
             throw new Error(
-                'HttpClient requires a platform-native fetch (Node.js ≥ 18, modern browsers). ' +
-                'No globalThis.fetch found.',
+                "HttpClient requires a platform-native fetch (Node.js ≥ 18, modern browsers). " +
+                    "No globalThis.fetch found.",
             );
         }
     }
@@ -50,9 +49,10 @@ export class HttpClient extends FlowComponent {
 
     private async _fetch(request: HttpRequest): Promise<void> {
         try {
-            const body = request.method === 'GET' || request.method === 'HEAD'
-                ? undefined
-                : request.body ?? undefined;
+            const body =
+                request.method === "GET" || request.method === "HEAD"
+                    ? undefined
+                    : (request.body ?? undefined);
 
             const res = await globalThis.fetch(request.url, {
                 method: request.method,
@@ -62,7 +62,9 @@ export class HttpClient extends FlowComponent {
             });
 
             const responseHeaders: HttpHeaders = {};
-            res.headers.forEach((v, k) => { responseHeaders[k] = v; });
+            res.headers.forEach((v, k) => {
+                responseHeaders[k] = v;
+            });
 
             this.responses.put({
                 requestId: request.requestId,
@@ -72,7 +74,9 @@ export class HttpClient extends FlowComponent {
                 body: (await res.text()) || undefined,
             });
         } catch (err) {
-            if ((err as Error).name === 'AbortError') return;
+            if ((err as Error).name === "AbortError") {
+                return;
+            }
             throw err;
         }
     }
@@ -81,7 +85,7 @@ export class HttpClient extends FlowComponent {
 function flattenForFetch(headers: HttpHeaders): Record<string, string> {
     const out: Record<string, string> = {};
     for (const [k, v] of Object.entries(headers)) {
-        out[k] = Array.isArray(v) ? v.join(', ') : v;
+        out[k] = Array.isArray(v) ? v.join(", ") : v;
     }
     return out;
 }

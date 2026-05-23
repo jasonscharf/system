@@ -1,15 +1,15 @@
 {
-  "extends": "../tsconfig.base.json",
-  "compilerOptions": {
-    "composite": true,
-    "rootDir": "src",
-    "outDir": "dist"
-  },
-  "references": [
-    { "path": "../core"     },
-    { "path": "../data"     },
-    { "path": "../entities" },
-    { "path": "../gen"      }
-  ],
-  "include": ["src"]
+    "extends": "../tsconfig.base.json",
+    "compilerOptions": {
+        "composite": true,
+        "rootDir": "src",
+        "outDir": "dist"
+    },
+    "references": [
+        { "path": "../core" },
+        { "path": "../data" },
+        { "path": "../entities" },
+        { "path": "../gen" }
+    ],
+    "include": ["src"]
 }

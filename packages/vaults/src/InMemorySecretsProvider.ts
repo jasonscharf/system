@@ -1,5 +1,4 @@
-import type { ISecretsProvider } from './ISecretsProvider.js';
-
+import type { ISecretsProvider } from "./ISecretsProvider.js";
 
 /**
  * In-memory secrets store backed by a plain Map.

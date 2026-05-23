@@ -1,9 +1,8 @@
-import { resolve, dirname } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { errResult, type TernRequest, type TernResult, type TernTypeRef } from '@jasonscharf/core';
-import type { Dispatcher } from '../routing/Dispatcher.js';
-import type { HandlerEntry } from '../config/types.js';
-
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { errResult, type TernRequest, type TernResult, type TernTypeRef } from "@jasonscharf/core";
+import type { HandlerEntry } from "../config/types.js";
+import type { Dispatcher } from "../routing/Dispatcher.js";
 
 /**
  * The contract every handler function must satisfy.
@@ -21,11 +20,11 @@ export interface HandlerContext {
 }
 
 interface LoadedEntry {
-    readonly typeIri:  string;
+    readonly typeIri: string;
     readonly priority: number;
     readonly moduleUrl: string;
     readonly exportName: string;
-    handler?: HandlerFn;   // populated on first use
+    handler?: HandlerFn; // populated on first use
 }
 
 /**
@@ -58,9 +57,17 @@ export class HandlerRegistry implements Dispatcher {
     /** Register a single inline handler function (useful for tests and defaults). */
     registerInline(typeRef: TernTypeRef, handler: HandlerFn, priority = 100): void {
         const typeIri = typeRef.iri;
-        if (!this._entries.has(typeIri)) { this._entries.set(typeIri, []); }
+        if (!this._entries.has(typeIri)) {
+            this._entries.set(typeIri, []);
+        }
         const entries = this._entries.get(typeIri)!;
-        entries.push({ typeIri, priority, moduleUrl: '__inline__', exportName: '__inline__', handler });
+        entries.push({
+            typeIri,
+            priority,
+            moduleUrl: "__inline__",
+            exportName: "__inline__",
+            handler,
+        });
         entries.sort((a, b) => a.priority - b.priority);
     }
 
@@ -84,14 +91,19 @@ export class HandlerRegistry implements Dispatcher {
             try {
                 const fn = await this._load(entry);
                 const result = await fn(request, ctx);
-                if (result.ok) { return result; }
+                if (result.ok) {
+                    return result;
+                }
             } catch (err) {
                 // Log the failure and try the next registered handler
-                console.error(`[HandlerRegistry] Handler ${entry.moduleUrl}#${entry.exportName} threw:`, err);
+                console.error(
+                    `[HandlerRegistry] Handler ${entry.moduleUrl}#${entry.exportName} threw:`,
+                    err,
+                );
             }
         }
 
-        return errResult(request.id, request.type, 'All handlers failed or returned error results');
+        return errResult(request.id, request.type, "All handlers failed or returned error results");
     }
 
     get registeredTypes(): string[] {
@@ -102,11 +114,13 @@ export class HandlerRegistry implements Dispatcher {
 
     private _add(e: HandlerEntry): void {
         const typeIri = e.typeIri;
-        if (!this._entries.has(typeIri)) { this._entries.set(typeIri, []); }
+        if (!this._entries.has(typeIri)) {
+            this._entries.set(typeIri, []);
+        }
 
-        const moduleUrl  = this._resolveModuleUrl(e.module);
-        const exportName = e.export ?? 'default';
-        const priority   = e.priority ?? 100;
+        const moduleUrl = this._resolveModuleUrl(e.module);
+        const exportName = e.export ?? "default";
+        const priority = e.priority ?? 100;
 
         const entries = this._entries.get(typeIri)!;
         entries.push({ typeIri, priority, moduleUrl, exportName });
@@ -115,24 +129,34 @@ export class HandlerRegistry implements Dispatcher {
 
     private _resolveModuleUrl(module: string): string {
         // Absolute URL or npm package — keep as-is
-        if (module.startsWith('http://') || module.startsWith('https://') || module.startsWith('file://')) {
+        if (
+            module.startsWith("http://") ||
+            module.startsWith("https://") ||
+            module.startsWith("file://")
+        ) {
             return module;
         }
         // npm package (no leading ./  or ../)
-        if (!module.startsWith('.')) { return module; }
+        if (!module.startsWith(".")) {
+            return module;
+        }
         // Relative path — resolve against baseDir
         return pathToFileURL(resolve(this._baseDir, module)).href;
     }
 
     private async _load(entry: LoadedEntry): Promise<HandlerFn> {
-        if (entry.handler) { return entry.handler; }
+        if (entry.handler) {
+            return entry.handler;
+        }
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mod = await import(/* @vite-ignore */ entry.moduleUrl) as Record<string, any>;
-        const fn  = mod[entry.exportName] as HandlerFn | undefined;
+        const mod = (await import(/* @vite-ignore */ entry.moduleUrl)) as Record<string, any>;
+        const fn = mod[entry.exportName] as HandlerFn | undefined;
 
-        if (typeof fn !== 'function') {
-            throw new Error(`Module "${entry.moduleUrl}" has no export named "${entry.exportName}"`);
+        if (typeof fn !== "function") {
+            throw new Error(
+                `Module "${entry.moduleUrl}" has no export named "${entry.exportName}"`,
+            );
         }
 
         entry.handler = fn;

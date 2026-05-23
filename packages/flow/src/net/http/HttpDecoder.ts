@@ -1,13 +1,14 @@
-import { FlowComponent, type FlowComponentOptions } from '../../FlowComponent.js';
-import { FlowPort } from '../../FlowPort.js';
-import { decodeBody, extractContentType } from './codec.js';
+import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
+import type { FlowPort } from "../../FlowPort.js";
+import { decodeBody, extractContentType } from "./codec.js";
 import type {
-    HttpRequest, HttpResponse,
-    ParsedHttpRequest, ParsedHttpResponse,
-} from './HttpTypes.js';
+    HttpRequest,
+    HttpResponse,
+    ParsedHttpRequest,
+    ParsedHttpResponse,
+} from "./HttpTypes.js";
 
-
-const BASE = 'http://localhost';
+const BASE = "http://localhost";
 
 function parseUrl(raw: string): { pathname: string; searchParams: URLSearchParams } {
     try {
@@ -36,10 +37,10 @@ export class HttpDecoder extends FlowComponent {
 
     constructor(options: FlowComponentOptions) {
         super(options);
-        this.requestIn = this.addPort<HttpRequest>('requestIn', 'in');
-        this.requestOut = this.addPort<ParsedHttpRequest>('requestOut', 'out');
-        this.responseIn = this.addPort<HttpResponse>('responseIn', 'in');
-        this.responseOut = this.addPort<ParsedHttpResponse>('responseOut', 'out');
+        this.requestIn = this.addPort<HttpRequest>("requestIn", "in");
+        this.requestOut = this.addPort<ParsedHttpRequest>("requestOut", "out");
+        this.responseIn = this.addPort<HttpResponse>("responseIn", "in");
+        this.responseOut = this.addPort<ParsedHttpResponse>("responseOut", "out");
     }
 
     override step(): void {

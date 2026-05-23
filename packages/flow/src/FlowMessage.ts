@@ -1,5 +1,4 @@
-import { uuidv4Binary } from '@jasonscharf/core';
-
+import { uuidv4Binary } from "@jasonscharf/core";
 
 export interface FlowMessage<T = unknown> {
     readonly id: Uint8Array;

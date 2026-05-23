@@ -1,6 +1,5 @@
-import { PrefixRegistry } from './PrefixRegistry.js';
-import { exists } from '../util/objects.js';
-
+import { exists } from "../util/objects.js";
+import type { PrefixRegistry } from "./PrefixRegistry.js";
 
 /**
  * An IRI is an internationalized URI used to identify members of semantic relationships.
@@ -17,7 +16,7 @@ export class IRI {
 
     static from(value: string): IRI {
         if (!value) {
-            throw new Error('IRI cannot be empty');
+            throw new Error("IRI cannot be empty");
         }
 
         if (/\s/.test(value)) {
@@ -47,14 +46,11 @@ export class IRI {
         return new IRI(registry.expand(prefixed));
     }
 
-    static resolve(
-        relative: string | IRI,
-        base: string | IRI
-    ): IRI {
+    static resolve(relative: string | IRI, base: string | IRI): IRI {
         const rel = relative instanceof IRI ? relative.value : relative;
         const b = base instanceof IRI ? base.value : base;
 
-        if (rel.startsWith('urn:')) {
+        if (rel.startsWith("urn:")) {
             return new IRI(rel);
         }
 
@@ -74,19 +70,16 @@ export class IRI {
     }
 
     isURN(): boolean {
-        return this._value.startsWith('urn:');
+        return this._value.startsWith("urn:");
     }
 
-    get urnParts():
-        | IRINodeNamespacePair
-        | null {
-
+    get urnParts(): IRINodeNamespacePair | null {
         if (!this.isURN()) {
             return null;
         }
 
-        const [, nid, ...rest] = this._value.split(':');
-        return { nid, nss: rest.join(':') };
+        const [, nid, ...rest] = this._value.split(":");
+        return { nid, nss: rest.join(":") };
     }
 
     toPrefixed(registry: PrefixRegistry): string | null {

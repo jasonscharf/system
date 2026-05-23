@@ -1,38 +1,36 @@
-import { defaultServerContext } from '@jasonscharf/server';
-import { FlowComponent, type FlowComponentOptions } from '@jasonscharf/flow';
-import { FlowPort } from '@jasonscharf/flow';
-import type { ISessionStore } from '../session/ISessionStore.js';
-import type { UserRepository } from '../repository/UserRepository.js';
-import type { UserSessionRepository } from '../repository/UserSessionRepository.js';
-import type { SessionData, UserEntity, UserSessionEntity } from '../types.js';
-
+import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
+import { defaultServerContext } from "@jasonscharf/server";
+import type { UserRepository } from "../repository/UserRepository.js";
+import type { UserSessionRepository } from "../repository/UserSessionRepository.js";
+import type { ISessionStore } from "../session/ISessionStore.js";
+import type { SessionData, UserEntity, UserSessionEntity } from "../types.js";
 
 export interface ValidateRequest {
-    token:      string;
+    token: string;
     requestId?: string;
 }
 
 export interface ValidateResult {
-    valid:      boolean;
-    user?:      UserEntity;
-    session?:   UserSessionEntity;
+    valid: boolean;
+    user?: UserEntity;
+    session?: UserSessionEntity;
     requestId?: string;
 }
 
 export interface RevokeRequest {
-    token:      string;
+    token: string;
     requestId?: string;
 }
 
 export interface RevokeResult {
-    success:    boolean;
+    success: boolean;
     requestId?: string;
 }
 
 export interface SessionComponentOptions extends FlowComponentOptions {
     sessionStore: ISessionStore;
-    users:        UserRepository;
-    sessions:     UserSessionRepository;
+    users: UserRepository;
+    sessions: UserSessionRepository;
 }
 
 /**
@@ -42,24 +40,24 @@ export interface SessionComponentOptions extends FlowComponentOptions {
  * then falls back to the TripleStore for resilience across restarts.
  */
 export class SessionComponent extends FlowComponent {
-    readonly validateIn:  FlowPort<ValidateRequest>;
+    readonly validateIn: FlowPort<ValidateRequest>;
     readonly validateOut: FlowPort<ValidateResult>;
-    readonly revokeIn:    FlowPort<RevokeRequest>;
-    readonly revokeOut:   FlowPort<RevokeResult>;
+    readonly revokeIn: FlowPort<RevokeRequest>;
+    readonly revokeOut: FlowPort<RevokeResult>;
 
-    private readonly _store:    ISessionStore;
-    private readonly _users:    UserRepository;
+    private readonly _store: ISessionStore;
+    private readonly _users: UserRepository;
     private readonly _sessions: UserSessionRepository;
 
     constructor(options: SessionComponentOptions) {
         super(options);
-        this.validateIn  = this.addPort<ValidateRequest>('validateIn',  'in');
-        this.validateOut = this.addPort<ValidateResult>('validateOut', 'out');
-        this.revokeIn    = this.addPort<RevokeRequest>('revokeIn',    'in');
-        this.revokeOut   = this.addPort<RevokeResult>('revokeOut',   'out');
+        this.validateIn = this.addPort<ValidateRequest>("validateIn", "in");
+        this.validateOut = this.addPort<ValidateResult>("validateOut", "out");
+        this.revokeIn = this.addPort<RevokeRequest>("revokeIn", "in");
+        this.revokeOut = this.addPort<RevokeResult>("revokeOut", "out");
 
-        this._store    = options.sessionStore;
-        this._users    = options.users;
+        this._store = options.sessionStore;
+        this._users = options.users;
         this._sessions = options.sessions;
     }
 
@@ -80,13 +78,21 @@ export class SessionComponent extends FlowComponent {
         // Fast path: Redis / memory store
         const cached = await this._store.get(key);
         if (cached) {
-            const data    = JSON.parse(cached) as SessionData;
+            const data = JSON.parse(cached) as SessionData;
             const expired = Date.now() > data.expiresAt;
             if (!expired) {
                 const user = await this._users.findById(defaultServerContext, data.userId);
                 if (user) {
-                    const session = await this._sessions.findByToken(defaultServerContext, req.token);
-                    this.validateOut.put({ valid: true, user, session: session ?? undefined, requestId: req.requestId });
+                    const session = await this._sessions.findByToken(
+                        defaultServerContext,
+                        req.token,
+                    );
+                    this.validateOut.put({
+                        valid: true,
+                        user,
+                        session: session ?? undefined,
+                        requestId: req.requestId,
+                    });
                     return;
                 }
             }
@@ -95,7 +101,7 @@ export class SessionComponent extends FlowComponent {
 
         // Slow path: TripleStore
         const session = await this._sessions.findByToken(defaultServerContext, req.token);
-        if (session && session.isActive && session.expiresAt.getTime() > Date.now()) {
+        if (session?.isActive && session.expiresAt.getTime() > Date.now()) {
             const user = await this._users.findById(defaultServerContext, session.userId);
             if (user) {
                 this.validateOut.put({ valid: true, user, session, requestId: req.requestId });
@@ -108,7 +114,10 @@ export class SessionComponent extends FlowComponent {
 
     private async _revoke(req: RevokeRequest): Promise<void> {
         const [storeOk, dbOk] = await Promise.all([
-            this._store.del(`tern:session:${req.token}`).then(() => true).catch(() => false),
+            this._store
+                .del(`tern:session:${req.token}`)
+                .then(() => true)
+                .catch(() => false),
             this._sessions.revoke(defaultServerContext, req.token),
         ]);
         this.revokeOut.put({ success: storeOk && dbOk, requestId: req.requestId });

@@ -1,6 +1,6 @@
 /**
  * Computes the Shannon Entropy of an array of unsigned 8-bit integers.
- * @param data 
+ * @param data
  * @returns A value between 0 and 8 indicating the Shannon Entropy.
  */
 export function shannonEntropy(data: Uint8Array): number {
@@ -17,7 +17,9 @@ export function shannonEntropy(data: Uint8Array): number {
     const n = data.length;
 
     for (const c of freq) {
-        if (c === 0) continue;
+        if (c === 0) {
+            continue;
+        }
         const p = c / n;
         entropy -= p * Math.log2(p);
     }
@@ -25,12 +27,11 @@ export function shannonEntropy(data: Uint8Array): number {
     return entropy;
 }
 
-
 /**
  * Isomorphic random UInt8Array.
  * Works in Node 18+ and supported browsers.
- * @param length 
- * @returns 
+ * @param length
+ * @returns
  */
 export function randomUInt8Array(length: number): Uint8Array {
     const arr = new Uint8Array(length);
@@ -40,7 +41,7 @@ export function randomUInt8Array(length: number): Uint8Array {
 
 /**
  * Computes a binary UUIDv4.
- * @returns 
+ * @returns
  */
 export function uuidv4Binary(): Uint8Array {
     const bytes = randomUInt8Array(16);

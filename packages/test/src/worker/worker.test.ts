@@ -1,9 +1,8 @@
-import { afterEach, beforeEach, describe, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, vi } from "vitest";
 
-
-describe('worker', () => {
+describe("worker", () => {
     beforeEach(() => {
-        vi.spyOn(console, 'log').mockImplementation(() => {});
+        vi.spyOn(console, "log").mockImplementation(() => {});
         vi.resetModules();
         vi.useFakeTimers();
     });
@@ -13,8 +12,8 @@ describe('worker', () => {
         vi.restoreAllMocks();
     });
 
-    it('fires the interval callback', async () => {
-        await import('@system/worker');
+    it("fires the interval callback", async () => {
+        await import("@system/worker");
         vi.advanceTimersByTime(2000);
     });
 });

@@ -1,22 +1,21 @@
-import { IRI } from '@jasonscharf/core';
-import type { Triple, RdfObject } from '@jasonscharf/core';
+import type { RdfObject, Triple } from "@jasonscharf/core";
+import { IRI } from "@jasonscharf/core";
 
-
-const RDF_TYPE = new IRI('http://www.w3.org/1999/02/22-rdf-syntax-ns#type');
-const OWL_CLASS = new IRI('http://www.w3.org/2002/07/owl#Class');
-const OWL_DATATYPE_PROP = new IRI('http://www.w3.org/2002/07/owl#DatatypeProperty');
-const OWL_OBJECT_PROP = new IRI('http://www.w3.org/2002/07/owl#ObjectProperty');
-const RDFS_DOMAIN = new IRI('http://www.w3.org/2000/01/rdf-schema#domain');
-const RDFS_RANGE = new IRI('http://www.w3.org/2000/01/rdf-schema#range');
-const RDFS_LABEL = new IRI('http://www.w3.org/2000/01/rdf-schema#label');
-const RDFS_COMMENT = new IRI('http://www.w3.org/2000/01/rdf-schema#comment');
+const RDF_TYPE = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
+const OWL_CLASS = new IRI("http://www.w3.org/2002/07/owl#Class");
+const OWL_DATATYPE_PROP = new IRI("http://www.w3.org/2002/07/owl#DatatypeProperty");
+const OWL_OBJECT_PROP = new IRI("http://www.w3.org/2002/07/owl#ObjectProperty");
+const RDFS_DOMAIN = new IRI("http://www.w3.org/2000/01/rdf-schema#domain");
+const RDFS_RANGE = new IRI("http://www.w3.org/2000/01/rdf-schema#range");
+const RDFS_LABEL = new IRI("http://www.w3.org/2000/01/rdf-schema#label");
+const RDFS_COMMENT = new IRI("http://www.w3.org/2000/01/rdf-schema#comment");
 
 export interface OntologyProperty {
     iri: string;
     name: string;
     range: string | null;
     comment: string | null;
-    kind: 'data' | 'object';
+    kind: "data" | "object";
 }
 
 export interface OntologyClass {
@@ -32,8 +31,8 @@ export interface Ontology {
 }
 
 function localName(iri: string): string {
-    const hash = iri.lastIndexOf('#');
-    const slash = iri.lastIndexOf('/');
+    const hash = iri.lastIndexOf("#");
+    const slash = iri.lastIndexOf("/");
     return iri.slice(Math.max(hash, slash) + 1);
 }
 
@@ -42,8 +41,12 @@ function asIRI(obj: RdfObject): IRI | null {
 }
 
 function literalValue(obj: RdfObject): string | null {
-    if (obj instanceof IRI) return null;
-    if ('termType' in obj && obj.termType === 'Literal') return obj.value;
+    if (obj instanceof IRI) {
+        return null;
+    }
+    if ("termType" in obj && obj.termType === "Literal") {
+        return obj.value;
+    }
     return null;
 }
 
@@ -53,13 +56,19 @@ export function readOntology(triples: Triple[]): Ontology {
 
     // First pass: identify classes and properties
     for (const { subject, predicate, object } of triples) {
-        if (!(subject instanceof IRI)) continue;
+        if (!(subject instanceof IRI)) {
+            continue;
+        }
         const subjectIRI = subject.value;
 
-        if (!predicate.equals(RDF_TYPE)) continue;
+        if (!predicate.equals(RDF_TYPE)) {
+            continue;
+        }
 
         const objIRI = asIRI(object);
-        if (!objIRI) continue;
+        if (!objIRI) {
+            continue;
+        }
 
         if (objIRI.equals(OWL_CLASS)) {
             if (!classes.has(subjectIRI)) {
@@ -77,7 +86,7 @@ export function readOntology(triples: Triple[]): Ontology {
                     name: localName(subjectIRI),
                     range: null,
                     comment: null,
-                    kind: objIRI.equals(OWL_DATATYPE_PROP) ? 'data' : 'object',
+                    kind: objIRI.equals(OWL_DATATYPE_PROP) ? "data" : "object",
                 });
             }
         }
@@ -85,26 +94,36 @@ export function readOntology(triples: Triple[]): Ontology {
 
     // Second pass: fill in labels, comments, domain/range
     for (const { subject, predicate, object } of triples) {
-        if (!(subject instanceof IRI)) continue;
+        if (!(subject instanceof IRI)) {
+            continue;
+        }
         const subjectIRI = subject.value;
 
         if (predicate.equals(RDFS_LABEL) || predicate.equals(RDFS_COMMENT)) {
             const value = literalValue(object);
-            if (value === null) continue;
+            if (value === null) {
+                continue;
+            }
 
             const cls = classes.get(subjectIRI);
-            if (cls && predicate.equals(RDFS_COMMENT)) cls.comment = value;
+            if (cls && predicate.equals(RDFS_COMMENT)) {
+                cls.comment = value;
+            }
 
             const prop = properties.get(subjectIRI);
-            if (prop && predicate.equals(RDFS_COMMENT)) prop.comment = value;
+            if (prop && predicate.equals(RDFS_COMMENT)) {
+                prop.comment = value;
+            }
         }
 
         if (predicate.equals(RDFS_DOMAIN)) {
             const domainIRI = asIRI(object);
-            if (!domainIRI) continue;
+            if (!domainIRI) {
+                continue;
+            }
             const cls = classes.get(domainIRI.value);
             const prop = properties.get(subjectIRI);
-            if (cls && prop && !cls.properties.find(p => p.iri === prop.iri)) {
+            if (cls && prop && !cls.properties.find((p) => p.iri === prop.iri)) {
                 cls.properties.push(prop);
             }
         }
@@ -112,7 +131,9 @@ export function readOntology(triples: Triple[]): Ontology {
         if (predicate.equals(RDFS_RANGE)) {
             const prop = properties.get(subjectIRI);
             const rangeIRI = asIRI(object);
-            if (prop && rangeIRI) prop.range = rangeIRI.value;
+            if (prop && rangeIRI) {
+                prop.range = rangeIRI.value;
+            }
         }
     }
 

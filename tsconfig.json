@@ -1,47 +1,47 @@
 {
-  "files": [],
-  "references": [
-    {
-      "path": "packages/api"
-    },
-    {
-      "path": "packages/auth"
-    },
-    {
-      "path": "packages/vaults"
-    },
-    {
-      "path": "packages/gen"
-    },
-    {
-      "path": "packages/app"
-    },
-    {
-      "path": "packages/core"
-    },
-    {
-      "path": "packages/data"
-    },
-    {
-      "path": "packages/flow"
-    },
-    {
-      "path": "packages/test"
-    },
-    {
-      "path": "packages/worker"
-    },
-    {
-      "path": "packages/sandbox-server"
-    },
-    {
-      "path": "packages/sandbox-cli"
-    },
-    {
-      "path": "packages/entities"
-    },
-    {
-      "path": "packages/sandbox-analytics"
-    },
-  ]
+    "files": [],
+    "references": [
+        {
+            "path": "packages/api"
+        },
+        {
+            "path": "packages/auth"
+        },
+        {
+            "path": "packages/vaults"
+        },
+        {
+            "path": "packages/gen"
+        },
+        {
+            "path": "packages/app"
+        },
+        {
+            "path": "packages/core"
+        },
+        {
+            "path": "packages/data"
+        },
+        {
+            "path": "packages/flow"
+        },
+        {
+            "path": "packages/test"
+        },
+        {
+            "path": "packages/worker"
+        },
+        {
+            "path": "packages/sandbox-server"
+        },
+        {
+            "path": "packages/sandbox-cli"
+        },
+        {
+            "path": "packages/entities"
+        },
+        {
+            "path": "packages/sandbox-analytics"
+        }
+    ]
 }

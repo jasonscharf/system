@@ -1,15 +1,13 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
-
-import { parseNTriples, readOntology, generateTypes } from './index.js';
-import { parseTurtle } from './TurtleParser.js';
-import { readShaclShapes, mergeShapes } from './ShaclReader.js';
-import type { ShaclShapes } from './ShaclReader.js';
-import { generateAugmentedTypes } from './TypeGenerator.js';
-import type { AugmentedGenConfig } from './TypeGenerator.js';
-import { generateShapesDescriptor } from './ShapeGenerator.js';
-import type { Triple } from '@jasonscharf/core';
-
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+import type { Triple } from "@jasonscharf/core";
+import { generateTypes, parseNTriples, readOntology } from "./index.js";
+import type { ShaclShapes } from "./ShaclReader.js";
+import { mergeShapes, readShaclShapes } from "./ShaclReader.js";
+import { generateShapesDescriptor } from "./ShapeGenerator.js";
+import { parseTurtle } from "./TurtleParser.js";
+import type { AugmentedGenConfig } from "./TypeGenerator.js";
+import { generateAugmentedTypes } from "./TypeGenerator.js";
 
 export interface BaseOntologyConfig {
     /** Path to the base .nt ontology file, relative to the config file. */
@@ -43,13 +41,12 @@ export interface GenConfig {
     iriImport?: string;
 }
 
-
 function parserFor(filePath: string) {
     return /\.(ttl|n3)$/i.test(filePath) ? parseTurtle : parseNTriples;
 }
 
 async function parseFile(filePath: string): Promise<Triple[]> {
-    const content = await readFile(filePath, 'utf-8');
+    const content = await readFile(filePath, "utf-8");
     const triples: Triple[] = [];
     for await (const t of parserFor(filePath)(content)) {
         triples.push(t);
@@ -67,17 +64,19 @@ async function parseFile(filePath: string): Promise<Triple[]> {
  * correctly in a single readOntology pass.
  */
 export async function generateFromConfig(configPath: string): Promise<void> {
-    const dir    = path.dirname(path.resolve(configPath));
-    const config = JSON.parse(await readFile(configPath, 'utf-8')) as GenConfig;
+    const dir = path.dirname(path.resolve(configPath));
+    const config = JSON.parse(await readFile(configPath, "utf-8")) as GenConfig;
 
     const externalClasses = new Map<string, string>(); // classIRI → importPath
-    const allTriples:  Triple[]       = [];
-    let   allShapes:   ShaclShapes    = { nodeShapes: new Map(), byTargetClass: new Map() };
+    const allTriples: Triple[] = [];
+    let allShapes: ShaclShapes = { nodeShapes: new Map(), byTargetClass: new Map() };
 
     // Parse each base ontology; record its classes as external
     for (const base of config.bases ?? []) {
         const triples = await parseFile(path.resolve(dir, base.ontology));
-        for (const t of triples) { allTriples.push(t); }
+        for (const t of triples) {
+            allTriples.push(t);
+        }
         const importPath = base.importPath ?? base.package;
         for (const cls of readOntology(triples).classes.values()) {
             externalClasses.set(cls.iri, importPath);
@@ -87,7 +86,9 @@ export async function generateFromConfig(configPath: string): Promise<void> {
     // Parse extension ontologies
     for (const extFile of config.extensions ?? []) {
         const triples = await parseFile(path.resolve(dir, extFile));
-        for (const t of triples) { allTriples.push(t); }
+        for (const t of triples) {
+            allTriples.push(t);
+        }
     }
 
     // Parse SHACL shapes
@@ -104,17 +105,17 @@ export async function generateFromConfig(configPath: string): Promise<void> {
         localNamespace: config.localNamespace,
         iriImport: config.iriImport,
     };
-    const typesSource  = generateAugmentedTypes(merged, allShapes, augConfig);
+    const typesSource = generateAugmentedTypes(merged, allShapes, augConfig);
     const outPath = path.resolve(dir, config.out);
     await mkdir(path.dirname(outPath), { recursive: true });
-    await writeFile(outPath, typesSource, 'utf-8');
+    await writeFile(outPath, typesSource, "utf-8");
     console.log(`[gen] merged types → ${path.relative(process.cwd(), outPath)}`);
 
     if (config.shapesOut) {
         const shapesSource = generateShapesDescriptor(allShapes);
-        const shapesPath   = path.resolve(dir, config.shapesOut);
+        const shapesPath = path.resolve(dir, config.shapesOut);
         await mkdir(path.dirname(shapesPath), { recursive: true });
-        await writeFile(shapesPath, shapesSource, 'utf-8');
+        await writeFile(shapesPath, shapesSource, "utf-8");
         console.log(`[gen] shapes descriptor → ${path.relative(process.cwd(), shapesPath)}`);
     }
 }
@@ -128,7 +129,7 @@ export async function generate(inputPath: string): Promise<void> {
     const ontology = readOntology(triples);
     const source = generateTypes(ontology, path.basename(inputPath));
 
-    const outPath = inputPath.replace(/\.(nt|n3|ttl|rdf)$/, '.generated.ts');
-    await writeFile(outPath, source, 'utf-8');
+    const outPath = inputPath.replace(/\.(nt|n3|ttl|rdf)$/, ".generated.ts");
+    await writeFile(outPath, source, "utf-8");
     console.log(`[gen] ${path.basename(inputPath)} → ${path.basename(outPath)}`);
 }

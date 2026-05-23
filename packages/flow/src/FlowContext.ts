@@ -1,5 +1,4 @@
-import type { FlowScheduler } from './FlowScheduler.js';
-
+import type { FlowScheduler } from "./FlowScheduler.js";
 
 export class FlowContext {
     private _scheduler?: FlowScheduler;

@@ -13,10 +13,14 @@ export function compose<T>(fns: MiddlewareFn<T>[]): MiddlewareFn<T> {
         let depth = -1;
 
         const dispatch = async (i: number): Promise<void> => {
-            if (i <= depth) { throw new Error('next() called multiple times'); }
+            if (i <= depth) {
+                throw new Error("next() called multiple times");
+            }
             depth = i;
             const fn = i < fns.length ? fns[i] : finalNext;
-            if (fn) { await fn(ctx, () => dispatch(i + 1)); }
+            if (fn) {
+                await fn(ctx, () => dispatch(i + 1));
+            }
         };
 
         return dispatch(0);

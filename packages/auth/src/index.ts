@@ -1,58 +1,60 @@
 // ── Entity schemas ────────────────────────────────────────────────────────────
-export { UserSchema,       CoreHandle       } from './entities/UserSchema.js';
-export { UserDeviceSchema, DeviceCoreHandle } from './entities/UserDeviceSchema.js';
-export { UserSessionSchema, SessionCoreHandle } from './entities/UserSessionSchema.js';
 
+export type { LoginResult } from "./AuthService.js";
+// ── Core service ──────────────────────────────────────────────────────────────
+export { AuthService } from "./AuthService.js";
+export type { AuthRouterOptions } from "./components/AuthRouterComponent.js";
+export { AuthRouterComponent } from "./components/AuthRouterComponent.js";
+export type {
+    CallbackError,
+    CallbackRequest,
+    CallbackSuccess,
+} from "./components/CallbackComponent.js";
+export { CallbackComponent } from "./components/CallbackComponent.js";
+export type { OAuthInitRequest, OAuthInitResult } from "./components/OAuthComponent.js";
+// ── FBP components ────────────────────────────────────────────────────────────
+export { OAuthComponent } from "./components/OAuthComponent.js";
+export type {
+    RevokeRequest,
+    RevokeResult,
+    ValidateRequest,
+    ValidateResult,
+} from "./components/SessionComponent.js";
+export { SessionComponent } from "./components/SessionComponent.js";
+export { DeviceCoreHandle, UserDeviceSchema } from "./entities/UserDeviceSchema.js";
+export { CoreHandle, UserSchema } from "./entities/UserSchema.js";
+export { SessionCoreHandle, UserSessionSchema } from "./entities/UserSessionSchema.js";
+export { GitHubProvider } from "./oauth/GitHubProvider.js";
+// ── OAuth providers ───────────────────────────────────────────────────────────
+export { GoogleProvider } from "./oauth/GoogleProvider.js";
+export type { IOAuthProvider, OAuthProfile, OAuthResult, OAuthTokens } from "./oauth/types.js";
+export type { UserWithActivity } from "./queries.js";
 // ── Entity queries (list, join) ───────────────────────────────────────────────
 export {
-    listUsers,
-    listUserDevices,
-    listActiveSessions,
-    listInactiveSessions,
-    findUserWithRecentActivity,
     findSessionsByTokens,
     findUserBySession,
-} from './queries.js';
-export type { UserWithActivity } from './queries.js';
-
-// ── Core service ──────────────────────────────────────────────────────────────
-export { AuthService } from './AuthService.js';
-export type { LoginResult } from './AuthService.js';
-
+    findUserWithRecentActivity,
+    listActiveSessions,
+    listInactiveSessions,
+    listUserDevices,
+    listUsers,
+} from "./queries.js";
+export { UserDeviceRepository } from "./repository/UserDeviceRepository.js";
+export { UserIdentityRepository } from "./repository/UserIdentityRepository.js";
+// ── Repositories ──────────────────────────────────────────────────────────────
+export { UserRepository } from "./repository/UserRepository.js";
+export { UserSessionRepository } from "./repository/UserSessionRepository.js";
+export type { ISessionStore } from "./session/ISessionStore.js";
+export { MemorySessionStore } from "./session/MemorySessionStore.js";
+// ── Session stores ────────────────────────────────────────────────────────────
+export { RedisSessionStore } from "./session/RedisSessionStore.js";
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type {
+    DeviceInfo,
     OAuthProvider,
+    SessionData,
+    UserDeviceEntity,
     UserEntity,
     UserIdentityEntity,
     UserSessionEntity,
-    UserDeviceEntity,
-    SessionData,
-    DeviceInfo,
-} from './types.js';
-
-// ── OAuth providers ───────────────────────────────────────────────────────────
-export { GoogleProvider } from './oauth/GoogleProvider.js';
-export { GitHubProvider } from './oauth/GitHubProvider.js';
-export type { IOAuthProvider, OAuthProfile, OAuthTokens, OAuthResult } from './oauth/types.js';
-
-// ── Session stores ────────────────────────────────────────────────────────────
-export { RedisSessionStore } from './session/RedisSessionStore.js';
-export { MemorySessionStore } from './session/MemorySessionStore.js';
-export type { ISessionStore } from './session/ISessionStore.js';
-
-// ── Repositories ──────────────────────────────────────────────────────────────
-export { UserRepository } from './repository/UserRepository.js';
-export { UserIdentityRepository } from './repository/UserIdentityRepository.js';
-export { UserSessionRepository } from './repository/UserSessionRepository.js';
-export { UserDeviceRepository } from './repository/UserDeviceRepository.js';
-
-// ── FBP components ────────────────────────────────────────────────────────────
-export { OAuthComponent }       from './components/OAuthComponent.js';
-export { CallbackComponent }    from './components/CallbackComponent.js';
-export { SessionComponent }     from './components/SessionComponent.js';
-export { AuthRouterComponent }  from './components/AuthRouterComponent.js';
-
-export type { OAuthInitRequest, OAuthInitResult }   from './components/OAuthComponent.js';
-export type { CallbackRequest, CallbackSuccess, CallbackError } from './components/CallbackComponent.js';
-export type { ValidateRequest, ValidateResult, RevokeRequest, RevokeResult } from './components/SessionComponent.js';
-export type { AuthRouterOptions }                   from './components/AuthRouterComponent.js';
+} from "./types.js";

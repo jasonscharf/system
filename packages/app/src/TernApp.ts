@@ -1,11 +1,13 @@
-import { dirname, resolve } from 'node:path';
-import { FlowApp } from '@jasonscharf/flow';
-import type { HandlerEntry } from './config/types.js';
-import { loadAppConfig, mergeHandlers } from './config/loader.js';
-import { HandlerRegistry, type HandlerContext, type HandlerFn } from './registry/HandlerRegistry.js';
-import type { AppConfig } from './config/types.js';
-import type { TernTypeRef } from '@jasonscharf/core';
-
+import { dirname, resolve } from "node:path";
+import type { TernTypeRef } from "@jasonscharf/core";
+import { FlowApp } from "@jasonscharf/flow";
+import { loadAppConfig, mergeHandlers } from "./config/loader.js";
+import type { AppConfig, HandlerEntry } from "./config/types.js";
+import {
+    type HandlerContext,
+    type HandlerFn,
+    HandlerRegistry,
+} from "./registry/HandlerRegistry.js";
 
 export interface TernAppOptions {
     /**
@@ -15,7 +17,7 @@ export interface TernAppOptions {
      */
     context?: Record<string, unknown>;
     /** Scheduler mode for the underlying FBP runtime. */
-    mode?: 'push' | 'pull';
+    mode?: "push" | "pull";
 }
 
 /**
@@ -36,20 +38,20 @@ export interface TernAppOptions {
  *   await app.start();
  */
 export class TernApp {
-    readonly config:   AppConfig;
+    readonly config: AppConfig;
     readonly registry: HandlerRegistry;
-    readonly flow:     FlowApp;
+    readonly flow: FlowApp;
 
     private readonly _extraContext: Record<string, unknown>;
 
     private constructor(
-        config:   AppConfig,
+        config: AppConfig,
         registry: HandlerRegistry,
-        options:  TernAppOptions = {},
+        options: TernAppOptions = {},
     ) {
-        this.config        = config;
-        this.registry      = registry;
-        this.flow          = new FlowApp({ mode: options.mode ?? 'push' });
+        this.config = config;
+        this.registry = registry;
+        this.flow = new FlowApp({ mode: options.mode ?? "push" });
         this._extraContext = options.context ?? {};
     }
 
@@ -72,7 +74,7 @@ export class TernApp {
      * Useful for programmatic setup or testing without config files.
      */
     static fromEntries(
-        config:  AppConfig,
+        config: AppConfig,
         entries: HandlerEntry[],
         options: TernAppOptions = {},
     ): TernApp {
@@ -95,7 +97,10 @@ export class TernApp {
      * Dispatch a request with a caller-supplied connectionId.
      * Merges `options.context` with connectionId and passes it to the handler.
      */
-    async dispatch(request: Parameters<HandlerRegistry['dispatch']>[0], connectionId: string): ReturnType<HandlerRegistry['dispatch']> {
+    async dispatch(
+        request: Parameters<HandlerRegistry["dispatch"]>[0],
+        connectionId: string,
+    ): ReturnType<HandlerRegistry["dispatch"]> {
         const ctx: HandlerContext = { connectionId, ...this._extraContext };
         return this.registry.dispatch(request, ctx);
     }

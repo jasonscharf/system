@@ -4,26 +4,34 @@
  * Manages a WebSocket connection to the sandbox server and exposes a typed
  * request/response API used by the UI layer.
  */
-import { FlowApp, WebSocketClient } from '@jasonscharf/flow';
-import { isTernResult, command, query, TERN_TYPES, type TernKind, type TernResult, type TernTypeRef } from '@jasonscharf/core';
-import type { StoreStats } from './types.js';
 
+import {
+    command,
+    isTernResult,
+    query,
+    TERN_TYPES,
+    type TernKind,
+    type TernResult,
+    type TernTypeRef,
+} from "@jasonscharf/core";
+import { FlowApp, WebSocketClient } from "@jasonscharf/flow";
+import type { StoreStats } from "./types.js";
 
 interface PendingRequest {
     resolve: (result: TernResult) => void;
-    reject:  (err: Error) => void;
+    reject: (err: Error) => void;
 }
 
 export interface EchoResult {
-    readonly echo:       string;
-    readonly original:   string;
+    readonly echo: string;
+    readonly original: string;
     readonly receivedAt: number;
 }
 
 export interface ShowcaseSnapshot {
-    readonly connected:  boolean;
-    readonly pingRtt:    number | null;
-    readonly stats:      StoreStats | null;
+    readonly connected: boolean;
+    readonly pingRtt: number | null;
+    readonly stats: StoreStats | null;
     readonly echoResult: EchoResult | null;
     readonly echoPending: boolean;
 }
@@ -31,15 +39,15 @@ export interface ShowcaseSnapshot {
 export class ClientApp {
     readonly showcase: ShowcaseState;
 
-    private readonly _app:      FlowApp;
-    private readonly _ws:       WebSocketClient;
-    private readonly _pending   = new Map<string, PendingRequest>();
-    private _connected          = false;
+    private readonly _app: FlowApp;
+    private readonly _ws: WebSocketClient;
+    private readonly _pending = new Map<string, PendingRequest>();
+    private _connected = false;
     private readonly _listeners = new Set<() => void>();
 
     constructor(serverUrl: string) {
-        this._app = new FlowApp({ mode: 'push' });
-        this._ws  = new WebSocketClient({ name: 'ws', context: this._app.context, url: serverUrl });
+        this._app = new FlowApp({ mode: "push" });
+        this._ws = new WebSocketClient({ name: "ws", context: this._app.context, url: serverUrl });
         this._app.addComponent(this._ws);
         this.showcase = new ShowcaseState(this);
     }
@@ -66,11 +74,15 @@ export class ClientApp {
         return () => this._listeners.delete(fn);
     }
 
-    async send(typeRef: TernTypeRef, payload?: unknown, kind: TernKind = 'query'): Promise<TernResult> {
+    async send(
+        typeRef: TernTypeRef,
+        payload?: unknown,
+        kind: TernKind = "query",
+    ): Promise<TernResult> {
         if (!this._connected) {
-            throw new Error('Not connected to server');
+            throw new Error("Not connected to server");
         }
-        const msg = kind === 'command' ? command(typeRef, payload) : query(typeRef, payload);
+        const msg = kind === "command" ? command(typeRef, payload) : query(typeRef, payload);
         return new Promise<TernResult>((resolve, reject) => {
             this._pending.set(msg.id, { resolve, reject });
             // Deliver to WebSocketClient.send (input port) then force a tick
@@ -102,15 +114,21 @@ export class ClientApp {
         let data: string | Uint8Array | undefined;
         while ((data = this._ws.received.read()) !== undefined) {
             try {
-                const raw = JSON.parse(typeof data === 'string' ? data : new TextDecoder().decode(data));
+                const raw = JSON.parse(
+                    typeof data === "string" ? data : new TextDecoder().decode(data),
+                );
                 if (isTernResult(raw)) {
                     this._onResult(raw);
                     changed = true;
                 }
-            } catch { /* drop unparseable frames */ }
+            } catch {
+                /* drop unparseable frames */
+            }
         }
 
-        if (changed) { this._notify(); }
+        if (changed) {
+            this._notify();
+        }
     }
 
     private _onResult(result: TernResult): void {
@@ -122,17 +140,24 @@ export class ClientApp {
     }
 
     private _notify(): void {
-        for (const fn of this._listeners) { fn(); }
+        for (const fn of this._listeners) {
+            fn();
+        }
     }
 }
-
 
 // ── ShowcaseState — observable model for the visual component ────────────────
 
 export class ShowcaseState {
-    private readonly _app:      ClientApp;
-    private _snap: ShowcaseSnapshot = { connected: false, pingRtt: null, stats: null, echoResult: null, echoPending: false };
-    private readonly _listeners     = new Set<() => void>();
+    private readonly _app: ClientApp;
+    private _snap: ShowcaseSnapshot = {
+        connected: false,
+        pingRtt: null,
+        stats: null,
+        echoResult: null,
+        echoPending: false,
+    };
+    private readonly _listeners = new Set<() => void>();
 
     constructor(app: ClientApp) {
         this._app = app;
@@ -152,7 +177,7 @@ export class ShowcaseState {
     }
 
     async ping(): Promise<void> {
-        const t0     = Date.now();
+        const t0 = Date.now();
         const result = await this._app.send(TERN_TYPES.ping);
         if (result.ok) {
             this._snap = { ...this._snap, pingRtt: Date.now() - t0 };
@@ -172,9 +197,13 @@ export class ShowcaseState {
         this._snap = { ...this._snap, echoPending: true, echoResult: null };
         this._notify();
         try {
-            const result = await this._app.send(TERN_TYPES.echo, { message }, 'command');
+            const result = await this._app.send(TERN_TYPES.echo, { message }, "command");
             if (result.ok && result.data) {
-                this._snap = { ...this._snap, echoResult: result.data as EchoResult, echoPending: false };
+                this._snap = {
+                    ...this._snap,
+                    echoResult: result.data as EchoResult,
+                    echoPending: false,
+                };
             } else {
                 this._snap = { ...this._snap, echoPending: false };
             }
@@ -185,6 +214,8 @@ export class ShowcaseState {
     }
 
     private _notify(): void {
-        for (const fn of this._listeners) { fn(); }
+        for (const fn of this._listeners) {
+            fn();
+        }
     }
 }

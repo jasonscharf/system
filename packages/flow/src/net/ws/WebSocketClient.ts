@@ -1,6 +1,5 @@
-import { FlowComponent, type FlowComponentOptions } from '../../FlowComponent.js';
-import { FlowPort } from '../../FlowPort.js';
-
+import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
+import type { FlowPort } from "../../FlowPort.js";
 
 export interface WebSocketClientOptions extends FlowComponentOptions {
     url: string;
@@ -29,46 +28,50 @@ export class WebSocketClient extends FlowComponent {
     constructor(options: WebSocketClientOptions) {
         super(options);
         this._url = options.url;
-        this.send = this.addPort<string | Uint8Array>('send', 'in');
-        this.received = this.addPort<string | Uint8Array>('received', 'out');
-        this.connected = this.addPort<void>('connected', 'out');
-        this.disconnected = this.addPort<void>('disconnected', 'out');
+        this.send = this.addPort<string | Uint8Array>("send", "in");
+        this.received = this.addPort<string | Uint8Array>("received", "out");
+        this.connected = this.addPort<void>("connected", "out");
+        this.disconnected = this.addPort<void>("disconnected", "out");
     }
 
     protected override async onInit(): Promise<void> {
-        if (typeof globalThis.WebSocket === 'undefined') {
+        if (typeof globalThis.WebSocket === "undefined") {
             throw new Error(
-                'WebSocketClient requires a platform-native WebSocket (Node.js ≥ 22, ' +
-                'modern browsers). No globalThis.WebSocket found.',
+                "WebSocketClient requires a platform-native WebSocket (Node.js ≥ 22, " +
+                    "modern browsers). No globalThis.WebSocket found.",
             );
         }
 
         const ws = new globalThis.WebSocket(this._url);
         // Request binary frames as ArrayBuffer so the handler branch is consistent
         // across browsers and Node.js (default in Node.js 22+ is 'blob').
-        ws.binaryType = 'arraybuffer';
+        ws.binaryType = "arraybuffer";
         this._ws = ws;
 
         await new Promise<void>((resolve, reject) => {
-            ws.addEventListener('open', () => {
-                this.connected.put(undefined as unknown as void);
+            ws.addEventListener("open", () => {
+                this.connected.put(undefined as unknown as undefined);
                 resolve();
             });
-            ws.addEventListener('error', (e) => reject(e));
+            ws.addEventListener("error", (e) => reject(e));
         });
 
-        ws.addEventListener('message', (evt) => {
+        ws.addEventListener("message", (evt) => {
             const raw = evt.data;
             const data: string | Uint8Array =
                 raw instanceof ArrayBuffer ? new Uint8Array(raw) : String(raw);
             this.received.put(data);
         });
 
-        ws.addEventListener('close', () => {
-            this.disconnected.put(undefined as unknown as void);
+        ws.addEventListener("close", () => {
+            this.disconnected.put(undefined as unknown as undefined);
         });
 
-        this.addDisposable({ dispose: () => { this._ws?.close(); } });
+        this.addDisposable({
+            dispose: () => {
+                this._ws?.close();
+            },
+        });
     }
 
     override step(): void {

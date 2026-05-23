@@ -1,59 +1,58 @@
-import { normalize, join, relative, extname, isAbsolute } from 'node:path';
-import { FlowComponent, type FlowComponentOptions } from '../../FlowComponent.js';
-import { FlowPort } from '../../FlowPort.js';
-import type { HttpHeaders, HttpStreamResponse, ParsedHttpRequest } from './HttpTypes.js';
-
+import { extname, isAbsolute, join, normalize, relative } from "node:path";
+import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
+import type { FlowPort } from "../../FlowPort.js";
+import type { HttpHeaders, HttpStreamResponse, ParsedHttpRequest } from "./HttpTypes.js";
 
 // ── MIME type map ──────────────────────────────────────────────────────────────
 
 const MIME: Record<string, string> = {
     // Images
-    '.apng': 'image/apng',
-    '.avif': 'image/avif',
-    '.bmp':  'image/bmp',
-    '.gif':  'image/gif',
-    '.ico':  'image/x-icon',
-    '.jpg':  'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.png':  'image/png',
-    '.svg':  'image/svg+xml',
-    '.tiff': 'image/tiff',
-    '.webp': 'image/webp',
+    ".apng": "image/apng",
+    ".avif": "image/avif",
+    ".bmp": "image/bmp",
+    ".gif": "image/gif",
+    ".ico": "image/x-icon",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".tiff": "image/tiff",
+    ".webp": "image/webp",
     // Video / Audio
-    '.mp4':  'video/mp4',
-    '.webm': 'video/webm',
-    '.ogg':  'video/ogg',
-    '.mp3':  'audio/mpeg',
-    '.wav':  'audio/wav',
-    '.flac': 'audio/flac',
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".ogg": "video/ogg",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".flac": "audio/flac",
     // Documents / Archives
-    '.pdf':  'application/pdf',
-    '.zip':  'application/zip',
-    '.tar':  'application/x-tar',
-    '.gz':   'application/gzip',
-    '.7z':   'application/x-7z-compressed',
+    ".pdf": "application/pdf",
+    ".zip": "application/zip",
+    ".tar": "application/x-tar",
+    ".gz": "application/gzip",
+    ".7z": "application/x-7z-compressed",
     // Web
-    '.html': 'text/html; charset=utf-8',
-    '.css':  'text/css; charset=utf-8',
-    '.js':   'application/javascript',
-    '.mjs':  'application/javascript',
-    '.json': 'application/json',
-    '.wasm': 'application/wasm',
-    '.txt':  'text/plain; charset=utf-8',
-    '.xml':  'application/xml',
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript",
+    ".mjs": "application/javascript",
+    ".json": "application/json",
+    ".wasm": "application/wasm",
+    ".txt": "text/plain; charset=utf-8",
+    ".xml": "application/xml",
     // Binary
-    '.bin':  'application/octet-stream',
-    '.dat':  'application/octet-stream',
+    ".bin": "application/octet-stream",
+    ".dat": "application/octet-stream",
 };
 
 function mimeFor(filename: string): string {
-    return MIME[extname(filename).toLowerCase()] ?? 'application/octet-stream';
+    return MIME[extname(filename).toLowerCase()] ?? "application/octet-stream";
 }
 
 // ── Async file-chunk generator ────────────────────────────────────────────────
 
 async function* fileChunks(filePath: string): AsyncGenerator<Uint8Array> {
-    const { createReadStream } = await import('node:fs');
+    const { createReadStream } = await import("node:fs");
     const stream = createReadStream(filePath);
     for await (const chunk of stream) {
         const buf = chunk as Buffer;
@@ -70,13 +69,14 @@ function errorResponse(requestId: string, status: number, message: string): Http
         requestId,
         status,
         headers: {
-            'content-type': 'text/plain; charset=utf-8',
-            'content-length': String(body.length),
+            "content-type": "text/plain; charset=utf-8",
+            "content-length": String(body.length),
         },
-        body: (async function*() { yield body; })(),
+        body: (async function* () {
+            yield body;
+        })(),
     };
 }
-
 
 // ── FileStreamHandler ─────────────────────────────────────────────────────────
 
@@ -114,8 +114,8 @@ export class FileStreamHandler extends FlowComponent {
     constructor(options: FileStreamHandlerOptions) {
         super(options);
         this._directory = normalize(options.directory);
-        this.in = this.addPort<ParsedHttpRequest>('in', 'in');
-        this.out = this.addPort<HttpStreamResponse>('out', 'out');
+        this.in = this.addPort<ParsedHttpRequest>("in", "in");
+        this.out = this.addPort<HttpStreamResponse>("out", "out");
     }
 
     override step(): void {
@@ -126,25 +126,23 @@ export class FileStreamHandler extends FlowComponent {
     }
 
     private async _handle(req: ParsedHttpRequest): Promise<void> {
-        const { stat } = await import('node:fs/promises');
+        const { stat } = await import("node:fs/promises");
 
-        const reqId = req.requestId ?? '';
+        const reqId = req.requestId ?? "";
 
         // ── Resolve filename ──────────────────────────────────────────────────
-        const rawName =
-            req.searchParams.get('name') ??
-            req.pathname.replace(/^\/+/, '');
+        const rawName = req.searchParams.get("name") ?? req.pathname.replace(/^\/+/, "");
 
         if (!rawName) {
-            this.out.put(errorResponse(reqId, 400, 'Missing filename'));
+            this.out.put(errorResponse(reqId, 400, "Missing filename"));
             return;
         }
 
         // ── Sandbox check ─────────────────────────────────────────────────────
         const resolved = normalize(join(this._directory, rawName));
         const rel = relative(this._directory, resolved);
-        if (rel.startsWith('..') || isAbsolute(rel)) {
-            this.out.put(errorResponse(reqId, 403, 'Forbidden'));
+        if (rel.startsWith("..") || isAbsolute(rel)) {
+            this.out.put(errorResponse(reqId, 403, "Forbidden"));
             return;
         }
 
@@ -152,19 +150,21 @@ export class FileStreamHandler extends FlowComponent {
         let fileSize: number;
         try {
             const info = await stat(resolved);
-            if (!info.isFile()) throw new Error('not a file');
+            if (!info.isFile()) {
+                throw new Error("not a file");
+            }
             fileSize = info.size;
         } catch {
-            this.out.put(errorResponse(reqId, 404, 'Not Found'));
+            this.out.put(errorResponse(reqId, 404, "Not Found"));
             return;
         }
 
         // ── Emit streaming response ───────────────────────────────────────────
         const headers: HttpHeaders = {
-            'content-type': mimeFor(rawName),
-            'content-length': String(fileSize),
-            'accept-ranges': 'bytes',
-            'cache-control': 'no-cache',
+            "content-type": mimeFor(rawName),
+            "content-length": String(fileSize),
+            "accept-ranges": "bytes",
+            "cache-control": "no-cache",
         };
 
         this.out.put({

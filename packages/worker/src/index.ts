@@ -1,9 +1,8 @@
-import { IRI } from '@jasonscharf/core';
+import { IRI } from "@jasonscharf/core";
 
-
-console.log('--- Worker start ---')
+console.log("--- Worker start ---");
 
 setInterval(() => {
-    const foo = new IRI('http://foo')
+    const _foo = new IRI("http://foo");
     console.log(`Hello from worker!`);
 }, 2000);

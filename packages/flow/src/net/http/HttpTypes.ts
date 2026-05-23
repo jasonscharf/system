@@ -1,6 +1,13 @@
 export type HttpMethod =
-    | 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
-    | 'HEAD' | 'OPTIONS' | 'TRACE' | 'CONNECT';
+    | "GET"
+    | "POST"
+    | "PUT"
+    | "PATCH"
+    | "DELETE"
+    | "HEAD"
+    | "OPTIONS"
+    | "TRACE"
+    | "CONNECT";
 
 /** Header map — values may be multi-valued (e.g. Set-Cookie). */
 export type HttpHeaders = Record<string, string | string[]>;

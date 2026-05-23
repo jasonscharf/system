@@ -1,16 +1,14 @@
-import { IRI, literal, quad, type Quad } from '@jasonscharf/core';
-import { uuidv4Binary } from '@jasonscharf/core';
-import type { FlowContext } from './FlowContext.js';
-import type { FlowNode } from './FlowNode.js';
-import { FlowPort } from './FlowPort.js';
-import type { ComponentState, ID, IDisposable, PortDirection } from './types.js';
-
+import { IRI, literal, type Quad, quad, uuidv4Binary } from "@jasonscharf/core";
+import type { FlowContext } from "./FlowContext.js";
+import type { FlowNode } from "./FlowNode.js";
+import { FlowPort } from "./FlowPort.js";
+import type { ComponentState, ID, IDisposable, PortDirection } from "./types.js";
 
 // RDF namespace for flow entities
-const FLOW_NS = 'http://tern.dev/ns/flow/';
-const XSD_NS = 'http://www.w3.org/2001/XMLSchema#';
+const FLOW_NS = "http://tern.dev/ns/flow/";
+const XSD_NS = "http://www.w3.org/2001/XMLSchema#";
 
-const RDF_TYPE = new IRI('http://www.w3.org/1999/02/22-rdf-syntax-ns#type');
+const RDF_TYPE = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
 const XSD_STRING = new IRI(`${XSD_NS}string`);
 const FLOW_COMPONENT = new IRI(`${FLOW_NS}Component`);
 const FLOW_NAME = new IRI(`${FLOW_NS}name`);
@@ -20,7 +18,6 @@ const FLOW_PORT_TYPE = new IRI(`${FLOW_NS}Port`);
 const FLOW_PORT_NAME = new IRI(`${FLOW_NS}portName`);
 const FLOW_DIRECTION = new IRI(`${FLOW_NS}direction`);
 const FLOW_DEFAULT_GRAPH = new IRI(`${FLOW_NS}graph`);
-
 
 export interface FlowComponentOptions {
     name?: string;
@@ -39,12 +36,12 @@ export class FlowComponent implements FlowNode {
     private readonly _children: FlowComponent[] = [];
     private readonly _disposables: IDisposable[] = [];
     private readonly _handlers = new Map<FlowPort<unknown>, Array<(msg: unknown) => void>>();
-    private _state: ComponentState = 'idle';
+    private _state: ComponentState = "idle";
 
     constructor(options: FlowComponentOptions) {
         this.id = options.id ?? uuidv4Binary();
         this.iri = options.iri;
-        this.name = options.name ?? '';
+        this.name = options.name ?? "";
         this.context = options.context;
     }
 
@@ -84,7 +81,9 @@ export class FlowComponent implements FlowNode {
         for (const [port, handlers] of this._handlers) {
             let msg: unknown;
             while ((msg = port.read()) !== undefined) {
-                for (const h of handlers) h(msg);
+                for (const h of handlers) {
+                    h(msg);
+                }
             }
         }
     }
@@ -98,11 +97,11 @@ export class FlowComponent implements FlowNode {
         for (const child of this._children) {
             await child.init();
         }
-        this._state = 'running';
+        this._state = "running";
     }
 
     async dispose(): Promise<void> {
-        this._state = 'disposed';
+        this._state = "disposed";
         for (const child of [...this._children].reverse()) {
             await child.dispose();
         }
@@ -113,9 +112,12 @@ export class FlowComponent implements FlowNode {
     }
 
     toQuads(): Quad[] {
-        const idHex = this.id instanceof Uint8Array
-            ? Array.from(this.id).map(b => b.toString(16).padStart(2, '0')).join('')
-            : this.id.toString(16);
+        const idHex =
+            this.id instanceof Uint8Array
+                ? Array.from(this.id)
+                      .map((b) => b.toString(16).padStart(2, "0"))
+                      .join("")
+                : this.id.toString(16);
 
         const subject = this.iri ?? new IRI(`${FLOW_NS}component/${idHex}`);
         const graph = FLOW_DEFAULT_GRAPH;

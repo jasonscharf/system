@@ -1,5 +1,4 @@
-import type { ISecretsProvider } from './ISecretsProvider.js';
-
+import type { ISecretsProvider } from "./ISecretsProvider.js";
 
 // ── Minimal type surfaces so we don't hard-import the Azure SDKs at module ────
 // load time (they're heavy and not always present). Dynamic import handles the ─
@@ -35,19 +34,26 @@ export class AzureKeyVaultProvider implements ISecretsProvider {
     private _client: SecretClientLike | null = null;
 
     constructor(vaultUri: string) {
-        this._vaultUri = vaultUri.replace(/\/$/, '');
+        this._vaultUri = vaultUri.replace(/\/$/, "");
     }
 
     private async _getClient(): Promise<SecretClientLike> {
-        if (this._client) { return this._client; }
+        if (this._client) {
+            return this._client;
+        }
 
         const [{ SecretClient }, { DefaultAzureCredential }] = await Promise.all([
-            import('@azure/keyvault-secrets'),
-            import('@azure/identity'),
+            import("@azure/keyvault-secrets"),
+            import("@azure/identity"),
         ]);
 
         const cred: AzureCredential = new DefaultAzureCredential();
-        this._client = new SecretClient(this._vaultUri, cred as Parameters<typeof SecretClient.prototype.getSecret>[0] extends never ? never : never);
+        this._client = new SecretClient(
+            this._vaultUri,
+            cred as Parameters<typeof SecretClient.prototype.getSecret>[0] extends never
+                ? never
+                : never,
+        );
 
         // TypeScript can't narrow the exact SDK type, but DefaultAzureCredential
         // satisfies the TokenCredential interface SecretClient requires at runtime.
@@ -59,16 +65,19 @@ export class AzureKeyVaultProvider implements ISecretsProvider {
     }
 
     async get(key: string): Promise<string | null> {
-        const client     = await this._getClient();
+        const client = await this._getClient();
         const secretName = this._toVaultName(key);
 
         try {
             const secret = await client.getSecret(secretName);
             return secret.value ?? null;
         } catch (err: unknown) {
-            const code = (err as { code?: string; statusCode?: number }).code
-                ?? String((err as { statusCode?: number }).statusCode);
-            if (code === 'SecretNotFound' || code === '404') { return null; }
+            const code =
+                (err as { code?: string; statusCode?: number }).code ??
+                String((err as { statusCode?: number }).statusCode);
+            if (code === "SecretNotFound" || code === "404") {
+                return null;
+            }
             throw err;
         }
     }
@@ -84,6 +93,6 @@ export class AzureKeyVaultProvider implements ISecretsProvider {
     }
 
     private _toVaultName(key: string): string {
-        return key.toLowerCase().replace(/_/g, '-');
+        return key.toLowerCase().replace(/_/g, "-");
     }
 }

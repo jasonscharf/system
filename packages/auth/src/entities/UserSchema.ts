@@ -1,17 +1,19 @@
-import { EntitySchema, handle } from '@jasonscharf/entities';
 import {
+    avatarUrlIRI,
+    createdAtIRI,
+    displayNameIRI,
+    emailIRI,
     UserIRI,
-    emailIRI, displayNameIRI, avatarUrlIRI,
-    createdAtIRI, updatedAtIRI,
-} from '@jasonscharf/core';
-import { AUTH_NS } from '../constants.js';
-
+    updatedAtIRI,
+} from "@jasonscharf/core";
+import { EntitySchema, handle } from "@jasonscharf/entities";
+import { AUTH_NS } from "../constants.js";
 
 /**
  * The core PropGroup handle for auth:User.
  * All core User properties live here in the property graph.
  */
-export const CoreHandle = handle('tern:core');
+export const CoreHandle = handle("tern:core");
 
 /**
  * EntitySchema for auth:User.
@@ -21,16 +23,16 @@ export const CoreHandle = handle('tern:core');
  *   UserSchema.register(myPropGroup);
  */
 export const UserSchema = new EntitySchema({
-    typeIRI:   UserIRI,
-    ns:        AUTH_NS,
+    typeIRI: UserIRI,
+    ns: AUTH_NS,
     coreGroup: {
-        handle:     CoreHandle,
+        handle: CoreHandle,
         properties: {
-            email:       emailIRI,
+            email: emailIRI,
             displayName: displayNameIRI,
-            avatarUrl:   avatarUrlIRI,
-            createdAt:   createdAtIRI,
-            updatedAt:   updatedAtIRI,
+            avatarUrl: avatarUrlIRI,
+            createdAt: createdAtIRI,
+            updatedAt: updatedAtIRI,
         },
         defaults: {
             createdAt: () => new Date(),

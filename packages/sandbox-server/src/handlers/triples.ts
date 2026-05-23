@@ -1,71 +1,88 @@
-import { okResult, errResult, TERN_TYPES, type IRI, type BlankNode, type Literal, type TernRequest, type TernResult } from '@jasonscharf/core';
-import { TripleStore, type QuadPattern } from '@jasonscharf/data';
-import { defaultServerContext } from '@jasonscharf/server';
-import type { HandlerContext } from '@jasonscharf/app';
-
+import type { HandlerContext } from "@jasonscharf/app";
+import {
+    type BlankNode,
+    errResult,
+    type IRI,
+    type Literal,
+    okResult,
+    TERN_TYPES,
+    type TernRequest,
+    type TernResult,
+} from "@jasonscharf/core";
+import { type QuadPattern, TripleStore } from "@jasonscharf/data";
+import { defaultServerContext } from "@jasonscharf/server";
 
 type RdfTerm = IRI | BlankNode | Literal;
 
-function makeIRI(value: string): IRI { return { value } as IRI; }
+function makeIRI(value: string): IRI {
+    return { value } as IRI;
+}
 
 function termFromWire(raw: unknown): RdfTerm | undefined {
-    if (!raw || typeof raw !== 'object') { return undefined; }
+    if (!raw || typeof raw !== "object") {
+        return undefined;
+    }
     const r = raw as Record<string, unknown>;
-    if (typeof r['value'] === 'string' && !('termType' in r)) {
-        return makeIRI(r['value']);
+    if (typeof r.value === "string" && !("termType" in r)) {
+        return makeIRI(r.value);
     }
-    if (r['termType'] === 'BlankNode' && typeof r['id'] === 'string') {
-        return { termType: 'BlankNode', id: r['id'] };
+    if (r.termType === "BlankNode" && typeof r.id === "string") {
+        return { termType: "BlankNode", id: r.id };
     }
-    if (r['termType'] === 'Literal' && typeof r['value'] === 'string') {
+    if (r.termType === "Literal" && typeof r.value === "string") {
         return {
-            termType: 'Literal',
-            value:    r['value'] as string,
-            datatype: makeIRI(typeof r['datatype'] === 'string' ? r['datatype']
-                              : 'http://www.w3.org/2001/XMLSchema#string'),
-            language: typeof r['lang'] === 'string' ? r['lang'] : undefined,
+            termType: "Literal",
+            value: r.value as string,
+            datatype: makeIRI(
+                typeof r.datatype === "string"
+                    ? r.datatype
+                    : "http://www.w3.org/2001/XMLSchema#string",
+            ),
+            language: typeof r.lang === "string" ? r.lang : undefined,
         };
     }
     return undefined;
 }
 
 function patternFromWire(raw: unknown): QuadPattern {
-    if (!raw || typeof raw !== 'object') { return {}; }
+    if (!raw || typeof raw !== "object") {
+        return {};
+    }
     const r = raw as Record<string, unknown>;
     return {
-        subject:   termFromWire(r['subject'])   as IRI | BlankNode | undefined,
-        predicate: termFromWire(r['predicate']) as IRI | undefined,
-        object:    termFromWire(r['object'])    as RdfTerm | undefined,
-        graph:     termFromWire(r['graph'])     as IRI | undefined,
+        subject: termFromWire(r.subject) as IRI | BlankNode | undefined,
+        predicate: termFromWire(r.predicate) as IRI | undefined,
+        object: termFromWire(r.object) as RdfTerm | undefined,
+        graph: termFromWire(r.graph) as IRI | undefined,
     };
 }
 
 function getStore(ctx: HandlerContext): TripleStore {
-    const store = ctx['store'];
+    const store = ctx.store;
     if (!(store instanceof TripleStore)) {
-        throw new Error('HandlerContext.store must be a TripleStore instance');
+        throw new Error("HandlerContext.store must be a TripleStore instance");
     }
     return store;
 }
 
 export async function handleFind(request: TernRequest, ctx: HandlerContext): Promise<TernResult> {
-    const store   = getStore(ctx);
+    const store = getStore(ctx);
     const pattern = patternFromWire(request.payload);
-    const quads   = await store.find(defaultServerContext, pattern);
+    const quads = await store.find(defaultServerContext, pattern);
     return okResult(request.id, TERN_TYPES.tripleFind, { quads });
 }
 
 export async function handleInsert(request: TernRequest, ctx: HandlerContext): Promise<TernResult> {
-    const store   = getStore(ctx);
+    const store = getStore(ctx);
     const payload = request.payload as Record<string, unknown> | undefined;
     if (!payload) {
-        return errResult(request.id, TERN_TYPES.tripleInsert, 'Missing payload');
+        return errResult(request.id, TERN_TYPES.tripleInsert, "Missing payload");
     }
     await store.insert(defaultServerContext, {
-        subject:   termFromWire(payload['subject'])!   as IRI | BlankNode,
-        predicate: termFromWire(payload['predicate'])! as IRI,
-        object:    termFromWire(payload['object'])!    as RdfTerm,
-        graph:     (termFromWire(payload['graph'])     as IRI | undefined) ?? makeIRI(''),
+        subject: termFromWire(payload.subject)! as IRI | BlankNode,
+        predicate: termFromWire(payload.predicate)! as IRI,
+        object: termFromWire(payload.object)! as RdfTerm,
+        graph: (termFromWire(payload.graph) as IRI | undefined) ?? makeIRI(""),
     });
     return okResult(request.id, TERN_TYPES.tripleInsert);
 }

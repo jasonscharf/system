@@ -1,18 +1,14 @@
 {
-  "bases": [
-    {
-      "ontology":   "../core/ontology/auth.ttl",
-      "package":    "@system/core",
-      "importPath": "@system/core"
-    }
-  ],
-  "extensions": [
-    "./ontology/analytics.ttl"
-  ],
-  "shapes": [
-    "./ontology/analytics.shacl.ttl"
-  ],
-  "localNamespace": "http://tern.dev/ns/analytics/",
-  "out":        "./src/analytics/types.generated.ts",
-  "shapesOut":  "./src/analytics/shapes.generated.ts"
+    "bases": [
+        {
+            "ontology": "../core/ontology/auth.ttl",
+            "package": "@system/core",
+            "importPath": "@system/core"
+        }
+    ],
+    "extensions": ["./ontology/analytics.ttl"],
+    "shapes": ["./ontology/analytics.shacl.ttl"],
+    "localNamespace": "http://tern.dev/ns/analytics/",
+    "out": "./src/analytics/types.generated.ts",
+    "shapesOut": "./src/analytics/shapes.generated.ts"
 }

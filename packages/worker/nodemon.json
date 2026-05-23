@@ -1,17 +1,9 @@
 {
-  "ext": "js,json",
-  "exec": "node --inspect=0.0.0.0:9000 dist/index.js",
-  "watch": [
-    "dist",
-    "../core/dist",
-    "nodemon.json",
-    "package.json"
-  ],
-  "ignore": [
-    "src",
-    "**/*.map"
-  ],
-  "delay": 500,
-  "signal": "SIGTERM",
-  "legacyWatch": true
+    "ext": "js,json",
+    "exec": "node --inspect=0.0.0.0:9000 dist/index.js",
+    "watch": ["dist", "../core/dist", "nodemon.json", "package.json"],
+    "ignore": ["src", "**/*.map"],
+    "delay": 500,
+    "signal": "SIGTERM",
+    "legacyWatch": true
 }

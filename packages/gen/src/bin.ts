@@ -18,17 +18,16 @@
  * Downstream packages just need this in package.json:
  *   "scripts": { "gen": "tern-codegen", "gen:watch": "tern-codegen --watch" }
  */
-import { access } from 'node:fs/promises';
-import path from 'node:path';
-import { generate, generateFromConfig } from './generate.js';
+import { access } from "node:fs/promises";
+import path from "node:path";
+import { generate, generateFromConfig } from "./generate.js";
 
-
-const [,, ...args] = process.argv;
+const [, , ...args] = process.argv;
 
 // ── Flag parsing ──────────────────────────────────────────────────────────────
 
-const watchIdx  = args.indexOf('--watch');
-const configIdx = args.indexOf('--config');
+const watchIdx = args.indexOf("--watch");
+const configIdx = args.indexOf("--config");
 const watchMode = watchIdx !== -1;
 
 const cleanArgs = args.filter((_, i) => i !== watchIdx);
@@ -39,37 +38,35 @@ if (configIdx !== -1) {
     // Explicit --config <file>
     const configPath = args[configIdx + 1];
     if (!configPath) {
-        console.error('Usage: tern-codegen --config <tern-gen.json> [--watch]');
+        console.error("Usage: tern-codegen --config <tern-gen.json> [--watch]");
         process.exit(1);
     }
     await runConfig(path.resolve(configPath), watchMode);
-
 } else if (cleanArgs.length === 0) {
     // Zero-arg: auto-discover tern-gen.json
     const configPath = await findConfig(process.cwd());
     if (!configPath) {
         console.error(
-            '[gen] No tern-gen.json found in current directory or any parent.\n' +
-            '      Create a tern-gen.json or run: tern-codegen --config <path>',
+            "[gen] No tern-gen.json found in current directory or any parent.\n" +
+                "      Create a tern-gen.json or run: tern-codegen --config <path>",
         );
         process.exit(1);
     }
     console.log(`[gen] Using ${path.relative(process.cwd(), configPath)}`);
     await runConfig(configPath, watchMode);
-
 } else {
     // Legacy single-file mode
     if (watchMode) {
         const targets = cleanArgs;
         if (targets.length === 0) {
-            console.error('Usage: tern-codegen --watch <glob> [glob ...]');
+            console.error("Usage: tern-codegen --watch <glob> [glob ...]");
             process.exit(1);
         }
-        const { default: chokidar } = await import('chokidar');
+        const { default: chokidar } = await import("chokidar");
         const watcher = chokidar.watch(targets, { ignoreInitial: false });
-        watcher.on('add', generate);
-        watcher.on('change', generate);
-        console.log(`[gen] Watching ${targets.join(', ')} ...`);
+        watcher.on("add", generate);
+        watcher.on("change", generate);
+        console.log(`[gen] Watching ${targets.join(", ")} ...`);
     } else {
         for (const t of cleanArgs) {
             await generate(t);
@@ -86,37 +83,41 @@ async function runConfig(configPath: string, watch: boolean): Promise<void> {
     }
 
     // Watch mode: re-run on any file listed in the config
-    const { readFile } = await import('node:fs/promises');
-    const config = JSON.parse(await readFile(configPath, 'utf-8'));
-    const dir    = path.dirname(configPath);
+    const { readFile } = await import("node:fs/promises");
+    const config = JSON.parse(await readFile(configPath, "utf-8"));
+    const dir = path.dirname(configPath);
 
     const watchTargets = [
         configPath,
-        ...(config.bases      ?? []).map((b: { ontology: string }) => path.resolve(dir, b.ontology)),
+        ...(config.bases ?? []).map((b: { ontology: string }) => path.resolve(dir, b.ontology)),
         ...(config.extensions ?? []).map((f: string) => path.resolve(dir, f)),
-        ...(config.shapes     ?? []).map((f: string) => path.resolve(dir, f)),
+        ...(config.shapes ?? []).map((f: string) => path.resolve(dir, f)),
     ];
 
-    const { default: chokidar } = await import('chokidar');
+    const { default: chokidar } = await import("chokidar");
     const run = () => generateFromConfig(configPath).catch(console.error);
 
     const watcher = chokidar.watch(watchTargets, { ignoreInitial: false });
-    watcher.on('add',    run);
-    watcher.on('change', run);
-    console.log(`[gen] Watching ${watchTargets.map(t => path.relative(process.cwd(), t)).join(', ')} ...`);
+    watcher.on("add", run);
+    watcher.on("change", run);
+    console.log(
+        `[gen] Watching ${watchTargets.map((t) => path.relative(process.cwd(), t)).join(", ")} ...`,
+    );
 }
 
 /** Walk up from startDir until tern-gen.json is found, or return null. */
 async function findConfig(startDir: string): Promise<string | null> {
     let dir = startDir;
     while (true) {
-        const candidate = path.join(dir, 'tern-gen.json');
+        const candidate = path.join(dir, "tern-gen.json");
         try {
             await access(candidate);
             return candidate;
         } catch {
             const parent = path.dirname(dir);
-            if (parent === dir) { return null; }
+            if (parent === dir) {
+                return null;
+            }
             dir = parent;
         }
     }

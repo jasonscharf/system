@@ -1,15 +1,17 @@
 /**
  * Returns once all other scheduled frames have completed.
  * This means pending from on the task queue - not in-flight promises.
- * @returns 
+ * @returns
  */
 export async function flush() {
-    return new Promise((resolve) => { schedule(resolve); })
+    return new Promise((resolve) => {
+        schedule(resolve);
+    });
 }
 
 /**
  * Sleeps for the provided number of milliseconds before invoking the specified function.
- * @param ms 
+ * @param ms
  * @returns A promise that resolved once the supplied interval has elapsed
  */
 export async function sleep(ms: number) {
@@ -18,8 +20,8 @@ export async function sleep(ms: number) {
 
 /**
  * Repeats the given function on the specified interval.
- * @param ms 
- * @param fn 
+ * @param ms
+ * @param fn
  * @returns A handle for `clearInterval`
  */
 export function repeat(ms: number, fn: Function): number {

@@ -1,9 +1,8 @@
-import type { PropGroupDef } from './EntitySchema.js';
-
+import type { PropGroupDef } from "./EntitySchema.js";
 
 export interface EntityRecord {
-    id:     string;
-    iri:    string;
+    id: string;
+    iri: string;
     /**
      * Groups keyed by handle.id string.  Each value is the hydrated prop object.
      * Collection properties (multiple quads for the same predicate) are returned
@@ -18,7 +17,7 @@ export interface EntityRecord {
  */
 export function groupOf<Props extends Record<string, unknown>>(
     record: EntityRecord,
-    def:    PropGroupDef<Props>,
+    def: PropGroupDef<Props>,
 ): Props | undefined {
     return record.groups[def.handle.id] as Props | undefined;
 }

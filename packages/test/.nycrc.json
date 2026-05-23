@@ -1,22 +1,10 @@
 {
-  "extends": "@istanbuljs/nyc-config-typescript",
-  "all": true,
-  "cache": false,
-  "check-coverage": false,
-  "include": [
-    "packages/**/src/**/*.ts"
-  ],
-  "exclude": [
-    "**/*.test.ts",
-    "**/*.spec.ts",
-    "**/*.d.ts",
-    "**/dist/**",
-    "**/node_modules/**"
-  ],
-  "reporter": [
-    "text-summary",
-    "html",
-    "lcov"
-  ],
-  "report-dir": "coverage/playwright"
+    "extends": "@istanbuljs/nyc-config-typescript",
+    "all": true,
+    "cache": false,
+    "check-coverage": false,
+    "include": ["packages/**/src/**/*.ts"],
+    "exclude": ["**/*.test.ts", "**/*.spec.ts", "**/*.d.ts", "**/dist/**", "**/node_modules/**"],
+    "reporter": ["text-summary", "html", "lcov"],
+    "report-dir": "coverage/playwright"
 }

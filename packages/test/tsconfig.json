@@ -1,36 +1,33 @@
 {
-  "extends": "../tsconfig.base.json",
-  "compilerOptions": {
-    "composite": true,
-    "outDir": "dist",
-    "paths": {
-      "@system/api":      ["../api/src/index.ts"],
-      "@system/auth":     ["../auth/src/index.ts"],
-      "@system/core":     ["../core/src/index.ts"],
-      "@system/app":      ["../app/src/index.ts"],
-      "@system/data":     ["../data/src/index.ts"],
-      "@system/entities": ["../entities/src/index.ts"],
-      "@system/flow":     ["../flow/src/index.ts"],
-      "@system/gen":      ["../gen/src/index.ts"],
-      "@system/vaults":   ["../vaults/src/index.ts"],
-      "@system/worker":   ["../worker/src/index.ts"]
-    }
-  },
-  "references": [
-    { "path": "../api"      },
-    { "path": "../app"      },
-    { "path": "../auth"     },
-    { "path": "../core"     },
-    { "path": "../data"     },
-    { "path": "../entities" },
-    { "path": "../flow"     },
-    { "path": "../gen"      },
-    { "path": "../server"   },
-    { "path": "../vaults"   },
-    { "path": "../worker"   }
-  ],
-  "include": [
-    "src",
-    "vitest.config.ts"
-  ]
+    "extends": "../tsconfig.base.json",
+    "compilerOptions": {
+        "composite": true,
+        "outDir": "dist",
+        "paths": {
+            "@system/api": ["../api/src/index.ts"],
+            "@system/auth": ["../auth/src/index.ts"],
+            "@system/core": ["../core/src/index.ts"],
+            "@system/app": ["../app/src/index.ts"],
+            "@system/data": ["../data/src/index.ts"],
+            "@system/entities": ["../entities/src/index.ts"],
+            "@system/flow": ["../flow/src/index.ts"],
+            "@system/gen": ["../gen/src/index.ts"],
+            "@system/vaults": ["../vaults/src/index.ts"],
+            "@system/worker": ["../worker/src/index.ts"]
+        }
+    },
+    "references": [
+        { "path": "../api" },
+        { "path": "../app" },
+        { "path": "../auth" },
+        { "path": "../core" },
+        { "path": "../data" },
+        { "path": "../entities" },
+        { "path": "../flow" },
+        { "path": "../gen" },
+        { "path": "../server" },
+        { "path": "../vaults" },
+        { "path": "../worker" }
+    ],
+    "include": ["src", "vitest.config.ts"]
 }

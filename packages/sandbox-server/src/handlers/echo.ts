@@ -19,8 +19,8 @@ export async function handleEcho(request: TernRequest, _ctx: HandlerContext): Pr
     }
 
     return okResult(request.id, TERN_TYPES.echo, {
-        echo:       payload.message.toUpperCase(),
-        original:   payload.message,
+        echo: payload.message.toUpperCase(),
+        original: payload.message,
         receivedAt: Date.now(),
     });
 }

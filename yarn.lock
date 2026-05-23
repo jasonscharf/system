@@ -1233,7 +1233,6 @@ __metadata:
     "@jasonscharf/flow": "workspace:^"
     "@jasonscharf/server": "workspace:^"
     "@jasonscharf/vaults": "workspace:^"
-    better-sqlite3: "npm:^11.10.0"
     ioredis: "npm:^5.6.1"
     pg: "npm:^8.16.0"
   languageName: unknown

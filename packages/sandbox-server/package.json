@@ -7,6 +7,7 @@
     "compile": "tsc -b",
     "clean": "rm -rf dist && rm -f tsconfig.tsbuildinfo",
     "start": "node dist/index.js",
+    "start:debug": "node --inspect=0.0.0.0:9229 dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -17,7 +18,6 @@
     "@jasonscharf/flow": "workspace:^",
     "@jasonscharf/server": "workspace:^",
     "@jasonscharf/vaults": "workspace:^",
-    "better-sqlite3": "^11.10.0",
     "ioredis": "^5.6.1",
     "pg": "^8.16.0"
   }

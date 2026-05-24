@@ -22,6 +22,9 @@ services:
 
     command: yarn test start:debug
     stop_grace_period: 1s
+    tty: true
+    ports:
+      - "9231:9231"
     volumes:
       - ./:/app
 
@@ -33,7 +36,72 @@ services:
       context: .
       target: worker
 
-    command: yarn worker start:debug
+    entrypoint: []
+    command: yarn workspace @jasonscharf/worker start:debug
     stop_grace_period: 1s
+    ports:
+      - "9230:9000"
     volumes:
       - ./:/app
+
+  #
+  # PostgreSQL  —  shared by sandbox-server
+  #
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB:       tern
+      POSTGRES_USER:     tern
+      POSTGRES_PASSWORD: tern
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tern -d tern"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  #
+  # Sandbox server  —  WS :8080, HTTP :8081, inspector :9229
+  #
+  sandbox-server:
+    build:
+      context: .
+      target: base
+
+    command: yarn sb-server start:debug
+    stop_grace_period: 1s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TERN_PG_HOST:     postgres
+      TERN_PG_DATABASE: tern
+      TERN_PG_USER:     tern
+      TERN_PG_PASSWORD: tern
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "9229:9229"
+    volumes:
+      - ./:/app
+
+  #
+  # Sandbox web  —  Vite dev server :5173
+  #
+  sandbox-web:
+    build:
+      context: .
+      target: base
+
+    command: yarn sb-web dev
+    stop_grace_period: 1s
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./:/app
+
+volumes:
+  postgres_data:

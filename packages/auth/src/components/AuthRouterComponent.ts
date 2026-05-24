@@ -230,6 +230,7 @@ export class AuthRouterComponent extends FlowComponent {
             ctx.body = null;
         });
 
+        // TODO: Should be POST
         // ── GET /auth/:provider/callback ──────────────────────────────────────
         this.httpRouter.get("/auth/:provider/callback", async (ctx) => {
             const prov = ctx.params.provider as OAuthProvider;

@@ -183,6 +183,17 @@ export class TripleStore {
         return (ctx.trx as Knex | undefined) ?? this._knex;
     }
 
+    /** Inserts a row and returns its auto-increment ID, for both Postgres and SQLite. */
+    private async _insert(ctx: ServerContext, table: string, data: Record<string, unknown>): Promise<number> {
+        const client = (this._knex.client as { config: { client: string } }).config.client;
+        if (client === "pg" || client === "postgresql") {
+            const [row] = (await this._db(ctx)(table).insert(data).returning("id")) as [{ id: number }];
+            return row.id;
+        }
+        const [id] = (await this._db(ctx)(table).insert(data)) as [number];
+        return id;
+    }
+
     // ── Transaction ───────────────────────────────────────────────────────────
 
     async withTransaction<T>(
@@ -204,11 +215,7 @@ export class TripleStore {
         if (row) {
             return row.id;
         }
-        const [id] = await this._db(ctx)(T.namespaces).insert({
-            [C.prefix]: prefix,
-            [C.iri]: iriStr,
-        });
-        return id as number;
+        return this._insert(ctx, T.namespaces, { [C.prefix]: prefix, [C.iri]: iriStr });
     }
 
     // ── Term internment ───────────────────────────────────────────────────────
@@ -218,8 +225,7 @@ export class TripleStore {
         if (row) {
             return row.id;
         }
-        const [id] = await this._db(ctx)(T.names).insert({ [C.iri]: iriStr });
-        return id as number;
+        return this._insert(ctx, T.names, { [C.iri]: iriStr });
     }
 
     async ensureNode(ctx: ServerContext, term: RdfTerm): Promise<number> {
@@ -231,11 +237,7 @@ export class TripleStore {
             if (row) {
                 return row.id;
             }
-            const [id] = await this._db(ctx)(T.nodes).insert({
-                [C.kind]: "iri",
-                [C.nameId]: nameId,
-            });
-            return id as number;
+            return this._insert(ctx, T.nodes, { [C.kind]: "iri", [C.nameId]: nameId });
         }
 
         if (term.termType === "BlankNode") {
@@ -245,11 +247,7 @@ export class TripleStore {
             if (row) {
                 return row.id;
             }
-            const [id] = await this._db(ctx)(T.nodes).insert({
-                [C.kind]: "blank",
-                [C.blank]: term.id,
-            });
-            return id as number;
+            return this._insert(ctx, T.nodes, { [C.kind]: "blank", [C.blank]: term.id });
         }
 
         // Literal node — deduplicate by (value, datatype, lang), populate value_json
@@ -268,14 +266,13 @@ export class TripleStore {
         }
 
         const jsonPayload = makeLiteralJson(term.value, dtIri, term.language);
-        const [id] = await this._db(ctx)(T.nodes).insert({
+        return this._insert(ctx, T.nodes, {
             [C.kind]: "literal",
             [C.value]: term.value,
             [C.datatype]: dtIri,
             [C.lang]: term.language ?? null,
             [C.valueJson]: JSON.stringify(jsonPayload),
         });
-        return id as number;
     }
 
     // ── Write ─────────────────────────────────────────────────────────────────

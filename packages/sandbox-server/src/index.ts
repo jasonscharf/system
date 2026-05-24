@@ -3,7 +3,7 @@
  *
  * Boot sequence:
  *   1. Init SecretsManager (Azure Key Vault in staging/prod; env vars locally).
- *   2. Open the triple store (SQLite locally; PostgreSQL in staging/prod).
+ *   2. Open the triple store (PostgreSQL).
  *   3. Load app config from config/app.yaml → HandlerRegistry.
  *   4. Wire two FBP pipelines:
  *        WS pipeline:   WS → decode → route → encode → WS

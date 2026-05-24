@@ -39,5 +39,8 @@
         "**/bower_components": true,
         "**/*.code-search": true,
         "**/dist": true
-    }
+    },
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": false,
+    "typescript.tsc.autoDetect": "off"
 }

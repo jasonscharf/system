@@ -33,42 +33,48 @@ export async function up(knex: Knex): Promise<void> {
 
     // ── tern_nodes ────────────────────────────────────────────────────────────
 
-    await knex.schema.alterTable(T.nodes, (t) => {
-        // Timestamps — default to now() so existing rows get a sensible value.
-        t.timestamp(C.createdAt, { useTz: true }).notNullable().defaultTo(now);
-        t.timestamp(C.updatedAt, { useTz: true }).notNullable().defaultTo(now);
+    const nodesHasCreatedAt = await knex.schema.hasColumn(T.nodes, C.createdAt);
+    if (!nodesHasCreatedAt) {
+        await knex.schema.alterTable(T.nodes, (t) => {
+            // Timestamps — default to now() so existing rows get a sensible value.
+            t.timestamp(C.createdAt, { useTz: true }).notNullable().defaultTo(now);
+            t.timestamp(C.updatedAt, { useTz: true }).notNullable().defaultTo(now);
 
-        // JSONB literal payload.  Postgres stores this as a real JSONB column;
-        // SQLite stores it as serialised JSON text — both accessed via Knex's
-        // json() abstraction so application code is database-agnostic.
-        if (isPg) {
-            t.specificType(C.valueJson, "jsonb").nullable();
-        } else {
-            t.json(C.valueJson).nullable();
-        }
-    });
+            // JSONB literal payload.  Postgres stores this as a real JSONB column;
+            // SQLite stores it as serialised JSON text — both accessed via Knex's
+            // json() abstraction so application code is database-agnostic.
+            if (isPg) {
+                t.specificType(C.valueJson, "jsonb").nullable();
+            } else {
+                t.json(C.valueJson).nullable();
+            }
+        });
+    }
 
     // ── tern_edges ────────────────────────────────────────────────────────────
 
-    await knex.schema.alterTable(T.edges, (t) => {
-        t.timestamp(C.createdAt, { useTz: true }).notNullable().defaultTo(now);
-        t.timestamp(C.updatedAt, { useTz: true }).notNullable().defaultTo(now);
-        t.boolean(C.isDeleted).notNullable().defaultTo(false);
-        t.timestamp(C.deletedAt, { useTz: true }).nullable();
-    });
+    const edgesHasCreatedAt = await knex.schema.hasColumn(T.edges, C.createdAt);
+    if (!edgesHasCreatedAt) {
+        await knex.schema.alterTable(T.edges, (t) => {
+            t.timestamp(C.createdAt, { useTz: true }).notNullable().defaultTo(now);
+            t.timestamp(C.updatedAt, { useTz: true }).notNullable().defaultTo(now);
+            t.boolean(C.isDeleted).notNullable().defaultTo(false);
+            t.timestamp(C.deletedAt, { useTz: true }).nullable();
+        });
 
-    // Drop the old full unique constraint — soft-delete means the same quad
-    // can appear multiple times in history.
-    await knex.schema.alterTable(T.edges, (t) => {
-        t.dropUnique([C.subject, C.predicate, C.object, C.graph]);
-    });
+        // Drop the old full unique constraint — soft-delete means the same quad
+        // can appear multiple times in history.
+        await knex.schema.alterTable(T.edges, (t) => {
+            t.dropUnique([C.subject, C.predicate, C.object, C.graph]);
+        });
 
-    // Index to make active-edge queries fast.
-    await knex.schema.alterTable(T.edges, (t) => {
-        t.index([C.isDeleted, C.subject], "tern_edges_active_subject_idx");
-        t.index([C.isDeleted, C.predicate], "tern_edges_active_predicate_idx");
-        t.index([C.isDeleted, C.object], "tern_edges_active_object_idx");
-    });
+        // Index to make active-edge queries fast.
+        await knex.schema.alterTable(T.edges, (t) => {
+            t.index([C.isDeleted, C.subject], "tern_edges_active_subject_idx");
+            t.index([C.isDeleted, C.predicate], "tern_edges_active_predicate_idx");
+            t.index([C.isDeleted, C.object], "tern_edges_active_object_idx");
+        });
+    }
 
     // ── Populate value_json for existing literal nodes ────────────────────────
 

@@ -1,0 +1,66 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "attach",
+            "name": "attach::sandbox-server",
+            "port": 9229,
+            "localRoot": "${workspaceFolder}",
+            "remoteRoot": "/app",
+            "sourceMaps": true,
+            "restart": true,
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        },
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "attach::sandbox-web",
+            "url": "http://localhost:5173",
+            "webRoot": "${workspaceFolder}/packages/sandbox-web",
+            "sourceMapPathOverrides": {
+                "/app/*": "${workspaceFolder}/*"
+            }
+        },
+        {
+            "type": "node",
+            "request": "attach",
+            "name": "attach::worker",
+            "port": 9230,
+            "localRoot": "${workspaceFolder}",
+            "remoteRoot": "/app",
+            "sourceMaps": true,
+            "restart": true,
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        },
+        {
+            "type": "node",
+            "request": "attach",
+            "name": "attach::tests",
+            "port": 9231,
+            "localRoot": "${workspaceFolder}",
+            "remoteRoot": "/app",
+            "sourceMaps": true,
+            "restart": true,
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Full Stack",
+            "configurations": [
+                "attach::sandbox-server",
+                "attach::sandbox-web",
+                "attach::worker",
+                "attach::tests"
+            ],
+            "stopAll": true
+        }
+    ]
+}

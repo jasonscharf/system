@@ -76,12 +76,14 @@ export async function up(knex: Knex): Promise<void> {
             END; $$;
         `);
 
+        await knex.raw(`DROP TRIGGER IF EXISTS tern_nodes_timestamps ON ${T.nodes}`);
         await knex.raw(`
             CREATE TRIGGER tern_nodes_timestamps
             BEFORE INSERT OR UPDATE ON ${T.nodes}
             FOR EACH ROW EXECUTE FUNCTION tern_node_timestamps();
         `);
 
+        await knex.raw(`DROP TRIGGER IF EXISTS tern_edges_timestamps ON ${T.edges}`);
         await knex.raw(`
             CREATE TRIGGER tern_edges_timestamps
             BEFORE INSERT OR UPDATE ON ${T.edges}

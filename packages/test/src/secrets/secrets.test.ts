@@ -237,6 +237,36 @@ describe("AzureKeyVaultProvider", () => {
 
         expect(await provider.get("ANY_KEY")).toBe("super-secret");
     });
+
+    it("getRequired() returns value when secret is present", async () => {
+        const provider = new AzureKeyVaultProvider("https://fake.vault.azure.net/");
+        const fakeClient = {
+            getSecret: vi.fn().mockResolvedValue({ value: "found-secret" }),
+        };
+        (provider as unknown as { _client: typeof fakeClient })._client = fakeClient;
+
+        expect(await provider.getRequired("MY_SECRET")).toBe("found-secret");
+    });
+
+    it("get() returns null when secret value is undefined", async () => {
+        const provider = new AzureKeyVaultProvider("https://fake.vault.azure.net/");
+        const fakeClient = {
+            getSecret: vi.fn().mockResolvedValue({ value: undefined }),
+        };
+        (provider as unknown as { _client: typeof fakeClient })._client = fakeClient;
+
+        expect(await provider.get("ANY_KEY")).toBeNull();
+    });
+
+    it("get() handles statusCode 404 as not-found", async () => {
+        const provider = new AzureKeyVaultProvider("https://fake.vault.azure.net/");
+        const fakeClient = {
+            getSecret: vi.fn().mockRejectedValue({ statusCode: 404 }),
+        };
+        (provider as unknown as { _client: typeof fakeClient })._client = fakeClient;
+
+        expect(await provider.get("ANY_KEY")).toBeNull();
+    });
 });
 
 // ── SecretsManager ────────────────────────────────────────────────────────────

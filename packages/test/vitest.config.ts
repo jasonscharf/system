@@ -3,6 +3,8 @@ import { defineConfig } from "vitest/config";
 
 const workspaceRoot = path.resolve(__dirname, "../..");
 
+const pkg = (name: string) => path.resolve(__dirname, `../${name}/src`);
+
 export default defineConfig({
     root: workspaceRoot,
     test: {
@@ -14,24 +16,42 @@ export default defineConfig({
             enabled: true,
             reportsDirectory: path.resolve(__dirname, "coverage/vitest"),
             reporter: ["text", "html", "lcov"],
-
             include: ["packages/*/src/**/*.ts"],
-            exclude: ["**/*.d.ts", "**/node_modules/**", "**/dist/**", "**/gen/src/bin.ts"],
+            exclude: [
+                "**/*.d.ts",
+                "**/node_modules/**",
+                "**/dist/**",
+                "**/gen/src/bin.ts",
+                "**/sandbox-*/src/**",
+            ],
         },
     },
     resolve: {
         alias: {
-            "@system/api": path.resolve(__dirname, "../api/src"),
-            "@system/app": path.resolve(__dirname, "../app/src"),
-            "@system/auth": path.resolve(__dirname, "../auth/src"),
-            "@system/core": path.resolve(__dirname, "../core/src"),
-            "@system/data": path.resolve(__dirname, "../data/src"),
-            "@system/entities": path.resolve(__dirname, "../entities/src"),
-            "@system/flow": path.resolve(__dirname, "../flow/src"),
-            "@system/gen": path.resolve(__dirname, "../gen/src"),
-            "@system/vaults": path.resolve(__dirname, "../vaults/src"),
-            "@system/test": path.resolve(__dirname, "../test/src"),
-            "@system/worker": path.resolve(__dirname, "../worker/src"),
+            // Primary package names
+            "@jasonscharf/api": pkg("api"),
+            "@jasonscharf/app": pkg("app"),
+            "@jasonscharf/auth": pkg("auth"),
+            "@jasonscharf/core": pkg("core"),
+            "@jasonscharf/data": pkg("data"),
+            "@jasonscharf/entities": pkg("entities"),
+            "@jasonscharf/flow": pkg("flow"),
+            "@jasonscharf/gen": pkg("gen"),
+            "@jasonscharf/server": pkg("server"),
+            "@jasonscharf/vaults": pkg("vaults"),
+            "@jasonscharf/worker": pkg("worker"),
+            // Legacy aliases used in config/codegen test fixtures
+            "@system/api": pkg("api"),
+            "@system/app": pkg("app"),
+            "@system/auth": pkg("auth"),
+            "@system/core": pkg("core"),
+            "@system/data": pkg("data"),
+            "@system/entities": pkg("entities"),
+            "@system/flow": pkg("flow"),
+            "@system/gen": pkg("gen"),
+            "@system/server": pkg("server"),
+            "@system/vaults": pkg("vaults"),
+            "@system/worker": pkg("worker"),
         },
     },
 });

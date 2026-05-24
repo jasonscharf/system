@@ -388,6 +388,19 @@ describe("migration 001_init down()", () => {
     });
 });
 
+// ── migration 003_timestamps down() ──────────────────────────────────────────
+
+describe("migration 003_timestamps down()", () => {
+    it("drops SQLite triggers cleanly", async () => {
+        const knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
+        const { down: migration003Down } = await import(
+            "../../../data/src/migrations/003_timestamps.js"
+        );
+        await migration003Down(knex);
+        await knex.destroy();
+    });
+});
+
 // ── DataContext: pg branch ────────────────────────────────────────────────────
 
 describe("createDataContext(pg)", () => {

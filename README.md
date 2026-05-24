@@ -78,7 +78,7 @@ yarn test:watch
 All database tests run against SQLite by default. To also run each suite against Postgres, set `TERN_PG_URL`:
 
 ```bash
-TERN_PG_URL=postgres://user:pass@localhost:5432/mydb yarn test
+SYS_POSTGRES_URL=postgres://user:pass@localhost:5432/mydb yarn test
 ```
 
 Each suite runs inside a rolled-back transaction, so no cleanup is needed between runs.

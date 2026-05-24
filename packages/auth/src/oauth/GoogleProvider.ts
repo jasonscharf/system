@@ -1,9 +1,8 @@
-import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } from "../constants.js";
 import type { IOAuthProvider, OAuthResult } from "./types.js";
 
-const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
-const TOKEN_URL = "https://oauth2.googleapis.com/token";
-const USER_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
+export const SYS_AUTH_GOOGLE_OAUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
+export const SYS_AUTH_GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+export const SYS_AUTH_GOOGLE_USER_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
 
 interface GoogleTokenResponse {
     access_token: string;
@@ -25,7 +24,7 @@ export class GoogleProvider implements IOAuthProvider {
     private readonly _clientId: string;
     private readonly _clientSecret: string;
 
-    constructor(clientId = GOOGLE_CLIENT_ID, clientSecret = GOOGLE_CLIENT_SECRET) {
+    constructor(clientId = "", clientSecret = "") {
         this._clientId = clientId;
         this._clientSecret = clientSecret;
     }
@@ -40,11 +39,11 @@ export class GoogleProvider implements IOAuthProvider {
             access_type: "offline",
             prompt: "select_account",
         });
-        return `${AUTH_URL}?${params.toString()}`;
+        return `${SYS_AUTH_GOOGLE_OAUTH_URL}?${params.toString()}`;
     }
 
     async exchangeCode(code: string, redirectUri: string): Promise<OAuthResult> {
-        const tokenRes = await fetch(TOKEN_URL, {
+        const tokenRes = await fetch(SYS_AUTH_GOOGLE_TOKEN_URL, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({
@@ -62,7 +61,7 @@ export class GoogleProvider implements IOAuthProvider {
 
         const tokens = (await tokenRes.json()) as GoogleTokenResponse;
 
-        const userRes = await fetch(USER_URL, {
+        const userRes = await fetch(SYS_AUTH_GOOGLE_USER_URL, {
             headers: { Authorization: `Bearer ${tokens.access_token}` },
         });
 

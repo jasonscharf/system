@@ -128,19 +128,19 @@ async function main(): Promise<void> {
 
     // ── OAuth provider credentials (from vault or env) ────────────────────────
     const googleClientId = await secrets.getWithDefault(
-        "GOOGLE_CLIENT_ID",
+        "SYS_AUTH_GOOGLE_CLIENT_ID",
         "placeholder_google_client_id",
     );
     const googleClientSecret = await secrets.getWithDefault(
-        "GOOGLE_CLIENT_SECRET",
+        "SYS_AUTH_GOOGLE_CLIENT_SECRET",
         "placeholder_google_client_secret",
     );
     const githubClientId = await secrets.getWithDefault(
-        "GITHUB_CLIENT_ID",
+        "SYS_AUTH_GITHUB_CLIENT_ID",
         "placeholder_github_client_id",
     );
     const githubClientSecret = await secrets.getWithDefault(
-        "GITHUB_CLIENT_SECRET",
+        "SYS_AUTH_GITHUB_CLIENT_SECRET",
         "placeholder_github_client_secret",
     );
 
@@ -179,6 +179,7 @@ async function main(): Promise<void> {
     const topRouter = new HttpRouter({ name: "top", context: flowApp.context });
 
     topRouter.use(async (ctx, next) => {
+        // TODO: Why was this injected by Claude? Cargo-culting?
         ctx.headers["access-control-allow-origin"] = "*";
         ctx.headers["access-control-allow-headers"] = "Authorization, Content-Type";
         ctx.headers["access-control-allow-methods"] = "GET, POST, OPTIONS";

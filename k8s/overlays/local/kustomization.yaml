@@ -27,10 +27,10 @@ secretGenerator:
   - name: server-secrets
     behavior: replace
     literals:
-      - GOOGLE_CLIENT_ID=placeholder_google_client_id
-      - GOOGLE_CLIENT_SECRET=placeholder_google_client_secret
-      - GITHUB_CLIENT_ID=placeholder_github_client_id
-      - GITHUB_CLIENT_SECRET=placeholder_github_client_secret
+      - SYS_AUTH_GOOGLE_CLIENT_ID=placeholder_google_client_id
+      - SYS_AUTH_GOOGLE_CLIENT_SECRET=placeholder_google_client_secret
+      - SYS_AUTH_GITHUB_CLIENT_ID=placeholder_github_client_id
+      - SYS_AUTH_GITHUB_CLIENT_SECRET=placeholder_github_client_secret
 
 # ── Patches ───────────────────────────────────────────────────────────────────
 patches:

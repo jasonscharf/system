@@ -774,6 +774,65 @@ describe("EntityStore — views getter", () => {
     });
 });
 
+describe("EntityStore — collectionGet/Remove with unknown prop returns early", () => {
+    let knex: import("knex").Knex;
+    let es: EntityStore;
+    let schema: EntitySchema;
+    let itemId: string;
+
+    beforeEach(async () => {
+        knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
+        es = new EntityStore(new TripleStore(knex));
+        schema = makeTestSchema();
+        const rec = await es.create({}, schema, { name: "Item" });
+        itemId = rec.id;
+    });
+    afterEach(async () => {
+        await knex.destroy();
+    });
+
+    it("collectionGet returns [] when prop is not in the group", async () => {
+        const result = await es.collectionGet({}, schema, itemId, TestCoreHandle, "unknownProp");
+        expect(result).toEqual([]);
+    });
+
+    it("collectionRemove returns false when prop is not in the group", async () => {
+        const removed = await es.collectionRemove(
+            {},
+            schema,
+            itemId,
+            TestCoreHandle,
+            "unknownProp",
+            "value",
+        );
+        expect(removed).toBe(false);
+    });
+
+    it("collectionPush throws when prop is not in the group", async () => {
+        await expect(
+            es.collectionPush({}, schema, itemId, TestCoreHandle, "unknownProp", "value"),
+        ).rejects.toThrow("unknownProp");
+    });
+});
+
+describe("EntityStore — inTransaction wraps work in a DB transaction", () => {
+    it("executes fn inside a knex transaction and returns result", async () => {
+        const knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
+        const store = new TripleStore(knex);
+        const es = new EntityStore(store);
+        const schema = makeTestSchema();
+
+        const result = await es.inTransaction(async (ctx) => {
+            return es.create(ctx, schema, { name: "TxItem" });
+        });
+
+        expect(result.id).toBeTruthy();
+        const found = await es.findById({}, schema, result.id, [TestCoreHandle]);
+        expect(found?.groups[TestCoreHandle.id]?.name).toBe("TxItem");
+        await knex.destroy();
+    });
+});
+
 describe("EntityStore._validate — schema with shape", () => {
     const nameIRI = new IRI("http://test.dev/name");
     const schemaWithShape = new EntitySchema({

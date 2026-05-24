@@ -8,11 +8,13 @@
 import {
     AuthRouterComponent,
     AuthService,
+    CallbackComponent,
     findSessionsByTokens,
     findUserBySession,
     findUserWithRecentActivity,
     GitHubProvider,
     GoogleProvider,
+    type IOAuthProvider,
     listActiveSessions,
     listInactiveSessions,
     listUserDevices,
@@ -32,7 +34,13 @@ import {
     UserSessionSchema,
 } from "@jasonscharf/auth";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { FlowContext, type HttpCtx, PushScheduler } from "@jasonscharf/flow";
+import {
+    FlowContext,
+    type HttpCtx,
+    type HttpResponseDraft,
+    type ParsedHttpRequest,
+    PushScheduler,
+} from "@jasonscharf/flow";
 import { EntityStore } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -696,6 +704,12 @@ describe("OAuthComponent", () => {
 
 // ── SessionComponent (FBP) ───────────────────────────────────────────────────
 
+class ThrowingSessionStore extends MemorySessionStore {
+    override async del(_key: string): Promise<void> {
+        throw new Error("store del failed");
+    }
+}
+
 describe("SessionComponent", () => {
     let knex: Knex;
     let trx: Knex.Transaction;
@@ -737,6 +751,189 @@ describe("SessionComponent", () => {
         await new Promise((r) => setTimeout(r, 50));
         const result = sessComp.revokeOut.read();
         expect(result?.requestId).toBe("r2");
+    });
+
+    it("validateIn → clears expired cache entry and returns valid:false (line 105)", async () => {
+        const expiredData = JSON.stringify({
+            userId: "u1",
+            deviceId: "d1",
+            expiresAt: Date.now() - 1000,
+        });
+        await memStore.set("tern:session:expired-tok", expiredData, 60);
+        sessComp.validateIn.put({ token: "expired-tok", requestId: "r3" });
+        sessComp.step();
+        await new Promise((r) => setTimeout(r, 50));
+        const result = sessComp.validateOut.read();
+        expect(result?.valid).toBe(false);
+        expect(result?.requestId).toBe("r3");
+    });
+
+    it("validateIn → valid:true via slow path when session is in TripleStore (lines 111-114)", async () => {
+        const userRepo = new UserRepository(store);
+        const sessRepo = new UserSessionRepository(store);
+        const ctx = {};
+        const user = await userRepo.create(ctx, { email: "slow@test.com", displayName: "Slow" });
+        const session = await sessRepo.create(ctx, {
+            userId: user.id,
+            deviceId: "d-slow",
+            expiresAt: new Date(Date.now() + 60_000),
+        });
+        sessComp.validateIn.put({ token: session.sessionToken, requestId: "r4" });
+        sessComp.step();
+        await new Promise((r) => setTimeout(r, 100));
+        const result = sessComp.validateOut.read();
+        expect(result?.valid).toBe(true);
+        expect(result?.requestId).toBe("r4");
+    });
+
+    it("validateIn → valid:true via fast path when cache hit with valid session (lines 90-102)", async () => {
+        const userRepo = new UserRepository(store);
+        const sessRepo = new UserSessionRepository(store);
+        const ctx = {};
+        const user = await userRepo.create(ctx, { email: "fast@test.com", displayName: "Fast" });
+        const session = await sessRepo.create(ctx, {
+            userId: user.id,
+            deviceId: "d-fast",
+            expiresAt: new Date(Date.now() + 60_000),
+        });
+        const cachedData = JSON.stringify({
+            userId: user.id,
+            deviceId: "d-fast",
+            expiresAt: Date.now() + 60_000,
+        });
+        await memStore.set(`tern:session:${session.sessionToken}`, cachedData, 60);
+        sessComp.validateIn.put({ token: session.sessionToken, requestId: "r5" });
+        sessComp.step();
+        await new Promise((r) => setTimeout(r, 100));
+        const result = sessComp.validateOut.read();
+        expect(result?.valid).toBe(true);
+        expect(result?.requestId).toBe("r5");
+    });
+
+    it("revokeIn → success:false when session store del throws (line 126 catch branch)", async () => {
+        const throwingComp = new SessionComponent({
+            name: "session-throw",
+            context: new FlowContext(),
+            sessionStore: new ThrowingSessionStore(),
+            users: new UserRepository(store),
+            sessions: new UserSessionRepository(store),
+        });
+        throwingComp.revokeIn.put({ token: "any-token", requestId: "r6" });
+        throwingComp.step();
+        await new Promise((r) => setTimeout(r, 50));
+        const result = throwingComp.revokeOut.read();
+        expect(result?.success).toBe(false);
+        expect(result?.requestId).toBe("r6");
+    });
+});
+
+// ── CallbackComponent (FBP) ──────────────────────────────────────────────────
+
+class TestOAuthProvider implements IOAuthProvider {
+    readonly name: OAuthProvider = "google";
+    getAuthUrl(_redirectUri: string, state: string): string {
+        return `https://accounts.google.com/o/oauth2/auth?state=${state}`;
+    }
+    async exchangeCode(
+        _code: string,
+        _redirectUri: string,
+    ): Promise<{
+        profile: {
+            providerUserId: string;
+            email: string;
+            displayName?: string;
+            avatarUrl?: string;
+        };
+        tokens: { accessToken: string; refreshToken?: string; expiresAt?: Date };
+    }> {
+        return {
+            profile: {
+                providerUserId: "test-sub-1",
+                email: "callback@test.com",
+                displayName: "CB User",
+            },
+            tokens: { accessToken: "at-1", expiresAt: new Date(Date.now() + 3600_000) },
+        };
+    }
+}
+
+describe("CallbackComponent (FBP)", () => {
+    let knex: Knex;
+    let trx: Knex.Transaction;
+    let store: TripleStore;
+    let comp: CallbackComponent;
+    let memStore: MemorySessionStore;
+
+    beforeEach(async () => {
+        knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
+        trx = await knex.transaction();
+        store = new TripleStore(trx as unknown as import("knex").Knex);
+        memStore = new MemorySessionStore();
+        comp = new CallbackComponent({
+            name: "callback",
+            context: new FlowContext(),
+            providers: [new TestOAuthProvider()],
+            sessionStore: memStore,
+            users: new UserRepository(store),
+            identities: new UserIdentityRepository(store),
+            sessions: new UserSessionRepository(store),
+            devices: new UserDeviceRepository(store),
+        });
+    });
+
+    afterEach(async () => {
+        await trx.rollback();
+        await knex.destroy();
+    });
+
+    it("callbackIn → successOut with new user on valid code", async () => {
+        comp.callbackIn.put({
+            provider: "google",
+            code: "good-code",
+            state: "s",
+            redirectUri: "http://localhost/cb",
+            device: { userAgent: "test-agent" },
+            requestId: "cb1",
+        });
+        comp.step();
+        await new Promise((r) => setTimeout(r, 100));
+        const result = comp.successOut.read();
+        expect(result?.user.email).toBe("callback@test.com");
+        expect(result?.requestId).toBe("cb1");
+        expect(comp.errorOut.read()).toBeUndefined();
+    });
+
+    it("callbackIn → successOut updates existing user on second login", async () => {
+        for (let i = 0; i < 2; i++) {
+            comp.callbackIn.put({
+                provider: "google",
+                code: "good-code",
+                state: "s",
+                redirectUri: "http://localhost/cb",
+                device: { userAgent: "test-agent" },
+                requestId: `cb${i}`,
+            });
+            comp.step();
+            await new Promise((r) => setTimeout(r, 100));
+            comp.successOut.read(); // drain
+        }
+        expect(comp.errorOut.read()).toBeUndefined();
+    });
+
+    it("callbackIn → errorOut for unknown provider", async () => {
+        comp.callbackIn.put({
+            provider: "github" as OAuthProvider,
+            code: "x",
+            state: "s",
+            redirectUri: "http://localhost/cb",
+            device: {},
+            requestId: "cb-err",
+        });
+        comp.step();
+        await new Promise((r) => setTimeout(r, 50));
+        const err = comp.errorOut.read();
+        expect(err?.error).toContain("Unknown provider");
+        expect(err?.requestId).toBe("cb-err");
     });
 });
 
@@ -885,6 +1082,255 @@ describe("AuthRouterComponent.sessionMiddleware()", () => {
         expect(fakeCtx.user).toBeUndefined();
 
         await knex.destroy();
+    });
+});
+
+// ── AuthRouterComponent: HTTP routes ─────────────────────────────────────────
+
+describe("AuthRouterComponent HTTP routes", () => {
+    let knex: Knex;
+    let trx: Knex.Transaction;
+    let store: TripleStore;
+    let router: AuthRouterComponent;
+    let memStore: MemorySessionStore;
+
+    function makeReq(
+        method: "GET" | "POST",
+        pathname: string,
+        opts: { headers?: Record<string, string>; query?: Record<string, string> } = {},
+    ): ParsedHttpRequest {
+        const params = new URLSearchParams(opts.query ?? {});
+        return {
+            requestId: Math.random().toString(36).slice(2),
+            method,
+            url: `http://localhost:3000${pathname}${params.size ? `?${params}` : ""}`,
+            pathname,
+            searchParams: params,
+            headers: opts.headers ?? {},
+        };
+    }
+
+    beforeEach(async () => {
+        knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
+        trx = await knex.transaction();
+        store = new TripleStore(trx as unknown as import("knex").Knex);
+        memStore = new MemorySessionStore();
+        router = new AuthRouterComponent({
+            name: "auth",
+            context: new FlowContext(),
+            providers: [new TestOAuthProvider()],
+            sessionStore: memStore,
+            users: new UserRepository(store),
+            identities: new UserIdentityRepository(store),
+            sessions: new UserSessionRepository(store),
+            devices: new UserDeviceRepository(store),
+            baseUrl: "http://localhost:3000",
+        });
+    });
+
+    afterEach(async () => {
+        await trx.rollback();
+        await knex.destroy();
+    });
+
+    async function dispatch(
+        method: "GET" | "POST",
+        pathname: string,
+        opts: { headers?: Record<string, string>; query?: Record<string, string> } = {},
+    ): Promise<HttpResponseDraft> {
+        const req = makeReq(method, pathname, opts);
+        router.requests.put(req);
+        router.step();
+        await new Promise((r) => setTimeout(r, 100));
+        const resp = router.responses.read();
+        if (!resp) {
+            throw new Error("No response received");
+        }
+        return resp;
+    }
+
+    it("GET /auth/:provider → 302 redirect to provider auth URL", async () => {
+        const resp = await dispatch("GET", "/auth/google");
+        expect(resp.status).toBe(302);
+        expect(typeof resp.headers?.location).toBe("string");
+    });
+
+    it("GET /auth/:provider with unknown provider → 404", async () => {
+        const resp = await dispatch("GET", "/auth/unknown-provider");
+        expect(resp.status).toBe(404);
+    });
+
+    it("GET /auth/:provider/callback with missing state → 302 failure redirect", async () => {
+        const resp = await dispatch("GET", "/auth/google/callback", {
+            query: { code: "abc", state: "s1" },
+        });
+        expect(resp.status).toBe(302);
+        expect(resp.headers?.location).toBe("/auth/error");
+    });
+
+    it("GET /auth/:provider/callback with state mismatch → 302 failure redirect", async () => {
+        const resp = await dispatch("GET", "/auth/google/callback", {
+            headers: { cookie: "tern_oauth_state=wrong-state" },
+            query: { code: "abc", state: "s1" },
+        });
+        expect(resp.status).toBe(302);
+        expect(resp.headers?.location).toBe("/auth/error");
+    });
+
+    it("GET /auth/:provider/callback with matching state → 302 success redirect", async () => {
+        const resp = await dispatch("GET", "/auth/google/callback", {
+            headers: { cookie: `tern_oauth_state=${encodeURIComponent("match-state")}` },
+            query: { code: "good-code", state: "match-state" },
+        });
+        expect(resp.status).toBe(302);
+        expect(resp.headers?.location).toBe("/");
+    });
+
+    it("POST /auth/logout without token → 200 ok", async () => {
+        const resp = await dispatch("POST", "/auth/logout");
+        expect(resp.status).toBe(200);
+        expect((resp.body as { ok: boolean }).ok).toBe(true);
+    });
+
+    it("POST /auth/logout with token → 200 ok and clears cookie", async () => {
+        const cbResp = await dispatch("GET", "/auth/google/callback", {
+            headers: { cookie: `tern_oauth_state=${encodeURIComponent("s2")}` },
+            query: { code: "c", state: "s2" },
+        });
+        const setCookie = cbResp.headers?.["set-cookie"];
+        const cookieArr = Array.isArray(setCookie) ? setCookie : [setCookie ?? ""];
+        const sessionCookie = cookieArr.find((c) => c?.startsWith("tern_session="));
+        const token = decodeURIComponent(sessionCookie?.split("=")[1]?.split(";")[0] ?? "");
+
+        const resp = await dispatch("POST", "/auth/logout", {
+            headers: { cookie: `tern_session=${encodeURIComponent(token)}` },
+        });
+        expect(resp.status).toBe(200);
+    });
+
+    it("POST /auth/logout/all without token → 401", async () => {
+        const resp = await dispatch("POST", "/auth/logout/all");
+        expect(resp.status).toBe(401);
+    });
+
+    it("GET /auth/me without token → 401", async () => {
+        const resp = await dispatch("GET", "/auth/me");
+        expect(resp.status).toBe(401);
+    });
+
+    it("GET /auth/me with invalid token → 401", async () => {
+        const resp = await dispatch("GET", "/auth/me", {
+            headers: { cookie: "tern_session=bad-token" },
+        });
+        expect(resp.status).toBe(401);
+    });
+
+    it("GET /auth/me with valid token → 200 with user info", async () => {
+        const cbResp = await dispatch("GET", "/auth/google/callback", {
+            headers: { cookie: `tern_oauth_state=${encodeURIComponent("s3")}` },
+            query: { code: "c", state: "s3" },
+        });
+        const setCookie = cbResp.headers?.["set-cookie"];
+        const cookieArr = Array.isArray(setCookie) ? setCookie : [setCookie ?? ""];
+        const sessionCookie = cookieArr.find((c) => c?.startsWith("tern_session="));
+        const token = decodeURIComponent(sessionCookie?.split("=")[1]?.split(";")[0] ?? "");
+
+        const resp = await dispatch("GET", "/auth/me", {
+            headers: { cookie: `tern_session=${encodeURIComponent(token)}` },
+        });
+        expect(resp.status).toBe(200);
+        expect((resp.body as { email: string }).email).toBe("callback@test.com");
+    });
+
+    it("GET /auth/sessions without token → 401", async () => {
+        const resp = await dispatch("GET", "/auth/sessions");
+        expect(resp.status).toBe(401);
+    });
+
+    it("GET /auth/sessions with invalid token → 401", async () => {
+        const resp = await dispatch("GET", "/auth/sessions", {
+            headers: { authorization: "Bearer bad-token" },
+        });
+        expect(resp.status).toBe(401);
+    });
+
+    it("GET /auth/sessions with valid token → 200 list", async () => {
+        const cbResp = await dispatch("GET", "/auth/google/callback", {
+            headers: { cookie: `tern_oauth_state=${encodeURIComponent("s4")}` },
+            query: { code: "c", state: "s4" },
+        });
+        const setCookie = cbResp.headers?.["set-cookie"];
+        const cookieArr = Array.isArray(setCookie) ? setCookie : [setCookie ?? ""];
+        const sessionCookie = cookieArr.find((c) => c?.startsWith("tern_session="));
+        const token = decodeURIComponent(sessionCookie?.split("=")[1]?.split(";")[0] ?? "");
+
+        const resp = await dispatch("GET", "/auth/sessions", {
+            headers: { authorization: `Bearer ${token}` },
+        });
+        expect(resp.status).toBe(200);
+        expect(Array.isArray(resp.body)).toBe(true);
+    });
+
+    it("POST /auth/logout/all with valid token → 200 revokes sessions", async () => {
+        const cbResp = await dispatch("GET", "/auth/google/callback", {
+            headers: { cookie: `tern_oauth_state=${encodeURIComponent("s5")}` },
+            query: { code: "c", state: "s5" },
+        });
+        const setCookie = cbResp.headers?.["set-cookie"];
+        const cookieArr = Array.isArray(setCookie) ? setCookie : [setCookie ?? ""];
+        const sessionCookie = cookieArr.find((c) => c?.startsWith("tern_session="));
+        const token = decodeURIComponent(sessionCookie?.split("=")[1]?.split(";")[0] ?? "");
+
+        const resp = await dispatch("POST", "/auth/logout/all", {
+            headers: { cookie: `tern_session=${encodeURIComponent(token)}` },
+        });
+        expect(resp.status).toBe(200);
+        expect((resp.body as { ok: boolean }).ok).toBe(true);
+    });
+
+    it("POST /auth/logout/all with invalid token → 401 (line 297 branch)", async () => {
+        const resp = await dispatch("POST", "/auth/logout/all", {
+            headers: { authorization: "Bearer invalid-token-xyz" },
+        });
+        expect(resp.status).toBe(401);
+    });
+
+    it("validateToken() returns null for unknown token (line 186)", async () => {
+        const result = await router.validateToken("no-such-token");
+        expect(result).toBeNull();
+    });
+
+    it("GET /auth/:provider/callback when handleCallback throws → 302 failure (lines 371-373)", async () => {
+        class ErrorOAuthProvider implements IOAuthProvider {
+            readonly name: OAuthProvider = "github";
+            getAuthUrl(_redirectUri: string, state: string): string {
+                return `https://github.com/login/oauth/authorize?state=${state}`;
+            }
+            async exchangeCode(_code: string, _redirectUri: string): Promise<never> {
+                throw new Error("OAuth exchange failed");
+            }
+        }
+        const errorRouter = new AuthRouterComponent({
+            name: "auth-err",
+            context: new FlowContext(),
+            providers: [new ErrorOAuthProvider()],
+            sessionStore: memStore,
+            users: new UserRepository(store),
+            identities: new UserIdentityRepository(store),
+            sessions: new UserSessionRepository(store),
+            devices: new UserDeviceRepository(store),
+            baseUrl: "http://localhost:3000",
+        });
+        const req = makeReq("GET", "/auth/github/callback", {
+            headers: { cookie: `tern_oauth_state=${encodeURIComponent("s6")}` },
+            query: { code: "c", state: "s6" },
+        });
+        errorRouter.requests.put(req);
+        errorRouter.step();
+        await new Promise((r) => setTimeout(r, 100));
+        const resp = errorRouter.responses.read();
+        expect(resp?.status).toBe(302);
+        expect(resp?.headers?.location).toBe("/auth/error");
     });
 });
 

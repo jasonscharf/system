@@ -805,8 +805,8 @@ describe("FileStreamHandler: directory request returns 404", () => {
         const { mkdtemp, rm, mkdir } = await import("node:fs/promises");
         const { join } = await import("node:path");
         const { tmpdir } = await import("node:os");
-        const { FileStreamHandler } = await import("@system/flow");
-        const { FlowContext: FC } = await import("@system/flow");
+        const { FileStreamHandler } = await import("@jasonscharf/flow");
+        const { FlowContext: FC } = await import("@jasonscharf/flow");
 
         const dir = await mkdtemp(join(tmpdir(), "tern-fsh-"));
         try {

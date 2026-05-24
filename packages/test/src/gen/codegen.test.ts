@@ -1206,3 +1206,191 @@ describe("validate", () => {
         expect(result.violations).toHaveLength(0);
     });
 });
+
+// ── TurtleParser: escape sequences + _expect error ────────────────────────────
+
+describe("parseTurtle — escape sequences in string literals", () => {
+    it("parses \\n escape in single-quoted Turtle string", async () => {
+        const ttl = `@prefix ex: <http://example.org/> .\nex:User ex:name "line\\nbreak" .\n`;
+        const triples = await collectTurtle(ttl);
+        expect((triples[0].object as Literal).value).toBe("line\nbreak");
+    });
+
+    it("parses \\t escape in Turtle string", async () => {
+        const ttl = `@prefix ex: <http://example.org/> .\nex:User ex:name "col1\\tcol2" .\n`;
+        const triples = await collectTurtle(ttl);
+        expect((triples[0].object as Literal).value).toBe("col1\tcol2");
+    });
+
+    it("parses \\r escape in Turtle string", async () => {
+        const ttl = `@prefix ex: <http://example.org/> .\nex:User ex:name "a\\rb" .\n`;
+        const triples = await collectTurtle(ttl);
+        expect((triples[0].object as Literal).value).toBe("a\rb");
+    });
+
+    it('parses \\" escape in Turtle string', async () => {
+        const ttl = `@prefix ex: <http://example.org/> .\nex:User ex:name "say \\"hi\\"" .\n`;
+        const triples = await collectTurtle(ttl);
+        expect((triples[0].object as Literal).value).toBe('say "hi"');
+    });
+
+    it("parses \\' escape in Turtle string", async () => {
+        const ttl = `@prefix ex: <http://example.org/> .\nex:User ex:name "it\\'s" .\n`;
+        const triples = await collectTurtle(ttl);
+        expect((triples[0].object as Literal).value).toBe("it's");
+    });
+
+    it("parses \\\\ escape in Turtle string", async () => {
+        const ttl = `@prefix ex: <http://example.org/> .\nex:User ex:name "back\\\\slash" .\n`;
+        const triples = await collectTurtle(ttl);
+        expect((triples[0].object as Literal).value).toBe("back\\slash");
+    });
+
+    it("passes through unknown escape sequence via _unescape default branch", async () => {
+        const ttl = `@prefix ex: <http://example.org/> .\nex:User ex:name "\\z" .\n`;
+        const triples = await collectTurtle(ttl);
+        expect((triples[0].object as Literal).value).toBe("z");
+    });
+
+    it("throws on unclosed IRI (triggers _expect error)", async () => {
+        const ttl = `@prefix ex: <http://example.org/> .\nex:User a <http://unclosed\n`;
+        await expect(collectTurtle(ttl)).rejects.toThrow();
+    });
+
+    it("parses BASE declaration (line 94 branch)", async () => {
+        const ttl = `BASE <http://base.example.org/>\n@prefix ex: <http://example.org/> .\nex:User a ex:Class .\n`;
+        const triples = await collectTurtle(ttl);
+        expect(triples).toHaveLength(1);
+    });
+
+    it("parses anonymous blank node as subject (line 115 branch)", async () => {
+        const ttl = `@prefix ex: <http://example.org/> .\n[ ex:name "Alice" ] .\n`;
+        const triples = await collectTurtle(ttl);
+        expect(triples).toHaveLength(1);
+        expect((triples[0].object as Literal).value).toBe("Alice");
+    });
+
+    it("handles trailing semicolon before dot (line 133 branch)", async () => {
+        const ttl = `@prefix ex: <http://example.org/> .\nex:User a ex:Class ; .\n`;
+        const triples = await collectTurtle(ttl);
+        expect(triples).toHaveLength(1);
+    });
+
+    it("parses full IRI as predicate (line 240 _parseIRI branch)", async () => {
+        const ttl = `@prefix ex: <http://example.org/> .\nex:User <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ex:Class .\n`;
+        const triples = await collectTurtle(ttl);
+        expect(triples).toHaveLength(1);
+        expect((triples[0].predicate as IRI).value).toBe(
+            "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+        );
+    });
+
+    it("parses @base directive (lines 70-75 branch)", async () => {
+        const ttl = `@base <http://base.example.org/> .\n@prefix ex: <http://example.org/> .\nex:User a ex:Class .\n`;
+        const triples = await collectTurtle(ttl);
+        expect(triples).toHaveLength(1);
+    });
+
+    it("throws on unknown @-directive (line 77 throw branch)", async () => {
+        const ttl = `@unknown <http://example.org/> .\n`;
+        await expect(collectTurtle(ttl)).rejects.toThrow();
+    });
+});
+
+// ── TypeGenerator: uncovered branches ─────────────────────────────────────────
+
+describe("generateAugmentedTypes — additional branch coverage", () => {
+    const LOCAL_NS = "http://local.example.org/";
+    const BASE_NS = "http://example.org/";
+    const emptyShapes: ShaclShapes = { nodeShapes: new Map(), byTargetClass: new Map() };
+
+    it("renders class-level comment in local interface (line 145 branch)", () => {
+        const xsdString = iri(`${XSD}string`);
+        const localTriples: Triple[] = [
+            t(`${LOCAL_NS}Widget`, `${RDF}type`, `${OWL}Class`),
+            {
+                subject: iri(`${LOCAL_NS}Widget`),
+                predicate: iri(`${RDFS}comment`),
+                object: literal("A widget entity.", xsdString),
+            },
+        ];
+        const output = generateAugmentedTypes(readOntology(localTriples), emptyShapes, {
+            externalClasses: new Map(),
+            localNamespace: LOCAL_NS,
+        });
+        expect(output).toContain("/** A widget entity. */");
+    });
+
+    it("renders property comment in local interface (line 93 branch)", () => {
+        const xsdString = iri(`${XSD}string`);
+        const localTriples: Triple[] = [
+            t(`${LOCAL_NS}Widget`, `${RDF}type`, `${OWL}Class`),
+            t(`${LOCAL_NS}label`, `${RDF}type`, `${OWL}DatatypeProperty`),
+            t(`${LOCAL_NS}label`, `${RDFS}domain`, `${LOCAL_NS}Widget`),
+            t(`${LOCAL_NS}label`, `${RDFS}range`, `${XSD}string`),
+            {
+                subject: iri(`${LOCAL_NS}label`),
+                predicate: iri(`${RDFS}comment`),
+                object: literal("The display label.", xsdString),
+            },
+        ];
+        const output = generateAugmentedTypes(readOntology(localTriples), emptyShapes, {
+            externalClasses: new Map(),
+            localNamespace: LOCAL_NS,
+        });
+        expect(output).toContain("/** The display label. */");
+    });
+
+    it("skips external class not present in externalClasses map (line 165 continue branch)", () => {
+        const baseTriples: Triple[] = [
+            t(`${BASE_NS}User`, `${RDF}type`, `${OWL}Class`),
+            t(`${BASE_NS}email`, `${RDF}type`, `${OWL}DatatypeProperty`),
+            t(`${BASE_NS}email`, `${RDFS}domain`, `${BASE_NS}User`),
+            t(`${BASE_NS}email`, `${RDFS}range`, `${XSD}string`),
+        ];
+        const localTriples: Triple[] = [t(`${LOCAL_NS}Project`, `${RDF}type`, `${OWL}Class`)];
+        const ontology = readOntology([...baseTriples, ...localTriples]);
+        // User is in BASE_NS (external), but externalClasses map is empty → !pkg → continue
+        const output = generateAugmentedTypes(ontology, emptyShapes, {
+            externalClasses: new Map(),
+            localNamespace: LOCAL_NS,
+        });
+        expect(output).toContain("export interface Project");
+        expect(output).not.toContain("declare module");
+    });
+
+    it("object property with SHACL maxCount=1 is not an array (shaclMaxCount line 76)", () => {
+        const localTriples: Triple[] = [
+            t(`${LOCAL_NS}Task`, `${RDF}type`, `${OWL}Class`),
+            t(`${LOCAL_NS}assignee`, `${RDF}type`, `${OWL}ObjectProperty`),
+            t(`${LOCAL_NS}assignee`, `${RDFS}domain`, `${LOCAL_NS}Task`),
+            t(`${LOCAL_NS}assignee`, `${RDFS}range`, `${LOCAL_NS}Task`),
+        ];
+        const shapeIri = new IRI(`${LOCAL_NS}TaskShape`);
+        const propBlank = blankNode("mcps1");
+        const shaclTrips: Triple[] = [
+            { subject: shapeIri, predicate: new IRI(RDF_T), object: shacl_iri("NodeShape") },
+            {
+                subject: shapeIri,
+                predicate: shacl_iri("targetClass"),
+                object: new IRI(`${LOCAL_NS}Task`),
+            },
+            { subject: shapeIri, predicate: shacl_iri("property"), object: propBlank },
+            {
+                subject: propBlank,
+                predicate: shacl_iri("path"),
+                object: new IRI(`${LOCAL_NS}assignee`),
+            },
+            { subject: propBlank, predicate: shacl_iri("maxCount"), object: lit("1") },
+        ];
+        const shapes = readShaclShapes(shaclTrips);
+        const ontology = readOntology(localTriples);
+        const output = generateAugmentedTypes(ontology, shapes, {
+            externalClasses: new Map(),
+            localNamespace: LOCAL_NS,
+        });
+        // maxCount=1 → NOT an array → no "[]" suffix on the property
+        expect(output).toContain("assignee?:");
+        expect(output).not.toContain("assignee?: Task[]");
+    });
+});

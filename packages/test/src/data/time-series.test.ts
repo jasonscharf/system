@@ -810,7 +810,7 @@ for (const db of providers) {
         });
 
         it("EntityStore.updateGroup produces two history rows for the changed predicate", async () => {
-            const { UserSchema, CoreHandle } = await import("@system/auth");
+            const { UserSchema, CoreHandle } = await import("@jasonscharf/auth");
 
             const user = await es.create(ctx, UserSchema, {
                 email: "test@example.com",
@@ -836,7 +836,7 @@ for (const db of providers) {
         });
 
         it("EntityStore.delete soft-deletes all entity edges", async () => {
-            const { UserSchema } = await import("@system/auth");
+            const { UserSchema } = await import("@jasonscharf/auth");
 
             const user = await es.create(ctx, UserSchema, { email: "del@example.com" });
 

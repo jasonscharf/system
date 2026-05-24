@@ -3,9 +3,9 @@
 "use server";
 
 const _defaults = {
-    SESSION_COOKIE: "sys_session",
+    SESSION_COOKIE: "tern_session",
     SESSION_TTL_SECS: String(7 * 24 * 60 * 60),
-    OAUTH_STATE_COOKIE: "sys_oauth_state",
+    OAUTH_STATE_COOKIE: "tern_oauth_state",
     OAUTH_STATE_TTL: String(10 * 60),
     GOOGLE_CLIENT_ID: "placeholder_google_client_id",
     GOOGLE_CLIENT_SECRET: "placeholder_google_client_secret",

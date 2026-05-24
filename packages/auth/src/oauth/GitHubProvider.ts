@@ -1,10 +1,10 @@
 import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET } from "../constants.js";
 import type { IOAuthProvider, OAuthResult } from "./types.js";
 
-const AUTH_URL = "https://github.com/login/oauth/authorize";
-const TOKEN_URL = "https://github.com/login/oauth/access_token";
-const USER_URL = "https://api.github.com/user";
-const EMAIL_URL = "https://api.github.com/user/emails";
+export const SYS_AUTH_GITHUB_OAUTH_URL = "https://github.com/login/oauth/authorize";
+export const SYS_AUTH_GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token";
+export const SYS_AUTH_GITHUB_USER_URL = "https://api.github.com/user";
+export const SYS_AUTH_GITHUB_EMAIL_URL = "https://api.github.com/user/emails";
 
 interface GitHubTokenResponse {
     access_token: string;
@@ -44,11 +44,11 @@ export class GitHubProvider implements IOAuthProvider {
             scope: "read:user user:email",
             state,
         });
-        return `${AUTH_URL}?${params.toString()}`;
+        return `${SYS_AUTH_GITHUB_OAUTH_URL}?${params.toString()}`;
     }
 
     async exchangeCode(code: string, redirectUri: string): Promise<OAuthResult> {
-        const tokenRes = await fetch(TOKEN_URL, {
+        const tokenRes = await fetch(SYS_AUTH_GITHUB_TOKEN_URL, {
             method: "POST",
             headers: {
                 "Content-Type": "application/x-www-form-urlencoded",
@@ -69,13 +69,13 @@ export class GitHubProvider implements IOAuthProvider {
         const tokens = (await tokenRes.json()) as GitHubTokenResponse;
 
         const [userRes, emailRes] = await Promise.all([
-            fetch(USER_URL, {
+            fetch(SYS_AUTH_GITHUB_USER_URL, {
                 headers: {
                     Authorization: `Bearer ${tokens.access_token}`,
                     Accept: "application/vnd.github+json",
                 },
             }),
-            fetch(EMAIL_URL, {
+            fetch(SYS_AUTH_GITHUB_EMAIL_URL, {
                 headers: {
                     Authorization: `Bearer ${tokens.access_token}`,
                     Accept: "application/vnd.github+json",

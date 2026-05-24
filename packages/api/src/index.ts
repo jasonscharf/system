@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import Koa from "koa";
 
+// TODO: Fromy env
 const PORT = Number(process.env.PORT ?? 3000);
 
 function loadVersion(): unknown {

@@ -25,12 +25,12 @@ Secret keys in Azure Key Vault follow the naming convention `env-var-name → lo
 
 | Env var | Vault secret name |
 |---------|-------------------|
-| `GOOGLE_CLIENT_ID` | `google-client-id` |
-| `GOOGLE_CLIENT_SECRET` | `google-client-secret` |
-| `GITHUB_CLIENT_ID` | `github-client-id` |
-| `GITHUB_CLIENT_SECRET` | `github-client-secret` |
-| `TERN_PG_PASSWORD` | `tern-pg-password` |
-| `REDIS_URL` | `redis-url` (optional) |
+| `SYS_AUTH_GOOGLE_CLIENT_ID` | `sys-auth-google-client-id` |
+| `SYS_AUTH_GOOGLE_CLIENT_SECRET` | `sys-auth-google-client-secret` |
+| `SYS_AUTH_GITHUB_CLIENT_ID` | `sys-auth-github-client-id` |
+| `SYS_AUTH_GITHUB_CLIENT_SECRET` | `sys-auth-github-client-secret` |
+| `SYS_POSTGRES_PASSWORD` | `sys-postgres-password` |
+| `SYS_REDIS_URL` | `sys-redis-url` (optional) |
 
 ## Quick Start
 

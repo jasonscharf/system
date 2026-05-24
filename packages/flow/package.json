@@ -1,42 +1,42 @@
 {
-  "name": "@jasonscharf/flow",
-  "version": "0.1.0",
-  "type": "module",
-  "exports": {
-    ".": {
-      "browser": "./dist/browser.js",
-      "source": "./src/index.ts",
-      "default": "./dist/index.js",
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+    "name": "@jasonscharf/flow",
+    "version": "0.1.0",
+    "type": "module",
+    "exports": {
+        ".": {
+            "browser": "./dist/browser.js",
+            "source": "./src/index.ts",
+            "default": "./dist/index.js",
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "files": [
+        "dist"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/jasonlscharf/system.git",
+        "directory": "packages/flow"
+    },
+    "publishConfig": {
+        "registry": "https://npm.pkg.github.com",
+        "access": "public"
+    },
+    "scripts": {
+        "build": "yarn compile",
+        "compile": "tsc -b",
+        "clean": "rm -rf dist && rm -f tsconfig.tsbuildinfo",
+        "start": "node dist/index.js",
+        "typecheck": "tsc -p tsconfig.json --noEmit"
+    },
+    "dependencies": {
+        "@jasonscharf/core": "workspace:^",
+        "ws": "^8.18.0"
+    },
+    "devDependencies": {
+        "@types/ws": "^8.5.14"
     }
-  },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/jasonlscharf/system.git",
-    "directory": "packages/flow"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
-    "access": "public"
-  },
-  "scripts": {
-    "build": "yarn compile",
-    "compile": "tsc -b",
-    "clean": "rm -rf dist && rm -f tsconfig.tsbuildinfo",
-    "start": "node dist/index.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
-  },
-  "dependencies": {
-    "@jasonscharf/core": "workspace:^",
-    "ws": "^8.18.0"
-  },
-  "devDependencies": {
-    "@types/ws": "^8.5.14"
-  }
 }

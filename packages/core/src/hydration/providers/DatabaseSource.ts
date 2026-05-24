@@ -1,7 +1,6 @@
-import type { IRI } from '../../semantics/IRI.js';
-import type { RdfObject, RdfSubject, Triple } from '../../rdf/Triple.js';
-import type { TripleSource } from '../TripleSource.js';
-
+import type { RdfObject, RdfSubject, Triple } from "../../rdf/Triple.js";
+import type { IRI } from "../../semantics/IRI.js";
+import type { TripleSource } from "../TripleSource.js";
 
 /**
  * Optional filter when querying a triple store.

@@ -1,11 +1,10 @@
-import { uuidv4Binary } from '../util/random.js';
-
+import { uuidv4Binary } from "../util/random.js";
 
 // ── Wire format ───────────────────────────────────────────────────────────────
 // All messages that cross process boundaries (WebSocket, etc.) are serialised
 // to this shape.  IDs are UUID v4 strings so JSON round-trips are lossless.
 
-export type TernKind = 'command' | 'query' | 'event' | 'result';
+export type TernKind = "command" | "query" | "event" | "result";
 
 /**
  * A reference to a well-known message type registered in the datastore.
@@ -30,15 +29,15 @@ export function typeRef(iri: string, id?: number): TernTypeRef {
 
 // ── Well-known message types ──────────────────────────────────────────────────
 
-const NS = 'http://tern.dev/ns/msg/';
+const NS = "http://tern.dev/ns/msg/";
 
 export const TERN_TYPES = {
-    ping:         typeRef(`${NS}ping`),
-    echo:         typeRef(`${NS}echo`),
+    ping: typeRef(`${NS}ping`),
+    echo: typeRef(`${NS}echo`),
     tripleInsert: typeRef(`${NS}triple.insert`),
-    tripleFind:   typeRef(`${NS}triple.find`),
+    tripleFind: typeRef(`${NS}triple.find`),
     tripleDelete: typeRef(`${NS}triple.delete`),
-    tripleStats:  typeRef(`${NS}triple.stats`),
+    tripleStats: typeRef(`${NS}triple.stats`),
 } as const satisfies Record<string, TernTypeRef>;
 
 // ── Message interfaces ────────────────────────────────────────────────────────
@@ -51,24 +50,24 @@ export interface TernMessage {
 }
 
 export interface TernRequest extends TernMessage {
-    readonly kind: 'command' | 'query' | 'event';
+    readonly kind: "command" | "query" | "event";
     readonly payload?: unknown;
 }
 
 export interface TernCommand extends TernRequest {
-    readonly kind: 'command';
+    readonly kind: "command";
 }
 
 export interface TernQuery extends TernRequest {
-    readonly kind: 'query';
+    readonly kind: "query";
 }
 
 export interface TernEvent extends TernRequest {
-    readonly kind: 'event';
+    readonly kind: "event";
 }
 
 export interface TernResult extends TernMessage {
-    readonly kind: 'result';
+    readonly kind: "result";
     readonly correlationId: string;
     readonly ok: boolean;
     readonly data?: unknown;
@@ -79,29 +78,31 @@ export interface TernResult extends TernMessage {
 
 function newId(): string {
     const bytes = uuidv4Binary();
-    const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    const hex = Array.from(bytes)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
     return [
         hex.slice(0, 8),
         hex.slice(8, 12),
         hex.slice(12, 16),
         hex.slice(16, 20),
         hex.slice(20),
-    ].join('-');
+    ].join("-");
 }
 
 /** Create a TernCommand from a well-known TernTypeRef. */
 export function command(type: TernTypeRef, payload?: unknown): TernCommand {
-    return { id: newId(), kind: 'command', type, payload };
+    return { id: newId(), kind: "command", type, payload };
 }
 
 /** Create a TernQuery from a well-known TernTypeRef. */
 export function query(type: TernTypeRef, payload?: unknown): TernQuery {
-    return { id: newId(), kind: 'query', type, payload };
+    return { id: newId(), kind: "query", type, payload };
 }
 
 /** Create a TernEvent from a well-known TernTypeRef. */
 export function event(type: TernTypeRef, payload?: unknown): TernEvent {
-    return { id: newId(), kind: 'event', type, payload };
+    return { id: newId(), kind: "event", type, payload };
 }
 
 export function result(
@@ -111,7 +112,7 @@ export function result(
     data?: unknown,
     error?: string,
 ): TernResult {
-    return { id: newId(), kind: 'result', correlationId, type, ok, data, error };
+    return { id: newId(), kind: "result", correlationId, type, ok, data, error };
 }
 
 export function okResult(correlationId: string, type: TernTypeRef, data?: unknown): TernResult {
@@ -125,19 +126,23 @@ export function errResult(correlationId: string, type: TernTypeRef, error: strin
 // ── Guards ────────────────────────────────────────────────────────────────────
 
 export function isTernRequest(msg: unknown): msg is TernRequest {
-    if (typeof msg !== 'object' || msg === null) { return false; }
+    if (typeof msg !== "object" || msg === null) {
+        return false;
+    }
     const m = msg as Record<string, unknown>;
     return (
-        typeof m['id'] === 'string' &&
-        typeof m['kind'] === 'string' &&
-        typeof m['type'] === 'object' &&
-        m['type'] !== null &&
-        typeof (m['type'] as Record<string, unknown>)['iri'] === 'string' &&
-        (m['kind'] === 'command' || m['kind'] === 'query' || m['kind'] === 'event')
+        typeof m.id === "string" &&
+        typeof m.kind === "string" &&
+        typeof m.type === "object" &&
+        m.type !== null &&
+        typeof (m.type as Record<string, unknown>).iri === "string" &&
+        (m.kind === "command" || m.kind === "query" || m.kind === "event")
     );
 }
 
 export function isTernResult(msg: unknown): msg is TernResult {
-    if (typeof msg !== 'object' || msg === null) { return false; }
-    return (msg as Record<string, unknown>)['kind'] === 'result';
+    if (typeof msg !== "object" || msg === null) {
+        return false;
+    }
+    return (msg as Record<string, unknown>).kind === "result";
 }

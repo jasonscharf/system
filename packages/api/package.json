@@ -1,43 +1,43 @@
 {
-  "name": "@jasonscharf/api",
-  "version": "0.1.0",
-  "type": "module",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+    "name": "@jasonscharf/api",
+    "version": "0.1.0",
+    "type": "module",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "files": [
+        "dist"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/jasonlscharf/system.git",
+        "directory": "packages/api"
+    },
+    "publishConfig": {
+        "registry": "https://npm.pkg.github.com",
+        "access": "public"
+    },
+    "scripts": {
+        "build": "yarn compile",
+        "compile": "tsc -b",
+        "clean": "rm -rf dist && rm tsconfig.tsbuildinfo",
+        "start": "node dist/index.js",
+        "typecheck": "tsc -p tsconfig.json --noEmit",
+        "watch": "tsc -b -w"
+    },
+    "dependencies": {
+        "@jasonscharf/core": "workspace:^",
+        "koa": "^3.1.1",
+        "koa-bodyparser": "^4.4.1",
+        "koa-router": "^14.0.0"
+    },
+    "devDependencies": {
+        "@types/koa": "^3",
+        "@types/koa-bodyparser": "^4"
     }
-  },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/jasonlscharf/system.git",
-    "directory": "packages/api"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
-    "access": "public"
-  },
-  "scripts": {
-    "build": "yarn compile",
-    "compile": "tsc -b",
-    "clean": "rm -rf dist && rm tsconfig.tsbuildinfo",
-    "start": "node dist/index.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "watch": "tsc -b -w"
-  },
-  "dependencies": {
-    "@jasonscharf/core": "workspace:^",
-    "koa": "^3.1.1",
-    "koa-bodyparser": "^4.4.1",
-    "koa-router": "^14.0.0"
-  },
-  "devDependencies": {
-    "@types/koa": "^3",
-    "@types/koa-bodyparser": "^4"
-  }
 }

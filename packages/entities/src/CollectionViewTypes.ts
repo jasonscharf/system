@@ -1,9 +1,8 @@
-import type { IRI } from '@jasonscharf/core';
-
+import type { IRI } from "@jasonscharf/core";
 
 export interface CollectionViewOpts {
     sortProp?: IRI;
-    sortDir?:  'asc' | 'desc';
+    sortDir?: "asc" | "desc";
 }
 
 export interface CollectionViewItemRecord {
@@ -13,10 +12,10 @@ export interface CollectionViewItemRecord {
 }
 
 export interface CollectionViewRecord {
-    iri:       string;
-    sourcePg:  string;
-    prop:      string;
+    iri: string;
+    sourcePg: string;
+    prop: string;
     sortProp?: string;
-    sortDir?:  'asc' | 'desc';
-    items:     CollectionViewItemRecord[];
+    sortDir?: "asc" | "desc";
+    items: CollectionViewItemRecord[];
 }

@@ -1,7 +1,6 @@
-import type { IRI } from '@jasonscharf/core';
-import type { ShaclNodeShape } from '@jasonscharf/gen';
-import type { EntityHandle } from './Handle.js';
-
+import type { IRI } from "@jasonscharf/core";
+import type { ShaclNodeShape } from "@jasonscharf/gen";
+import type { EntityHandle } from "./Handle.js";
 
 /**
  * Defines one PropGroup within an entity schema.
@@ -15,9 +14,9 @@ import type { EntityHandle } from './Handle.js';
 export type DefaultValue<T> = T | (() => T);
 
 export interface PropGroupDef<Props extends Record<string, unknown> = Record<string, unknown>> {
-    readonly handle:     EntityHandle;
+    readonly handle: EntityHandle;
     readonly properties: { readonly [K in keyof Props]: IRI };
-    readonly shape?:     ShaclNodeShape;
+    readonly shape?: ShaclNodeShape;
     /**
      * Default values applied during `EntityStore.create()` and `addGroup()` when
      * a property is absent from the supplied data.  Values may be static or
@@ -42,17 +41,17 @@ export interface PropGroupDef<Props extends Record<string, unknown> = Record<str
  */
 export class EntitySchema<CoreProps extends Record<string, unknown> = Record<string, unknown>> {
     readonly typeIRI: IRI;
-    readonly ns:      string;
+    readonly ns: string;
 
     private readonly _groups = new Map<string, PropGroupDef>();
 
     constructor(opts: {
-        typeIRI:   IRI;
-        ns:        string;
+        typeIRI: IRI;
+        ns: string;
         coreGroup: PropGroupDef<CoreProps>;
     }) {
         this.typeIRI = opts.typeIRI;
-        this.ns      = opts.ns;
+        this.ns = opts.ns;
         this._groups.set(opts.coreGroup.handle.id, opts.coreGroup);
     }
 
@@ -70,9 +69,11 @@ export class EntitySchema<CoreProps extends Record<string, unknown> = Record<str
     }
 
     /** Returns the subset of registered groups matching the requested handles (or all if '*'). */
-    resolveGroups(handles: EntityHandle[] | '*'): PropGroupDef[] {
-        if (handles === '*') { return this.allGroups(); }
-        return handles.flatMap(h => {
+    resolveGroups(handles: EntityHandle[] | "*"): PropGroupDef[] {
+        if (handles === "*") {
+            return this.allGroups();
+        }
+        return handles.flatMap((h) => {
             const g = this._groups.get(h.id);
             return g ? [g] : [];
         });

@@ -1,5 +1,4 @@
-import type { OAuthProvider } from '../types.js';
-
+import type { OAuthProvider } from "../types.js";
 
 export interface OAuthProfile {
     providerUserId: string;

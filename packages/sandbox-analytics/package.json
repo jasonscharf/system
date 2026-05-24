@@ -1,25 +1,25 @@
 {
-  "name": "@jasonscharf/sandbox-analytics",
-  "version": "0.1.0",
-  "type": "module",
-  "private": true,
-  "files": [
-    "dist",
-    "ontology"
-  ],
-  "scripts": {
-    "build": "yarn compile",
-    "compile": "tsc -b",
-    "clean": "rm -rf dist && rm -f tsconfig.tsbuildinfo",
-    "gen": "tern-codegen",
-    "gen:watch": "tern-codegen --watch",
-    "start": "node dist/index.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
-  },
-  "dependencies": {
-    "@jasonscharf/auth": "workspace:^",
-    "@jasonscharf/core": "workspace:^",
-    "@jasonscharf/entities": "workspace:^",
-    "@jasonscharf/gen": "workspace:^"
-  }
+    "name": "@jasonscharf/sandbox-analytics",
+    "version": "0.1.0",
+    "type": "module",
+    "private": true,
+    "files": [
+        "dist",
+        "ontology"
+    ],
+    "scripts": {
+        "build": "yarn compile",
+        "compile": "tsc -b",
+        "clean": "rm -rf dist && rm -f tsconfig.tsbuildinfo",
+        "gen": "tern-codegen",
+        "gen:watch": "tern-codegen --watch",
+        "start": "node dist/index.js",
+        "typecheck": "tsc -p tsconfig.json --noEmit"
+    },
+    "dependencies": {
+        "@jasonscharf/auth": "workspace:^",
+        "@jasonscharf/core": "workspace:^",
+        "@jasonscharf/entities": "workspace:^",
+        "@jasonscharf/gen": "workspace:^"
+    }
 }

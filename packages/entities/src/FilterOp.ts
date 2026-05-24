@@ -1,1 +1,1 @@
-export type FilterOp = '=' | '!=' | '<' | '<=' | '>' | '>=' | 'LIKE' | 'ILIKE';
+export type FilterOp = "=" | "!=" | "<" | "<=" | ">" | ">=" | "LIKE" | "ILIKE";

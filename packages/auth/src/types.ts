@@ -1,4 +1,4 @@
-export type OAuthProvider = 'google' | 'github';
+export type OAuthProvider = "google" | "github";
 
 export interface UserEntity {
     id: string;

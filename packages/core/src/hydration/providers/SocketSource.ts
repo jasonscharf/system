@@ -1,6 +1,5 @@
-import type { Triple } from '../../rdf/Triple.js';
-import type { TripleSource } from '../TripleSource.js';
-
+import type { Triple } from "../../rdf/Triple.js";
+import type { TripleSource } from "../TripleSource.js";
 
 /**
  * Deserializes a raw WebSocket message into triples.
@@ -27,8 +26,8 @@ export class SocketSource implements TripleSource {
 
         // Phase 1: wait for the connection to open.
         await new Promise<void>((res, rej) => {
-            socket.addEventListener('open', () => res());
-            socket.addEventListener('error', () => rej(new Error(`Cannot connect to ${this.url}`)));
+            socket.addEventListener("open", () => res());
+            socket.addEventListener("error", () => rej(new Error(`Cannot connect to ${this.url}`)));
         });
 
         // Phase 2: buffer messages and stream them as triples.
@@ -36,20 +35,26 @@ export class SocketSource implements TripleSource {
         let done = false;
         let resolve!: () => void;
         let reject!: (err: Error) => void;
-        let waiting = new Promise<void>((res, rej) => { resolve = res; reject = rej; });
-
-        socket.addEventListener('message', (ev) => {
-            queue.push(this.deserializer(ev.data as string));
-            resolve();
-            waiting = new Promise<void>((res, rej) => { resolve = res; reject = rej; });
+        let waiting = new Promise<void>((res, rej) => {
+            resolve = res;
+            reject = rej;
         });
 
-        socket.addEventListener('close', () => {
+        socket.addEventListener("message", (ev) => {
+            queue.push(this.deserializer(ev.data as string));
+            resolve();
+            waiting = new Promise<void>((res, rej) => {
+                resolve = res;
+                reject = rej;
+            });
+        });
+
+        socket.addEventListener("close", () => {
             done = true;
             resolve();
         });
 
-        socket.addEventListener('error', () => {
+        socket.addEventListener("error", () => {
             reject(new Error(`WebSocket error on ${this.url}`));
         });
 
@@ -59,7 +64,9 @@ export class SocketSource implements TripleSource {
             }
             const batch = queue.shift();
             if (batch) {
-                for (const t of batch) yield t;
+                for (const t of batch) {
+                    yield t;
+                }
             }
         }
     }

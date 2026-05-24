@@ -1,7 +1,6 @@
-import { FlowComponent, type FlowComponentOptions } from '../../FlowComponent.js';
-import { FlowPort } from '../../FlowPort.js';
-import type { HttpRequest } from './HttpTypes.js';
-
+import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
+import type { FlowPort } from "../../FlowPort.js";
+import type { HttpRequest } from "./HttpTypes.js";
 
 /**
  * Feeds raw HttpRequests into the flow graph on behalf of HttpServer.
@@ -12,7 +11,7 @@ export class HttpRequestReader extends FlowComponent {
 
     constructor(options: FlowComponentOptions) {
         super(options);
-        this.out = this.addPort<HttpRequest>('out', 'out');
+        this.out = this.addPort<HttpRequest>("out", "out");
     }
 
     _inject(request: HttpRequest): void {

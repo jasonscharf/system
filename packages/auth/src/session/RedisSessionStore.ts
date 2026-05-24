@@ -1,6 +1,5 @@
-import type { Redis } from 'ioredis';
-import type { ISessionStore } from './ISessionStore.js';
-
+import type { Redis } from "ioredis";
+import type { ISessionStore } from "./ISessionStore.js";
 
 export class RedisSessionStore implements ISessionStore {
     private readonly _redis: Redis;
@@ -10,7 +9,7 @@ export class RedisSessionStore implements ISessionStore {
     }
 
     async set(key: string, value: string, ttlSeconds: number): Promise<void> {
-        await this._redis.set(key, value, 'EX', ttlSeconds);
+        await this._redis.set(key, value, "EX", ttlSeconds);
     }
 
     async get(key: string): Promise<string | null> {

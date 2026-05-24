@@ -1,7 +1,6 @@
-import { FlowComponent, FlowPort, type FlowComponentOptions } from '@jasonscharf/flow';
-import type { TernResult } from '@jasonscharf/core';
-import type { WsMessage } from '@jasonscharf/flow';
-
+import type { TernResult } from "@jasonscharf/core";
+import type { WsMessage } from "@jasonscharf/flow";
+import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
 
 export interface OutgoingMessage {
     readonly connectionId: string;
@@ -17,13 +16,16 @@ export class MessageEncoder extends FlowComponent {
 
     constructor(options: FlowComponentOptions) {
         super(options);
-        this.in  = this.addPort<OutgoingMessage>('in', 'in');
-        this.out = this.addPort<WsMessage>('out', 'out');
+        this.in = this.addPort<OutgoingMessage>("in", "in");
+        this.out = this.addPort<WsMessage>("out", "out");
     }
 
     override step(): void {
-        let msg: OutgoingMessage | undefined;
-        while ((msg = this.in.read()) !== undefined) {
+        for (;;) {
+            const msg = this.in.read();
+            if (msg === undefined) {
+                break;
+            }
             this.out.put({
                 connectionId: msg.connectionId,
                 data: JSON.stringify(msg.result),

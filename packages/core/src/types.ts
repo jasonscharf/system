@@ -1,1 +1,1 @@
-export type ID = BigInt | Uint8Array;
+export type ID = bigint | Uint8Array;

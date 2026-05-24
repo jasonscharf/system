@@ -1,7 +1,6 @@
-import type { Knex } from 'knex';
-import { C, T } from '../schema.js';
-import type { LiteralJson } from '../schema.js';
-
+import type { Knex } from "knex";
+import type { LiteralJson } from "../schema.js";
+import { C, T } from "../schema.js";
 
 /**
  * Transforms the triple store into a graph + time series database.
@@ -30,17 +29,22 @@ import type { LiteralJson } from '../schema.js';
 export async function up(knex: Knex): Promise<void> {
     const now = knex.fn.now();
     const client = (knex.client as { config: { client: string } }).config.client;
-    const isPg   = client === 'pg' || client === 'postgresql';
+    const isPg = client === "pg" || client === "postgresql";
 
     // ── tern_nodes ────────────────────────────────────────────────────────────
 
     const nodesHasCreatedAt = await knex.schema.hasColumn(T.nodes, C.createdAt);
     if (!nodesHasCreatedAt) {
-        await knex.schema.alterTable(T.nodes, t => {
+        await knex.schema.alterTable(T.nodes, (t) => {
+            // Timestamps — default to now() so existing rows get a sensible value.
             t.timestamp(C.createdAt, { useTz: true }).notNullable().defaultTo(now);
             t.timestamp(C.updatedAt, { useTz: true }).notNullable().defaultTo(now);
+
+            // JSONB literal payload.  Postgres stores this as a real JSONB column;
+            // SQLite stores it as serialised JSON text — both accessed via Knex's
+            // json() abstraction so application code is database-agnostic.
             if (isPg) {
-                t.specificType(C.valueJson, 'jsonb').nullable();
+                t.specificType(C.valueJson, "jsonb").nullable();
             } else {
                 t.json(C.valueJson).nullable();
             }
@@ -51,7 +55,7 @@ export async function up(knex: Knex): Promise<void> {
 
     const edgesHasCreatedAt = await knex.schema.hasColumn(T.edges, C.createdAt);
     if (!edgesHasCreatedAt) {
-        await knex.schema.alterTable(T.edges, t => {
+        await knex.schema.alterTable(T.edges, (t) => {
             t.timestamp(C.createdAt, { useTz: true }).notNullable().defaultTo(now);
             t.timestamp(C.updatedAt, { useTz: true }).notNullable().defaultTo(now);
             t.boolean(C.isDeleted).notNullable().defaultTo(false);
@@ -60,32 +64,37 @@ export async function up(knex: Knex): Promise<void> {
 
         // Drop the old full unique constraint — soft-delete means the same quad
         // can appear multiple times in history.
-        await knex.schema.alterTable(T.edges, t => {
+        await knex.schema.alterTable(T.edges, (t) => {
             t.dropUnique([C.subject, C.predicate, C.object, C.graph]);
         });
 
         // Index to make active-edge queries fast.
-        await knex.schema.alterTable(T.edges, t => {
-            t.index([C.isDeleted, C.subject],   'tern_edges_active_subject_idx');
-            t.index([C.isDeleted, C.predicate], 'tern_edges_active_predicate_idx');
-            t.index([C.isDeleted, C.object],    'tern_edges_active_object_idx');
+        await knex.schema.alterTable(T.edges, (t) => {
+            t.index([C.isDeleted, C.subject], "tern_edges_active_subject_idx");
+            t.index([C.isDeleted, C.predicate], "tern_edges_active_predicate_idx");
+            t.index([C.isDeleted, C.object], "tern_edges_active_object_idx");
         });
     }
 
     // ── Populate value_json for existing literal nodes ────────────────────────
 
-    const XSD = 'http://www.w3.org/2001/XMLSchema#';
+    const XSD = "http://www.w3.org/2001/XMLSchema#";
     const literals = await knex(T.nodes)
-        .where(C.kind, 'literal')
+        .where(C.kind, "literal")
         .select<{ id: number; value: string; datatype: string | null; lang: string | null }[]>(
-            C.id, C.value, C.datatype, C.lang,
+            C.id,
+            C.value,
+            C.datatype,
+            C.lang,
         );
 
     for (const row of literals) {
-        const dt  = row.datatype ?? `${XSD}string`;
-        const raw = row.value ?? '';
+        const dt = row.datatype ?? `${XSD}string`;
+        const raw = row.value ?? "";
         const json: LiteralJson = { v: coerceLiteralValue(raw, dt), dt };
-        if (row.lang) { json.lang = row.lang; }
+        if (row.lang) {
+            json.lang = row.lang;
+        }
 
         await knex(T.nodes)
             .where(C.id, row.id)
@@ -95,22 +104,22 @@ export async function up(knex: Knex): Promise<void> {
 
 export async function down(knex: Knex): Promise<void> {
     // Restore the unique constraint before removing soft-delete columns.
-    await knex.schema.alterTable(T.edges, t => {
-        t.dropIndex([C.isDeleted, C.subject],   'tern_edges_active_subject_idx');
-        t.dropIndex([C.isDeleted, C.predicate], 'tern_edges_active_predicate_idx');
-        t.dropIndex([C.isDeleted, C.object],    'tern_edges_active_object_idx');
+    await knex.schema.alterTable(T.edges, (t) => {
+        t.dropIndex([C.isDeleted, C.subject], "tern_edges_active_subject_idx");
+        t.dropIndex([C.isDeleted, C.predicate], "tern_edges_active_predicate_idx");
+        t.dropIndex([C.isDeleted, C.object], "tern_edges_active_object_idx");
 
         t.unique([C.subject, C.predicate, C.object, C.graph]);
     });
 
-    await knex.schema.alterTable(T.edges, t => {
+    await knex.schema.alterTable(T.edges, (t) => {
         t.dropColumn(C.createdAt);
         t.dropColumn(C.updatedAt);
         t.dropColumn(C.isDeleted);
         t.dropColumn(C.deletedAt);
     });
 
-    await knex.schema.alterTable(T.nodes, t => {
+    await knex.schema.alterTable(T.nodes, (t) => {
         t.dropColumn(C.createdAt);
         t.dropColumn(C.updatedAt);
         t.dropColumn(C.valueJson);
@@ -119,7 +128,7 @@ export async function down(knex: Knex): Promise<void> {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const XSD = 'http://www.w3.org/2001/XMLSchema#';
+const XSD = "http://www.w3.org/2001/XMLSchema#";
 
 /**
  * Converts the string representation of an XSD typed literal into its native
@@ -128,7 +137,7 @@ const XSD = 'http://www.w3.org/2001/XMLSchema#';
 function coerceLiteralValue(value: string, datatypeIri: string): string | number | boolean {
     switch (datatypeIri) {
         case `${XSD}boolean`:
-            return value === 'true';
+            return value === "true";
 
         case `${XSD}integer`:
         case `${XSD}int`:
@@ -139,14 +148,14 @@ function coerceLiteralValue(value: string, datatypeIri: string): string | number
         case `${XSD}unsignedLong`:
         case `${XSD}unsignedShort`: {
             const n = parseInt(value, 10);
-            return isNaN(n) ? value : n;
+            return Number.isNaN(n) ? value : n;
         }
 
         case `${XSD}decimal`:
         case `${XSD}float`:
         case `${XSD}double`: {
             const n = parseFloat(value);
-            return isNaN(n) ? value : n;
+            return Number.isNaN(n) ? value : n;
         }
 
         default:

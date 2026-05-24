@@ -1,7 +1,6 @@
-import type { FlowComponent } from './FlowComponent.js';
-import type { FlowTransport } from './FlowTransport.js';
-import type { PortDirection } from './types.js';
-
+import type { FlowComponent } from "./FlowComponent.js";
+import type { FlowTransport } from "./FlowTransport.js";
+import type { PortDirection } from "./types.js";
 
 export class FlowPort<T> {
     readonly name: string;
@@ -31,7 +30,7 @@ export class FlowPort<T> {
 
     put(msg: T): void {
         this._queue.push(msg);
-        if (this.direction === 'in') {
+        if (this.direction === "in") {
             this.owner.context.scheduler?.enqueue(this.owner);
         } else {
             for (const transport of this._transports) {

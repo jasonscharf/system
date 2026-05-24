@@ -1,8 +1,7 @@
-import { FlowComponent, FlowPort, type FlowComponentOptions } from '@jasonscharf/flow';
-import { type Dispatcher } from '@jasonscharf/app';
-import type { IncomingMessage } from './MessageDecoder.js';
-import type { OutgoingMessage } from './MessageEncoder.js';
-
+import type { Dispatcher } from "@jasonscharf/app";
+import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
+import type { IncomingMessage } from "./MessageDecoder.js";
+import type { OutgoingMessage } from "./MessageEncoder.js";
 
 export interface MessageRouterOptions extends FlowComponentOptions {
     /**
@@ -25,28 +24,31 @@ export class MessageRouter extends FlowComponent {
     readonly out: FlowPort<OutgoingMessage>;
 
     private readonly _dispatcher: Dispatcher;
-    private readonly _extraCtx:   Record<string, unknown>;
+    private readonly _extraCtx: Record<string, unknown>;
 
     constructor(options: MessageRouterOptions) {
         super(options);
         this._dispatcher = options.dispatcher;
-        this._extraCtx   = options.handlerContext ?? {};
-        this.in  = this.addPort<IncomingMessage>('in', 'in');
-        this.out = this.addPort<OutgoingMessage>('out', 'out');
+        this._extraCtx = options.handlerContext ?? {};
+        this.in = this.addPort<IncomingMessage>("in", "in");
+        this.out = this.addPort<OutgoingMessage>("out", "out");
     }
 
     override step(): void {
-        let msg: IncomingMessage | undefined;
-        while ((msg = this.in.read()) !== undefined) {
+        for (;;) {
+            const msg = this.in.read();
+            if (msg === undefined) {
+                break;
+            }
             void this._dispatch(msg);
         }
     }
 
     private async _dispatch(incoming: IncomingMessage): Promise<void> {
-        const result = await this._dispatcher.dispatch(
-            incoming.request,
-            { connectionId: incoming.connectionId, ...this._extraCtx },
-        );
+        const result = await this._dispatcher.dispatch(incoming.request, {
+            connectionId: incoming.connectionId,
+            ...this._extraCtx,
+        });
         this.out.put({ connectionId: incoming.connectionId, result });
     }
 }

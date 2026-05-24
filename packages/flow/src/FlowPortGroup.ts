@@ -1,5 +1,4 @@
-import type { FlowPort } from './FlowPort.js';
-
+import type { FlowPort } from "./FlowPort.js";
 
 type PortTuple = readonly FlowPort<unknown>[];
 
@@ -18,11 +17,13 @@ export class FlowPortGroup<T extends PortTuple> {
     constructor(private readonly _ports: T) {}
 
     get ready(): boolean {
-        return this._ports.every(p => p.size > 0);
+        return this._ports.every((p) => p.size > 0);
     }
 
     readAll(): UnwrapPorts<T> | undefined {
-        if (!this.ready) return undefined;
-        return this._ports.map(p => p.read()) as UnwrapPorts<T>;
+        if (!this.ready) {
+            return undefined;
+        }
+        return this._ports.map((p) => p.read()) as UnwrapPorts<T>;
     }
 }

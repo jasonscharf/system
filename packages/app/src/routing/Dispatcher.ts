@@ -1,5 +1,4 @@
-import type { TernRequest, TernResult } from '@jasonscharf/core';
-
+import type { TernRequest, TernResult } from "@jasonscharf/core";
 
 /**
  * Minimal dispatch contract shared by TernRouter, HandlerRegistry, and any

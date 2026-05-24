@@ -1,7 +1,6 @@
-import { FlowComponent, type FlowComponentOptions } from '../../FlowComponent.js';
-import { FlowPort } from '../../FlowPort.js';
-import type { HttpResponse } from './HttpTypes.js';
-
+import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
+import type { FlowPort } from "../../FlowPort.js";
+import type { HttpResponse } from "./HttpTypes.js";
 
 export type HttpResponseSendFn = (response: HttpResponse) => void;
 
@@ -15,7 +14,7 @@ export class HttpResponseWriter extends FlowComponent {
 
     constructor(options: FlowComponentOptions) {
         super(options);
-        this.in = this.addPort<HttpResponse>('in', 'in');
+        this.in = this.addPort<HttpResponse>("in", "in");
     }
 
     _setSend(fn: HttpResponseSendFn): void {
@@ -23,8 +22,11 @@ export class HttpResponseWriter extends FlowComponent {
     }
 
     override step(): void {
-        let resp: HttpResponse | undefined;
-        while ((resp = this.in.read()) !== undefined) {
+        for (;;) {
+            const resp = this.in.read();
+            if (resp === undefined) {
+                break;
+            }
             this._send?.(resp);
         }
     }

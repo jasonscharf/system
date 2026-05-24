@@ -1,8 +1,7 @@
-import { FlowComponent, type FlowComponentOptions } from '../../FlowComponent.js';
-import { FlowPort } from '../../FlowPort.js';
-import { HttpCtx } from './HttpCtx.js';
-import type { HttpHeaders, HttpMethod, HttpResponseDraft, ParsedHttpRequest } from './HttpTypes.js';
-
+import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
+import type { FlowPort } from "../../FlowPort.js";
+import { HttpCtx } from "./HttpCtx.js";
+import type { HttpHeaders, HttpMethod, HttpResponseDraft, ParsedHttpRequest } from "./HttpTypes.js";
 
 // ── Compose (local copy — flow package has no dep on @system/app) ─────────────
 
@@ -13,15 +12,18 @@ function compose<T>(fns: MiddlewareFn<T>[]): MiddlewareFn<T> {
     return async (ctx: T, finalNext: Next) => {
         let depth = -1;
         const dispatch = async (i: number): Promise<void> => {
-            if (i <= depth) { throw new Error('next() called multiple times'); }
+            if (i <= depth) {
+                throw new Error("next() called multiple times");
+            }
             depth = i;
             const fn = i < fns.length ? fns[i] : finalNext;
-            if (fn) { await fn(ctx, () => dispatch(i + 1)); }
+            if (fn) {
+                await fn(ctx, () => dispatch(i + 1));
+            }
         };
         return dispatch(0);
     };
 }
-
 
 // ── Path matching ─────────────────────────────────────────────────────────────
 
@@ -29,25 +31,27 @@ function matchPath(pattern: string, pathname: string): Record<string, string> | 
     const params: Record<string, string> = {};
 
     // Fast-path: exact match (most common case for static routes)
-    if (!pattern.includes(':') && !pattern.includes('*')) {
+    if (!pattern.includes(":") && !pattern.includes("*")) {
         return pattern === pathname ? params : null;
     }
 
-    const pp = pattern.split('/').filter(Boolean);
-    const rp = pathname.split('/').filter(Boolean);
+    const pp = pattern.split("/").filter(Boolean);
+    const rp = pathname.split("/").filter(Boolean);
 
     for (let i = 0; i < pp.length; i++) {
         const seg = pp[i];
 
-        if (seg === '*') {
+        if (seg === "*") {
             // Greedy wildcard — captures remaining segments
-            params['*'] = rp.slice(i).join('/');
+            params["*"] = rp.slice(i).join("/");
             return params;
         }
 
-        if (i >= rp.length) { return null; }
+        if (i >= rp.length) {
+            return null;
+        }
 
-        if (seg.startsWith(':')) {
+        if (seg.startsWith(":")) {
             params[seg.slice(1)] = decodeURIComponent(rp[i]);
         } else if (seg !== rp[i]) {
             return null;
@@ -58,29 +62,34 @@ function matchPath(pattern: string, pathname: string): Record<string, string> | 
     return pp.length === rp.length ? params : null;
 }
 
-
 // ── Content-type inference ────────────────────────────────────────────────────
 
 function inferContentType(body: unknown, headers: HttpHeaders): string | undefined {
-    const existing = headers['content-type'];
-    if (existing) { return Array.isArray(existing) ? existing[0] : existing; }
-    if (body instanceof Uint8Array) { return 'application/octet-stream'; }
-    if (typeof body === 'string')   { return 'text/plain; charset=utf-8'; }
-    if (body !== null && body !== undefined) { return 'application/json'; }
+    const existing = headers["content-type"];
+    if (existing) {
+        return Array.isArray(existing) ? existing[0] : existing;
+    }
+    if (body instanceof Uint8Array) {
+        return "application/octet-stream";
+    }
+    if (typeof body === "string") {
+        return "text/plain; charset=utf-8";
+    }
+    if (body !== null && body !== undefined) {
+        return "application/json";
+    }
     return undefined;
 }
-
 
 // ── Route record ──────────────────────────────────────────────────────────────
 
 export type HttpMiddlewareFn = MiddlewareFn<HttpCtx>;
 
 interface Route {
-    method:  HttpMethod | null;   // null = any method (middleware)
+    method: HttpMethod | null; // null = any method (middleware)
     pattern: string;
-    fn:      HttpMiddlewareFn;
+    fn: HttpMiddlewareFn;
 }
-
 
 // ── HttpRouter ────────────────────────────────────────────────────────────────
 
@@ -132,18 +141,18 @@ export interface HttpRouterOptions extends FlowComponentOptions {
  *   router.mount('/v1', v1);
  */
 export class HttpRouter extends FlowComponent {
-    readonly requests:  FlowPort<ParsedHttpRequest>;
+    readonly requests: FlowPort<ParsedHttpRequest>;
     readonly responses: FlowPort<HttpResponseDraft>;
 
-    private readonly _routes:  Route[]                                     = [];
-    private readonly _mounts:  Array<{ prefix: string; router: HttpRouter }> = [];
-    private readonly _extras:  Record<string, unknown>;
+    private readonly _routes: Route[] = [];
+    private readonly _mounts: Array<{ prefix: string; router: HttpRouter }> = [];
+    private readonly _extras: Record<string, unknown>;
 
     constructor(options: HttpRouterOptions) {
         super(options);
-        this._extras   = options.extras ?? {};
-        this.requests  = this.addPort<ParsedHttpRequest>('requests', 'in');
-        this.responses = this.addPort<HttpResponseDraft>('responses', 'out');
+        this._extras = options.extras ?? {};
+        this.requests = this.addPort<ParsedHttpRequest>("requests", "in");
+        this.responses = this.addPort<HttpResponseDraft>("responses", "out");
     }
 
     // ── Middleware ────────────────────────────────────────────────────────────
@@ -153,10 +162,10 @@ export class HttpRouter extends FlowComponent {
     /** Register middleware scoped to a path prefix. */
     use(prefix: string, ...fns: HttpMiddlewareFn[]): this;
     use(prefixOrFn: string | HttpMiddlewareFn, ...rest: HttpMiddlewareFn[]): this {
-        if (typeof prefixOrFn === 'function') {
-            this._routes.push({ method: null, pattern: '/*', fn: prefixOrFn });
+        if (typeof prefixOrFn === "function") {
+            this._routes.push({ method: null, pattern: "/*", fn: prefixOrFn });
         } else {
-            const prefix = prefixOrFn.endsWith('/') ? `${prefixOrFn}*` : `${prefixOrFn}/*`;
+            const prefix = prefixOrFn.endsWith("/") ? `${prefixOrFn}*` : `${prefixOrFn}/*`;
             this._routes.push({ method: null, pattern: prefix, fn: compose(rest) });
         }
         return this;
@@ -165,19 +174,33 @@ export class HttpRouter extends FlowComponent {
     // ── Method handlers ───────────────────────────────────────────────────────
 
     /** Handle GET requests matching `path`. */
-    get(path: string,    ...fns: HttpMiddlewareFn[]): this { return this._add('GET',    path, fns); }
+    get(path: string, ...fns: HttpMiddlewareFn[]): this {
+        return this._add("GET", path, fns);
+    }
     /** Handle POST requests matching `path`. */
-    post(path: string,   ...fns: HttpMiddlewareFn[]): this { return this._add('POST',   path, fns); }
+    post(path: string, ...fns: HttpMiddlewareFn[]): this {
+        return this._add("POST", path, fns);
+    }
     /** Handle PUT requests matching `path`. */
-    put(path: string,    ...fns: HttpMiddlewareFn[]): this { return this._add('PUT',    path, fns); }
+    put(path: string, ...fns: HttpMiddlewareFn[]): this {
+        return this._add("PUT", path, fns);
+    }
     /** Handle PATCH requests matching `path`. */
-    patch(path: string,  ...fns: HttpMiddlewareFn[]): this { return this._add('PATCH',  path, fns); }
+    patch(path: string, ...fns: HttpMiddlewareFn[]): this {
+        return this._add("PATCH", path, fns);
+    }
     /** Handle DELETE requests matching `path`. */
-    delete(path: string, ...fns: HttpMiddlewareFn[]): this { return this._add('DELETE', path, fns); }
+    delete(path: string, ...fns: HttpMiddlewareFn[]): this {
+        return this._add("DELETE", path, fns);
+    }
     /** Handle HEAD requests matching `path`. */
-    head(path: string,   ...fns: HttpMiddlewareFn[]): this { return this._add('HEAD',   path, fns); }
+    head(path: string, ...fns: HttpMiddlewareFn[]): this {
+        return this._add("HEAD", path, fns);
+    }
     /** Handle any HTTP method matching `path`. */
-    all(path: string,    ...fns: HttpMiddlewareFn[]): this { return this._add(null,     path, fns); }
+    all(path: string, ...fns: HttpMiddlewareFn[]): this {
+        return this._add(null, path, fns);
+    }
 
     // ── Sub-routing ───────────────────────────────────────────────────────────
 
@@ -186,15 +209,18 @@ export class HttpRouter extends FlowComponent {
      * `prefix` are forwarded to `router` with the prefix stripped from the path.
      */
     mount(prefix: string, router: HttpRouter): this {
-        this._mounts.push({ prefix: prefix.replace(/\/$/, ''), router });
+        this._mounts.push({ prefix: prefix.replace(/\/$/, ""), router });
         return this;
     }
 
     // ── FBP step ──────────────────────────────────────────────────────────────
 
     override step(): void {
-        let req: ParsedHttpRequest | undefined;
-        while ((req = this.requests.read()) !== undefined) {
+        for (;;) {
+            const req = this.requests.read();
+            if (req === undefined) {
+                break;
+            }
             void this._handle(req);
         }
     }
@@ -207,7 +233,7 @@ export class HttpRouter extends FlowComponent {
     }
 
     private async _handle(req: ParsedHttpRequest): Promise<void> {
-        const ctx   = new HttpCtx(req, this._extras);
+        const ctx = new HttpCtx(req, this._extras);
         const chain = this._buildChain(req.method, req.pathname, ctx);
 
         await compose(chain)(ctx, async () => {
@@ -218,10 +244,10 @@ export class HttpRouter extends FlowComponent {
         });
 
         this.responses.put({
-            requestId:   req.requestId,
-            status:      ctx.status,
-            headers:     ctx.headers,
-            body:        ctx.body,
+            requestId: req.requestId,
+            status: ctx.status,
+            headers: ctx.headers,
+            body: ctx.body,
             contentType: inferContentType(ctx.body, ctx.headers),
         });
     }
@@ -230,10 +256,14 @@ export class HttpRouter extends FlowComponent {
         const chain: HttpMiddlewareFn[] = [];
 
         for (const route of this._routes) {
-            if (route.method && route.method !== method) { continue; }
+            if (route.method && route.method !== method) {
+                continue;
+            }
 
             const params = matchPath(route.pattern, pathname);
-            if (params === null) { continue; }
+            if (params === null) {
+                continue;
+            }
 
             chain.push(async (c, next) => {
                 Object.assign(c.params, params);
@@ -243,8 +273,10 @@ export class HttpRouter extends FlowComponent {
 
         // Delegate to mounted sub-routers
         for (const { prefix, router } of this._mounts) {
-            if (!pathname.startsWith(prefix)) { continue; }
-            const subPath = pathname.slice(prefix.length) || '/';
+            if (!pathname.startsWith(prefix)) {
+                continue;
+            }
+            const subPath = pathname.slice(prefix.length) || "/";
             const subChain = router._buildChain(method, subPath, ctx);
             chain.push(...subChain);
         }

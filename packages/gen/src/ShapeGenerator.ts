@@ -1,19 +1,30 @@
-import type { ShaclShapes, ShaclNodeShape } from './ShaclReader.js';
-
+import type { ShaclNodeShape, ShaclShapes } from "./ShaclReader.js";
 
 function renderNodeShape(shape: ShaclNodeShape): string {
-    const props = shape.properties.map(ps => {
-        const pairs: string[] = [
-            `path: ${JSON.stringify(ps.path)}`,
-        ];
-        if (ps.minCount  !== undefined) { pairs.push(`minCount: ${ps.minCount}`); }
-        if (ps.maxCount  !== undefined) { pairs.push(`maxCount: ${ps.maxCount}`); }
-        if (ps.datatype)                { pairs.push(`datatype: ${JSON.stringify(ps.datatype)}`); }
-        if (ps.classConstraint)         { pairs.push(`classConstraint: ${JSON.stringify(ps.classConstraint)}`); }
-        if (ps.pattern)                 { pairs.push(`pattern: ${JSON.stringify(ps.pattern)}`); }
-        if (ps.message)                 { pairs.push(`message: ${JSON.stringify(ps.message)}`); }
-        return `            { ${pairs.join(', ')} },`;
-    }).join('\n');
+    const props = shape.properties
+        .map((ps) => {
+            const pairs: string[] = [`path: ${JSON.stringify(ps.path)}`];
+            if (ps.minCount !== undefined) {
+                pairs.push(`minCount: ${ps.minCount}`);
+            }
+            if (ps.maxCount !== undefined) {
+                pairs.push(`maxCount: ${ps.maxCount}`);
+            }
+            if (ps.datatype) {
+                pairs.push(`datatype: ${JSON.stringify(ps.datatype)}`);
+            }
+            if (ps.classConstraint) {
+                pairs.push(`classConstraint: ${JSON.stringify(ps.classConstraint)}`);
+            }
+            if (ps.pattern) {
+                pairs.push(`pattern: ${JSON.stringify(ps.pattern)}`);
+            }
+            if (ps.message) {
+                pairs.push(`message: ${JSON.stringify(ps.message)}`);
+            }
+            return `            { ${pairs.join(", ")} },`;
+        })
+        .join("\n");
 
     return [
         `        {`,
@@ -24,7 +35,7 @@ function renderNodeShape(shape: ShaclNodeShape): string {
         props,
         `            ],`,
         `        }`,
-    ].join('\n');
+    ].join("\n");
 }
 
 /**
@@ -37,16 +48,16 @@ function renderNodeShape(shape: ShaclNodeShape): string {
 export function generateShapesDescriptor(shapes: ShaclShapes): string {
     const shapeList = [...shapes.nodeShapes.values()];
 
-    const shapeEntries = shapeList.map(shape =>
-        `    [${JSON.stringify(shape.iri)},\n${renderNodeShape(shape)},\n    ]`
-    ).join(',\n');
+    const _shapeEntries = shapeList
+        .map((shape) => `    [${JSON.stringify(shape.iri)},\n${renderNodeShape(shape)},\n    ]`)
+        .join(",\n");
 
     const lines: string[] = [
         `// auto-generated shapes descriptor — do not edit by hand`,
         `import type { ShaclShapes, ShaclNodeShape } from '@jasonscharf/gen';`,
         ``,
         `const list: ShaclNodeShape[] = [`,
-        ...shapeList.map(shape => renderNodeShape(shape) + ','),
+        ...shapeList.map((shape) => `${renderNodeShape(shape)},`),
         `];`,
         ``,
         `export const shapes: ShaclShapes = {`,
@@ -55,5 +66,5 @@ export function generateShapesDescriptor(shapes: ShaclShapes): string {
         `};`,
     ];
 
-    return lines.join('\n') + '\n';
+    return `${lines.join("\n")}\n`;
 }

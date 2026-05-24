@@ -1,7 +1,6 @@
-import { FlowComponent, type FlowComponentOptions } from '../../FlowComponent.js';
-import { FlowPort } from '../../FlowPort.js';
-import type { WsMessage } from './WsMessage.js';
-
+import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
+import type { FlowPort } from "../../FlowPort.js";
+import type { WsMessage } from "./WsMessage.js";
 
 export interface WebSocketWriterOptions extends FlowComponentOptions {
     send: (connectionId: string, data: string | Uint8Array) => void;
@@ -18,12 +17,15 @@ export class WebSocketWriter extends FlowComponent {
     constructor(options: WebSocketWriterOptions) {
         super(options);
         this._send = options.send;
-        this.in = this.addPort<WsMessage>('in', 'in');
+        this.in = this.addPort<WsMessage>("in", "in");
     }
 
     override step(): void {
-        let msg: WsMessage | undefined;
-        while ((msg = this.in.read()) !== undefined) {
+        for (;;) {
+            const msg = this.in.read();
+            if (msg === undefined) {
+                break;
+            }
             this._send(msg.connectionId, msg.data);
         }
     }

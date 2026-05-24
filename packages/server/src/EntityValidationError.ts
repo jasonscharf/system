@@ -1,1 +1,1 @@
-export { EntityValidationError } from '@jasonscharf/entities';
+export { EntityValidationError } from "@jasonscharf/entities";

@@ -1,5 +1,4 @@
-import type { FlowPort } from './FlowPort.js';
-
+import type { FlowPort } from "./FlowPort.js";
 
 export abstract class FlowTransport<T> {
     readonly from: FlowPort<T>;

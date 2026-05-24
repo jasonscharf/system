@@ -1,39 +1,39 @@
 {
-  "name": "@jasonscharf/core",
-  "version": "0.1.0",
-  "type": "module",
-  "exports": {
-    ".": {
-      "browser": "./dist/browser.js",
-      "source": "./src/index.ts",
-      "default": "./dist/index.js",
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+    "name": "@jasonscharf/core",
+    "version": "0.1.0",
+    "type": "module",
+    "exports": {
+        ".": {
+            "browser": "./dist/browser.js",
+            "source": "./src/index.ts",
+            "default": "./dist/index.js",
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "files": [
+        "dist",
+        "ontology"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/jasonlscharf/system.git",
+        "directory": "packages/core"
+    },
+    "publishConfig": {
+        "registry": "https://npm.pkg.github.com",
+        "access": "public"
+    },
+    "scripts": {
+        "build": "yarn compile",
+        "gen": "tern-codegen",
+        "gen:watch": "tern-codegen --watch",
+        "compile": "tsc -b",
+        "clean": "rm -rf dist && rm tsconfig.tsbuildinfo",
+        "start": "node dist/index.js",
+        "typecheck": "tsc -p tsconfig.json --noEmit",
+        "watch": "tsc -b -w"
     }
-  },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist",
-    "ontology"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/jasonlscharf/system.git",
-    "directory": "packages/core"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
-    "access": "public"
-  },
-  "scripts": {
-    "build": "yarn compile",
-    "gen": "tern-codegen",
-    "gen:watch": "tern-codegen --watch",
-    "compile": "tsc -b",
-    "clean": "rm -rf dist && rm tsconfig.tsbuildinfo",
-    "start": "node dist/index.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "watch": "tsc -b -w"
-  }
 }

@@ -1,18 +1,18 @@
 {
-  "extends": "../tsconfig.base.json",
-  "compilerOptions": {
-    "composite": true,
-    "rootDir": "src",
-    "outDir": "dist"
-  },
-  "references": [
-    { "path": "../app" },
-    { "path": "../auth" },
-    { "path": "../core" },
-    { "path": "../data" },
-    { "path": "../flow" },
-    { "path": "../server" },
-    { "path": "../vaults" }
-  ],
-  "include": ["src"]
+    "extends": "../tsconfig.base.json",
+    "compilerOptions": {
+        "composite": true,
+        "rootDir": "src",
+        "outDir": "dist"
+    },
+    "references": [
+        { "path": "../app" },
+        { "path": "../auth" },
+        { "path": "../core" },
+        { "path": "../data" },
+        { "path": "../flow" },
+        { "path": "../server" },
+        { "path": "../vaults" }
+    ],
+    "include": ["src"]
 }

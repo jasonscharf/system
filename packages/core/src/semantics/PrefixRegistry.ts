@@ -77,7 +77,9 @@ export class PrefixRegistry {
             }
         }
 
-        if (!bestPrefix) return null;
+        if (!bestPrefix) {
+            return null;
+        }
 
         return `${bestPrefix}:${iri.slice(bestNsLength)}`;
     }

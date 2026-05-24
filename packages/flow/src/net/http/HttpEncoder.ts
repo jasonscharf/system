@@ -1,8 +1,12 @@
-import { FlowComponent, type FlowComponentOptions } from '../../FlowComponent.js';
-import { FlowPort } from '../../FlowPort.js';
-import { encodeBody, mergeEncodedHeaders } from './codec.js';
-import type { HttpRequest, HttpRequestDraft, HttpResponse, HttpResponseDraft } from './HttpTypes.js';
-
+import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
+import type { FlowPort } from "../../FlowPort.js";
+import { encodeBody, mergeEncodedHeaders } from "./codec.js";
+import type {
+    HttpRequest,
+    HttpRequestDraft,
+    HttpResponse,
+    HttpResponseDraft,
+} from "./HttpTypes.js";
 
 /**
  * Serialises the body of draft HTTP messages to wire format (string | Uint8Array)
@@ -22,27 +26,33 @@ export class HttpEncoder extends FlowComponent {
 
     constructor(options: FlowComponentOptions) {
         super(options);
-        this.requestIn = this.addPort<HttpRequestDraft>('requestIn', 'in');
-        this.requestOut = this.addPort<HttpRequest>('requestOut', 'out');
-        this.responseIn = this.addPort<HttpResponseDraft>('responseIn', 'in');
-        this.responseOut = this.addPort<HttpResponse>('responseOut', 'out');
+        this.requestIn = this.addPort<HttpRequestDraft>("requestIn", "in");
+        this.requestOut = this.addPort<HttpRequest>("requestOut", "out");
+        this.responseIn = this.addPort<HttpResponseDraft>("responseIn", "in");
+        this.responseOut = this.addPort<HttpResponse>("responseOut", "out");
     }
 
     override step(): void {
-        let req: HttpRequestDraft | undefined;
-        while ((req = this.requestIn.read()) !== undefined) {
+        for (;;) {
+            const req = this.requestIn.read();
+            if (req === undefined) {
+                break;
+            }
             const { body, contentTypeHeader } = encodeBody(req.body, req.contentType);
             this.requestOut.put({
                 requestId: req.requestId,
-                method: req.method ?? 'GET',
+                method: req.method ?? "GET",
                 url: req.url,
                 headers: mergeEncodedHeaders(req.headers, contentTypeHeader),
                 body,
             });
         }
 
-        let resp: HttpResponseDraft | undefined;
-        while ((resp = this.responseIn.read()) !== undefined) {
+        for (;;) {
+            const resp = this.responseIn.read();
+            if (resp === undefined) {
+                break;
+            }
             const { body, contentTypeHeader } = encodeBody(resp.body, resp.contentType);
             this.responseOut.put({
                 requestId: resp.requestId,

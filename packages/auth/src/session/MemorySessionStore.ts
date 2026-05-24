@@ -1,8 +1,7 @@
-import type { ISessionStore } from './ISessionStore.js';
-
+import type { ISessionStore } from "./ISessionStore.js";
 
 interface Entry {
-    value:  string;
+    value: string;
     expiry: number;
 }
 
@@ -15,7 +14,9 @@ export class MemorySessionStore implements ISessionStore {
 
     async get(key: string): Promise<string | null> {
         const entry = this._store.get(key);
-        if (!entry) { return null; }
+        if (!entry) {
+            return null;
+        }
         if (Date.now() >= entry.expiry) {
             this._store.delete(key);
             return null;

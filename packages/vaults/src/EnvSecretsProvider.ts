@@ -1,5 +1,4 @@
-import type { ISecretsProvider } from './ISecretsProvider.js';
-
+import type { ISecretsProvider } from "./ISecretsProvider.js";
 
 /**
  * Reads secrets directly from process.env.
@@ -12,7 +11,7 @@ export class EnvSecretsProvider implements ISecretsProvider {
 
     async getRequired(key: string): Promise<string> {
         const value = process.env[key];
-        if (value === undefined || value === '') {
+        if (value === undefined || value === "") {
             throw new Error(`Required environment variable '${key}' is not set`);
         }
         return value;

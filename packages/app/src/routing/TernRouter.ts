@@ -1,7 +1,6 @@
-import { errResult, type TernRequest, type TernResult, type TernTypeRef } from '@jasonscharf/core';
-import { compose, type MiddlewareFn, type Next } from './compose.js';
-import type { Dispatcher } from './Dispatcher.js';
-
+import { errResult, type TernRequest, type TernResult, type TernTypeRef } from "@jasonscharf/core";
+import { compose, type MiddlewareFn } from "./compose.js";
+import type { Dispatcher } from "./Dispatcher.js";
 
 // ── Context ───────────────────────────────────────────────────────────────────
 
@@ -12,10 +11,8 @@ import type { Dispatcher } from './Dispatcher.js';
  * write any property — including arbitrary extras — so it acts as a
  * Koa-style request-scoped store.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export class TernCtx implements Record<string, any> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    [key: string]: any;
+export class TernCtx implements Record<string, unknown> {
+    [key: string]: unknown;
 
     readonly request: TernRequest;
     result: TernResult | undefined = undefined;
@@ -28,14 +25,12 @@ export class TernCtx implements Record<string, any> {
 
 export type TernMiddlewareFn = MiddlewareFn<TernCtx>;
 
-
 // ── Route / mount internals ───────────────────────────────────────────────────
 
 interface Route {
     readonly typeIri: string;
-    readonly fn:      TernMiddlewareFn;
+    readonly fn: TernMiddlewareFn;
 }
-
 
 // ── TernRouter ────────────────────────────────────────────────────────────────
 
@@ -74,8 +69,8 @@ interface Route {
  */
 export class TernRouter implements Dispatcher {
     private readonly _globalMiddleware: TernMiddlewareFn[] = [];
-    private readonly _routes:           Route[]           = [];
-    private readonly _mounts:           TernRouter[]      = [];
+    private readonly _routes: Route[] = [];
+    private readonly _mounts: TernRouter[] = [];
 
     // ── Registration ──────────────────────────────────────────────────────────
 
@@ -117,9 +112,11 @@ export class TernRouter implements Dispatcher {
         const ctx = new TernCtx(request, extras);
 
         // Build the full chain: global middleware → type-matched handler
-        const route    = this._findRoute(request.type.iri);
+        const route = this._findRoute(request.type.iri);
         const chain: TernMiddlewareFn[] = [...this._globalMiddleware];
-        if (route) { chain.push(route.fn); }
+        if (route) {
+            chain.push(route.fn);
+        }
 
         await compose(chain)(ctx, async () => {
             // Reached the end of the chain with no result → error
@@ -132,17 +129,24 @@ export class TernRouter implements Dispatcher {
             }
         });
 
-        return ctx.result!;
+        if (ctx.result == null) {
+            throw new Error("TernRouter: dispatch produced no result");
+        }
+        return ctx.result;
     }
 
     // ── Internal ──────────────────────────────────────────────────────────────
 
     private _findRoute(typeIri: string): Route | undefined {
-        const own = this._routes.find(r => r.typeIri === typeIri);
-        if (own) { return own; }
+        const own = this._routes.find((r) => r.typeIri === typeIri);
+        if (own) {
+            return own;
+        }
         for (const sub of this._mounts) {
             const found = sub._findRoute(typeIri);
-            if (found) { return found; }
+            if (found) {
+                return found;
+            }
         }
         return undefined;
     }

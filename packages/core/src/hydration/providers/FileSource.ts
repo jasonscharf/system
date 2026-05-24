@@ -1,6 +1,5 @@
-import type { Triple } from '../../rdf/Triple.js';
-import type { TripleSource } from '../TripleSource.js';
-
+import type { Triple } from "../../rdf/Triple.js";
+import type { TripleSource } from "../TripleSource.js";
 
 /** Parses a raw string into triples. Supply an implementation for your preferred RDF format. */
 export type TripleParser = (content: string) => AsyncIterable<Triple>;
@@ -20,8 +19,8 @@ export class FileSource implements TripleSource {
     ) {}
 
     async *stream(): AsyncIterable<Triple> {
-        const { readFile } = await import('node:fs/promises');
-        const content = await readFile(this.path, 'utf-8');
+        const { readFile } = await import("node:fs/promises");
+        const content = await readFile(this.path, "utf-8");
         yield* this.parser(content);
     }
 }

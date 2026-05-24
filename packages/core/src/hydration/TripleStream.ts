@@ -1,6 +1,5 @@
-import type { Triple } from '../rdf/Triple.js';
-import type { TripleSource } from './TripleSource.js';
-
+import type { Triple } from "../rdf/Triple.js";
+import type { TripleSource } from "./TripleSource.js";
 
 /**
  * A composable, lazy wrapper around a TripleSource.
@@ -26,7 +25,9 @@ export class TripleStream implements AsyncIterable<Triple> {
     filter(fn: (triple: Triple) => boolean): TripleStream {
         return fromGenerator(async function* (self) {
             for await (const t of self) {
-                if (fn(t)) yield t;
+                if (fn(t)) {
+                    yield t;
+                }
             }
         }, this);
     }
@@ -45,7 +46,9 @@ export class TripleStream implements AsyncIterable<Triple> {
         return fromGenerator(async function* (self) {
             let count = 0;
             for await (const t of self) {
-                if (count++ >= n) break;
+                if (count++ >= n) {
+                    break;
+                }
                 yield t;
             }
         }, this);

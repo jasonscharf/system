@@ -2,7 +2,7 @@
 
 export interface StoreStats {
     namespaces: number;
-    names:      number;
-    nodes:      number;
-    edges:      number;
+    names: number;
+    nodes: number;
+    edges: number;
 }

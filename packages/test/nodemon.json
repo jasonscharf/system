@@ -1,18 +1,15 @@
 {
-  "watch": [
-    "../**/dist",
-    "../**/nodemon.json",
-    "../**/package.json",
-    "../**/tsconfig.json",
-    "../**/tsconfig.*.json"
-  ],
-  "ext": "js,json",
-  "exec": "vitest watch",
-  "ignore": [
-    "src",
-    "**/*.map"
-  ],
-  "delay": 200,
-  "signal": "SIGTERM",
-  "legacyWatch": true
+    "watch": [
+        "../**/dist",
+        "../**/nodemon.json",
+        "../**/package.json",
+        "../**/tsconfig.json",
+        "../**/tsconfig.*.json"
+    ],
+    "ext": "js,json",
+    "exec": "vitest watch",
+    "ignore": ["src", "**/*.map"],
+    "delay": 200,
+    "signal": "SIGTERM",
+    "legacyWatch": true
 }

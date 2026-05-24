@@ -10,9 +10,7 @@
             "remoteRoot": "/app",
             "sourceMaps": true,
             "restart": true,
-            "skipFiles": [
-                "<node_internals>/**"
-            ]
+            "skipFiles": ["<node_internals>/**"]
         },
         {
             "type": "chrome",
@@ -33,9 +31,7 @@
             "remoteRoot": "/app",
             "sourceMaps": true,
             "restart": true,
-            "skipFiles": [
-                "<node_internals>/**"
-            ]
+            "skipFiles": ["<node_internals>/**"]
         },
         {
             "type": "node",
@@ -46,9 +42,7 @@
             "remoteRoot": "/app",
             "sourceMaps": true,
             "restart": true,
-            "skipFiles": [
-                "<node_internals>/**"
-            ]
+            "skipFiles": ["<node_internals>/**"]
         }
     ],
     "compounds": [

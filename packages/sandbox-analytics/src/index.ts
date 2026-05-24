@@ -4,17 +4,17 @@
  * Import this package's index (or call registerAnalytics() explicitly) to
  * register the analytics PropGroup on UserSchema before using EntityStore.
  */
-import { UserSchema } from '@jasonscharf/auth';
-import { handle }     from '@jasonscharf/entities';
+import { UserSchema } from "@jasonscharf/auth";
+import { handle } from "@jasonscharf/entities";
+import { shapes } from "./analytics/shapes.generated.js";
 import {
     analyticsRoleIRI,
-    lastActiveAtIRI,
     consentedToTrackingIRI,
-} from './analytics/types.generated.js';
-import { shapes } from './analytics/shapes.generated.js';
+    lastActiveAtIRI,
+} from "./analytics/types.generated.js";
 
 /** The stable handle that identifies the analytics PropGroup on any entity. */
-export const AnalyticsHandle = handle('com.tern.sandbox.analytics');
+export const AnalyticsHandle = handle("com.tern.sandbox.analytics");
 
 /**
  * Registers the analytics PropGroup on UserSchema.
@@ -22,13 +22,13 @@ export const AnalyticsHandle = handle('com.tern.sandbox.analytics');
  */
 export function registerAnalytics(): void {
     UserSchema.register({
-        handle:     AnalyticsHandle,
+        handle: AnalyticsHandle,
         properties: {
-            analyticsRole:       analyticsRoleIRI,
-            lastActiveAt:        lastActiveAtIRI,
+            analyticsRole: analyticsRoleIRI,
+            lastActiveAt: lastActiveAtIRI,
             consentedToTracking: consentedToTrackingIRI,
         },
-        shape: shapes.byTargetClass.get('http://tern.dev/ns/auth/User'),
+        shape: shapes.byTargetClass.get("http://tern.dev/ns/auth/User"),
     });
 }
 
@@ -94,21 +94,20 @@ registerAnalytics();
  *   console.log(userResult.valid, projectResult.valid);  // true true
  */
 
-export type { Project } from './analytics/types.generated.js';
+export { projectPropertyMap, userPropertyMap } from "./analytics/propertyMaps.js";
+export { shapes } from "./analytics/shapes.generated.js";
+export type { Project } from "./analytics/types.generated.js";
 export {
-    ProjectIRI,
     analyticsRoleIRI,
-    lastActiveAtIRI,
     consentedToTrackingIRI,
-    projectNameIRI,
-    projectSlugIRI,
     isActiveIRI,
+    lastActiveAtIRI,
+    ProjectIRI,
     projectCreatedAtIRI,
-    projectOwnerIRI,
     projectMemberIRI,
-} from './analytics/types.generated.js';
-
-export { shapes } from './analytics/shapes.generated.js';
-export { userPropertyMap, projectPropertyMap } from './analytics/propertyMaps.js';
-export { validate } from './validate/ShaclValidator.js';
-export type { ValidationResult, ValidationViolation } from './validate/ShaclValidator.js';
+    projectNameIRI,
+    projectOwnerIRI,
+    projectSlugIRI,
+} from "./analytics/types.generated.js";
+export type { ValidationResult, ValidationViolation } from "./validate/ShaclValidator.js";
+export { validate } from "./validate/ShaclValidator.js";

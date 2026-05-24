@@ -1,5 +1,4 @@
-import type { ShaclNodeShape, ShaclPropertyShape } from '@jasonscharf/gen';
-
+import type { ShaclNodeShape, ShaclPropertyShape } from "@jasonscharf/gen";
 
 export interface ValidationViolation {
     /** TypeScript property name (or RDF IRI path if not in the property map). */
@@ -8,7 +7,7 @@ export interface ValidationViolation {
     value: unknown;
     /** Human-readable description of the constraint that was violated. */
     message: string;
-    severity: 'violation' | 'warning';
+    severity: "violation" | "warning";
 }
 
 export interface ValidationResult {
@@ -44,17 +43,23 @@ export function validate(
 
     for (const propShape of shape.properties) {
         const propName = iriToName[propShape.path] ?? propShape.path;
-        const raw      = entity[propName];
-        const values   = Array.isArray(raw) ? raw : (raw !== undefined ? [raw] : []);
-        const count    = values.length;
+        const raw = entity[propName];
+        const values = Array.isArray(raw) ? raw : raw !== undefined ? [raw] : [];
+        const count = values.length;
 
         // sh:minCount
-        if ((propShape.minCount ?? 0) > 0 && count < propShape.minCount!) {
+        if (
+            propShape.minCount !== undefined &&
+            propShape.minCount > 0 &&
+            count < propShape.minCount
+        ) {
             violations.push({
                 property: propName,
-                value:    raw,
-                message:  propShape.message ?? `${propName} is required (minCount ${propShape.minCount}).`,
-                severity: 'violation',
+                value: raw,
+                message:
+                    propShape.message ??
+                    `${propName} is required (minCount ${propShape.minCount}).`,
+                severity: "violation",
             });
         }
 
@@ -62,23 +67,27 @@ export function validate(
         if (propShape.maxCount !== undefined && count > propShape.maxCount) {
             violations.push({
                 property: propName,
-                value:    raw,
-                message:  `${propName} must have at most ${propShape.maxCount} value(s) (got ${count}).`,
-                severity: 'violation',
+                value: raw,
+                message: `${propName} must have at most ${propShape.maxCount} value(s) (got ${count}).`,
+                severity: "violation",
             });
         }
 
-        if (count === 0) { continue; }
+        if (count === 0) {
+            continue;
+        }
 
         for (const v of values) {
             // sh:pattern (strings only)
-            if (propShape.pattern && typeof v === 'string') {
+            if (propShape.pattern && typeof v === "string") {
                 if (!new RegExp(propShape.pattern).test(v)) {
                     violations.push({
                         property: propName,
-                        value:    v,
-                        message:  propShape.message ?? `${propName} does not match pattern ${propShape.pattern}.`,
-                        severity: 'violation',
+                        value: v,
+                        message:
+                            propShape.message ??
+                            `${propName} does not match pattern ${propShape.pattern}.`,
+                        severity: "violation",
                     });
                 }
             }
@@ -86,7 +95,9 @@ export function validate(
             // sh:datatype — lightweight coercion check
             if (propShape.datatype) {
                 const violation = checkDatatype(propName, v, propShape);
-                if (violation) { violations.push(violation); }
+                if (violation) {
+                    violations.push(violation);
+                }
             }
         }
     }
@@ -99,25 +110,41 @@ function checkDatatype(
     value: unknown,
     ps: ShaclPropertyShape,
 ): ValidationViolation | null {
-    const xsd = 'http://www.w3.org/2001/XMLSchema#';
-    const dt   = ps.datatype!;
+    const xsd = "http://www.w3.org/2001/XMLSchema#";
+    if (ps.datatype == null) {
+        throw new Error("checkDatatype: ps.datatype must not be null");
+    }
+    const dt = ps.datatype;
 
     let ok = true;
-    if (dt === `${xsd}string`)   { ok = typeof value === 'string'; }
-    if (dt === `${xsd}boolean`)  { ok = typeof value === 'boolean'; }
-    if (dt === `${xsd}integer` || dt === `${xsd}decimal` || dt === `${xsd}float` || dt === `${xsd}double`) {
-        ok = typeof value === 'number';
+    if (dt === `${xsd}string`) {
+        ok = typeof value === "string";
+    }
+    if (dt === `${xsd}boolean`) {
+        ok = typeof value === "boolean";
+    }
+    if (
+        dt === `${xsd}integer` ||
+        dt === `${xsd}decimal` ||
+        dt === `${xsd}float` ||
+        dt === `${xsd}double`
+    ) {
+        ok = typeof value === "number";
     }
     if (dt === `${xsd}dateTime` || dt === `${xsd}date`) {
-        ok = value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value)));
+        ok =
+            value instanceof Date ||
+            (typeof value === "string" && !Number.isNaN(Date.parse(value)));
     }
 
     if (!ok) {
         return {
             property: propName,
             value,
-            message:  ps.message ?? `${propName} has wrong datatype (expected ${dt.replace(xsd, 'xsd:')}).`,
-            severity: 'violation',
+            message:
+                ps.message ??
+                `${propName} has wrong datatype (expected ${dt.replace(xsd, "xsd:")}).`,
+            severity: "violation",
         };
     }
 

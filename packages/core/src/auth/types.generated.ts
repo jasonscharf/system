@@ -1,5 +1,5 @@
 // auto-generated — do not edit by hand
-import { IRI } from '../semantics/IRI.js';
+import { IRI } from "../semantics/IRI.js";
 
 /** A Tern platform user. */
 export interface User {
@@ -15,7 +15,7 @@ export interface User {
     updatedAt?: Date;
 }
 
-export const UserIRI = new IRI('http://tern.dev/ns/auth/User');
+export const UserIRI = new IRI("http://tern.dev/ns/auth/User");
 
 /** An OAuth identity linked to a user. */
 export interface UserIdentity {
@@ -39,7 +39,7 @@ export interface UserIdentity {
     identityOf?: User[];
 }
 
-export const UserIdentityIRI = new IRI('http://tern.dev/ns/auth/UserIdentity');
+export const UserIdentityIRI = new IRI("http://tern.dev/ns/auth/UserIdentity");
 
 /** An active session for a user on a device. */
 export interface UserSession {
@@ -59,7 +59,7 @@ export interface UserSession {
     sessionDevice?: UserDevice[];
 }
 
-export const UserSessionIRI = new IRI('http://tern.dev/ns/auth/UserSession');
+export const UserSessionIRI = new IRI("http://tern.dev/ns/auth/UserSession");
 
 /** A device from which a user authenticates. */
 export interface UserDevice {
@@ -75,27 +75,27 @@ export interface UserDevice {
     deviceUser?: User[];
 }
 
-export const UserDeviceIRI = new IRI('http://tern.dev/ns/auth/UserDevice');
+export const UserDeviceIRI = new IRI("http://tern.dev/ns/auth/UserDevice");
 
-export const emailIRI = new IRI('http://tern.dev/ns/auth/email');
-export const displayNameIRI = new IRI('http://tern.dev/ns/auth/displayName');
-export const avatarUrlIRI = new IRI('http://tern.dev/ns/auth/avatarUrl');
-export const providerIRI = new IRI('http://tern.dev/ns/auth/provider');
-export const providerUserIdIRI = new IRI('http://tern.dev/ns/auth/providerUserId');
-export const providerEmailIRI = new IRI('http://tern.dev/ns/auth/providerEmail');
-export const accessTokenIRI = new IRI('http://tern.dev/ns/auth/accessToken');
-export const refreshTokenIRI = new IRI('http://tern.dev/ns/auth/refreshToken');
-export const tokenExpiresAtIRI = new IRI('http://tern.dev/ns/auth/tokenExpiresAt');
-export const deviceNameIRI = new IRI('http://tern.dev/ns/auth/deviceName');
-export const devicePlatformIRI = new IRI('http://tern.dev/ns/auth/devicePlatform');
-export const deviceUserAgentIRI = new IRI('http://tern.dev/ns/auth/deviceUserAgent');
-export const sessionTokenIRI = new IRI('http://tern.dev/ns/auth/sessionToken');
-export const expiresAtIRI = new IRI('http://tern.dev/ns/auth/expiresAt');
-export const isActiveIRI = new IRI('http://tern.dev/ns/auth/isActive');
-export const ipAddressIRI = new IRI('http://tern.dev/ns/auth/ipAddress');
-export const createdAtIRI = new IRI('http://tern.dev/ns/auth/createdAt');
-export const updatedAtIRI = new IRI('http://tern.dev/ns/auth/updatedAt');
-export const identityOfIRI = new IRI('http://tern.dev/ns/auth/identityOf');
-export const sessionUserIRI = new IRI('http://tern.dev/ns/auth/sessionUser');
-export const sessionDeviceIRI = new IRI('http://tern.dev/ns/auth/sessionDevice');
-export const deviceUserIRI = new IRI('http://tern.dev/ns/auth/deviceUser');
+export const emailIRI = new IRI("http://tern.dev/ns/auth/email");
+export const displayNameIRI = new IRI("http://tern.dev/ns/auth/displayName");
+export const avatarUrlIRI = new IRI("http://tern.dev/ns/auth/avatarUrl");
+export const providerIRI = new IRI("http://tern.dev/ns/auth/provider");
+export const providerUserIdIRI = new IRI("http://tern.dev/ns/auth/providerUserId");
+export const providerEmailIRI = new IRI("http://tern.dev/ns/auth/providerEmail");
+export const accessTokenIRI = new IRI("http://tern.dev/ns/auth/accessToken");
+export const refreshTokenIRI = new IRI("http://tern.dev/ns/auth/refreshToken");
+export const tokenExpiresAtIRI = new IRI("http://tern.dev/ns/auth/tokenExpiresAt");
+export const deviceNameIRI = new IRI("http://tern.dev/ns/auth/deviceName");
+export const devicePlatformIRI = new IRI("http://tern.dev/ns/auth/devicePlatform");
+export const deviceUserAgentIRI = new IRI("http://tern.dev/ns/auth/deviceUserAgent");
+export const sessionTokenIRI = new IRI("http://tern.dev/ns/auth/sessionToken");
+export const expiresAtIRI = new IRI("http://tern.dev/ns/auth/expiresAt");
+export const isActiveIRI = new IRI("http://tern.dev/ns/auth/isActive");
+export const ipAddressIRI = new IRI("http://tern.dev/ns/auth/ipAddress");
+export const createdAtIRI = new IRI("http://tern.dev/ns/auth/createdAt");
+export const updatedAtIRI = new IRI("http://tern.dev/ns/auth/updatedAt");
+export const identityOfIRI = new IRI("http://tern.dev/ns/auth/identityOf");
+export const sessionUserIRI = new IRI("http://tern.dev/ns/auth/sessionUser");
+export const sessionDeviceIRI = new IRI("http://tern.dev/ns/auth/sessionDevice");
+export const deviceUserIRI = new IRI("http://tern.dev/ns/auth/deviceUser");

@@ -1,40 +1,44 @@
 {
-  "name": "system",
-  "private": true,
-  "packageManager": "yarn@4.1.0",
-  "workspaces": [
-    "packages/*"
-  ],
-  "scripts": {
-    "all": "yarn workspaces foreach --all run",
-    "build": "node scripts/stamp.mjs && yarn all compile",
-    "stamp": "node scripts/stamp.mjs",
-    "bup": "yarn compose up --build -d && yarn tail",
-    "clean": "yarn workspaces foreach --all run clean",
-    "compose": "docker compose -p sys -f docker-compose.yml -f docker-compose.dev.yml",
-    "compose:prod": "docker compose -p sys -f docker-compose.yml",
-    "dev": "yarn compose up -d && yarn tail",
-    "mux": "stmux -w always -e ERROR -m beep,system --",
-    "tail": "yarn compose logs -f",
-    "test": "yarn workspace @jasonscharf/test start",
-    "test:watch": "yarn workspace @jasonscharf/test start:debug",
-    "typecheck": "yarn workspaces foreach -pt run typecheck",
-    "watch": "tsc -b -w --preserveWatchOutput",
-    "watch:reload": "node dev.watch.js",
-    "gen": "yarn workspace @system/gen",
-    "aliases": "--- Workspace aliases ---",
-    "api": "yarn workspace @system/api",
-    "core": "yarn workspace @system/core",
-    "tests": "yarn workspace @system/test",
-    "worker": "yarn workspace @system/worker",
-    "sb-web": "yarn workspace @jasonscharf/sandbox-web",
-    "sb-server": "yarn workspace @jasonscharf/sandbox-server",
-    "sb-cli": "yarn workspace @jasonscharf/sandbox-cli"
-  },
-  "devDependencies": {
-    "@types/node": "^25.0.3",
-    "chokidar": "^5.0.0",
-    "typescript": "^5.4.0",
-    "vitest": "^4.0.16"
-  }
+    "name": "system",
+    "private": true,
+    "packageManager": "yarn@4.1.0",
+    "workspaces": [
+        "packages/*"
+    ],
+    "scripts": {
+        "all": "yarn workspaces foreach --all run",
+        "build": "node scripts/stamp.mjs && yarn all compile",
+        "stamp": "node scripts/stamp.mjs",
+        "bup": "yarn compose up --build -d && yarn tail",
+        "clean": "yarn workspaces foreach --all run clean",
+        "compose": "docker compose -p sys -f docker-compose.yml -f docker-compose.dev.yml",
+        "compose:prod": "docker compose -p sys -f docker-compose.yml",
+        "dev": "yarn compose up -d && yarn tail",
+        "mux": "stmux -w always -e ERROR -m beep,system --",
+        "tail": "yarn compose logs -f",
+        "test": "yarn workspace @jasonscharf/test start",
+        "test:watch": "yarn workspace @jasonscharf/test start:debug",
+        "format": "yarn biome format --write .",
+        "lint": "yarn biome lint --write .",
+        "check": "yarn biome check --write .",
+        "typecheck": "yarn workspaces foreach -pt run typecheck",
+        "watch": "tsc -b -w --preserveWatchOutput",
+        "watch:reload": "node dev.watch.js",
+        "gen": "yarn workspace @system/gen",
+        "aliases": "--- Workspace aliases ---",
+        "api": "yarn workspace @system/api",
+        "core": "yarn workspace @system/core",
+        "tests": "yarn workspace @system/test",
+        "worker": "yarn workspace @system/worker",
+        "sb-web": "yarn workspace @jasonscharf/sandbox-web",
+        "sb-server": "yarn workspace @jasonscharf/sandbox-server",
+        "sb-cli": "yarn workspace @jasonscharf/sandbox-cli"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.4.15",
+        "@types/node": "^25.0.3",
+        "chokidar": "^5.0.0",
+        "typescript": "^5.4.0",
+        "vitest": "^4.0.16"
+    }
 }

@@ -1,5 +1,4 @@
-import type { Triple } from '../rdf/Triple.js';
-
+import type { Triple } from "../rdf/Triple.js";
 
 /**
  * An abstract source that produces RDF triples as an async stream.

@@ -10,9 +10,9 @@
  *   Third-party groups use reverse-domain   — e.g.  handle('com.myapp.billing')
  */
 export interface EntityHandle {
-    readonly id:      string;
+    readonly id: string;
     readonly version: number;
-    readonly symbol:  symbol;
+    readonly symbol: symbol;
     toString(): string;
 }
 
@@ -23,12 +23,12 @@ export function handle(id: string, version = 1): EntityHandle {
         id,
         version,
         symbol: sym,
-        toString:             () => str,
+        toString: () => str,
         [Symbol.toPrimitive]: () => str,
     }) as EntityHandle;
 }
 
 /** Slugified handle string safe for embedding in IRIs (colons and dots replaced). */
 export function handleSlug(h: EntityHandle): string {
-    return h.id.replace(/[^a-zA-Z0-9.\-]/g, '_') + `_v${h.version}`;
+    return `${h.id.replace(/[^a-zA-Z0-9.-]/g, "_")}_v${h.version}`;
 }

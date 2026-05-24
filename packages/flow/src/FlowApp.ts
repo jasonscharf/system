@@ -1,10 +1,9 @@
-import type { FlowComponent } from './FlowComponent.js';
-import { FlowContext } from './FlowContext.js';
-import type { FlowPort } from './FlowPort.js';
-import { FlowScheduler, PullScheduler, PushScheduler } from './FlowScheduler.js';
-import { LocalTransport, type FlowTransport } from './FlowTransport.js';
-import type { ScheduleMode } from './types.js';
-
+import type { FlowComponent } from "./FlowComponent.js";
+import { FlowContext } from "./FlowContext.js";
+import type { FlowPort } from "./FlowPort.js";
+import { type FlowScheduler, PullScheduler, PushScheduler } from "./FlowScheduler.js";
+import { type FlowTransport, LocalTransport } from "./FlowTransport.js";
+import type { ScheduleMode } from "./types.js";
 
 export interface FlowAppOptions {
     mode?: ScheduleMode;
@@ -26,11 +25,9 @@ export class FlowApp {
 
     constructor(options: FlowAppOptions = {}) {
         this.context = new FlowContext();
-        this.scheduler = options.scheduler ?? (
-            (options.mode ?? 'push') === 'pull'
-                ? new PullScheduler()
-                : new PushScheduler()
-        );
+        this.scheduler =
+            options.scheduler ??
+            ((options.mode ?? "push") === "pull" ? new PullScheduler() : new PushScheduler());
         this.context._setScheduler(this.scheduler);
     }
 
@@ -44,11 +41,7 @@ export class FlowApp {
         return this;
     }
 
-    connect<T>(
-        from: FlowPort<T>,
-        to: FlowPort<T>,
-        transport?: FlowTransport<T>,
-    ): this {
+    connect<T>(from: FlowPort<T>, to: FlowPort<T>, transport?: FlowTransport<T>): this {
         const t = transport ?? new LocalTransport(from, to);
         from._addTransport(t);
         this._components.add(from.owner);
@@ -78,7 +71,9 @@ export class FlowApp {
     }
 
     private _updatePullOrder(): void {
-        if (!(this.scheduler instanceof PullScheduler)) return;
+        if (!(this.scheduler instanceof PullScheduler)) {
+            return;
+        }
         this.scheduler._setPullOrder(this._topoSort());
     }
 
@@ -92,27 +87,51 @@ export class FlowApp {
         }
 
         for (const { fromOwner, toOwner } of this._connections) {
-            if (fromOwner === toOwner) continue;
-            const neighbors = adj.get(fromOwner)!;
+            if (fromOwner === toOwner) {
+                continue;
+            }
+            const neighbors = adj.get(fromOwner);
+            if (neighbors == null) {
+                throw new Error("_topoSort: missing adjacency entry for fromOwner");
+            }
             if (!neighbors.has(toOwner)) {
                 neighbors.add(toOwner);
-                inDegree.set(toOwner, inDegree.get(toOwner)! + 1);
+                const cur = inDegree.get(toOwner);
+                if (cur == null) {
+                    throw new Error("_topoSort: missing inDegree entry for toOwner");
+                }
+                inDegree.set(toOwner, cur + 1);
             }
         }
 
         const queue: FlowComponent[] = [];
         for (const [c, deg] of inDegree) {
-            if (deg === 0) queue.push(c);
+            if (deg === 0) {
+                queue.push(c);
+            }
         }
 
         const sorted: FlowComponent[] = [];
         while (queue.length > 0) {
-            const node = queue.shift()!;
+            const node = queue.shift();
+            if (node == null) {
+                break;
+            }
             sorted.push(node);
-            for (const neighbor of adj.get(node)!) {
-                const deg = inDegree.get(neighbor)! - 1;
-                inDegree.set(neighbor, deg);
-                if (deg === 0) queue.push(neighbor);
+            const nodeNeighbors = adj.get(node);
+            if (nodeNeighbors == null) {
+                throw new Error("_topoSort: missing adjacency entry for node");
+            }
+            for (const neighbor of nodeNeighbors) {
+                const deg = inDegree.get(neighbor);
+                if (deg == null) {
+                    throw new Error("_topoSort: missing inDegree entry for neighbor");
+                }
+                const newDeg = deg - 1;
+                inDegree.set(neighbor, newDeg);
+                if (newDeg === 0) {
+                    queue.push(neighbor);
+                }
             }
         }
 

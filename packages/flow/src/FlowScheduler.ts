@@ -1,6 +1,5 @@
-import type { FlowComponent } from './FlowComponent.js';
-import type { ScheduleMode } from './types.js';
-
+import type { FlowComponent } from "./FlowComponent.js";
+import type { ScheduleMode } from "./types.js";
 
 export abstract class FlowScheduler {
     protected _running = false;
@@ -13,7 +12,9 @@ export abstract class FlowScheduler {
     abstract tick(): void;
 
     start(): void {
-        if (this._running) return;
+        if (this._running) {
+            return;
+        }
         this._running = true;
         void this._loop();
     }
@@ -25,17 +26,16 @@ export abstract class FlowScheduler {
     private async _loop(): Promise<void> {
         while (this._running) {
             this.tick();
-            await new Promise<void>(r => setTimeout(r, 0));
+            await new Promise<void>((r) => setTimeout(r, 0));
         }
     }
 }
-
 
 export class PushScheduler extends FlowScheduler {
     private readonly _queue = new Set<FlowComponent>();
 
     override get mode(): ScheduleMode {
-        return 'push';
+        return "push";
     }
 
     override get queueSize(): number {
@@ -55,12 +55,11 @@ export class PushScheduler extends FlowScheduler {
     }
 }
 
-
 export class PullScheduler extends FlowScheduler {
     private _order: FlowComponent[] = [];
 
     override get mode(): ScheduleMode {
-        return 'pull';
+        return "pull";
     }
 
     override get queueSize(): number {

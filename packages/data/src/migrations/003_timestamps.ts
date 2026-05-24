@@ -1,6 +1,5 @@
-import type { Knex } from 'knex';
-import { T } from '../schema.js';
-
+import type { Knex } from "knex";
+import { T } from "../schema.js";
 
 const ISO = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 
@@ -39,7 +38,7 @@ const ISO = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
  */
 export async function up(knex: Knex): Promise<void> {
     const client = (knex.client as { config: { client: string } }).config.client;
-    const isPg   = client === 'pg' || client === 'postgresql';
+    const isPg = client === "pg" || client === "postgresql";
 
     if (isPg) {
         // ── Postgres ──────────────────────────────────────────────────────────
@@ -90,7 +89,6 @@ export async function up(knex: Knex): Promise<void> {
             BEFORE INSERT OR UPDATE ON ${T.edges}
             FOR EACH ROW EXECUTE FUNCTION tern_edge_timestamps();
         `);
-
     } else {
         // ── SQLite ────────────────────────────────────────────────────────────
 
@@ -140,7 +138,7 @@ export async function up(knex: Knex): Promise<void> {
 
 export async function down(knex: Knex): Promise<void> {
     const client = (knex.client as { config: { client: string } }).config.client;
-    const isPg   = client === 'pg' || client === 'postgresql';
+    const isPg = client === "pg" || client === "postgresql";
 
     if (isPg) {
         await knex.raw(`DROP TRIGGER IF EXISTS tern_nodes_timestamps ON ${T.nodes}`);
@@ -148,8 +146,8 @@ export async function down(knex: Knex): Promise<void> {
         await knex.raw(`DROP FUNCTION IF EXISTS tern_node_timestamps()`);
         await knex.raw(`DROP FUNCTION IF EXISTS tern_edge_timestamps()`);
     } else {
-        await knex.raw('DROP TRIGGER IF EXISTS tern_nodes_ts_insert');
-        await knex.raw('DROP TRIGGER IF EXISTS tern_edges_ts_insert');
-        await knex.raw('DROP TRIGGER IF EXISTS tern_edges_ts_soft_delete');
+        await knex.raw("DROP TRIGGER IF EXISTS tern_nodes_ts_insert");
+        await knex.raw("DROP TRIGGER IF EXISTS tern_edges_ts_insert");
+        await knex.raw("DROP TRIGGER IF EXISTS tern_edges_ts_soft_delete");
     }
 }

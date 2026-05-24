@@ -1,8 +1,7 @@
-import type { IRI } from '../semantics/IRI.js';
-import type { BlankNode } from './BlankNode.js';
-import type { DefaultGraph } from './DefaultGraph.js';
-import type { Literal } from './Literal.js';
-
+import type { IRI } from "../semantics/IRI.js";
+import type { BlankNode } from "./BlankNode.js";
+import type { DefaultGraph } from "./DefaultGraph.js";
+import type { Literal } from "./Literal.js";
 
 export type RdfSubject = IRI | BlankNode;
 export type RdfPredicate = IRI;
@@ -19,11 +18,7 @@ export interface Quad extends Triple {
     readonly graph: RdfGraph;
 }
 
-export function triple(
-    subject: RdfSubject,
-    predicate: RdfPredicate,
-    object: RdfObject,
-): Triple {
+export function triple(subject: RdfSubject, predicate: RdfPredicate, object: RdfObject): Triple {
     return { subject, predicate, object };
 }
 

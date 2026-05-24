@@ -108,7 +108,7 @@ async function getLiteralNode(knex: Knex, value: string) {
         id: number;
         value: string;
         datatype: string;
-        value_json: string | null;
+        value_json: string;
         created_at: string;
         updated_at: string;
     }>();

@@ -855,7 +855,7 @@ describe("AuthRouterComponent.sessionMiddleware()", () => {
         } as unknown as HttpCtx;
 
         await mw(fakeCtx, async () => {});
-        expect((fakeCtx as { user: unknown }).user).toBeDefined();
+        expect((fakeCtx as unknown as { user: unknown }).user).toBeDefined();
 
         vi.unstubAllGlobals();
         await knex.destroy();

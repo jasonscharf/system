@@ -79,8 +79,6 @@ export class WebSocketServer extends FlowComponent {
         const { WebSocketServer: WsServer } = await import("ws");
 
         const wss = new WsServer({ host: this._host ?? "127.0.0.1", port: this._port });
-        this._wss = wss;
-
         wss.on("connection", (ws) => {
             const id = hexId(uuidv4Binary());
             this._connections.set(id, ws);

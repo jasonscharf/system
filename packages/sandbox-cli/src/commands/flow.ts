@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
+import type { FlowApp } from "@jasonscharf/flow";
 
 interface RunningApp {
     id: string;
@@ -25,7 +26,7 @@ export async function flowRun(args: string[]): Promise<void> {
     // Lazy import so the flow package is only loaded when the command is used
     const { FlowLoader } = await import("@jasonscharf/flow");
 
-    let app: unknown;
+    let app!: FlowApp;
     if (ext === ".json") {
         app = await FlowLoader.fromJSON(text, { baseUrl: absPath });
     } else if (ext === ".yaml" || ext === ".yml") {
@@ -38,7 +39,7 @@ export async function flowRun(args: string[]): Promise<void> {
     }
 
     const id = String(_nextId++);
-    const name = (app as { name?: string }).name ?? file;
+    const name = (app as unknown as { name?: string }).name ?? file;
 
     await app.start();
 

@@ -40,11 +40,18 @@ describe(deepFreeze, () => {
     it("throws on attempted mutation", () => {
         const foo = { a: { b: { num: 5, str: "banana", c: { d: 6 } } } };
         const froze = deepFreeze(foo);
-        expect(() => (froze.a = {})).toThrow();
-        expect(() => (froze.b = {})).toThrow();
-        expect(() => (froze.b.num = 6)).toThrow();
-        expect(() => (froze.b.str = "toboggan")).toThrow();
-        expect(() => (froze.b.d = {})).toThrow();
+        const any = froze as unknown as Record<string, Record<string, unknown>>;
+        expect(() => (any.a = {})).toThrow();
+        expect(() => (any.b = {})).toThrow();
+        expect(() => {
+            any.b.num = 6;
+        }).toThrow();
+        expect(() => {
+            any.b.str = "toboggan";
+        }).toThrow();
+        expect(() => {
+            any.b.d = {};
+        }).toThrow();
     });
 });
 

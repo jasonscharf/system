@@ -134,7 +134,6 @@ export class HttpServer extends FlowComponent {
             });
         });
 
-        this._server = server;
         this.addDisposable({
             dispose: () =>
                 new Promise<void>((resolve) => {

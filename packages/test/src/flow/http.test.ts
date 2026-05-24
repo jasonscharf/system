@@ -9,6 +9,7 @@ import {
     HttpDecoder,
     HttpEncoder,
     type HttpMethod,
+    type HttpRequest,
     type HttpResponse,
     type HttpResponseDraft,
     HttpRouter,
@@ -1282,7 +1283,7 @@ describe("HttpServer: streaming response happy path", () => {
         const responsePromise = fetch(`http://127.0.0.1:${port}/stream`).catch(() => null);
 
         // Poll until the request arrives in the port queue (max 2s)
-        let req: ParsedHttpRequest | undefined;
+        let req: HttpRequest | undefined;
         for (let i = 0; i < 100 && !req; i++) {
             await new Promise((r) => setTimeout(r, 20));
             req = server.requests.read();

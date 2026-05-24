@@ -111,8 +111,11 @@ export class ClientApp {
         }
 
         // Incoming messages from the server
-        let data: string | Uint8Array | undefined;
-        while ((data = this._ws.received.read()) !== undefined) {
+        for (;;) {
+            const data = this._ws.received.read();
+            if (data === undefined) {
+                break;
+            }
             try {
                 const raw = JSON.parse(
                     typeof data === "string" ? data : new TextDecoder().decode(data),

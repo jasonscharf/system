@@ -21,8 +21,11 @@ export class MessageEncoder extends FlowComponent {
     }
 
     override step(): void {
-        let msg: OutgoingMessage | undefined;
-        while ((msg = this.in.read()) !== undefined) {
+        for (;;) {
+            const msg = this.in.read();
+            if (msg === undefined) {
+                break;
+            }
             this.out.put({
                 connectionId: msg.connectionId,
                 data: JSON.stringify(msg.result),

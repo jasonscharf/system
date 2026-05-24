@@ -79,8 +79,11 @@ export class FlowComponent implements FlowNode {
 
     step(): void {
         for (const [port, handlers] of this._handlers) {
-            let msg: unknown;
-            while ((msg = port.read()) !== undefined) {
+            for (;;) {
+                const msg = port.read();
+                if (msg === undefined) {
+                    break;
+                }
                 for (const h of handlers) {
                     h(msg);
                 }

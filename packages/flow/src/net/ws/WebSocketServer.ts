@@ -115,8 +115,11 @@ export class WebSocketServer extends FlowComponent {
 
     override step(): void {
         // Bridge: server.send → writer.in so the writer can dispatch to clients.
-        let msg: WsMessage | undefined;
-        while ((msg = this.send.read()) !== undefined) {
+        for (;;) {
+            const msg = this.send.read();
+            if (msg === undefined) {
+                break;
+            }
             this.writer.in.put(msg);
         }
     }

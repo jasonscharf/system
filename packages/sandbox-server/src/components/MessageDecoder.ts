@@ -22,8 +22,11 @@ export class MessageDecoder extends FlowComponent {
     }
 
     override step(): void {
-        let msg: WsMessage | undefined;
-        while ((msg = this.in.read()) !== undefined) {
+        for (;;) {
+            const msg = this.in.read();
+            if (msg === undefined) {
+                break;
+            }
             try {
                 const raw = JSON.parse(
                     typeof msg.data === "string" ? msg.data : new TextDecoder().decode(msg.data),

@@ -72,8 +72,11 @@ export class CallbackComponent extends FlowComponent {
     }
 
     override step(): void {
-        let req: CallbackRequest | undefined;
-        while ((req = this.callbackIn.read()) !== undefined) {
+        for (;;) {
+            const req = this.callbackIn.read();
+            if (req === undefined) {
+                break;
+            }
             void this._process(req);
         }
     }

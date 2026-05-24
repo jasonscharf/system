@@ -206,7 +206,10 @@ for (const db of providers) {
         it("stores a string literal in value_json with string v", async () => {
             await store.ensureNode(ctx, literal("alice@example.com", `${XSD}string`));
             const row = await getLiteralNode(trx as unknown as Knex, "alice@example.com");
-            const json = JSON.parse(row!.value_json);
+            if (row == null) {
+                throw new Error("row must not be null");
+            }
+            const json = JSON.parse(row.value_json);
             expect(json.v).toBe("alice@example.com");
             expect(json.dt).toBe(`${XSD}string`);
         });
@@ -214,7 +217,10 @@ for (const db of providers) {
         it("stores a boolean literal with native boolean v=true", async () => {
             await store.ensureNode(ctx, literal("true", `${XSD}boolean`));
             const row = await getLiteralNode(trx as unknown as Knex, "true");
-            const json = JSON.parse(row!.value_json);
+            if (row == null) {
+                throw new Error("row must not be null");
+            }
+            const json = JSON.parse(row.value_json);
             expect(json.v).toBe(true);
             expect(typeof json.v).toBe("boolean");
         });
@@ -222,14 +228,20 @@ for (const db of providers) {
         it("stores a boolean literal with native boolean v=false", async () => {
             await store.ensureNode(ctx, literal("false", `${XSD}boolean`));
             const row = await getLiteralNode(trx as unknown as Knex, "false");
-            const json = JSON.parse(row!.value_json);
+            if (row == null) {
+                throw new Error("row must not be null");
+            }
+            const json = JSON.parse(row.value_json);
             expect(json.v).toBe(false);
         });
 
         it("stores an integer literal with native number v", async () => {
             await store.ensureNode(ctx, literal("42", `${XSD}integer`));
             const row = await getLiteralNode(trx as unknown as Knex, "42");
-            const json = JSON.parse(row!.value_json);
+            if (row == null) {
+                throw new Error("row must not be null");
+            }
+            const json = JSON.parse(row.value_json);
             expect(json.v).toBe(42);
             expect(typeof json.v).toBe("number");
         });
@@ -237,7 +249,10 @@ for (const db of providers) {
         it("stores a decimal literal with native number v", async () => {
             await store.ensureNode(ctx, literal("3.14", `${XSD}decimal`));
             const row = await getLiteralNode(trx as unknown as Knex, "3.14");
-            const json = JSON.parse(row!.value_json);
+            if (row == null) {
+                throw new Error("row must not be null");
+            }
+            const json = JSON.parse(row.value_json);
             expect(json.v).toBeCloseTo(3.14);
         });
 
@@ -245,7 +260,10 @@ for (const db of providers) {
             const dt = "2024-01-15T12:00:00Z";
             await store.ensureNode(ctx, literal(dt, `${XSD}dateTime`));
             const row = await getLiteralNode(trx as unknown as Knex, dt);
-            const json = JSON.parse(row!.value_json);
+            if (row == null) {
+                throw new Error("row must not be null");
+            }
+            const json = JSON.parse(row.value_json);
             expect(json.v).toBe(dt);
             expect(json.dt).toBe(`${XSD}dateTime`);
         });
@@ -259,7 +277,10 @@ for (const db of providers) {
             };
             await store.ensureNode(ctx, term);
             const row = await getLiteralNode(trx as unknown as Knex, "hello");
-            const json = JSON.parse(row!.value_json);
+            if (row == null) {
+                throw new Error("row must not be null");
+            }
+            const json = JSON.parse(row.value_json);
             expect(json.v).toBe("hello");
             expect(json.lang).toBe("en");
         });
@@ -680,7 +701,10 @@ for (const db of providers) {
             await store.delete(ctx, { subject: EX("s") });
 
             const rows = await getEdgeById(trx as unknown as Knex, "http://example.org/s");
-            const row = rows[0]!;
+            const row = rows[0];
+            if (row == null) {
+                throw new Error("row must not be null");
+            }
             const created = new Date(row.created_at).getTime();
             const deleted = new Date(row.deleted_at).getTime();
             expect(deleted).toBeGreaterThanOrEqual(created);
@@ -696,7 +720,10 @@ for (const db of providers) {
             await store.delete(ctx, { subject: EX("s") });
 
             const rows = await getEdgeById(trx as unknown as Knex, "http://example.org/s");
-            const row = rows[0]!;
+            const row = rows[0];
+            if (row == null) {
+                throw new Error("row must not be null");
+            }
             expect(row.updated_at).toBe(row.deleted_at);
         });
 
@@ -874,7 +901,10 @@ for (const db of providers) {
             });
 
             const edges = await getEdgeById(trx as unknown as Knex, "http://example.org/s");
-            const edge = edges[0]!;
+            const edge = edges[0];
+            if (edge == null) {
+                throw new Error("edge must not be null");
+            }
 
             expect(edge.created_at).toBeTruthy();
             expect(edge.updated_at).toBeTruthy();
@@ -891,12 +921,18 @@ for (const db of providers) {
             await store.delete(ctx, { subject: EX("s") });
 
             const edges = await getEdgeById(trx as unknown as Knex, "http://example.org/s");
-            const edge = edges[0]!;
+            const edge = edges[0];
+            if (edge == null) {
+                throw new Error("edge must not be null");
+            }
 
             expect(!!edge.is_deleted).toBe(true);
             expect(edge.deleted_at).toBeTruthy();
             expect(edge.updated_at).toBeTruthy();
-            expect(new Date(edge.deleted_at!).getTime()).toBeGreaterThan(0);
+            if (edge.deleted_at == null) {
+                throw new Error("edge.deleted_at must not be null");
+            }
+            expect(new Date(edge.deleted_at).getTime()).toBeGreaterThan(0);
         });
 
         it("trigger preserves created_at across a soft-delete update", async () => {
@@ -906,10 +942,18 @@ for (const db of providers) {
                 object: EX("T"),
                 graph: DEFAULT_GRAPH,
             });
-            const before = (await getEdgeById(trx as unknown as Knex, "http://example.org/s"))[0]!;
+            const beforeRows = await getEdgeById(trx as unknown as Knex, "http://example.org/s");
+            const before = beforeRows[0];
+            if (before == null) {
+                throw new Error("before must not be null");
+            }
 
             await store.delete(ctx, { subject: EX("s") });
-            const after = (await getEdgeById(trx as unknown as Knex, "http://example.org/s"))[0]!;
+            const afterRows = await getEdgeById(trx as unknown as Knex, "http://example.org/s");
+            const after = afterRows[0];
+            if (after == null) {
+                throw new Error("after must not be null");
+            }
 
             expect(after.created_at).toBe(before.created_at);
         });

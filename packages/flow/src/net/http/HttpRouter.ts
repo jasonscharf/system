@@ -216,8 +216,11 @@ export class HttpRouter extends FlowComponent {
     // ── FBP step ──────────────────────────────────────────────────────────────
 
     override step(): void {
-        let req: ParsedHttpRequest | undefined;
-        while ((req = this.requests.read()) !== undefined) {
+        for (;;) {
+            const req = this.requests.read();
+            if (req === undefined) {
+                break;
+            }
             void this._handle(req);
         }
     }

@@ -90,10 +90,17 @@ export class FlowApp {
             if (fromOwner === toOwner) {
                 continue;
             }
-            const neighbors = adj.get(fromOwner)!;
+            const neighbors = adj.get(fromOwner);
+            if (neighbors == null) {
+                throw new Error("_topoSort: missing adjacency entry for fromOwner");
+            }
             if (!neighbors.has(toOwner)) {
                 neighbors.add(toOwner);
-                inDegree.set(toOwner, inDegree.get(toOwner)! + 1);
+                const cur = inDegree.get(toOwner);
+                if (cur == null) {
+                    throw new Error("_topoSort: missing inDegree entry for toOwner");
+                }
+                inDegree.set(toOwner, cur + 1);
             }
         }
 
@@ -106,12 +113,23 @@ export class FlowApp {
 
         const sorted: FlowComponent[] = [];
         while (queue.length > 0) {
-            const node = queue.shift()!;
+            const node = queue.shift();
+            if (node == null) {
+                break;
+            }
             sorted.push(node);
-            for (const neighbor of adj.get(node)!) {
-                const deg = inDegree.get(neighbor)! - 1;
-                inDegree.set(neighbor, deg);
-                if (deg === 0) {
+            const nodeNeighbors = adj.get(node);
+            if (nodeNeighbors == null) {
+                throw new Error("_topoSort: missing adjacency entry for node");
+            }
+            for (const neighbor of nodeNeighbors) {
+                const deg = inDegree.get(neighbor);
+                if (deg == null) {
+                    throw new Error("_topoSort: missing inDegree entry for neighbor");
+                }
+                const newDeg = deg - 1;
+                inDegree.set(neighbor, newDeg);
+                if (newDeg === 0) {
                     queue.push(neighbor);
                 }
             }

@@ -11,10 +11,8 @@ import type { Dispatcher } from "./Dispatcher.js";
  * write any property — including arbitrary extras — so it acts as a
  * Koa-style request-scoped store.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export class TernCtx implements Record<string, any> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    [key: string]: any;
+export class TernCtx implements Record<string, unknown> {
+    [key: string]: unknown;
 
     readonly request: TernRequest;
     result: TernResult | undefined = undefined;
@@ -131,7 +129,10 @@ export class TernRouter implements Dispatcher {
             }
         });
 
-        return ctx.result!;
+        if (ctx.result == null) {
+            throw new Error("TernRouter: dispatch produced no result");
+        }
+        return ctx.result;
     }
 
     // ── Internal ──────────────────────────────────────────────────────────────

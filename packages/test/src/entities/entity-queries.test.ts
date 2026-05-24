@@ -230,7 +230,7 @@ for (const db of providers) {
         });
 
         it("listActiveSessions returns empty when all sessions revoked", async () => {
-            const { user, device } = await makeUserWithSession(es, "y@test.com", {
+            const { user: _user, device: _device } = await makeUserWithSession(es, "y@test.com", {
                 isActive: false,
             });
             expect(await listActiveSessions(ctx, es)).toHaveLength(0);
@@ -414,7 +414,7 @@ for (const db of providers) {
         });
 
         it("returns the correct user when multiple users exist", async () => {
-            const { session: s1 } = await makeUserWithSession(es, "j1@test.com");
+            const { session: _s1 } = await makeUserWithSession(es, "j1@test.com");
             const { user: u2, session: s2 } = await makeUserWithSession(es, "j2@test.com");
 
             const token = s2.groups[SessionCoreHandle.id]?.sessionToken as string;

@@ -41,8 +41,11 @@ export class HttpClient extends FlowComponent {
     }
 
     override step(): void {
-        let req: HttpRequest | undefined;
-        while ((req = this.requests.read()) !== undefined) {
+        for (;;) {
+            const req = this.requests.read();
+            if (req === undefined) {
+                break;
+            }
             void this._fetch(req);
         }
     }

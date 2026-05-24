@@ -48,7 +48,11 @@ export function validate(
         const count = values.length;
 
         // sh:minCount
-        if ((propShape.minCount ?? 0) > 0 && count < propShape.minCount!) {
+        if (
+            propShape.minCount !== undefined &&
+            propShape.minCount > 0 &&
+            count < propShape.minCount
+        ) {
             violations.push({
                 property: propName,
                 value: raw,
@@ -107,7 +111,10 @@ function checkDatatype(
     ps: ShaclPropertyShape,
 ): ValidationViolation | null {
     const xsd = "http://www.w3.org/2001/XMLSchema#";
-    const dt = ps.datatype!;
+    if (ps.datatype == null) {
+        throw new Error("checkDatatype: ps.datatype must not be null");
+    }
+    const dt = ps.datatype;
 
     let ok = true;
     if (dt === `${xsd}string`) {

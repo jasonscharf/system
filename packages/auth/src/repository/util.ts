@@ -11,7 +11,11 @@ export function iriFor(type: "user" | "identity" | "session" | "device", id: str
 }
 
 export function idFrom(iriStr: string): string {
-    return iriStr.split("/").pop()!;
+    const seg = iriStr.split("/").pop();
+    if (seg == null) {
+        throw new Error(`idFrom: could not extract id from IRI "${iriStr}"`);
+    }
+    return seg;
 }
 
 export function newSessionToken(): string {

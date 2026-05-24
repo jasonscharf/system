@@ -103,8 +103,8 @@ describe("IRI", () => {
 
         it("throws on whitespace NID", () => {
             expect(() => IRI.fromURN(" ", "1")).toThrow();
-            expect(() => IRI.fromURN(null as any, "1")).toThrow();
-            expect(() => IRI.fromURN(undefined as any, "1")).toThrow();
+            expect(() => IRI.fromURN(null as unknown as string, "1")).toThrow();
+            expect(() => IRI.fromURN(undefined as unknown as string, "1")).toThrow();
         });
 
         it("throws on whitespace leading/trailing NID", () => {
@@ -118,7 +118,7 @@ describe("IRI", () => {
         });
 
         it("throws on null NSS", () => {
-            expect(() => IRI.fromURN("isbn", null as any)).toThrow();
+            expect(() => IRI.fromURN("isbn", null as unknown as string)).toThrow();
         });
 
         it("throws on whitespace in NSS", () => {

@@ -42,8 +42,11 @@ class Counter extends FlowComponent {
     }
 
     override step(): void {
-        let n: number | undefined;
-        while ((n = this.input.read()) !== undefined) {
+        for (;;) {
+            const n = this.input.read();
+            if (n === undefined) {
+                break;
+            }
             this.count += n;
             this.output.put(this.count);
         }
@@ -61,8 +64,11 @@ class Doubler extends FlowComponent {
     }
 
     override step(): void {
-        let n: number | undefined;
-        while ((n = this.input.read()) !== undefined) {
+        for (;;) {
+            const n = this.input.read();
+            if (n === undefined) {
+                break;
+            }
             this.output.put(n * 2);
         }
     }
@@ -811,7 +817,13 @@ describe("FlowLoader extras", () => {
                 connections: [{ from: "src.out", to: "dst.in" }],
             }),
             {
-                moduleResolver: async (uri) => ({ default: classes[uri]! }),
+                moduleResolver: async (uri) => {
+                    const cls = classes[uri];
+                    if (cls == null) {
+                        throw new Error(`no class registered for uri: ${uri}`);
+                    }
+                    return { default: cls };
+                },
             },
         );
         expect(app.components.size).toBe(2);

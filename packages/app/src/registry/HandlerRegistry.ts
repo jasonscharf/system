@@ -60,7 +60,10 @@ export class HandlerRegistry implements Dispatcher {
         if (!this._entries.has(typeIri)) {
             this._entries.set(typeIri, []);
         }
-        const entries = this._entries.get(typeIri)!;
+        const entries = this._entries.get(typeIri);
+        if (entries == null) {
+            throw new Error(`HandlerRegistry: missing entries for typeIri "${typeIri}"`);
+        }
         entries.push({
             typeIri,
             priority,
@@ -122,7 +125,10 @@ export class HandlerRegistry implements Dispatcher {
         const exportName = e.export ?? "default";
         const priority = e.priority ?? 100;
 
-        const entries = this._entries.get(typeIri)!;
+        const entries = this._entries.get(typeIri);
+        if (entries == null) {
+            throw new Error(`HandlerRegistry: missing entries for typeIri "${typeIri}"`);
+        }
         entries.push({ typeIri, priority, moduleUrl, exportName });
         entries.sort((a, b) => a.priority - b.priority);
     }
@@ -149,8 +155,7 @@ export class HandlerRegistry implements Dispatcher {
             return entry.handler;
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mod = (await import(/* @vite-ignore */ entry.moduleUrl)) as Record<string, any>;
+        const mod = (await import(/* @vite-ignore */ entry.moduleUrl)) as Record<string, unknown>;
         const fn = mod[entry.exportName] as HandlerFn | undefined;
 
         if (typeof fn !== "function") {

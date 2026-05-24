@@ -35,8 +35,11 @@ export class MessageRouter extends FlowComponent {
     }
 
     override step(): void {
-        let msg: IncomingMessage | undefined;
-        while ((msg = this.in.read()) !== undefined) {
+        for (;;) {
+            const msg = this.in.read();
+            if (msg === undefined) {
+                break;
+            }
             void this._dispatch(msg);
         }
     }

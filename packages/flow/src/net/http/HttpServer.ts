@@ -92,11 +92,12 @@ export class HttpServer extends FlowComponent {
         this.reader.out._addTransport(new LocalTransport(this.reader.out, this.requests));
 
         this.writer._setSend((response) => {
-            const res = this._pending.get(response.requestId ?? "");
+            const requestId = response.requestId ?? "";
+            const res = this._pending.get(requestId);
             if (!res) {
                 return;
             }
-            this._pending.delete(response.requestId!);
+            this._pending.delete(requestId);
             const headers = toOutgoingHeaders(response.headers ?? {});
             res.writeHead(response.status, response.statusText ?? "", headers);
             if (response.body != null) {
@@ -150,14 +151,20 @@ export class HttpServer extends FlowComponent {
 
     override step(): void {
         // Buffered responses → writer
-        let resp: HttpResponse | undefined;
-        while ((resp = this.responses.read()) !== undefined) {
+        for (;;) {
+            const resp = this.responses.read();
+            if (resp === undefined) {
+                break;
+            }
             this.writer.in.put(resp);
         }
 
         // Streaming responses — kick off async pipe for each
-        let stream: HttpStreamResponse | undefined;
-        while ((stream = this.streamingResponses.read()) !== undefined) {
+        for (;;) {
+            const stream = this.streamingResponses.read();
+            if (stream === undefined) {
+                break;
+            }
             void this._sendStream(stream);
         }
     }

@@ -33,8 +33,11 @@ export class HttpEncoder extends FlowComponent {
     }
 
     override step(): void {
-        let req: HttpRequestDraft | undefined;
-        while ((req = this.requestIn.read()) !== undefined) {
+        for (;;) {
+            const req = this.requestIn.read();
+            if (req === undefined) {
+                break;
+            }
             const { body, contentTypeHeader } = encodeBody(req.body, req.contentType);
             this.requestOut.put({
                 requestId: req.requestId,
@@ -45,8 +48,11 @@ export class HttpEncoder extends FlowComponent {
             });
         }
 
-        let resp: HttpResponseDraft | undefined;
-        while ((resp = this.responseIn.read()) !== undefined) {
+        for (;;) {
+            const resp = this.responseIn.read();
+            if (resp === undefined) {
+                break;
+            }
             const { body, contentTypeHeader } = encodeBody(resp.body, resp.contentType);
             this.responseOut.put({
                 requestId: resp.requestId,

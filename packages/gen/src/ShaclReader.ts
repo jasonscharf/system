@@ -130,7 +130,10 @@ export function readShaclShapes(triples: Triple[]): ShaclShapes {
         if (!subjKey || !propShapeMap.has(subjKey)) {
             continue;
         }
-        const ps = propShapeMap.get(subjKey)!;
+        const ps = propShapeMap.get(subjKey);
+        if (ps == null) {
+            continue;
+        }
 
         if (predicate.equals(SH_PATH)) {
             const k = termKey(object);

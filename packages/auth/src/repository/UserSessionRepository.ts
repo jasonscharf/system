@@ -194,16 +194,40 @@ export class UserSessionRepository {
             return q ? (q.object as IRI).value : undefined;
         };
 
+        const sessionToken = get(sessionTokenIRI);
+        if (sessionToken == null) {
+            throw new Error(
+                `UserSessionRepository: missing sessionTokenIRI for session id "${id}"`,
+            );
+        }
+        const sessionUserIriVal = getIri(sessionUserIRI);
+        if (sessionUserIriVal == null) {
+            throw new Error(`UserSessionRepository: missing sessionUserIRI for session id "${id}"`);
+        }
+        const sessionDeviceIriVal = getIri(sessionDeviceIRI);
+        if (sessionDeviceIriVal == null) {
+            throw new Error(
+                `UserSessionRepository: missing sessionDeviceIRI for session id "${id}"`,
+            );
+        }
+        const expiresAtStr = get(expiresAtIRI);
+        if (expiresAtStr == null) {
+            throw new Error(`UserSessionRepository: missing expiresAtIRI for session id "${id}"`);
+        }
+        const createdAtStr = get(createdAtIRI);
+        if (createdAtStr == null) {
+            throw new Error(`UserSessionRepository: missing createdAtIRI for session id "${id}"`);
+        }
         return {
             id,
             iri: iriFor("session", id).value,
-            sessionToken: get(sessionTokenIRI)!,
-            userId: idFrom(getIri(sessionUserIRI)!),
-            deviceId: idFrom(getIri(sessionDeviceIRI)!),
-            expiresAt: new Date(get(expiresAtIRI)!),
+            sessionToken,
+            userId: idFrom(sessionUserIriVal),
+            deviceId: idFrom(sessionDeviceIriVal),
+            expiresAt: new Date(expiresAtStr),
             isActive: get(isActiveIRI) === "true",
             ipAddress: get(ipAddressIRI),
-            createdAt: new Date(get(createdAtIRI)!),
+            createdAt: new Date(createdAtStr),
         };
     }
 }

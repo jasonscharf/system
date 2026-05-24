@@ -80,7 +80,10 @@ describe("FileStreamHandler (unit)", () => {
 
         await new Promise((r) => setTimeout(r, 20)); // wait for async _handle
 
-        const resp = h.out.read()!;
+        const resp = h.out.read();
+        if (resp == null) {
+            throw new Error("expected a response from h.out");
+        }
         expect(resp.requestId).toBe("r1");
         expect(resp.status).toBe(400);
     });

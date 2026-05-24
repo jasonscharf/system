@@ -44,8 +44,11 @@ export class HttpDecoder extends FlowComponent {
     }
 
     override step(): void {
-        let req: HttpRequest | undefined;
-        while ((req = this.requestIn.read()) !== undefined) {
+        for (;;) {
+            const req = this.requestIn.read();
+            if (req === undefined) {
+                break;
+            }
             const ct = extractContentType(req.headers);
             const { pathname, searchParams } = parseUrl(req.url);
             this.requestOut.put({
@@ -60,8 +63,11 @@ export class HttpDecoder extends FlowComponent {
             });
         }
 
-        let resp: HttpResponse | undefined;
-        while ((resp = this.responseIn.read()) !== undefined) {
+        for (;;) {
+            const resp = this.responseIn.read();
+            if (resp === undefined) {
+                break;
+            }
             const ct = extractContentType(resp.headers);
             this.responseOut.put({
                 requestId: resp.requestId,

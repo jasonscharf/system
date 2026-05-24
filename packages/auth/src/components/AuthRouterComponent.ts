@@ -5,6 +5,7 @@ import {
     type FlowPort,
     type HttpMiddlewareFn,
     HttpRouter,
+    LocalTransport,
 } from "@jasonscharf/flow";
 import { AuthService } from "../AuthService.js";
 import { OAUTH_STATE_COOKIE, SESSION_COOKIE, SESSION_TTL_SECS } from "../constants.js";
@@ -160,8 +161,11 @@ export class AuthRouterComponent extends FlowComponent {
 
     override step(): void {
         // Forward all inbound HTTP requests to the inner router's input port
-        let req: ParsedHttpRequest | undefined;
-        while ((req = this.requests.read()) !== undefined) {
+        for (;;) {
+            const req = this.requests.read();
+            if (req === undefined) {
+                break;
+            }
             this.httpRouter.requests.put(req);
         }
         // Process the inner router (async handlers fire and deliver to _router.responses,
@@ -205,10 +209,9 @@ export class AuthRouterComponent extends FlowComponent {
 
     private _registerRoutes(): void {
         // Wire router responses to our output port
-        this.httpRouter.responses._addTransport({
-            deliver: (msg: HttpResponseDraft) => this.responses.put(msg),
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
+        this.httpRouter.responses._addTransport(
+            new LocalTransport(this.httpRouter.responses, this.responses),
+        );
 
         // ── GET /auth/:provider ───────────────────────────────────────────────
         this.httpRouter.get("/auth/:provider", async (ctx) => {

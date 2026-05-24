@@ -14,7 +14,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe(deepFreeze, () => {
-    let obj: { a: { b: { c: {} } } };
+    let obj: { a: { b: { c: object } } };
     beforeEach(() => (obj = { a: { b: { c: {} } } }));
 
     it("freezes nested objects", () => {

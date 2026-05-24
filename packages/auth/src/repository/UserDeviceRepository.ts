@@ -143,14 +143,22 @@ export class UserDeviceRepository {
             return q ? (q.object as IRI).value : undefined;
         };
 
+        const deviceUserIriVal = getIri(deviceUserIRI);
+        if (deviceUserIriVal == null) {
+            throw new Error(`UserDeviceRepository: missing deviceUserIRI for device id "${id}"`);
+        }
+        const createdAtVal = get(createdAtIRI);
+        if (createdAtVal == null) {
+            throw new Error(`UserDeviceRepository: missing createdAtIRI for device id "${id}"`);
+        }
         return {
             id,
             iri: iriFor("device", id).value,
-            userId: idFrom(getIri(deviceUserIRI)!),
+            userId: idFrom(deviceUserIriVal),
             deviceName: get(deviceNameIRI),
             devicePlatform: get(devicePlatformIRI),
             deviceUserAgent: get(deviceUserAgentIRI),
-            createdAt: new Date(get(createdAtIRI)!),
+            createdAt: new Date(createdAtVal),
         };
     }
 }

@@ -28,7 +28,11 @@ export function pgIri(entityIriVal: string, h: EntityHandle): IRI {
 
 /** Extract the entity id from its IRI (last path segment). */
 export function idFromIri(iriStr: string): string {
-    return iriStr.split("/").pop()!;
+    const seg = iriStr.split("/").pop();
+    if (seg == null) {
+        throw new Error(`idFromIri: could not extract id from IRI "${iriStr}"`);
+    }
+    return seg;
 }
 
 /** Convert a JS value to an RDF Literal. */

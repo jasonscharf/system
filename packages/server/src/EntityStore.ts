@@ -53,7 +53,10 @@ export class EntityStore {
         schema: EntitySchema<CoreProps>,
         data: Partial<CoreProps>,
     ): Promise<EntityRecord> {
-        const coreGroup = schema.allGroups()[0]!;
+        const coreGroup = schema.allGroups()[0];
+        if (coreGroup == null) {
+            throw new Error("EntityStore.create: schema has no groups defined");
+        }
         const withDefs = this._applyDefaults(coreGroup, data);
         this._validate(coreGroup, withDefs);
 
@@ -81,7 +84,7 @@ export class EntityStore {
 
     async addGroup<Props extends Record<string, unknown>>(
         ctx: ServerContext,
-        schema: EntitySchema<any>,
+        schema: EntitySchema,
         id: string,
         h: EntityHandle,
         data: Partial<Props>,
@@ -111,7 +114,7 @@ export class EntityStore {
 
     async findById(
         ctx: ServerContext,
-        schema: EntitySchema<any>,
+        schema: EntitySchema,
         id: string,
         handles: EntityHandle[] | "*",
     ): Promise<EntityRecord | null> {
@@ -129,7 +132,7 @@ export class EntityStore {
 
     async updateGroup<Props extends Record<string, unknown>>(
         ctx: ServerContext,
-        schema: EntitySchema<any>,
+        schema: EntitySchema,
         id: string,
         h: EntityHandle,
         patch: Partial<Props>,
@@ -144,7 +147,15 @@ export class EntityStore {
             ([propName]) => !!(groupDef.properties as Record<string, IRI>)[propName],
         );
         const predIris = patchEntries
-            .map(([propName]) => (groupDef.properties as Record<string, IRI>)[propName]!)
+            .map(([propName]) => {
+                const iri = (groupDef.properties as Record<string, IRI>)[propName];
+                if (iri == null) {
+                    throw new Error(
+                        `EntityStore.updateGroup: missing IRI for property "${propName}"`,
+                    );
+                }
+                return iri;
+            })
             .filter(Boolean);
 
         return this._withTrx(ctx, async (txCtx) => {
@@ -154,7 +165,12 @@ export class EntityStore {
             const quads = patchEntries
                 .filter(([, value]) => value !== undefined)
                 .flatMap(([propName, value]) => {
-                    const propIri = (groupDef.properties as Record<string, IRI>)[propName]!;
+                    const propIri = (groupDef.properties as Record<string, IRI>)[propName];
+                    if (propIri == null) {
+                        throw new Error(
+                            `EntityStore.updateGroup: missing IRI for property "${propName}"`,
+                        );
+                    }
                     return [
                         {
                             subject: pg,
@@ -172,7 +188,7 @@ export class EntityStore {
 
     // ── Delete ────────────────────────────────────────────────────────────────
 
-    async delete(ctx: ServerContext, schema: EntitySchema<any>, id: string): Promise<void> {
+    async delete(ctx: ServerContext, schema: EntitySchema, id: string): Promise<void> {
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
         const pgLinks = await this._store.find(ctx, { subject: ent, predicate: TERN_PROP_GROUP });
         const pgNodes = pgLinks.map((q) => q.object as IRI);
@@ -189,7 +205,7 @@ export class EntityStore {
 
     async collectionGet(
         ctx: ServerContext,
-        schema: EntitySchema<any>,
+        schema: EntitySchema,
         id: string,
         h: EntityHandle,
         prop: string,
@@ -210,7 +226,7 @@ export class EntityStore {
 
     async collectionPush(
         ctx: ServerContext,
-        schema: EntitySchema<any>,
+        schema: EntitySchema,
         id: string,
         h: EntityHandle,
         prop: string,
@@ -244,7 +260,7 @@ export class EntityStore {
 
     async collectionRemove(
         ctx: ServerContext,
-        schema: EntitySchema<any>,
+        schema: EntitySchema,
         id: string,
         h: EntityHandle,
         prop: string,
@@ -283,7 +299,7 @@ export class EntityStore {
 
     async collectionPop(
         ctx: ServerContext,
-        schema: EntitySchema<any>,
+        schema: EntitySchema,
         id: string,
         h: EntityHandle,
         prop: string,
@@ -299,7 +315,7 @@ export class EntityStore {
 
     async collectionSet(
         ctx: ServerContext,
-        schema: EntitySchema<any>,
+        schema: EntitySchema,
         id: string,
         h: EntityHandle,
         prop: string,
@@ -333,7 +349,7 @@ export class EntityStore {
 
     async collectionInsertAt(
         ctx: ServerContext,
-        schema: EntitySchema<any>,
+        schema: EntitySchema,
         id: string,
         h: EntityHandle,
         prop: string,
@@ -350,7 +366,7 @@ export class EntityStore {
 
     async createCollectionView(
         ctx: ServerContext,
-        schema: EntitySchema<any>,
+        schema: EntitySchema,
         id: string,
         h: EntityHandle,
         prop: string,
@@ -379,7 +395,7 @@ export class EntityStore {
 
     async hydrateMany(
         ctx: ServerContext,
-        schema: EntitySchema<any>,
+        schema: EntitySchema,
         iris: string[],
         handles: EntityHandle[] | "*",
     ): Promise<EntityRecord[]> {
@@ -404,7 +420,7 @@ export class EntityStore {
 
     private async _hydrate(
         ctx: ServerContext,
-        schema: EntitySchema<any>,
+        schema: EntitySchema,
         id: string,
         entIri: string,
         handles: EntityHandle[] | "*",
@@ -490,7 +506,7 @@ export class EntityStore {
         return result as T;
     }
 
-    private _requireGroup(schema: EntitySchema<any>, h: EntityHandle): PropGroupDef {
+    private _requireGroup(schema: EntitySchema, h: EntityHandle): PropGroupDef {
         const g = schema.group(h);
         if (!g) {
             throw new Error(`PropGroup not registered on schema: ${h.id}`);

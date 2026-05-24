@@ -62,12 +62,18 @@ export class SessionComponent extends FlowComponent {
     }
 
     override step(): void {
-        let vReq: ValidateRequest | undefined;
-        while ((vReq = this.validateIn.read()) !== undefined) {
+        for (;;) {
+            const vReq = this.validateIn.read();
+            if (vReq === undefined) {
+                break;
+            }
             void this._validate(vReq);
         }
-        let rReq: RevokeRequest | undefined;
-        while ((rReq = this.revokeIn.read()) !== undefined) {
+        for (;;) {
+            const rReq = this.revokeIn.read();
+            if (rReq === undefined) {
+                break;
+            }
             void this._revoke(rReq);
         }
     }

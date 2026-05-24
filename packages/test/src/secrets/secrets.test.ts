@@ -199,7 +199,7 @@ describe("AzureKeyVaultProvider", () => {
             getSecret: vi.fn().mockRejectedValue({ code: "SecretNotFound" }),
         };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (provider as any)._client = fakeClient;
+        (provider as unknown as { _client: typeof fakeClient })._client = fakeClient;
 
         const value = await provider.get("ANY_KEY");
         expect(value).toBeNull();
@@ -211,7 +211,7 @@ describe("AzureKeyVaultProvider", () => {
             getSecret: vi.fn().mockRejectedValue(new Error("Network failure")),
         };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (provider as any)._client = fakeClient;
+        (provider as unknown as { _client: typeof fakeClient })._client = fakeClient;
 
         await expect(provider.get("ANY_KEY")).rejects.toThrow("Network failure");
     });
@@ -222,7 +222,7 @@ describe("AzureKeyVaultProvider", () => {
             getSecret: vi.fn().mockRejectedValue({ code: "SecretNotFound" }),
         };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (provider as any)._client = fakeClient;
+        (provider as unknown as { _client: typeof fakeClient })._client = fakeClient;
 
         await expect(provider.getRequired("MY_SECRET")).rejects.toThrow("MY_SECRET");
     });
@@ -233,7 +233,7 @@ describe("AzureKeyVaultProvider", () => {
             getSecret: vi.fn().mockResolvedValue({ value: "super-secret" }),
         };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (provider as any)._client = fakeClient;
+        (provider as unknown as { _client: typeof fakeClient })._client = fakeClient;
 
         expect(await provider.get("ANY_KEY")).toBe("super-secret");
     });

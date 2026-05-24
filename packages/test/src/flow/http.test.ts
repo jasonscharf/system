@@ -43,6 +43,14 @@ async function waitForMessage<T>(port: FlowPort<T>, timeoutMs = 3000): Promise<T
     throw new Error(`Timeout waiting for message on port "${port.name}"`);
 }
 
+function readPort<T>(port: FlowPort<T>): T {
+    const val = port.read();
+    if (val === undefined) {
+        throw new Error(`expected a message on port "${port.name}"`);
+    }
+    return val;
+}
+
 // ── HttpEncoder ───────────────────────────────────────────────────────────────
 
 describe("HttpEncoder", () => {
@@ -64,7 +72,7 @@ describe("HttpEncoder", () => {
     it("encodes a JSON body and sets Content-Type header", () => {
         enc.requestIn.put({ method: "POST", url: "/foo", body: { name: "Alice" } });
         enc.step();
-        const out = enc.requestOut.read()!;
+        const out = readPort(enc.requestOut);
         expect(out.body).toBe(JSON.stringify({ name: "Alice" }));
         expect(String(out.headers["content-type"])).toContain("application/json");
     });
@@ -72,7 +80,7 @@ describe("HttpEncoder", () => {
     it("encodes a string body as text/plain by default", () => {
         enc.requestIn.put({ method: "POST", url: "/foo", body: "hello" });
         enc.step();
-        const out = enc.requestOut.read()!;
+        const out = readPort(enc.requestOut);
         expect(out.body).toBe("hello");
         expect(String(out.headers["content-type"])).toContain("text/plain");
     });
@@ -81,7 +89,7 @@ describe("HttpEncoder", () => {
         const bytes = new Uint8Array([1, 2, 3]);
         enc.requestIn.put({ method: "POST", url: "/bin", body: bytes });
         enc.step();
-        const out = enc.requestOut.read()!;
+        const out = readPort(enc.requestOut);
         expect(out.body).toEqual(bytes);
         expect(String(out.headers["content-type"])).toContain("application/octet-stream");
     });
@@ -94,7 +102,7 @@ describe("HttpEncoder", () => {
             contentType: "application/x-www-form-urlencoded",
         });
         enc.step();
-        const out = enc.requestOut.read()!;
+        const out = readPort(enc.requestOut);
         expect(out.body).toContain("a=1");
         expect(out.body).toContain("b=2");
     });
@@ -102,7 +110,7 @@ describe("HttpEncoder", () => {
     it("omits body and Content-Type for requests without body", () => {
         enc.requestIn.put({ method: "GET", url: "/ping" });
         enc.step();
-        const out = enc.requestOut.read()!;
+        const out = readPort(enc.requestOut);
         expect(out.body).toBeUndefined();
         expect(out.headers["content-type"]).toBeUndefined();
     });
@@ -110,7 +118,7 @@ describe("HttpEncoder", () => {
     it("encodes response drafts with status and body", () => {
         enc.responseIn.put({ requestId: "r1", status: 200, body: { ok: true } });
         enc.step();
-        const out = enc.responseOut.read()!;
+        const out = readPort(enc.responseOut);
         expect(out.requestId).toBe("r1");
         expect(out.status).toBe(200);
         expect(out.body).toBe(JSON.stringify({ ok: true }));
@@ -119,14 +127,14 @@ describe("HttpEncoder", () => {
     it("defaults response status to 200", () => {
         enc.responseIn.put({ body: "pong" });
         enc.step();
-        const out = enc.responseOut.read()!;
+        const out = readPort(enc.responseOut);
         expect(out.status).toBe(200);
     });
 
     it("passes through explicit headers untouched", () => {
         enc.requestIn.put({ method: "GET", url: "/", headers: { "x-custom": "val" } });
         enc.step();
-        const out = enc.requestOut.read()!;
+        const out = readPort(enc.requestOut);
         expect(out.headers["x-custom"]).toBe("val");
     });
 
@@ -166,7 +174,7 @@ describe("HttpDecoder", () => {
             body: '{"x":1}',
         });
         dec.step();
-        const out = dec.requestOut.read()!;
+        const out = readPort(dec.requestOut);
         expect(out.body).toEqual({ x: 1 });
         expect(out.contentType).toContain("application/json");
     });
@@ -179,7 +187,7 @@ describe("HttpDecoder", () => {
             body: "a=1&b=hello+world",
         });
         dec.step();
-        const out = dec.requestOut.read()!;
+        const out = readPort(dec.requestOut);
         expect((out.body as Record<string, string>).a).toBe("1");
         expect((out.body as Record<string, string>).b).toBe("hello world");
     });
@@ -204,7 +212,7 @@ describe("HttpDecoder", () => {
     it("populates pathname and searchParams from url", () => {
         dec.requestIn.put({ method: "GET", url: "/users?page=2&limit=10", headers: {} });
         dec.step();
-        const out = dec.requestOut.read()!;
+        const out = readPort(dec.requestOut);
         expect(out.pathname).toBe("/users");
         expect(out.searchParams.get("page")).toBe("2");
         expect(out.searchParams.get("limit")).toBe("10");
@@ -217,7 +225,7 @@ describe("HttpDecoder", () => {
             body: '{"id":42}',
         });
         dec.step();
-        const out = dec.responseOut.read()!;
+        const out = readPort(dec.responseOut);
         expect(out.body).toEqual({ id: 42 });
         expect(out.ok).toBe(true);
     });
@@ -237,7 +245,7 @@ describe("HttpDecoder", () => {
         enc.requestIn.put({ method: "POST", url: "/echo", body: payload });
         enc.step();
 
-        const encoded = enc.requestOut.read()!;
+        const encoded = readPort(enc.requestOut);
         dec2.requestIn.put(encoded);
         dec2.step();
 
@@ -298,8 +306,11 @@ describe("HTTP echo integration", () => {
         }
 
         override step(): void {
-            let req: ParsedHttpRequest | undefined;
-            while ((req = this.in.read()) !== undefined) {
+            for (;;) {
+                const req = this.in.read();
+                if (req === undefined) {
+                    break;
+                }
                 this.out.put({
                     requestId: req.requestId,
                     status: 200,
@@ -729,7 +740,7 @@ describe("HttpDecoder with Uint8Array body", () => {
             body: bytes,
         });
         dec.step();
-        const out = dec.requestOut.read()!;
+        const out = readPort(dec.requestOut);
         expect(out.body).toEqual({ x: 1 });
     });
 });
@@ -740,7 +751,7 @@ describe("HttpEncoder: request without body", () => {
         const enc = new HttpEncoder({ name: "enc", context: ctx });
         enc.requestIn.put({ method: "GET", url: "/ping" });
         enc.step();
-        const out = enc.requestOut.read()!;
+        const out = readPort(enc.requestOut);
         expect(out.body).toBeUndefined();
         expect(out.headers["content-type"]).toBeUndefined();
     });
@@ -816,7 +827,7 @@ describe("FileStreamHandler: directory request returns 404", () => {
             });
             handler.step();
             await new Promise((r) => setTimeout(r, 50));
-            const resp = handler.out.read()!;
+            const resp = readPort(handler.out);
             expect(resp.status).toBe(404);
         } finally {
             await rm(dir, { recursive: true, force: true });
@@ -851,7 +862,7 @@ describe("codec: array content-type header and Uint8Array raw return", () => {
             body: bytes,
         });
         dec.step();
-        const out = dec.requestOut.read()!;
+        const out = readPort(dec.requestOut);
         // raw Uint8Array returned as-is for non-text types
         expect(out.body).toBe(bytes);
     });
@@ -919,7 +930,7 @@ describe("HttpDecoder: malformed URL triggers catch branch", () => {
         const badUrl = "http://[::invalid";
         dec.requestIn.put({ method: "GET", url: badUrl, headers: {} });
         dec.step();
-        const out = dec.requestOut.read()!;
+        const out = readPort(dec.requestOut);
         expect(out.pathname).toBe(badUrl);
     });
 });
@@ -968,8 +979,11 @@ describe("HttpServer: response with no body (res.end() empty branch)", () => {
                 super({ name: "h", context: ctx.context });
             }
             override step(): void {
-                let req: ParsedHttpRequest | undefined;
-                while ((req = this.in.read()) !== undefined) {
+                for (;;) {
+                    const req = this.in.read();
+                    if (req === undefined) {
+                        break;
+                    }
                     this.out.put({ requestId: (req as ParsedHttpRequest).requestId, status: 204 });
                 }
             }
@@ -1033,7 +1047,7 @@ describe("HttpEncoder: missing method defaults to GET", () => {
         const enc = new HttpEncoder({ name: "enc", context: ctx });
         enc.requestIn.put({ url: "/test" }); // no method
         enc.step();
-        const out = enc.requestOut.read()!;
+        const out = readPort(enc.requestOut);
         expect(out.method).toBe("GET");
     });
 });

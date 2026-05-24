@@ -119,8 +119,11 @@ export class FileStreamHandler extends FlowComponent {
     }
 
     override step(): void {
-        let req: ParsedHttpRequest | undefined;
-        while ((req = this.in.read()) !== undefined) {
+        for (;;) {
+            const req = this.in.read();
+            if (req === undefined) {
+                break;
+            }
             void this._handle(req);
         }
     }

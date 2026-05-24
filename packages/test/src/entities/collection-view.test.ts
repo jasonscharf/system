@@ -370,14 +370,14 @@ for (const db of providers) {
             );
             const view = await cvs.getView(ctx, viewIri);
             // Insertion order was charlie, alice, bob — asc sort by displayName → Alice, Bob, Charlie
-            const refs = view?.items.map((i) => i.ref);
-            // We stored entity IRIs. Find them by querying back from the UserSchema.
-            const _aliceRec = await es.findById(ctx, UserSchema, refs.find((r) => r)!, "*");
+            const refs = view?.items.map((i) => i.ref) ?? [];
             // Instead of guessing which IRI is which, verify that adjacent sorted pairs
             // have displayNames in asc order: refs[0].displayName <= refs[1].displayName
             for (let i = 0; i < refs.length - 1; i++) {
-                const a = await es.findById(ctx, UserSchema, refs[i]!.split("/").pop()!, "*");
-                const b = await es.findById(ctx, UserSchema, refs[i + 1]!.split("/").pop()!, "*");
+                const refA = refs[i] ?? "";
+                const refB = refs[i + 1] ?? "";
+                const a = await es.findById(ctx, UserSchema, refA.split("/").pop() ?? refA, "*");
+                const b = await es.findById(ctx, UserSchema, refB.split("/").pop() ?? refB, "*");
                 const aDN = String(a?.groups[CoreHandle.id]?.displayName ?? "");
                 const bDN = String(b?.groups[CoreHandle.id]?.displayName ?? "");
                 expect(aDN <= bDN).toBe(true);
@@ -398,11 +398,13 @@ for (const db of providers) {
                 },
             );
             const view = await cvs.getView(ctx, viewIri);
-            const refs = view?.items.map((i) => i.ref);
+            const refs = view?.items.map((i) => i.ref) ?? [];
             // Verify desc ordering: each adjacent pair should have displayName descending
             for (let i = 0; i < refs.length - 1; i++) {
-                const a = await es.findById(ctx, UserSchema, refs[i]!.split("/").pop()!, "*");
-                const b = await es.findById(ctx, UserSchema, refs[i + 1]!.split("/").pop()!, "*");
+                const refA = refs[i] ?? "";
+                const refB = refs[i + 1] ?? "";
+                const a = await es.findById(ctx, UserSchema, refA.split("/").pop() ?? refA, "*");
+                const b = await es.findById(ctx, UserSchema, refB.split("/").pop() ?? refB, "*");
                 const aDN = String(a?.groups[CoreHandle.id]?.displayName ?? "");
                 const bDN = String(b?.groups[CoreHandle.id]?.displayName ?? "");
                 expect(aDN >= bDN).toBe(true);
@@ -500,7 +502,10 @@ for (const db of providers) {
 
             // Read back v1's metadata so we get the exact sourcePg + prop the view stored
             const v1Record = await cvs.getView(ctx, v1);
-            const { sourcePg, prop } = v1Record!;
+            if (v1Record == null) {
+                throw new Error("v1Record must not be null");
+            }
+            const { sourcePg, prop } = v1Record;
 
             const views = await cvs.findViewsForSource(ctx, sourcePg, prop);
             // v1 and v2 both watch G1's members; v3 watches G2's members

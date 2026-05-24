@@ -26,7 +26,11 @@ export interface UserWithActivity {
 
 /** Extract the trailing path segment of an entity IRI to get its stored id. */
 function idOf(iri: string): string {
-    return iri.split("/").pop()!;
+    const seg = iri.split("/").pop();
+    if (seg == null) {
+        throw new Error(`idOf: could not extract id from IRI "${iri}"`);
+    }
+    return seg;
 }
 
 /** Coerce a groups property value to a string (IRI ref or plain value). */

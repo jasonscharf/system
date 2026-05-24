@@ -201,9 +201,7 @@ class TurtleReader {
 
     // ── Blank nodes ───────────────────────────────────────────────────────────
 
-    private _parseAnonBlank(
-        out: Triple[],
-    ): typeof blankNode extends (...args: any[]) => infer R ? R : never {
+    private _parseAnonBlank(out: Triple[]): ReturnType<typeof blankNode> {
         this._expect("[");
         const node = blankNode(`b${++this._blanks}`);
         this._skipWsAndComments();

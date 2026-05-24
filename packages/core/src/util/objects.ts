@@ -6,20 +6,24 @@
  * @returns
  */
 export function deepFreeze<TObject>(
-    obj: TObject | any,
+    obj: TObject,
     seen = new WeakMap<object, boolean>(),
 ): typeof obj {
     if (!exists(obj)) {
         return obj;
     }
 
-    seen.set(obj, true);
+    seen.set(obj as unknown as object, true);
 
     Object.getOwnPropertyNames(obj)
-        .filter((prop) => !seen.has(obj[prop] as unknown as any))
-        .filter((prop) => obj[prop] && typeof obj[prop] === "object")
+        .filter((prop) => !seen.has((obj as Record<string, unknown>)[prop] as object))
+        .filter(
+            (prop) =>
+                (obj as Record<string, unknown>)[prop] &&
+                typeof (obj as Record<string, unknown>)[prop] === "object",
+        )
         .forEach((prop) => {
-            deepFreeze(obj[prop], seen);
+            deepFreeze((obj as Record<string, unknown>)[prop], seen);
         });
 
     return Object.freeze<TObject>(obj);

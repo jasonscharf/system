@@ -24,7 +24,7 @@ export async function sleep(ms: number) {
  * @param fn
  * @returns A handle for `clearInterval`
  */
-export function repeat(ms: number, fn: Function): number {
+export function repeat(ms: number, fn: () => void): number {
     return setInterval(fn, ms);
 }
 

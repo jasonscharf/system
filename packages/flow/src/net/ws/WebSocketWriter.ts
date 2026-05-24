@@ -21,8 +21,11 @@ export class WebSocketWriter extends FlowComponent {
     }
 
     override step(): void {
-        let msg: WsMessage | undefined;
-        while ((msg = this.in.read()) !== undefined) {
+        for (;;) {
+            const msg = this.in.read();
+            if (msg === undefined) {
+                break;
+            }
             this._send(msg.connectionId, msg.data);
         }
     }

@@ -1,8 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Triple } from "@jasonscharf/core";
-import { blankNode, IRI, literal } from "@jasonscharf/core";
+import { blankNode, IRI, type Literal, literal, type Triple } from "@jasonscharf/core";
 import type { ShaclShapes } from "@jasonscharf/gen";
 import {
     generate,
@@ -86,7 +85,7 @@ describe("parseNTriples", () => {
     it("parses plain string literal", async () => {
         const input = '<http://s> <http://p> "hello" .\n';
         const triples = await collect(parseNTriples(input));
-        const obj = triples[0].object as any;
+        const obj = triples[0].object as Literal;
         expect(obj.termType).toBe("Literal");
         expect(obj.value).toBe("hello");
     });
@@ -94,14 +93,14 @@ describe("parseNTriples", () => {
     it("parses language-tagged literal", async () => {
         const input = '<http://s> <http://p> "hello"@en .\n';
         const triples = await collect(parseNTriples(input));
-        const obj = triples[0].object as any;
+        const obj = triples[0].object as Literal;
         expect(obj.language).toBe("en");
     });
 
     it("parses datatype literal", async () => {
         const input = '<http://s> <http://p> "42"^^<http://www.w3.org/2001/XMLSchema#integer> .\n';
         const triples = await collect(parseNTriples(input));
-        const obj = triples[0].object as any;
+        const obj = triples[0].object as Literal;
         expect(obj.termType).toBe("Literal");
         expect(obj.value).toBe("42");
         expect(obj.datatype.value).toContain("integer");
@@ -109,32 +108,32 @@ describe("parseNTriples", () => {
 
     it("handles \\n escape in literals", async () => {
         const triples = await collect(parseNTriples('<http://s> <http://p> "line\\nbreak" .\n'));
-        expect((triples[0].object as any).value).toBe("line\nbreak");
+        expect((triples[0].object as Literal).value).toBe("line\nbreak");
     });
 
     it("handles \\r escape in literals", async () => {
         const triples = await collect(parseNTriples('<http://s> <http://p> "a\\rb" .\n'));
-        expect((triples[0].object as any).value).toBe("a\rb");
+        expect((triples[0].object as Literal).value).toBe("a\rb");
     });
 
     it("handles \\t escape in literals", async () => {
         const triples = await collect(parseNTriples('<http://s> <http://p> "a\\tb" .\n'));
-        expect((triples[0].object as any).value).toBe("a\tb");
+        expect((triples[0].object as Literal).value).toBe("a\tb");
     });
 
     it('handles \\" escape in literals', async () => {
         const triples = await collect(parseNTriples('<http://s> <http://p> "say \\"hi\\"" .\n'));
-        expect((triples[0].object as any).value).toBe('say "hi"');
+        expect((triples[0].object as Literal).value).toBe('say "hi"');
     });
 
     it("handles \\\\ escape in literals", async () => {
         const triples = await collect(parseNTriples('<http://s> <http://p> "back\\\\slash" .\n'));
-        expect((triples[0].object as any).value).toBe("back\\slash");
+        expect((triples[0].object as Literal).value).toBe("back\\slash");
     });
 
     it("passes through unknown escape sequences", async () => {
         const triples = await collect(parseNTriples('<http://s> <http://p> "\\z" .\n'));
-        expect((triples[0].object as any).value).toBe("z");
+        expect((triples[0].object as Literal).value).toBe("z");
     });
 
     it("throws on malformed line", async () => {
@@ -188,7 +187,10 @@ describe("readOntology", () => {
 
     it("assigns properties to their domain class", () => {
         const ontology = readOntology(triples);
-        const cls = ontology.classes.get(`${EX}User`)!;
+        const cls = ontology.classes.get(`${EX}User`);
+        if (cls == null) {
+            throw new Error("expected User class in ontology");
+        }
         expect(cls.properties.map((p) => p.iri)).toContain(`${EX}email`);
     });
 
@@ -475,7 +477,7 @@ ex:User ex:tag "a", "b", "c" .
 ex:User ex:name "Alice" .
 `;
         const triples = await collectTurtle(ttl);
-        const obj = triples[0].object as any;
+        const obj = triples[0].object as Literal;
         expect(obj.termType).toBe("Literal");
         expect(obj.value).toBe("Alice");
     });
@@ -486,7 +488,7 @@ ex:User ex:name "Alice" .
 ex:User ex:name "Bonjour"@fr .
 `;
         const triples = await collectTurtle(ttl);
-        const obj = triples[0].object as any;
+        const obj = triples[0].object as Literal;
         expect(obj.language).toBe("fr");
     });
 
@@ -497,7 +499,7 @@ ex:User ex:name "Bonjour"@fr .
 ex:User ex:score "42"^^xsd:integer .
 `;
         const triples = await collectTurtle(ttl);
-        const obj = triples[0].object as any;
+        const obj = triples[0].object as Literal;
         expect(obj.termType).toBe("Literal");
         expect(obj.value).toBe("42");
         expect(obj.datatype.value).toContain("integer");
@@ -509,7 +511,7 @@ ex:User ex:score "42"^^xsd:integer .
 ex:User ex:count 42 .
 `;
         const triples = await collectTurtle(ttl);
-        const obj = triples[0].object as any;
+        const obj = triples[0].object as Literal;
         expect(obj.termType).toBe("Literal");
         expect(obj.value).toBe("42");
     });
@@ -520,7 +522,7 @@ ex:User ex:count 42 .
 ex:User ex:ratio 3.14 .
 `;
         const triples = await collectTurtle(ttl);
-        const obj = triples[0].object as any;
+        const obj = triples[0].object as Literal;
         expect(obj.termType).toBe("Literal");
         expect(obj.value).toBe("3.14");
     });
@@ -531,7 +533,7 @@ ex:User ex:ratio 3.14 .
 ex:User ex:active true .
 `;
         const triples = await collectTurtle(ttl);
-        const obj = triples[0].object as any;
+        const obj = triples[0].object as Literal;
         expect(obj.value).toBe("true");
     });
 
@@ -541,7 +543,7 @@ ex:User ex:active true .
 ex:User ex:active false .
 `;
         const triples = await collectTurtle(ttl);
-        const obj = triples[0].object as any;
+        const obj = triples[0].object as Literal;
         expect(obj.value).toBe("false");
     });
 
@@ -571,7 +573,7 @@ ex:User ex:desc """Hello
 World""" .
 `;
         const triples = await collectTurtle(ttl);
-        const obj = triples[0].object as any;
+        const obj = triples[0].object as Literal;
         expect(obj.value).toContain("Hello");
         expect(obj.value).toContain("World");
     });
@@ -597,7 +599,7 @@ ex:User a ex:Class . # trailing comment
 ex:User ex:delta -5 .
 `;
         const triples = await collectTurtle(ttl);
-        const obj = triples[0].object as any;
+        const obj = triples[0].object as Literal;
         expect(obj.value).toBe("-5");
     });
 });
@@ -656,9 +658,15 @@ describe("readShaclShapes", () => {
 
     it("parses property shapes correctly", () => {
         const shapes = readShaclShapes(shaclTriples());
-        const shape = shapes.byTargetClass.get("http://example.org/User")!;
+        const shape = shapes.byTargetClass.get("http://example.org/User");
+        if (shape == null) {
+            throw new Error("expected User shape");
+        }
         expect(shape.properties).toHaveLength(1);
-        const ps = shape.properties[0]!;
+        const ps = shape.properties[0];
+        if (ps == null) {
+            throw new Error("expected at least one property shape");
+        }
         expect(ps.path).toBe("http://example.org/email");
         expect(ps.minCount).toBe(1);
         expect(ps.maxCount).toBe(1);
@@ -668,7 +676,10 @@ describe("readShaclShapes", () => {
 
     it("parses sh:datatype on property shapes", () => {
         const shapes = readShaclShapes(shaclTriples());
-        const shape = shapes.byTargetClass.get("http://example.org/User")!;
+        const shape = shapes.byTargetClass.get("http://example.org/User");
+        if (shape == null) {
+            throw new Error("expected User shape");
+        }
         expect(shape.properties[0]?.datatype).toContain("string");
     });
 
@@ -683,7 +694,14 @@ describe("readShaclShapes", () => {
             { subject: propBlank, predicate: shacl_iri("class"), object: ex_iri("User") },
         ];
         const shapes = readShaclShapes(triples);
-        const ps = shapes.byTargetClass.get("http://example.org/Org")!.properties[0]!;
+        const orgShape = shapes.byTargetClass.get("http://example.org/Org");
+        if (orgShape == null) {
+            throw new Error("expected Org shape");
+        }
+        const ps = orgShape.properties[0];
+        if (ps == null) {
+            throw new Error("expected at least one property shape on Org");
+        }
         expect(ps.classConstraint).toBe("http://example.org/User");
     });
 
@@ -695,7 +713,10 @@ describe("readShaclShapes", () => {
             { subject: shapeIri, predicate: shacl_iri("closed"), object: lit("true") },
         ];
         const shapes = readShaclShapes(triples);
-        const shape = shapes.nodeShapes.get("http://example.org/ClosedShape")!;
+        const shape = shapes.nodeShapes.get("http://example.org/ClosedShape");
+        if (shape == null) {
+            throw new Error("expected ClosedShape node shape");
+        }
         expect(shape.closed).toBe(true);
     });
 

@@ -29,7 +29,7 @@ export class EntityQuery<H extends EntityHandle[]> {
 
     constructor(
         private readonly _store: TripleStore,
-        private readonly _schema: EntitySchema<any>,
+        private readonly _schema: EntitySchema,
         private readonly _handles: H | "*",
     ) {
         this._es = new EntityStore(_store);
@@ -167,13 +167,13 @@ export class EntityQuery<H extends EntityHandle[]> {
             case "!=":
                 return value !== f.value;
             case "<":
-                return (value as any) < (f.value as any);
+                return (value as number) < (f.value as number);
             case "<=":
-                return (value as any) <= (f.value as any);
+                return (value as number) <= (f.value as number);
             case ">":
-                return (value as any) > (f.value as any);
+                return (value as number) > (f.value as number);
             case ">=":
-                return (value as any) >= (f.value as any);
+                return (value as number) >= (f.value as number);
             case "LIKE":
             case "ILIKE": {
                 const pat = String(f.value).replace(/%/g, ".*").replace(/_/g, ".");
@@ -190,10 +190,7 @@ export class EntityQuery<H extends EntityHandle[]> {
 
 export function entities(store: TripleStore) {
     return {
-        find<H extends EntityHandle[]>(
-            schema: EntitySchema<any>,
-            handles: H | "*",
-        ): EntityQuery<H> {
+        find<H extends EntityHandle[]>(schema: EntitySchema, handles: H | "*"): EntityQuery<H> {
             return new EntityQuery<H>(store, schema, handles);
         },
     };

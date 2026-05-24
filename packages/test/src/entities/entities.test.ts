@@ -127,7 +127,10 @@ for (const db of providers) {
 
         it("applies createdAt / updatedAt defaults automatically", async () => {
             const rec = await es.create(ctx, UserSchema, { email: "bob@example.com" });
-            const core = rec.groups[CoreHandle.id]!;
+            const core = rec.groups[CoreHandle.id];
+            if (core == null) {
+                throw new Error("core group must not be null");
+            }
             expect(core.createdAt).toBeInstanceOf(Date);
             expect(core.updatedAt).toBeInstanceOf(Date);
         });
@@ -138,7 +141,13 @@ for (const db of providers) {
                 displayName: "Carol",
             });
             const found = await es.findById(ctx, UserSchema, created.id, [CoreHandle]);
-            const core = found!.groups[CoreHandle.id]!;
+            if (found == null) {
+                throw new Error("found must not be null");
+            }
+            const core = found.groups[CoreHandle.id];
+            if (core == null) {
+                throw new Error("core group must not be null");
+            }
             expect(core.email).toBe("carol@example.com");
             expect(core.displayName).toBe("Carol");
         });
@@ -183,7 +192,14 @@ for (const db of providers) {
         it("groupOf() helper narrows the type", async () => {
             const rec = await es.create(ctx, UserSchema, { email: "g@example.com" });
             const found = await es.findById(ctx, UserSchema, rec.id, [CoreHandle]);
-            const core = groupOf(found!, UserSchema.allGroups()[0]!);
+            if (found == null) {
+                throw new Error("found must not be null");
+            }
+            const firstGroup = UserSchema.allGroups()[0];
+            if (firstGroup == null) {
+                throw new Error("firstGroup must not be null");
+            }
+            const core = groupOf(found, firstGroup);
             expect(core).toBeDefined();
             expect(core?.email).toBe("g@example.com");
         });
@@ -936,7 +952,12 @@ for (const db of providers) {
             const results = await entities(ctx.store)
                 .find(schema, [TestCoreHandle])
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                .where(TestCoreHandle, "score", "BOGUS" as any, 10)
+                .where(
+                    TestCoreHandle,
+                    "score",
+                    "BOGUS" as unknown as "=" | "!=" | "<" | "<=" | ">" | ">=",
+                    10,
+                )
                 .all(ctx);
             // default returns false → no records match → filtered to 0
             expect(results.length).toBe(0);

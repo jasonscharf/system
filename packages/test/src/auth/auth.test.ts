@@ -19,6 +19,7 @@ import {
     listUsers,
     MemorySessionStore,
     OAuthComponent,
+    type OAuthProvider,
     RedisSessionStore,
     SessionComponent,
     SessionCoreHandle,
@@ -31,7 +32,7 @@ import {
     UserSessionSchema,
 } from "@jasonscharf/auth";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { FlowContext, PushScheduler } from "@jasonscharf/flow";
+import { FlowContext, type HttpCtx, PushScheduler } from "@jasonscharf/flow";
 import { EntityStore } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -675,7 +676,10 @@ describe("OAuthComponent", () => {
 
     it("skips messages for unknown providers", () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        comp.initIn.put({ provider: "twitter" as any, redirectUri: "http://localhost/cb" });
+        comp.initIn.put({
+            provider: "twitter" as unknown as OAuthProvider,
+            redirectUri: "http://localhost/cb",
+        });
         comp.step();
         expect(comp.redirectOut.size).toBe(0);
     });
@@ -848,8 +852,7 @@ describe("AuthRouterComponent.sessionMiddleware()", () => {
                 headers: { cookie: `tern_session=${encodeURIComponent(session.sessionToken)}` },
             },
             user: undefined as unknown,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any;
+        } as unknown as HttpCtx;
 
         await mw(fakeCtx, async () => {});
         expect((fakeCtx as { user: unknown }).user).toBeDefined();
@@ -875,9 +878,10 @@ describe("AuthRouterComponent.sessionMiddleware()", () => {
         });
 
         const mw = router.sessionMiddleware();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const fakeCtx: any = { req: { headers: { cookie: "tern_session=bad-token" } } };
-        await mw(fakeCtx, async () => {});
+        const fakeCtx: { req: { headers: Record<string, string> }; user?: unknown } = {
+            req: { headers: { cookie: "tern_session=bad-token" } },
+        };
+        await mw(fakeCtx as unknown as HttpCtx, async () => {});
         expect(fakeCtx.user).toBeUndefined();
 
         await knex.destroy();
@@ -893,7 +897,9 @@ describe("RedisSessionStore", () => {
             get: vi.fn().mockResolvedValue("my-value"),
             del: vi.fn().mockResolvedValue(1),
         };
-        const store = new RedisSessionStore(mockRedis as any);
+        const store = new RedisSessionStore(
+            mockRedis as unknown as ConstructorParameters<typeof RedisSessionStore>[0],
+        );
         await store.set("k", "my-value", 60);
         expect(mockRedis.set).toHaveBeenCalledWith("k", "my-value", "EX", 60);
         const v = await store.get("k");
@@ -907,7 +913,9 @@ describe("RedisSessionStore", () => {
             get: vi.fn().mockResolvedValue(null),
             del: vi.fn(),
         };
-        const store = new RedisSessionStore(mockRedis as any);
+        const store = new RedisSessionStore(
+            mockRedis as unknown as ConstructorParameters<typeof RedisSessionStore>[0],
+        );
         expect(await store.get("missing")).toBeNull();
     });
 
@@ -917,7 +925,9 @@ describe("RedisSessionStore", () => {
             get: vi.fn(),
             del: vi.fn().mockResolvedValue(1),
         };
-        const store = new RedisSessionStore(mockRedis as any);
+        const store = new RedisSessionStore(
+            mockRedis as unknown as ConstructorParameters<typeof RedisSessionStore>[0],
+        );
         await store.del("k");
         expect(mockRedis.del).toHaveBeenCalledWith("k");
     });

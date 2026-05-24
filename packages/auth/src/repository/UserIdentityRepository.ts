@@ -206,21 +206,58 @@ export class UserIdentityRepository {
             return q ? (q.object as IRI).value : undefined;
         };
 
-        const userIriStr = getIri(identityOfIRI)!;
+        const userIriStr = getIri(identityOfIRI);
+        if (userIriStr == null) {
+            throw new Error(
+                `UserIdentityRepository: missing identityOfIRI for identity id "${id}"`,
+            );
+        }
         const userId = idFrom(userIriStr);
+
+        const provider = get(providerIRI);
+        if (provider == null) {
+            throw new Error(`UserIdentityRepository: missing providerIRI for identity id "${id}"`);
+        }
+        const providerUserId = get(providerUserIdIRI);
+        if (providerUserId == null) {
+            throw new Error(
+                `UserIdentityRepository: missing providerUserIdIRI for identity id "${id}"`,
+            );
+        }
+        const providerEmail = get(providerEmailIRI);
+        if (providerEmail == null) {
+            throw new Error(
+                `UserIdentityRepository: missing providerEmailIRI for identity id "${id}"`,
+            );
+        }
+        const accessToken = get(accessTokenIRI);
+        if (accessToken == null) {
+            throw new Error(
+                `UserIdentityRepository: missing accessTokenIRI for identity id "${id}"`,
+            );
+        }
+        const tokenExpiresAtStr = get(tokenExpiresAtIRI);
+        const createdAtStr = get(createdAtIRI);
+        if (createdAtStr == null) {
+            throw new Error(`UserIdentityRepository: missing createdAtIRI for identity id "${id}"`);
+        }
+        const updatedAtStr = get(updatedAtIRI);
+        if (updatedAtStr == null) {
+            throw new Error(`UserIdentityRepository: missing updatedAtIRI for identity id "${id}"`);
+        }
 
         return {
             id,
             iri: iriFor("identity", id).value,
-            provider: get(providerIRI)! as OAuthProvider,
-            providerUserId: get(providerUserIdIRI)!,
-            providerEmail: get(providerEmailIRI)!,
-            accessToken: get(accessTokenIRI)!,
+            provider: provider as OAuthProvider,
+            providerUserId,
+            providerEmail,
+            accessToken,
             refreshToken: get(refreshTokenIRI),
-            tokenExpiresAt: get(tokenExpiresAtIRI) ? new Date(get(tokenExpiresAtIRI)!) : undefined,
+            tokenExpiresAt: tokenExpiresAtStr ? new Date(tokenExpiresAtStr) : undefined,
             userId,
-            createdAt: new Date(get(createdAtIRI)!),
-            updatedAt: new Date(get(updatedAtIRI)!),
+            createdAt: new Date(createdAtStr),
+            updatedAt: new Date(updatedAtStr),
         };
     }
 }

@@ -78,10 +78,22 @@ export async function handleInsert(request: TernRequest, ctx: HandlerContext): P
     if (!payload) {
         return errResult(request.id, TERN_TYPES.tripleInsert, "Missing payload");
     }
+    const subject = termFromWire(payload.subject);
+    if (subject == null) {
+        return errResult(request.id, TERN_TYPES.tripleInsert, "Missing or invalid subject");
+    }
+    const predicate = termFromWire(payload.predicate);
+    if (predicate == null) {
+        return errResult(request.id, TERN_TYPES.tripleInsert, "Missing or invalid predicate");
+    }
+    const object = termFromWire(payload.object);
+    if (object == null) {
+        return errResult(request.id, TERN_TYPES.tripleInsert, "Missing or invalid object");
+    }
     await store.insert(defaultServerContext, {
-        subject: termFromWire(payload.subject)! as IRI | BlankNode,
-        predicate: termFromWire(payload.predicate)! as IRI,
-        object: termFromWire(payload.object)! as RdfTerm,
+        subject: subject as IRI | BlankNode,
+        predicate: predicate as IRI,
+        object: object as RdfTerm,
         graph: (termFromWire(payload.graph) as IRI | undefined) ?? makeIRI(""),
     });
     return okResult(request.id, TERN_TYPES.tripleInsert);

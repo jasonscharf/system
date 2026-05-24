@@ -81,10 +81,16 @@ function isIRI(term: RdfTerm): term is IRI {
 
 function nodeToTerm(row: NodeRow, nameIri: string | null): RdfTerm {
     if (row.kind === "iri") {
-        return makeIRI(nameIri!);
+        if (nameIri == null) {
+            throw new Error("nodeToTerm: nameIri must not be null for IRI node");
+        }
+        return makeIRI(nameIri);
     }
     if (row.kind === "blank") {
-        return { termType: "BlankNode", id: row.blank! } satisfies BlankNode;
+        if (row.blank == null) {
+            throw new Error("nodeToTerm: blank must not be null for blank node");
+        }
+        return { termType: "BlankNode", id: row.blank } satisfies BlankNode;
     }
 
     // Literal — prefer the typed JSONB payload when present
@@ -101,9 +107,12 @@ function nodeToTerm(row: NodeRow, nameIri: string | null): RdfTerm {
     // Fallback: legacy value / datatype / lang columns (pre-migration rows)
     /* v8 ignore next -- row.datatype is always set by ensureNode */
     const dtIri = row.datatype ?? "http://www.w3.org/2001/XMLSchema#string";
+    if (row.value == null) {
+        throw new Error("nodeToTerm: value must not be null for literal node");
+    }
     return {
         termType: "Literal",
-        value: row.value!,
+        value: row.value,
         datatype: makeIRI(dtIri),
         language: row.lang ?? undefined,
     } satisfies Literal;
@@ -385,19 +394,40 @@ export class TripleStore {
         }
         const nodeMap = await this._loadNodes(ctx, [...nodeIds]);
 
-        return edges.map((e) => ({
-            subject: nodeMap.get(e.subject)! as IRI | BlankNode,
-            predicate: nodeMap.get(e.predicate)! as IRI,
-            object: nodeMap.get(e.object)! as RdfTerm,
-            graph:
-                e.graph !== null
-                    ? (nodeMap.get(e.graph)! as IRI)
-                    : (DEFAULT_GRAPH satisfies DefaultGraph),
-            createdAt: new Date(e.created_at),
-            updatedAt: new Date(e.updated_at),
-            isDeleted: !!e.is_deleted,
-            deletedAt: e.deleted_at ? new Date(e.deleted_at) : null,
-        }));
+        return edges.map((e) => {
+            const subject = nodeMap.get(e.subject);
+            if (subject == null) {
+                throw new Error(`findHistory: missing node for subject id ${e.subject}`);
+            }
+            const predicate = nodeMap.get(e.predicate);
+            if (predicate == null) {
+                throw new Error(`findHistory: missing node for predicate id ${e.predicate}`);
+            }
+            const object = nodeMap.get(e.object);
+            if (object == null) {
+                throw new Error(`findHistory: missing node for object id ${e.object}`);
+            }
+            let graph: IRI | DefaultGraph;
+            if (e.graph !== null) {
+                const graphNode = nodeMap.get(e.graph);
+                if (graphNode == null) {
+                    throw new Error(`findHistory: missing node for graph id ${e.graph}`);
+                }
+                graph = graphNode as IRI;
+            } else {
+                graph = DEFAULT_GRAPH satisfies DefaultGraph;
+            }
+            return {
+                subject: subject as IRI | BlankNode,
+                predicate: predicate as IRI,
+                object: object as RdfTerm,
+                graph,
+                createdAt: new Date(e.created_at),
+                updatedAt: new Date(e.updated_at),
+                isDeleted: !!e.is_deleted,
+                deletedAt: e.deleted_at ? new Date(e.deleted_at) : null,
+            };
+        });
     }
 
     // ── Soft delete ───────────────────────────────────────────────────────────
@@ -518,19 +548,41 @@ export class TripleStore {
 
         const result = new Map<string, Quad[]>();
         for (const e of edges) {
-            const subjTerm = idToSubject.get(e.subject)!;
+            const subjTerm = idToSubject.get(e.subject);
+            if (subjTerm == null) {
+                throw new Error(`findForSubjects: missing subject term for id ${e.subject}`);
+            }
             const key = isIRI(subjTerm) ? subjTerm.value : `_:${(subjTerm as BlankNode).id}`;
             if (!result.has(key)) {
                 result.set(key, []);
             }
+            const subjectNode = nodeMap.get(e.subject);
+            if (subjectNode == null) {
+                throw new Error(`findForSubjects: missing node for subject id ${e.subject}`);
+            }
+            const predicateNode = nodeMap.get(e.predicate);
+            if (predicateNode == null) {
+                throw new Error(`findForSubjects: missing node for predicate id ${e.predicate}`);
+            }
+            const objectNode = nodeMap.get(e.object);
+            if (objectNode == null) {
+                throw new Error(`findForSubjects: missing node for object id ${e.object}`);
+            }
+            let graph: IRI | DefaultGraph;
+            if (e.graph !== null) {
+                const graphNode = nodeMap.get(e.graph);
+                if (graphNode == null) {
+                    throw new Error(`findForSubjects: missing node for graph id ${e.graph}`);
+                }
+                graph = graphNode as IRI;
+            } else {
+                graph = DEFAULT_GRAPH satisfies DefaultGraph;
+            }
             result.get(key)?.push({
-                subject: nodeMap.get(e.subject)! as IRI | BlankNode,
-                predicate: nodeMap.get(e.predicate)! as IRI,
-                object: nodeMap.get(e.object)! as RdfTerm,
-                graph:
-                    e.graph !== null
-                        ? (nodeMap.get(e.graph)! as IRI)
-                        : (DEFAULT_GRAPH satisfies DefaultGraph),
+                subject: subjectNode as IRI | BlankNode,
+                predicate: predicateNode as IRI,
+                object: objectNode as RdfTerm,
+                graph,
             });
         }
         return result;
@@ -680,15 +732,36 @@ export class TripleStore {
         }
         const nodeMap = await this._loadNodes(ctx, [...nodeIds]);
 
-        return edges.map((e) => ({
-            subject: nodeMap.get(e.subject)! as IRI | BlankNode,
-            predicate: nodeMap.get(e.predicate)! as IRI,
-            object: nodeMap.get(e.object)! as RdfTerm,
-            graph:
-                e.graph !== null
-                    ? (nodeMap.get(e.graph)! as IRI)
-                    : (DEFAULT_GRAPH satisfies DefaultGraph),
-        }));
+        return edges.map((e) => {
+            const subject = nodeMap.get(e.subject);
+            if (subject == null) {
+                throw new Error(`_hydrateEdges: missing node for subject id ${e.subject}`);
+            }
+            const predicate = nodeMap.get(e.predicate);
+            if (predicate == null) {
+                throw new Error(`_hydrateEdges: missing node for predicate id ${e.predicate}`);
+            }
+            const object = nodeMap.get(e.object);
+            if (object == null) {
+                throw new Error(`_hydrateEdges: missing node for object id ${e.object}`);
+            }
+            let graph: IRI | DefaultGraph;
+            if (e.graph !== null) {
+                const graphNode = nodeMap.get(e.graph);
+                if (graphNode == null) {
+                    throw new Error(`_hydrateEdges: missing node for graph id ${e.graph}`);
+                }
+                graph = graphNode as IRI;
+            } else {
+                graph = DEFAULT_GRAPH satisfies DefaultGraph;
+            }
+            return {
+                subject: subject as IRI | BlankNode,
+                predicate: predicate as IRI,
+                object: object as RdfTerm,
+                graph,
+            };
+        });
     }
 
     private async _loadNodes(ctx: ServerContext, ids: number[]): Promise<Map<number, RdfTerm>> {
@@ -701,7 +774,7 @@ export class TripleStore {
 
         const iriNodeIds = nodes
             .filter((n) => n.kind === "iri" && n.name_id !== null)
-            .map((n) => n.name_id!);
+            .map((n) => n.name_id as number);
         /* v8 ignore next */
         const names: NameRow[] =
             iriNodeIds.length > 0

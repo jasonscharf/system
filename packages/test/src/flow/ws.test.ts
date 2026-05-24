@@ -53,8 +53,11 @@ class UppercaseTransform extends FlowComponent {
     }
 
     override step(): void {
-        let msg: WsMessage | undefined;
-        while ((msg = this.in.read()) !== undefined) {
+        for (;;) {
+            const msg = this.in.read();
+            if (msg === undefined) {
+                break;
+            }
             this.out.put({
                 connectionId: msg.connectionId,
                 data: typeof msg.data === "string" ? msg.data.toUpperCase() : msg.data,
@@ -329,7 +332,10 @@ describe("WebSocketClient: binary message handling", () => {
 
         // Wait for server to register the connection
         await new Promise((r) => setTimeout(r, 50));
-        const connId = server.connected.read()!;
+        const connId = server.connected.read();
+        if (connId == null) {
+            throw new Error("expected a connection id from server.connected");
+        }
 
         // Server sends binary to client
         server.send.put({ connectionId: connId, data: new Uint8Array([10, 20, 30]) });

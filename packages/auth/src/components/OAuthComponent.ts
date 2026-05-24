@@ -39,8 +39,11 @@ export class OAuthComponent extends FlowComponent {
     }
 
     override step(): void {
-        let req: OAuthInitRequest | undefined;
-        while ((req = this.initIn.read()) !== undefined) {
+        for (;;) {
+            const req = this.initIn.read();
+            if (req === undefined) {
+                break;
+            }
             const provider = this._providers.get(req.provider);
             if (!provider) {
                 continue;

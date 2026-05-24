@@ -155,17 +155,20 @@ describe("DatabaseSource", () => {
 
 describe("SocketSource", () => {
     let mockSocket: {
-        listeners: Record<string, ((e?: any) => void)[]>;
+        listeners: Record<string, ((e?: unknown) => void)[]>;
         emit: (event: string, data?: unknown) => void;
     };
 
     class MockWebSocket {
-        listeners: Record<string, ((e?: any) => void)[]> = {};
+        listeners: Record<string, ((e?: unknown) => void)[]> = {};
         constructor(_url: string) {
-            mockSocket = this as any;
+            mockSocket = this as unknown as typeof mockSocket;
         }
-        addEventListener(event: string, fn: (e?: any) => void) {
-            (this.listeners[event] ??= []).push(fn);
+        addEventListener(event: string, fn: (e?: unknown) => void) {
+            if (this.listeners[event] == null) {
+                this.listeners[event] = [];
+            }
+            this.listeners[event].push(fn);
         }
         emit(event: string, data?: unknown) {
             for (const fn of this.listeners[event] ?? []) {

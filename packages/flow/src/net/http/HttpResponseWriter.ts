@@ -22,8 +22,11 @@ export class HttpResponseWriter extends FlowComponent {
     }
 
     override step(): void {
-        let resp: HttpResponse | undefined;
-        while ((resp = this.in.read()) !== undefined) {
+        for (;;) {
+            const resp = this.in.read();
+            if (resp === undefined) {
+                break;
+            }
             this._send?.(resp);
         }
     }

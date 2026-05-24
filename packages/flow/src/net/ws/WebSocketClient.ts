@@ -75,8 +75,11 @@ export class WebSocketClient extends FlowComponent {
     }
 
     override step(): void {
-        let data: string | Uint8Array | undefined;
-        while ((data = this.send.read()) !== undefined) {
+        for (;;) {
+            const data = this.send.read();
+            if (data === undefined) {
+                break;
+            }
             this._ws?.send(data);
         }
     }

@@ -1,5 +1,6 @@
 import { FlowApp } from "./FlowApp.js";
 import type { FlowComponent, FlowComponentOptions } from "./FlowComponent.js";
+import type { FlowPort } from "./FlowPort.js";
 import type { ScheduleMode } from "./types.js";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
@@ -182,65 +183,69 @@ function parseYaml(text: string): YamlValue {
 
 const defaultModuleResolver: ModuleResolver = async (uri) => {
     // Lazily import the module at the given URI
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return import(/* @vite-ignore */ uri) as any;
+    return import(/* @vite-ignore */ uri) as Promise<{
+        default: new (options: FlowComponentOptions) => FlowComponent;
+    }>;
 };
 
 // ── FlowLoader ────────────────────────────────────────────────────────────────
 
-export class FlowLoader {
-    static async fromJSON(json: string, options: LoadOptions = {}): Promise<FlowApp> {
-        const spec = JSON.parse(json) as FlowProgramSpec;
-        return FlowLoader._build(spec, options);
-    }
-
-    static async fromYAML(yaml: string, options: LoadOptions = {}): Promise<FlowApp> {
-        const parsed = parseYaml(yaml);
-        return FlowLoader._build(parsed as unknown as FlowProgramSpec, options);
-    }
-
-    static async fromRDF(_rdf: string, _options: LoadOptions = {}): Promise<FlowApp> {
-        // RDF loading is handled via @system/core's hydration pipeline.
-        // This stub reserves the API surface; a full implementation would
-        // parse Turtle/N-Quads and reconstruct the FlowProgramSpec from the
-        // flow: ontology quads.
-        throw new Error("RDF loading not yet implemented — use fromJSON or fromYAML");
-    }
-
-    private static async _build(spec: FlowProgramSpec, options: LoadOptions): Promise<FlowApp> {
-        const resolver = options.moduleResolver ?? defaultModuleResolver;
-        const app = new FlowApp({ mode: spec.mode ?? "push" });
-
-        const componentMap = new Map<string, FlowComponent>();
-
-        for (const cSpec of spec.components ?? []) {
-            const mod = await resolver(cSpec.type);
-            const Cls = mod.default;
-            const component = new Cls({
-                name: cSpec.name ?? cSpec.id,
-                context: app.context,
-            });
-            componentMap.set(cSpec.id, component);
-            app.addComponent(component);
-        }
-
-        for (const conn of spec.connections ?? []) {
-            const [fromId, fromPort] = conn.from.split(".");
-            const [toId, toPort] = conn.to.split(".");
-            const fromComp = componentMap.get(fromId);
-            const toComp = componentMap.get(toId);
-            if (!fromComp || !toComp) {
-                throw new Error(`Unknown component in connection: ${conn.from} → ${conn.to}`);
-            }
-            const outPort = fromComp.ports.get(fromPort);
-            const inPort = toComp.ports.get(toPort);
-            if (!outPort || !inPort) {
-                throw new Error(`Unknown port in connection: ${conn.from} → ${conn.to}`);
-            }
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            app.connect(outPort as any, inPort as any);
-        }
-
-        return app;
-    }
+export async function fromJSON(json: string, options: LoadOptions = {}): Promise<FlowApp> {
+    const spec = JSON.parse(json) as FlowProgramSpec;
+    return _build(spec, options);
 }
+
+export async function fromYAML(yaml: string, options: LoadOptions = {}): Promise<FlowApp> {
+    const parsed = parseYaml(yaml);
+    return _build(parsed as unknown as FlowProgramSpec, options);
+}
+
+export async function fromRDF(_rdf: string, _options: LoadOptions = {}): Promise<FlowApp> {
+    // RDF loading is handled via @system/core's hydration pipeline.
+    // This stub reserves the API surface; a full implementation would
+    // parse Turtle/N-Quads and reconstruct the FlowProgramSpec from the
+    // flow: ontology quads.
+    throw new Error("RDF loading not yet implemented — use fromJSON or fromYAML");
+}
+
+async function _build(spec: FlowProgramSpec, options: LoadOptions): Promise<FlowApp> {
+    const resolver = options.moduleResolver ?? defaultModuleResolver;
+    const app = new FlowApp({ mode: spec.mode ?? "push" });
+
+    const componentMap = new Map<string, FlowComponent>();
+
+    for (const cSpec of spec.components ?? []) {
+        const mod = await resolver(cSpec.type);
+        const Cls = mod.default;
+        const component = new Cls({
+            name: cSpec.name ?? cSpec.id,
+            context: app.context,
+        });
+        componentMap.set(cSpec.id, component);
+        app.addComponent(component);
+    }
+
+    for (const conn of spec.connections ?? []) {
+        const [fromId, fromPort] = conn.from.split(".");
+        const [toId, toPort] = conn.to.split(".");
+        const fromComp = componentMap.get(fromId);
+        const toComp = componentMap.get(toId);
+        if (!fromComp || !toComp) {
+            throw new Error(`Unknown component in connection: ${conn.from} → ${conn.to}`);
+        }
+        const outPort = fromComp.ports.get(fromPort);
+        const inPort = toComp.ports.get(toPort);
+        if (!outPort || !inPort) {
+            throw new Error(`Unknown port in connection: ${conn.from} → ${conn.to}`);
+        }
+        app.connect(outPort as FlowPort<unknown>, inPort as FlowPort<unknown>);
+    }
+
+    return app;
+}
+
+/**
+ * @deprecated Import the named functions directly: `fromJSON`, `fromYAML`, `fromRDF`.
+ * This namespace object is provided for backwards compatibility.
+ */
+export const FlowLoader = { fromJSON, fromYAML, fromRDF } as const;

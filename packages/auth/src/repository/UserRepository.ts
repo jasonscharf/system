@@ -170,14 +170,26 @@ export class UserRepository {
             return q ? String((q.object as { value: string }).value) : undefined;
         };
 
+        const email = get(emailIRI);
+        if (email == null) {
+            throw new Error(`UserRepository: missing emailIRI for user id "${id}"`);
+        }
+        const createdAtStr = get(createdAtIRI);
+        if (createdAtStr == null) {
+            throw new Error(`UserRepository: missing createdAtIRI for user id "${id}"`);
+        }
+        const updatedAtStr = get(updatedAtIRI);
+        if (updatedAtStr == null) {
+            throw new Error(`UserRepository: missing updatedAtIRI for user id "${id}"`);
+        }
         return {
             id,
             iri: iriFor("user", id).value,
-            email: get(emailIRI)!,
+            email,
             displayName: get(displayNameIRI),
             avatarUrl: get(avatarUrlIRI),
-            createdAt: new Date(get(createdAtIRI)!),
-            updatedAt: new Date(get(updatedAtIRI)!),
+            createdAt: new Date(createdAtStr),
+            updatedAt: new Date(updatedAtStr),
         };
     }
 }

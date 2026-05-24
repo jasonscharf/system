@@ -7,10 +7,8 @@ import type { HttpHeaders, HttpMethod, ParsedHttpRequest } from "./HttpTypes.js"
  * `ctx.body`.  Arbitrary extras (database handles, loggers, …) added via the
  * router constructor are accessible via the index signature `ctx['store']`.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export class HttpCtx implements Record<string, any> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    [key: string]: any;
+export class HttpCtx implements Record<string, unknown> {
+    [key: string]: unknown;
 
     /** The fully decoded inbound request. */
     readonly req: ParsedHttpRequest;

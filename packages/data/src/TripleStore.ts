@@ -184,10 +184,16 @@ export class TripleStore {
     }
 
     /** Inserts a row and returns its auto-increment ID, for both Postgres and SQLite. */
-    private async _insert(ctx: ServerContext, table: string, data: Record<string, unknown>): Promise<number> {
+    private async _insert(
+        ctx: ServerContext,
+        table: string,
+        data: Record<string, unknown>,
+    ): Promise<number> {
         const client = (this._knex.client as { config: { client: string } }).config.client;
         if (client === "pg" || client === "postgresql") {
-            const [row] = (await this._db(ctx)(table).insert(data).returning("id")) as [{ id: number }];
+            const [row] = (await this._db(ctx)(table).insert(data).returning("id")) as [
+                { id: number },
+            ];
             return row.id;
         }
         const [id] = (await this._db(ctx)(table).insert(data)) as [number];

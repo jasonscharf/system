@@ -46,7 +46,10 @@ export function isStagingOrProduction() {
 // Create a new blank object, copy process variables but only if present in `defaults`
 export const env = (<typeof defaults>Object.assign({}, defaults)) as Record<string, string>;
 
-export function copyEnvBlock(source: Record<string, string>, target: Record<string, string>) {
+export function copyEnvBlock(
+    source: Record<string, string>,
+    target: Record<string, string | null | undefined>,
+) {
     Object.keys(target)
         .filter(exists)
         .forEach((key) => {

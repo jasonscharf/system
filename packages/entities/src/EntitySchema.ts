@@ -1,6 +1,17 @@
-import type { IRI } from "@jasonscharf/core";
+import { IRI, literal, type Quad } from "@jasonscharf/core";
 import type { ShaclNodeShape } from "@jasonscharf/gen";
-import type { EntityHandle } from "./Handle.js";
+import {
+    RDF_TYPE,
+    TERN_FIELD,
+    TERN_FIELD_IRI,
+    TERN_FIELD_NAME,
+    TERN_HANDLE,
+    TERN_PROP_GROUP,
+    TERN_SCHEMA_GRAPH,
+    XSD_STRING,
+} from "./constants.js";
+import { type EntityHandle, handleSlug } from "./Handle.js";
+import { localName } from "./util.js";
 
 /**
  * Defines one PropGroup within an entity schema.
@@ -77,5 +88,62 @@ export class EntitySchema<CoreProps extends Record<string, unknown> = Record<str
             const g = this._groups.get(h.id);
             return g ? [g] : [];
         });
+    }
+
+    /**
+     * Serialises this schema as RDF quads into the tern:schema named graph.
+     *
+     * Produces stable, IRI-based nodes (no blank nodes) so the result can be
+     * round-tripped through the quad store and diffed on startup.
+     *
+     * Graph: TERN_SCHEMA_GRAPH
+     * Subject IRIs:
+     *   entity type  → typeIRI  (e.g. auth:User)
+     *   prop group   → {schemaGraph}/{typeLocal}/{handleSlug}
+     *   field        → {groupIRI}/{fieldName}
+     */
+    toQuads(): Quad[] {
+        const OWL_CLASS = new IRI("http://www.w3.org/2002/07/owl#Class");
+        const g = TERN_SCHEMA_GRAPH;
+        const typeLocal = localName(this.typeIRI.value);
+        const quads: Quad[] = [
+            { subject: this.typeIRI, predicate: RDF_TYPE, object: OWL_CLASS, graph: g },
+        ];
+
+        for (const group of this._groups.values()) {
+            const slug = handleSlug(group.handle);
+            const pgNode = new IRI(`${TERN_SCHEMA_GRAPH.value}/${typeLocal}/${slug}`);
+
+            quads.push(
+                { subject: this.typeIRI, predicate: TERN_PROP_GROUP, object: pgNode, graph: g },
+                {
+                    subject: pgNode,
+                    predicate: TERN_HANDLE,
+                    object: literal(group.handle.toString(), XSD_STRING),
+                    graph: g,
+                },
+            );
+
+            for (const [fieldName, fieldIRI] of Object.entries(group.properties)) {
+                const fieldNode = new IRI(`${pgNode.value}/${fieldName}`);
+                quads.push(
+                    { subject: pgNode, predicate: TERN_FIELD, object: fieldNode, graph: g },
+                    {
+                        subject: fieldNode,
+                        predicate: TERN_FIELD_NAME,
+                        object: literal(fieldName, XSD_STRING),
+                        graph: g,
+                    },
+                    {
+                        subject: fieldNode,
+                        predicate: TERN_FIELD_IRI,
+                        object: fieldIRI as IRI,
+                        graph: g,
+                    },
+                );
+            }
+        }
+
+        return quads;
     }
 }

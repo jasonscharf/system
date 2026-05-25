@@ -96,3 +96,29 @@ tern:cviView a owl:ObjectProperty ;
     rdfs:domain tern:CollectionViewItem ;
     rdfs:range  tern:CollectionView ;
     rdfs:comment "Back-link from a CollectionViewItem to its parent CollectionView." .
+
+# ── Schema registry ───────────────────────────────────────────────────────────
+#
+# EntitySchema metadata is stored in the named graph tern:schema so that
+# downstream installations can detect breaking schema changes on startup.
+#
+# Example:
+#   auth:User rdf:type owl:Class .                     ← in tern:schema graph
+#   auth:User tern:propGroup <tern:schema/user/tern_core_v1> .
+#   <tern:schema/user/tern_core_v1>  tern:handle "tern:core@1" .
+#   <tern:schema/user/tern_core_v1>  tern:field  <tern:schema/user/tern_core_v1/email> .
+#   <tern:schema/user/tern_core_v1/email>  tern:fieldName "email" .
+#   <tern:schema/user/tern_core_v1/email>  tern:fieldIRI  auth:email .
+
+tern:SchemaGraph a owl:NamedIndividual ;
+    rdfs:comment "Named graph IRI used to store EntitySchema metadata." .
+
+tern:field a owl:ObjectProperty ;
+    rdfs:comment "Links a schema PropGroup node to one of its field descriptor nodes." .
+
+tern:fieldName a owl:DatatypeProperty ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "The TypeScript property name for a field within a PropGroup." .
+
+tern:fieldIRI a owl:ObjectProperty ;
+    rdfs:comment "The RDF predicate IRI that a PropGroup field maps to." .

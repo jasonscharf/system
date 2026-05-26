@@ -5,6 +5,9 @@
  * (when TERN_PG_URL is set) inside rolled-back transactions.
  */
 
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import {
     AuthRouterComponent,
     AuthService,
@@ -44,6 +47,21 @@ import {
 import { EntityStore } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+function startServer(
+    handler: (req: IncomingMessage, res: ServerResponse) => void,
+): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+    return new Promise((resolve) => {
+        const srv = createServer(handler);
+        srv.listen(0, "127.0.0.1", () => {
+            const { port } = srv.address() as AddressInfo;
+            resolve({
+                baseUrl: `http://127.0.0.1:${port}`,
+                close: () => new Promise<void>((done) => srv.close(() => done())),
+            });
+        });
+    });
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -129,37 +147,46 @@ describe("GoogleProvider", () => {
     });
 
     it("exchangeCode() calls token + userinfo endpoints", async () => {
-        const mockFetch = vi
-            .fn()
-            .mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ access_token: "at", expires_in: 3600 }),
-            } as Response)
-            .mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
-                    sub: "g123",
-                    email: "u@test.com",
-                    name: "User",
-                    picture: "http://pic",
-                }),
-            } as Response);
-
-        vi.stubGlobal("fetch", mockFetch);
-
-        const result = await provider.exchangeCode("code123", "http://localhost/cb");
-        expect(result.profile.providerUserId).toBe("g123");
-        expect(result.profile.email).toBe("u@test.com");
-        expect(result.tokens.accessToken).toBe("at");
-        expect(result.tokens.expiresAt).toBeInstanceOf(Date);
-
-        vi.unstubAllGlobals();
+        const { baseUrl, close } = await startServer((req, res) => {
+            if (req.url === "/token") {
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ access_token: "at", expires_in: 3600 }));
+            } else {
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(
+                    JSON.stringify({ sub: "g123", email: "u@test.com", name: "User", picture: "http://pic" }),
+                );
+            }
+        });
+        try {
+            const p = new GoogleProvider("cid", "cs", {
+                tokenUrl: `${baseUrl}/token`,
+                userUrl: `${baseUrl}/userinfo`,
+            });
+            const result = await p.exchangeCode("code123", "http://localhost/cb");
+            expect(result.profile.providerUserId).toBe("g123");
+            expect(result.profile.email).toBe("u@test.com");
+            expect(result.tokens.accessToken).toBe("at");
+            expect(result.tokens.expiresAt).toBeInstanceOf(Date);
+        } finally {
+            await close();
+        }
     });
 
     it("exchangeCode() throws on token endpoint error", async () => {
-        vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 400 } as Response));
-        await expect(provider.exchangeCode("bad", "http://localhost/cb")).rejects.toThrow("400");
-        vi.unstubAllGlobals();
+        const { baseUrl, close } = await startServer((_, res) => {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "invalid_grant" }));
+        });
+        try {
+            const p = new GoogleProvider("cid", "cs", {
+                tokenUrl: `${baseUrl}/token`,
+                userUrl: `${baseUrl}/userinfo`,
+            });
+            await expect(p.exchangeCode("bad", "http://localhost/cb")).rejects.toThrow("400");
+        } finally {
+            await close();
+        }
     });
 });
 
@@ -175,27 +202,29 @@ describe("GitHubProvider", () => {
     });
 
     it("exchangeCode() fetches user + primary email", async () => {
-        const mockFetch = vi
-            .fn()
-            .mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ access_token: "ghat", token_type: "bearer", scope: "" }),
-            } as Response)
-            .mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ id: 42, login: "dev", name: "Dev", avatar_url: "http://av" }),
-            } as Response)
-            .mockResolvedValueOnce({
-                ok: true,
-                json: async () => [{ email: "dev@gh.com", primary: true, verified: true }],
-            } as Response);
-
-        vi.stubGlobal("fetch", mockFetch);
-        const result = await provider.exchangeCode("code", "http://localhost/cb");
-        expect(result.profile.providerUserId).toBe("42");
-        expect(result.profile.email).toBe("dev@gh.com");
-        expect(result.tokens.accessToken).toBe("ghat");
-        vi.unstubAllGlobals();
+        const { baseUrl, close } = await startServer((req, res) => {
+            res.writeHead(200, { "Content-Type": "application/json" });
+            if (req.url === "/token") {
+                res.end(JSON.stringify({ access_token: "ghat", token_type: "bearer", scope: "" }));
+            } else if (req.url === "/user") {
+                res.end(JSON.stringify({ id: 42, login: "dev", name: "Dev", avatar_url: "http://av" }));
+            } else {
+                res.end(JSON.stringify([{ email: "dev@gh.com", primary: true, verified: true }]));
+            }
+        });
+        try {
+            const p = new GitHubProvider("gh-client", "gh-secret", {
+                tokenUrl: `${baseUrl}/token`,
+                userUrl: `${baseUrl}/user`,
+                emailUrl: `${baseUrl}/emails`,
+            });
+            const result = await p.exchangeCode("code", "http://localhost/cb");
+            expect(result.profile.providerUserId).toBe("42");
+            expect(result.profile.email).toBe("dev@gh.com");
+            expect(result.tokens.accessToken).toBe("ghat");
+        } finally {
+            await close();
+        }
     });
 });
 

@@ -31,10 +31,22 @@ export class GitHubProvider implements IOAuthProvider {
 
     private readonly _clientId: string;
     private readonly _clientSecret: string;
+    private readonly _authUrl: string;
+    private readonly _tokenUrl: string;
+    private readonly _userUrl: string;
+    private readonly _emailUrl: string;
 
-    constructor(clientId = GITHUB_CLIENT_ID, clientSecret = GITHUB_CLIENT_SECRET) {
+    constructor(
+        clientId = GITHUB_CLIENT_ID,
+        clientSecret = GITHUB_CLIENT_SECRET,
+        urls?: { authUrl?: string; tokenUrl?: string; userUrl?: string; emailUrl?: string },
+    ) {
         this._clientId = clientId;
         this._clientSecret = clientSecret;
+        this._authUrl = urls?.authUrl ?? SYS_AUTH_GITHUB_OAUTH_URL;
+        this._tokenUrl = urls?.tokenUrl ?? SYS_AUTH_GITHUB_TOKEN_URL;
+        this._userUrl = urls?.userUrl ?? SYS_AUTH_GITHUB_USER_URL;
+        this._emailUrl = urls?.emailUrl ?? SYS_AUTH_GITHUB_EMAIL_URL;
     }
 
     getAuthUrl(redirectUri: string, state: string): string {
@@ -44,11 +56,11 @@ export class GitHubProvider implements IOAuthProvider {
             scope: "read:user user:email",
             state,
         });
-        return `${SYS_AUTH_GITHUB_OAUTH_URL}?${params.toString()}`;
+        return `${this._authUrl}?${params.toString()}`;
     }
 
     async exchangeCode(code: string, redirectUri: string): Promise<OAuthResult> {
-        const tokenRes = await fetch(SYS_AUTH_GITHUB_TOKEN_URL, {
+        const tokenRes = await fetch(this._tokenUrl, {
             method: "POST",
             headers: {
                 "Content-Type": "application/x-www-form-urlencoded",
@@ -69,13 +81,13 @@ export class GitHubProvider implements IOAuthProvider {
         const tokens = (await tokenRes.json()) as GitHubTokenResponse;
 
         const [userRes, emailRes] = await Promise.all([
-            fetch(SYS_AUTH_GITHUB_USER_URL, {
+            fetch(this._userUrl, {
                 headers: {
                     Authorization: `Bearer ${tokens.access_token}`,
                     Accept: "application/vnd.github+json",
                 },
             }),
-            fetch(SYS_AUTH_GITHUB_EMAIL_URL, {
+            fetch(this._emailUrl, {
                 headers: {
                     Authorization: `Bearer ${tokens.access_token}`,
                     Accept: "application/vnd.github+json",

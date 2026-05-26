@@ -23,10 +23,20 @@ export class GoogleProvider implements IOAuthProvider {
 
     private readonly _clientId: string;
     private readonly _clientSecret: string;
+    private readonly _authUrl: string;
+    private readonly _tokenUrl: string;
+    private readonly _userUrl: string;
 
-    constructor(clientId = "", clientSecret = "") {
+    constructor(
+        clientId = "",
+        clientSecret = "",
+        urls?: { authUrl?: string; tokenUrl?: string; userUrl?: string },
+    ) {
         this._clientId = clientId;
         this._clientSecret = clientSecret;
+        this._authUrl = urls?.authUrl ?? SYS_AUTH_GOOGLE_OAUTH_URL;
+        this._tokenUrl = urls?.tokenUrl ?? SYS_AUTH_GOOGLE_TOKEN_URL;
+        this._userUrl = urls?.userUrl ?? SYS_AUTH_GOOGLE_USER_URL;
     }
 
     getAuthUrl(redirectUri: string, state: string): string {
@@ -39,11 +49,11 @@ export class GoogleProvider implements IOAuthProvider {
             access_type: "offline",
             prompt: "select_account",
         });
-        return `${SYS_AUTH_GOOGLE_OAUTH_URL}?${params.toString()}`;
+        return `${this._authUrl}?${params.toString()}`;
     }
 
     async exchangeCode(code: string, redirectUri: string): Promise<OAuthResult> {
-        const tokenRes = await fetch(SYS_AUTH_GOOGLE_TOKEN_URL, {
+        const tokenRes = await fetch(this._tokenUrl, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({
@@ -62,7 +72,7 @@ export class GoogleProvider implements IOAuthProvider {
 
         const tokens = (await tokenRes.json()) as GoogleTokenResponse;
 
-        const userRes = await fetch(SYS_AUTH_GOOGLE_USER_URL, {
+        const userRes = await fetch(this._userUrl, {
             headers: { Authorization: `Bearer ${tokens.access_token}` },
         });
 

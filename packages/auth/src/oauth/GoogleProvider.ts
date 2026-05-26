@@ -1,3 +1,4 @@
+import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } from "../constants.js";
 import type { IOAuthProvider, OAuthResult } from "./types.js";
 
 export const SYS_AUTH_GOOGLE_OAUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -28,8 +29,8 @@ export class GoogleProvider implements IOAuthProvider {
     private readonly _userUrl: string;
 
     constructor(
-        clientId = "",
-        clientSecret = "",
+        clientId = GOOGLE_CLIENT_ID,
+        clientSecret = GOOGLE_CLIENT_SECRET,
         urls?: { authUrl?: string; tokenUrl?: string; userUrl?: string },
     ) {
         this._clientId = clientId;
@@ -77,7 +78,8 @@ export class GoogleProvider implements IOAuthProvider {
         });
 
         if (!userRes.ok) {
-            throw new Error(`Google user info fetch failed: ${userRes.status}`);
+            const body = await userRes.text();
+            throw new Error(`Google user info fetch failed: ${userRes.status} — ${body}`);
         }
 
         const user = (await userRes.json()) as GoogleUserInfo;

@@ -75,7 +75,8 @@ export class GitHubProvider implements IOAuthProvider {
         });
 
         if (!tokenRes.ok) {
-            throw new Error(`GitHub token exchange failed: ${tokenRes.status}`);
+            const body = await tokenRes.text();
+            throw new Error(`GitHub token exchange failed: ${tokenRes.status} — ${body}`);
         }
 
         const tokens = (await tokenRes.json()) as GitHubTokenResponse;
@@ -96,7 +97,8 @@ export class GitHubProvider implements IOAuthProvider {
         ]);
 
         if (!userRes.ok) {
-            throw new Error(`GitHub user fetch failed: ${userRes.status}`);
+            const body = await userRes.text();
+            throw new Error(`GitHub user fetch failed: ${userRes.status} — ${body}`);
         }
 
         const user = (await userRes.json()) as GitHubUser;

@@ -55,12 +55,9 @@ export class GoogleProvider implements IOAuthProvider {
             }).toString(),
         });
 
-        console.log(`REDIRECT URI IS: ${redirectUri}`);
-        const body = await tokenRes.text();
-        console.log(body);
-
         if (!tokenRes.ok) {
-            throw new Error(`Google token exchange failed: ${tokenRes.status}`);
+            const body = await tokenRes.text();
+            throw new Error(`Google token exchange failed: ${tokenRes.status} — ${body}`);
         }
 
         const tokens = (await tokenRes.json()) as GoogleTokenResponse;

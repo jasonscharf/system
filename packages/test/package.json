@@ -31,6 +31,7 @@
         "@jasonscharf/entities": "workspace:^",
         "@jasonscharf/flow": "workspace:^",
         "@jasonscharf/gen": "workspace:^",
+        "@jasonscharf/rbac": "workspace:^",
         "@jasonscharf/server": "workspace:^",
         "@jasonscharf/vaults": "workspace:^",
         "@jasonscharf/worker": "workspace:^",

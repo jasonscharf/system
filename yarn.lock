@@ -1291,6 +1291,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@jasonscharf/rbac@workspace:^, @jasonscharf/rbac@workspace:packages/rbac":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/rbac@workspace:packages/rbac"
+  dependencies:
+    "@jasonscharf/core": "workspace:^"
+    "@jasonscharf/data": "workspace:^"
+    "@jasonscharf/server": "workspace:^"
+    "@types/node": "npm:^22.0.0"
+  languageName: unknown
+  linkType: soft
+
 "@jasonscharf/sandbox-analytics@workspace:packages/sandbox-analytics":
   version: 0.0.0-use.local
   resolution: "@jasonscharf/sandbox-analytics@workspace:packages/sandbox-analytics"
@@ -1310,6 +1321,18 @@ __metadata:
     "@jasonscharf/flow": "workspace:^"
   bin:
     sandbox: ./dist/bin.js
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/sandbox-rbac@workspace:packages/sandbox-rbac":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/sandbox-rbac@workspace:packages/sandbox-rbac"
+  dependencies:
+    "@jasonscharf/core": "workspace:^"
+    "@jasonscharf/data": "workspace:^"
+    "@jasonscharf/rbac": "workspace:^"
+    "@jasonscharf/server": "workspace:^"
+    "@types/node": "npm:^22.0.0"
   languageName: unknown
   linkType: soft
 
@@ -1370,6 +1393,7 @@ __metadata:
     "@jasonscharf/entities": "workspace:^"
     "@jasonscharf/flow": "workspace:^"
     "@jasonscharf/gen": "workspace:^"
+    "@jasonscharf/rbac": "workspace:^"
     "@jasonscharf/server": "workspace:^"
     "@jasonscharf/vaults": "workspace:^"
     "@jasonscharf/worker": "workspace:^"

@@ -1,0 +1,22 @@
+{
+    "name": "@jasonscharf/sandbox-rbac",
+    "version": "0.1.0",
+    "type": "module",
+    "private": true,
+    "scripts": {
+        "start": "node --experimental-vm-modules dist/index.js",
+        "build": "yarn compile",
+        "compile": "tsc -b",
+        "clean": "rm -rf dist && rm -f tsconfig.tsbuildinfo",
+        "typecheck": "tsc -p tsconfig.json --noEmit"
+    },
+    "dependencies": {
+        "@jasonscharf/core": "workspace:^",
+        "@jasonscharf/data": "workspace:^",
+        "@jasonscharf/rbac": "workspace:^",
+        "@jasonscharf/server": "workspace:^"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0"
+    }
+}

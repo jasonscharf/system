@@ -1220,6 +1220,7 @@ __metadata:
   resolution: "@jasonscharf/app@workspace:packages/app"
   dependencies:
     "@jasonscharf/core": "workspace:^"
+    "@jasonscharf/data": "workspace:^"
     "@jasonscharf/flow": "workspace:^"
   languageName: unknown
   linkType: soft
@@ -1242,6 +1243,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@jasonscharf/convos@workspace:packages/convos"
   dependencies:
+    "@jasonscharf/app": "workspace:^"
     "@jasonscharf/core": "workspace:^"
     "@jasonscharf/data": "workspace:^"
     "@jasonscharf/rbac": "workspace:^"
@@ -1313,6 +1315,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@jasonscharf/rbac@workspace:packages/rbac"
   dependencies:
+    "@jasonscharf/app": "workspace:^"
     "@jasonscharf/core": "workspace:^"
     "@jasonscharf/data": "workspace:^"
     "@jasonscharf/server": "workspace:^"

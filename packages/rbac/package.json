@@ -31,6 +31,7 @@
         "typecheck": "tsc -p tsconfig.json --noEmit"
     },
     "dependencies": {
+        "@jasonscharf/app": "workspace:^",
         "@jasonscharf/core": "workspace:^",
         "@jasonscharf/data": "workspace:^",
         "@jasonscharf/server": "workspace:^"

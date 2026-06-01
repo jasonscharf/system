@@ -5,6 +5,13 @@ export type { ConvoServiceOptions } from "./ConvoService.js";
 export { ConvoService } from "./ConvoService.js";
 export { CONVOS_GRAPH, CONVOS_NS } from "./constants.js";
 // ── Extension lifecycle ───────────────────────────────────────────────────────
+export {
+    CONVOS_EXTENSION_NAME,
+    convosExtension,
+    getConvoService,
+    getConvosInstall,
+    getNotificationService,
+} from "./extension.js";
 export type { ConvosInstallResult } from "./install.js";
 export {
     CONVO_MODERATOR_ROLE_NAME,

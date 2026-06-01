@@ -1,8 +1,15 @@
 import { dirname, resolve } from "node:path";
 import type { TernTypeRef } from "@jasonscharf/core";
+import type { TripleStore } from "@jasonscharf/data";
 import { FlowApp } from "@jasonscharf/flow";
 import { loadAppConfig, mergeHandlers } from "./config/loader.js";
-import type { AppConfig, HandlerEntry } from "./config/types.js";
+import type {
+    AppConfig,
+    ExtensionInstallContext,
+    HandlerEntry,
+    InstalledExtension,
+    TernExtension,
+} from "./config/types.js";
 import {
     type HandlerContext,
     type HandlerFn,
@@ -12,8 +19,8 @@ import {
 export interface TernAppOptions {
     /**
      * Extra context fields injected into every handler invocation alongside
-     * the standard `connectionId`.  Use this to pass a database handle, logger,
-     * feature flags, etc. without coupling handler modules to the host app.
+     * the standard `connectionId`.  Pass `{ store }` here and all installed
+     * extension services (rbac, convos, …) will be automatically merged in.
      */
     context?: Record<string, unknown>;
     /** Scheduler mode for the underlying FBP runtime. */
@@ -27,15 +34,13 @@ export interface TernAppOptions {
  *   TernApp.fromYAML('./config/app.yaml', options)
  *   TernApp.fromEntries([...handlerEntries], options)
  *
+ * Install infrastructure extensions before starting:
+ *   const rbacInstalled  = await app.use(rbacExtension);
+ *   const convosInstalled = await app.use(convosExtension);
+ *   const rbac  = getRbacService(rbacInstalled);
+ *   const convos = getConvoService(convosInstalled);
+ *
  * Then call `app.start()` to bring up the FBP runtime.
- *
- * Example (full config-driven boot):
- *
- *   const app = await TernApp.fromYAML(
- *     fileURLToPath(new URL('./config/app.yaml', import.meta.url)),
- *     { context: { store: myTripleStore } },
- *   );
- *   await app.start();
  */
 export class TernApp {
     readonly config: AppConfig;
@@ -43,6 +48,7 @@ export class TernApp {
     readonly flow: FlowApp;
 
     private readonly _extraContext: Record<string, unknown>;
+    private readonly _installed = new Map<string, InstalledExtension>();
 
     private constructor(
         config: AppConfig,
@@ -52,7 +58,7 @@ export class TernApp {
         this.config = config;
         this.registry = registry;
         this.flow = new FlowApp({ mode: options.mode ?? "push" });
-        this._extraContext = options.context ?? {};
+        this._extraContext = { ...(options.context ?? {}) };
     }
 
     // ── Factories ─────────────────────────────────────────────────────────────
@@ -81,6 +87,72 @@ export class TernApp {
         const registry = new HandlerRegistry(process.cwd());
         registry.registerAll(mergeHandlers([], entries));
         return new TernApp(config, registry, options);
+    }
+
+    // ── Extension lifecycle ───────────────────────────────────────────────────
+
+    /**
+     * Install a TernExtension and make its services available throughout the app.
+     *
+     * Installation is idempotent — calling `use()` with the same extension name
+     * twice returns the cached result without re-running `install()`.
+     *
+     * Prerequisites listed in `extension.requires` must already be installed;
+     * TernApp throws if they are not.
+     *
+     * Installed services are automatically merged into the HandlerContext so
+     * message handlers can access them as `ctx.rbac`, `ctx.convos`, etc.
+     *
+     * Requires `{ store: TripleStore }` to be present in TernAppOptions.context.
+     */
+    async use(extension: TernExtension): Promise<InstalledExtension> {
+        const existing = this._installed.get(extension.name);
+        if (existing) {
+            return existing;
+        }
+
+        for (const dep of extension.requires ?? []) {
+            if (!this._installed.has(dep)) {
+                throw new Error(
+                    `Extension "${extension.name}" requires "${dep}" — install it first with app.use(${dep.replace("tern.", "")}Extension)`,
+                );
+            }
+        }
+
+        const store = this._extraContext.store as TripleStore | undefined;
+        if (!store) {
+            throw new Error(
+                `Extension "${extension.name}" requires a TripleStore — pass { store } in TernApp context`,
+            );
+        }
+
+        const installCtx: ExtensionInstallContext = {
+            store,
+            context: this._extraContext,
+            extensions: this._installed,
+        };
+
+        let services: Record<string, unknown> = {};
+        if (extension.install) {
+            services = await extension.install(installCtx);
+        }
+
+        const installed: InstalledExtension = {
+            name: extension.name,
+            version: extension.version,
+            services,
+        };
+
+        this._installed.set(extension.name, installed);
+
+        // Merge services into extra context so all handlers can access them
+        Object.assign(this._extraContext, services);
+
+        if (extension.handlers) {
+            this.registry.registerAll(extension.handlers);
+        }
+
+        return installed;
     }
 
     // ── Registration ──────────────────────────────────────────────────────────

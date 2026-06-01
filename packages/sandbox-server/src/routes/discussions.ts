@@ -2,24 +2,14 @@
  * Discussions API routes mounted at /api/convos.
  *
  * Access model:
- *   - ANON_IRI has ConvoModerator granted at startup — works without any login.
- *   - Authenticated users (valid session cookie / Bearer token) are lazily
- *     provisioned with ConvoUser on their first request so they can participate.
- *   - RBAC is enforced by ConvoService; all permission errors surface as 403.
+ *   - Unauthenticated requests have no convos permissions → 403.
+ *   - Authenticated users are lazily provisioned with ConvoUser on their first
+ *     request so they can participate without manual setup.
+ *   - RBAC is enforced inside ConvoService; permission errors surface as 403.
  */
 
 import type { AuthRouterComponent, UserEntity } from "@jasonscharf/auth";
-import {
-    ConversationRepository,
-    ConvoService,
-    DraftRepository,
-    InboxRepository,
-    MessageRepository,
-    NotificationRepository,
-    ParticipantRepository,
-    ReadReceiptRepository,
-} from "@jasonscharf/convos";
-import type { TripleStore } from "@jasonscharf/data";
+import type { ConvoService } from "@jasonscharf/convos";
 import type { HttpCtx, HttpRouter } from "@jasonscharf/flow";
 import type { RbacService } from "@jasonscharf/rbac";
 import { defaultServerContext } from "@jasonscharf/server";
@@ -48,13 +38,6 @@ function q(c: HttpCtx, key: string): string | undefined {
 
 // ── Auto-provision ────────────────────────────────────────────────────────────
 
-/**
- * Lazily grant ConvoUser to an authenticated caller on their first discussions
- * request. This is idempotent — if they already have the permission it's a
- * no-op at the RBAC layer.
- *
- * The grant is scoped system-wide, same as the anon grant.
- */
 async function ensureUserProvisioned(
     rbac: RbacService,
     userIri: string,
@@ -74,27 +57,14 @@ async function ensureUserProvisioned(
 
 export function mountDiscussionsRoutes(
     router: HttpRouter,
-    store: TripleStore,
+    svc: ConvoService,
     rbac: RbacService,
     auth: AuthRouterComponent,
     userRoleIri: string,
 ): void {
-    const svc = new ConvoService({
-        conversations: new ConversationRepository(store),
-        messages: new MessageRepository(store),
-        participants: new ParticipantRepository(store),
-        drafts: new DraftRepository(store),
-        inboxes: new InboxRepository(store),
-        notifications: new NotificationRepository(store),
-        receipts: new ReadReceiptRepository(store),
-        rbac,
-    });
-
-    // Session middleware populates ctx.user for every /api/convos request.
     const sessionMW = auth.sessionMiddleware();
 
     async function handle(c: HttpCtx, handler: (c: HttpCtx) => Promise<void>): Promise<void> {
-        // Resolve session user and auto-provision if needed.
         await sessionMW(c, async () => {});
         const user = sessionUser(c);
         if (user) {

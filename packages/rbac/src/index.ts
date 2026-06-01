@@ -1,5 +1,6 @@
 export * from "./AccessChecker.js";
 export * from "./constants.js";
+export { getRbacService, RBAC_EXTENSION_NAME, rbacExtension } from "./extension.js";
 export * from "./RbacInspector.js";
 export * from "./RbacService.js";
 export * from "./repository/PermissionRepository.js";

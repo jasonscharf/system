@@ -5,25 +5,68 @@ import type { ConversationEntity, MessageEntity } from "@jasonscharf/convos";
 // ── config ────────────────────────────────────────────────────────────────────
 
 const API_BASE = "/api/convos";
-// The sandbox forum is a well-known subject IRI. Any IRI works here.
 const FORUM_IRI = "http://tern.dev/sandbox/forum";
-const ANON_IRI = "http://tern.dev/sandbox/user/anon";
+const AUTH_URL = "/auth/google";
 
-// ── types ─────────────────────────────────────────────────────────────────────
+// ── me ────────────────────────────────────────────────────────────────────────
 
-interface ThreadViewProps {
-    conversation: ConversationEntity;
-    onBack: () => void;
+interface MeInfo {
+    iri: string;
+    authenticated: boolean;
+    email?: string;
+    displayName?: string;
+}
+
+function useMe(): { me: MeInfo | null; loading: boolean } {
+    const [me, setMe] = useState<MeInfo | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetch(`${API_BASE}/me`, { credentials: "include" })
+            .then((r) => (r.ok ? (r.json() as Promise<MeInfo>) : null))
+            .then((data) => setMe(data))
+            .catch(() => setMe(null))
+            .finally(() => setLoading(false));
+    }, []);
+
+    return { me, loading };
+}
+
+// ── LoginGate ─────────────────────────────────────────────────────────────────
+
+function LoginGate(): React.ReactElement {
+    return (
+        <div className="disc-page">
+            <div className="disc-page__header">
+                <h1 className="disc-page__title">Discussions</h1>
+            </div>
+            <div className="disc-login-gate">
+                <p className="disc-login-gate__msg">
+                    You need to sign in to participate in discussions.
+                </p>
+                <a className="disc-btn disc-btn--primary" href={AUTH_URL}>
+                    Sign in with Google
+                </a>
+            </div>
+        </div>
+    );
 }
 
 // ── ThreadView ────────────────────────────────────────────────────────────────
 
-function ThreadView({ conversation, onBack }: ThreadViewProps): React.ReactElement {
+interface ThreadViewProps {
+    conversation: ConversationEntity;
+    me: MeInfo;
+    onBack: () => void;
+}
+
+function ThreadView({ conversation, me, onBack }: ThreadViewProps): React.ReactElement {
     const [messages, setMessages] = useState<MessageEntity[]>([]);
     const [loading, setLoading] = useState(true);
     const [content, setContent] = useState("");
     const [replyTo, setReplyTo] = useState<MessageEntity | null>(null);
     const [posting, setPosting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
 
     const loadMessages = useCallback(async () => {
@@ -49,7 +92,7 @@ function ThreadView({ conversation, onBack }: ThreadViewProps): React.ReactEleme
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId: ANON_IRI, lastReadMessageId: lastId }),
+            body: JSON.stringify({ userId: me.iri, lastReadMessageId: lastId }),
         });
     }
 
@@ -59,18 +102,26 @@ function ThreadView({ conversation, onBack }: ThreadViewProps): React.ReactEleme
         if (!trimmed || posting) {
             return;
         }
+        setError(null);
         setPosting(true);
         try {
-            await fetch(`${API_BASE}/conversations/${conversation.id}/messages`, {
+            const r = await fetch(`${API_BASE}/conversations/${conversation.id}/messages`, {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     content: trimmed,
-                    callerIri: ANON_IRI,
                     replyToId: replyTo?.id,
                 }),
             });
+            if (r.status === 403) {
+                setError("You don't have permission to post here.");
+                return;
+            }
+            if (!r.ok) {
+                setError("Failed to post message.");
+                return;
+            }
             setContent("");
             setReplyTo(null);
             await loadMessages();
@@ -104,6 +155,9 @@ function ThreadView({ conversation, onBack }: ThreadViewProps): React.ReactEleme
                         {conversation.status}
                     </span>
                 </div>
+                <span className="disc-thread__actor">
+                    {me.displayName ?? me.email ?? me.iri.split("/").pop()}
+                </span>
             </div>
 
             <div className="disc-thread__messages">
@@ -114,7 +168,7 @@ function ThreadView({ conversation, onBack }: ThreadViewProps): React.ReactEleme
                 {messages.map((msg) => (
                     <div
                         key={msg.id}
-                        className={`disc-msg${msg.isDeleted ? " disc-msg--deleted" : ""}`}
+                        className={`disc-msg${msg.isDeleted ? " disc-msg--deleted" : ""}${msg.authorId === me.iri ? " disc-msg--own" : ""}`}
                     >
                         {msg.replyToId && (
                             <div className="disc-msg__reply-indicator">
@@ -122,7 +176,7 @@ function ThreadView({ conversation, onBack }: ThreadViewProps): React.ReactEleme
                             </div>
                         )}
                         <div className="disc-msg__author">
-                            {msg.authorId.split("/").pop()}
+                            {msg.authorId === me.iri ? "You" : msg.authorId.split("/").pop()}
                             {msg.revisionCount > 0 && (
                                 <span className="disc-msg__edited"> (edited)</span>
                             )}
@@ -155,7 +209,12 @@ function ThreadView({ conversation, onBack }: ThreadViewProps): React.ReactEleme
                         <div className="disc-composer__reply-banner">
                             <span>
                                 Replying to{" "}
-                                <strong>{replyTo.authorId.split("/").pop()}</strong>:&nbsp;
+                                <strong>
+                                    {replyTo.authorId === me.iri
+                                        ? "yourself"
+                                        : replyTo.authorId.split("/").pop()}
+                                </strong>
+                                :&nbsp;
                                 {replyTo.content.slice(0, 60)}
                             </span>
                             <button
@@ -167,6 +226,7 @@ function ThreadView({ conversation, onBack }: ThreadViewProps): React.ReactEleme
                             </button>
                         </div>
                     )}
+                    {error && <p className="disc-error">{error}</p>}
                     <textarea
                         className="disc-composer__textarea"
                         value={content}
@@ -194,6 +254,8 @@ function ThreadView({ conversation, onBack }: ThreadViewProps): React.ReactEleme
 // ── DiscussionsPage ───────────────────────────────────────────────────────────
 
 export function DiscussionsPage(): React.ReactElement {
+    const { me, loading: meLoading } = useMe();
+
     const [conversations, setConversations] = useState<ConversationEntity[]>([]);
     const [selected, setSelected] = useState<ConversationEntity | null>(null);
     const [loading, setLoading] = useState(true);
@@ -201,6 +263,7 @@ export function DiscussionsPage(): React.ReactElement {
     const [newTitle, setNewTitle] = useState("");
     const [newMessage, setNewMessage] = useState("");
     const [submitting, setSubmitting] = useState(false);
+    const [createError, setCreateError] = useState<string | null>(null);
 
     const loadConvos = useCallback(async () => {
         setLoading(true);
@@ -218,17 +281,41 @@ export function DiscussionsPage(): React.ReactElement {
     }, []);
 
     useEffect(() => {
-        void loadConvos();
-    }, [loadConvos]);
+        if (me?.authenticated) {
+            void loadConvos();
+        }
+    }, [me, loadConvos]);
+
+    if (meLoading) {
+        return <div className="disc-page"><p className="disc-empty">Loading…</p></div>;
+    }
+
+    if (!me?.authenticated) {
+        return <LoginGate />;
+    }
+
+    if (selected) {
+        return (
+            <ThreadView
+                conversation={selected}
+                me={me}
+                onBack={() => {
+                    setSelected(null);
+                    void loadConvos();
+                }}
+            />
+        );
+    }
 
     async function handleCreate(e: React.FormEvent): Promise<void> {
         e.preventDefault();
         if (!newTitle.trim() || submitting) {
             return;
         }
+        setCreateError(null);
         setSubmitting(true);
         try {
-            await fetch(`${API_BASE}/conversations`, {
+            const r = await fetch(`${API_BASE}/conversations`, {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
@@ -236,9 +323,16 @@ export function DiscussionsPage(): React.ReactElement {
                     subjectIri: FORUM_IRI,
                     title: newTitle.trim(),
                     initialMessage: newMessage.trim() || undefined,
-                    callerIri: ANON_IRI,
                 }),
             });
+            if (r.status === 403) {
+                setCreateError("You don't have permission to create threads.");
+                return;
+            }
+            if (!r.ok) {
+                setCreateError("Failed to create thread.");
+                return;
+            }
             setNewTitle("");
             setNewMessage("");
             setCreating(false);
@@ -248,22 +342,15 @@ export function DiscussionsPage(): React.ReactElement {
         }
     }
 
-    if (selected) {
-        return (
-            <ThreadView
-                conversation={selected}
-                onBack={() => {
-                    setSelected(null);
-                    void loadConvos();
-                }}
-            />
-        );
-    }
-
     return (
         <div className="disc-page">
             <div className="disc-page__header">
-                <h1 className="disc-page__title">Discussions</h1>
+                <div className="disc-page__header-top">
+                    <h1 className="disc-page__title">Discussions</h1>
+                    <span className="disc-page__user">
+                        {me.displayName ?? me.email ?? me.iri.split("/").pop()}
+                    </span>
+                </div>
                 <p className="disc-page__subtitle">
                     Forum threads attached to{" "}
                     <code className="disc-code">{FORUM_IRI}</code>. Any business
@@ -302,6 +389,7 @@ export function DiscussionsPage(): React.ReactElement {
                         onChange={(e) => setNewMessage(e.target.value)}
                         rows={3}
                     />
+                    {createError && <p className="disc-error">{createError}</p>}
                     <div className="disc-new-form__actions">
                         <button
                             type="submit"
@@ -336,7 +424,9 @@ export function DiscussionsPage(): React.ReactElement {
                             </div>
                             <div className="disc-thread-item__meta">
                                 <span className="disc-thread-item__author">
-                                    {c.createdBy.split("/").pop()}
+                                    {c.createdBy === me.iri
+                                        ? "You"
+                                        : c.createdBy.split("/").pop()}
                                 </span>
                                 <span className="disc-thread-item__time">
                                     {new Date(c.createdAt).toLocaleDateString()}

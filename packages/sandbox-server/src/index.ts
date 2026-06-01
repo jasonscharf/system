@@ -39,6 +39,7 @@ import { SecretsManager } from "@jasonscharf/vaults";
 import { MessageDecoder } from "./components/MessageDecoder.js";
 import { MessageEncoder } from "./components/MessageEncoder.js";
 import { MessageRouter } from "./components/MessageRouter.js";
+import { mountDiscussionsRoutes } from "./routes/discussions.js";
 
 function loadVersion(): unknown {
     try {
@@ -200,6 +201,8 @@ async function main(): Promise<void> {
     });
 
     topRouter.mount("/auth", authRouter.httpRouter);
+
+    mountDiscussionsRoutes(topRouter, store);
 
     flowApp
         .addComponent(httpServer)

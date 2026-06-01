@@ -11,6 +11,7 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "@jasonscharf/convos": "workspace:^",
         "@jasonscharf/core": "workspace:^",
         "@jasonscharf/flow": "workspace:^",
         "react": "^19.2.3",

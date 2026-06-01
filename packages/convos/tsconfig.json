@@ -3,18 +3,14 @@
     "compilerOptions": {
         "composite": true,
         "rootDir": "src",
-        "outDir": "dist"
+        "outDir": "dist",
+        "jsx": "react-jsx"
     },
     "references": [
-        { "path": "../app" },
-        { "path": "../auth" },
-        { "path": "../convos" },
         { "path": "../core" },
         { "path": "../data" },
-        { "path": "../flow" },
-        { "path": "../rbac" },
         { "path": "../server" },
-        { "path": "../vaults" }
+        { "path": "../rbac" }
     ],
     "include": ["src"]
 }

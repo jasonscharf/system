@@ -32,6 +32,7 @@ export default defineConfig({
             "@jasonscharf/api": pkg("api"),
             "@jasonscharf/app": pkg("app"),
             "@jasonscharf/auth": pkg("auth"),
+            "@jasonscharf/convos": pkg("convos"),
             "@jasonscharf/core": pkg("core"),
             "@jasonscharf/data": pkg("data"),
             "@jasonscharf/entities": pkg("entities"),

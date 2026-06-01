@@ -1,7 +1,9 @@
-import { StrictMode } from "react";
+import type React from "react";
+import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ClientApp } from "./ClientApp.js";
 import { ComponentShowcaseView } from "./components/ComponentShowcase.js";
+import { DiscussionsPage } from "./components/DiscussionsPage.js";
 import "./style.css";
 
 // In k8s the web container is behind an nginx reverse proxy that forwards
@@ -14,6 +16,41 @@ const SERVER_URL =
     import.meta.env.VITE_SERVER_URL ??
     `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws`;
 
+type Page = "showcase" | "discussions";
+
+function App({ model }: { model: ClientApp["showcase"] }): React.ReactElement {
+    const [page, setPage] = useState<Page>("showcase");
+
+    return (
+        <>
+            <nav className="app-nav">
+                <span className="app-nav__brand">Tern Sandbox</span>
+                <div className="app-nav__links">
+                    <button
+                        type="button"
+                        className={`app-nav__link${page === "showcase" ? " app-nav__link--active" : ""}`}
+                        onClick={() => setPage("showcase")}
+                    >
+                        Components
+                    </button>
+                    <button
+                        type="button"
+                        className={`app-nav__link${page === "discussions" ? " app-nav__link--active" : ""}`}
+                        onClick={() => setPage("discussions")}
+                    >
+                        Discussions
+                    </button>
+                </div>
+            </nav>
+
+            <main className="app-main">
+                {page === "showcase" && <ComponentShowcaseView model={model} />}
+                {page === "discussions" && <DiscussionsPage />}
+            </main>
+        </>
+    );
+}
+
 async function main(): Promise<void> {
     const app = new ClientApp(SERVER_URL);
 
@@ -24,7 +61,7 @@ async function main(): Promise<void> {
 
     createRoot(root).render(
         <StrictMode>
-            <ComponentShowcaseView model={app.showcase} />
+            <App model={app.showcase} />
         </StrictMode>,
     );
 

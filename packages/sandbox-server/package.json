@@ -13,6 +13,7 @@
     "dependencies": {
         "@jasonscharf/app": "workspace:^",
         "@jasonscharf/auth": "workspace:^",
+        "@jasonscharf/convos": "workspace:^",
         "@jasonscharf/core": "workspace:^",
         "@jasonscharf/data": "workspace:^",
         "@jasonscharf/flow": "workspace:^",

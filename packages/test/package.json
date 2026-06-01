@@ -26,6 +26,7 @@
         "@jasonscharf/api": "workspace:^",
         "@jasonscharf/app": "workspace:^",
         "@jasonscharf/auth": "workspace:^",
+        "@jasonscharf/convos": "workspace:^",
         "@jasonscharf/core": "workspace:^",
         "@jasonscharf/data": "workspace:^",
         "@jasonscharf/entities": "workspace:^",

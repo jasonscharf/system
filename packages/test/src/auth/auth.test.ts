@@ -154,7 +154,12 @@ describe("GoogleProvider", () => {
             } else {
                 res.writeHead(200, { "Content-Type": "application/json" });
                 res.end(
-                    JSON.stringify({ sub: "g123", email: "u@test.com", name: "User", picture: "http://pic" }),
+                    JSON.stringify({
+                        sub: "g123",
+                        email: "u@test.com",
+                        name: "User",
+                        picture: "http://pic",
+                    }),
                 );
             }
         });
@@ -207,7 +212,9 @@ describe("GitHubProvider", () => {
             if (req.url === "/token") {
                 res.end(JSON.stringify({ access_token: "ghat", token_type: "bearer", scope: "" }));
             } else if (req.url === "/user") {
-                res.end(JSON.stringify({ id: 42, login: "dev", name: "Dev", avatar_url: "http://av" }));
+                res.end(
+                    JSON.stringify({ id: 42, login: "dev", name: "Dev", avatar_url: "http://av" }),
+                );
             } else {
                 res.end(JSON.stringify([{ email: "dev@gh.com", primary: true, verified: true }]));
             }

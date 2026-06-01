@@ -1324,18 +1324,6 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@jasonscharf/sandbox-rbac@workspace:packages/sandbox-rbac":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/sandbox-rbac@workspace:packages/sandbox-rbac"
-  dependencies:
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/data": "workspace:^"
-    "@jasonscharf/rbac": "workspace:^"
-    "@jasonscharf/server": "workspace:^"
-    "@types/node": "npm:^22.0.0"
-  languageName: unknown
-  linkType: soft
-
 "@jasonscharf/sandbox-server@workspace:packages/sandbox-server":
   version: 0.0.0-use.local
   resolution: "@jasonscharf/sandbox-server@workspace:packages/sandbox-server"
@@ -1345,6 +1333,7 @@ __metadata:
     "@jasonscharf/core": "workspace:^"
     "@jasonscharf/data": "workspace:^"
     "@jasonscharf/flow": "workspace:^"
+    "@jasonscharf/rbac": "workspace:^"
     "@jasonscharf/server": "workspace:^"
     "@jasonscharf/vaults": "workspace:^"
     better-sqlite3: "npm:^11.10.0"

@@ -5,10 +5,6 @@
         "rootDir": "src",
         "outDir": "dist"
     },
-    "references": [
-        { "path": "../core" },
-        { "path": "../data" },
-        { "path": "../server" }
-    ],
+    "references": [{ "path": "../core" }, { "path": "../data" }, { "path": "../server" }],
     "include": ["src"]
 }

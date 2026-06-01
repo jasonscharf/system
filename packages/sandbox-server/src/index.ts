@@ -25,7 +25,7 @@ import {
     UserRepository,
     UserSessionRepository,
 } from "@jasonscharf/auth";
-import { installConvos } from "@jasonscharf/convos";
+import { convosExtension, getConvoService, getConvosInstall } from "@jasonscharf/convos";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import {
     FlowApp,
@@ -35,19 +35,9 @@ import {
     HttpServer,
     WebSocketServer,
 } from "@jasonscharf/flow";
-import {
-    PermissionRepository,
-    PolicyGrantRepository,
-    RbacService,
-    ResourceNodeRepository,
-    RoleRepository,
-    ServiceAccountRepository,
-    TenantRepository,
-    UserGroupRepository,
-} from "@jasonscharf/rbac";
+import { getRbacService, rbacExtension } from "@jasonscharf/rbac";
 import { defaultServerContext } from "@jasonscharf/server";
 import { SecretsManager } from "@jasonscharf/vaults";
-import { up as seedRbac } from "../../data/src/migrations/004_rbac.js";
 import { MessageDecoder } from "./components/MessageDecoder.js";
 import { MessageEncoder } from "./components/MessageEncoder.js";
 import { MessageRouter } from "./components/MessageRouter.js";
@@ -157,31 +147,13 @@ async function main(): Promise<void> {
         "placeholder_github_client_secret",
     );
 
-    // ── RBAC system seed ─────────────────────────────────────────────────────
-    // 004_rbac seeds the system tenant, superusers group, superadmin role, and
-    // wildcard permission. It is idempotent and must be run before installConvos.
-    await seedRbac(knex);
-
-    // ── RBAC service ──────────────────────────────────────────────────────────
-    const rbac = new RbacService({
-        store,
-        tenants: new TenantRepository(store),
-        groups: new UserGroupRepository(store),
-        roles: new RoleRepository(store),
-        grants: new PolicyGrantRepository(store),
-        permissions: new PermissionRepository(store),
-        resources: new ResourceNodeRepository(store),
-        serviceAccounts: new ServiceAccountRepository(store),
-    });
-
-    // ── convos extension: seed permissions/roles ─────────────────────────────
-    // Authenticated users are lazily provisioned with ConvoUser on first request.
-    // Unauthenticated callers have no convos permissions and receive 403.
-    const convosInstall = await installConvos(defaultServerContext, rbac);
-    console.log("[sandbox-server] convos: permissions + roles seeded");
-
-    // ── Application config ────────────────────────────────────────────────────
+    // ── Application config + infrastructure extensions ───────────────────────
     const ternApp = await TernApp.fromYAML(CONFIG, { context: { store } });
+    const rbacInstalled = await ternApp.use(rbacExtension);
+    const convosInstalled = await ternApp.use(convosExtension);
+    const rbac = getRbacService(rbacInstalled);
+    const convos = getConvoService(convosInstalled);
+    const convosInstall = getConvosInstall(convosInstalled);
     console.log(
         `[sandbox-server] Loaded: ${ternApp.config.name} v${ternApp.config.version ?? "?"}`,
     );
@@ -237,7 +209,7 @@ async function main(): Promise<void> {
 
     topRouter.mount("/auth", authRouter.httpRouter);
 
-    mountDiscussionsRoutes(topRouter, store, rbac, authRouter, convosInstall.userRoleIri);
+    mountDiscussionsRoutes(topRouter, convos, rbac, authRouter, convosInstall.userRoleIri);
 
     flowApp
         .addComponent(httpServer)

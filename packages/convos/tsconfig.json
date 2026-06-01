@@ -7,10 +7,11 @@
         "jsx": "react-jsx"
     },
     "references": [
+        { "path": "../app" },
         { "path": "../core" },
         { "path": "../data" },
-        { "path": "../server" },
-        { "path": "../rbac" }
+        { "path": "../rbac" },
+        { "path": "../server" }
     ],
     "include": ["src"]
 }

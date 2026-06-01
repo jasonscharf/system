@@ -7,14 +7,17 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+    type ExtensionInstallContext,
     type HandlerContext,
     type HandlerEntry,
     HandlerRegistry,
+    type InstalledExtension,
     loadAppConfig,
     mergeHandlers,
     parseTurtle,
     parseYaml,
     TernApp,
+    type TernExtension,
 } from "@jasonscharf/app";
 import {
     errResult,
@@ -1225,5 +1228,171 @@ describe("loader.ts: Turtle handler bnode missing type and module triples", () =
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
+    });
+});
+
+// ── TernApp.use() — infrastructure extension lifecycle ───────────────────────
+
+describe("TernApp.use()", () => {
+    function makeApp(withStore = true): TernApp {
+        const ctx = withStore ? { store: "fake-store" } : {};
+        return TernApp.fromEntries({ name: "test", extensions: [], handlers: [] }, [], {
+            context: ctx,
+        });
+    }
+
+    it("calls install() and returns InstalledExtension with services", async () => {
+        const app = makeApp();
+        let installCalled = false;
+
+        const ext: TernExtension = {
+            name: "test.greeter",
+            version: "1.0.0",
+            async install(_ctx: ExtensionInstallContext) {
+                installCalled = true;
+                return { greeting: "hello" };
+            },
+        };
+
+        const installed: InstalledExtension = await app.use(ext);
+        expect(installCalled).toBe(true);
+        expect(installed.name).toBe("test.greeter");
+        expect(installed.version).toBe("1.0.0");
+        expect(installed.services.greeting).toBe("hello");
+    });
+
+    it("merges installed services into the HandlerContext", async () => {
+        const knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
+        const app = TernApp.fromEntries({ name: "test", extensions: [], handlers: [] }, [], {
+            context: { store: knex },
+        });
+
+        await app.use({
+            name: "test.context-check",
+            async install() {
+                return { magicValue: 42 };
+            },
+        });
+
+        let capturedValue: unknown;
+        app.register(TERN_TYPES.ping, async (req, ctx) => {
+            capturedValue = (ctx as Record<string, unknown>).magicValue;
+            return okResult(req.id, req.type, {});
+        });
+
+        await app.dispatch(query(TERN_TYPES.ping, {}), "conn-1");
+        expect(capturedValue).toBe(42);
+        await knex.destroy();
+    });
+
+    it("is idempotent — second use() call returns the cached result without re-running install", async () => {
+        const app = makeApp();
+        let callCount = 0;
+
+        const ext: TernExtension = {
+            name: "test.once",
+            async install() {
+                callCount++;
+                return { count: callCount };
+            },
+        };
+
+        const first = await app.use(ext);
+        const second = await app.use(ext);
+        expect(callCount).toBe(1);
+        expect(first).toBe(second);
+    });
+
+    it("enforces requires — throws when a dependency is not installed", async () => {
+        const app = makeApp();
+
+        const dependent: TernExtension = {
+            name: "test.dependent",
+            requires: ["test.missing"],
+            async install() {
+                return {};
+            },
+        };
+
+        await expect(app.use(dependent)).rejects.toThrow(/requires "test.missing"/);
+    });
+
+    it("succeeds when all requires are satisfied in order", async () => {
+        const app = makeApp();
+
+        const base: TernExtension = {
+            name: "test.base",
+            async install() {
+                return { baseService: "ready" };
+            },
+        };
+        const dependent: TernExtension = {
+            name: "test.dependent",
+            requires: ["test.base"],
+            async install({ extensions }: ExtensionInstallContext) {
+                const b = extensions.get("test.base");
+                return { fromBase: b?.services.baseService };
+            },
+        };
+
+        await app.use(base);
+        const result = await app.use(dependent);
+        expect(result.services.fromBase).toBe("ready");
+    });
+
+    it("install context exposes all previously installed extensions", async () => {
+        const app = makeApp();
+
+        await app.use({
+            name: "test.alpha",
+            async install() {
+                return { alpha: true };
+            },
+        });
+        const beta = await app.use({
+            name: "test.beta",
+            requires: ["test.alpha"],
+            async install({ extensions }: ExtensionInstallContext) {
+                return { sawAlpha: extensions.get("test.alpha")?.services.alpha };
+            },
+        });
+        expect(beta.services.sawAlpha).toBe(true);
+    });
+
+    it("registers extension handlers in the dispatcher", async () => {
+        const app = makeApp();
+        const CUSTOM_IRI = "http://test.dev/custom-handler";
+
+        await app.use({
+            name: "test.with-handlers",
+            async install() {
+                return {};
+            },
+            handlers: [{ typeIri: CUSTOM_IRI, module: "__inline__" }],
+        });
+
+        expect(app.registry.registeredTypes).toContain(CUSTOM_IRI);
+    });
+
+    it("throws a clear error when no store is present in context", async () => {
+        const app = makeApp(false);
+
+        await expect(
+            app.use({
+                name: "test.needs-store",
+                async install() {
+                    return {};
+                },
+            }),
+        ).rejects.toThrow(/requires a TripleStore/);
+    });
+
+    it("extension without install() installs cleanly with empty services", async () => {
+        const app = makeApp();
+
+        const noopExt: TernExtension = { name: "test.noop" };
+        const installed = await app.use(noopExt);
+        expect(installed.name).toBe("test.noop");
+        expect(installed.services).toEqual({});
     });
 });

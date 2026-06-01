@@ -5,16 +5,19 @@
  * each operation inside a rolled-back transaction for clean isolation.
  *
  * Suites:
- *   ConversationRepository — CRUD, subject/inbox queries, status/assignment
- *   MessageRepository     — create, edit (revisions), soft-delete, threading
- *   ParticipantRepository — add, remove, role change, idempotent add
- *   DraftRepository       — save, update, delete, find by author
- *   InboxRepository       — create, membership, find by subject
- *   NotificationRepository — create, read, dismiss, fan-out, unread count
- *   ReadReceiptRepository — upsert watermark, find by user+conversation
- *   ConvoService (no RBAC) — orchestrated happy-path scenarios
- *   ConvoService + RBAC   — permission grant/deny per operation
- *   installConvos         — seeds permissions and roles
+ *   ConversationRepository  — CRUD, subject/inbox queries, status/assignment
+ *   MessageRepository       — create, edit (revisions), soft-delete, threading
+ *   ParticipantRepository   — add, remove, role change, idempotent add
+ *   DraftRepository         — save, update, delete, find by author
+ *   InboxRepository         — create, membership, find by subject
+ *   NotificationRepository  — create, read, dismiss, fan-out, unread count,
+ *                             templateKey + payload storage, findByTemplateKey
+ *   ReadReceiptRepository   — upsert watermark, find by user+conversation
+ *   ConvoService (no RBAC)  — orchestrated happy-path scenarios
+ *   ConvoService + RBAC     — permission grant/deny per operation
+ *   installConvos           — seeds permissions and roles
+ *   NotificationService     — one-time, resettable, window dedupe; payload;
+ *                             sendToMany; history; NPM-consumer example
  */
 
 import {
@@ -25,6 +28,7 @@ import {
     installConvos,
     MessageRepository,
     NotificationRepository,
+    NotificationService,
     ParticipantRepository,
     PERM_CONVO_CLOSE,
     PERM_CONVO_CREATE,
@@ -1185,6 +1189,360 @@ for (const provider of providers) {
             expect(
                 await rbac.can({ trx }, { principal: ALICE, permission: PERM_CONVO_CREATE }),
             ).toBe(false);
+        });
+    });
+
+    // ── NotificationService ───────────────────────────────────────────────────
+
+    describe(`NotificationService — ${provider.name}`, () => {
+        let knex: Knex;
+        let trx: Knex.Transaction;
+        let store: TripleStore;
+        let notifRepo: NotificationRepository;
+        let svc: NotificationService;
+
+        beforeEach(async () => {
+            knex = await provider.create();
+            trx = await knex.transaction();
+            store = new TripleStore(knex);
+            notifRepo = new NotificationRepository(store);
+            svc = new NotificationService({ notifications: notifRepo });
+        });
+        afterEach(async () => {
+            await trx.rollback();
+            await knex.destroy();
+        });
+
+        // ── one-time ──────────────────────────────────────────────────────────
+
+        it("one-time: delivers on first call and is suppressed on subsequent calls", async () => {
+            const first = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:welcome",
+                payload: { name: "Alice" },
+                dedupe: { kind: "one-time" },
+            });
+            expect(first).not.toBeNull();
+            if (!first) {
+                return;
+            }
+            expect(first.templateKey).toBe("insights:welcome");
+            expect(first.payload).toBe(JSON.stringify({ name: "Alice" }));
+
+            const second = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:welcome",
+                payload: { name: "Alice" },
+                dedupe: { kind: "one-time" },
+            });
+            expect(second).toBeNull();
+        });
+
+        it("one-time: dismissing does NOT reset the latch", async () => {
+            const n = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:welcome",
+                dedupe: { kind: "one-time" },
+            });
+            expect(n).not.toBeNull();
+            if (!n) {
+                return;
+            }
+            await notifRepo.dismiss({ trx }, n.id);
+
+            const after = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:welcome",
+                dedupe: { kind: "one-time" },
+            });
+            expect(after).toBeNull();
+        });
+
+        it("one-time: independent per user", async () => {
+            await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:welcome",
+                dedupe: { kind: "one-time" },
+            });
+            const bob = await svc.send({ trx }, {
+                userId: BOB,
+                templateKey: "insights:welcome",
+                dedupe: { kind: "one-time" },
+            });
+            expect(bob).not.toBeNull();
+        });
+
+        // ── resettable ────────────────────────────────────────────────────────
+
+        it("resettable: delivers once, then suppresses until dismissed", async () => {
+            const first = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:tip",
+                dedupe: { kind: "resettable" },
+            });
+            expect(first).not.toBeNull();
+
+            const suppressed = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:tip",
+                dedupe: { kind: "resettable" },
+            });
+            expect(suppressed).toBeNull();
+
+            if (!first) {
+                return;
+            }
+            await notifRepo.dismiss({ trx }, first.id);
+
+            const afterDismiss = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:tip",
+                dedupe: { kind: "resettable" },
+            });
+            expect(afterDismiss).not.toBeNull();
+        });
+
+        // ── window ────────────────────────────────────────────────────────────
+
+        it("window: delivers within the time window and then suppresses", async () => {
+            const first = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:daily-digest",
+                payload: { activeUsers: 42 },
+                dedupe: { kind: "window", hours: 24 },
+            });
+            expect(first).not.toBeNull();
+
+            const withinWindow = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:daily-digest",
+                payload: { activeUsers: 50 },
+                dedupe: { kind: "window", hours: 24 },
+            });
+            expect(withinWindow).toBeNull();
+        });
+
+        it("window: dismissing resets the window", async () => {
+            const first = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:daily-digest",
+                dedupe: { kind: "window", hours: 24 },
+            });
+            expect(first).not.toBeNull();
+            if (!first) {
+                return;
+            }
+            await notifRepo.dismiss({ trx }, first.id);
+
+            const afterDismiss = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:daily-digest",
+                dedupe: { kind: "window", hours: 24 },
+            });
+            expect(afterDismiss).not.toBeNull();
+        });
+
+        it("window: a zero-hour window never suppresses (always delivers)", async () => {
+            await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:realtime",
+                dedupe: { kind: "window", hours: 0 },
+            });
+            const second = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:realtime",
+                dedupe: { kind: "window", hours: 0 },
+            });
+            expect(second).not.toBeNull();
+        });
+
+        // ── sendToMany ────────────────────────────────────────────────────────
+
+        it("sendToMany: delivers to each user independently, skipping suppressed ones", async () => {
+            await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:feature-announcement",
+                dedupe: { kind: "one-time" },
+            });
+
+            const results = await svc.sendToMany({ trx }, [ALICE, BOB, CHARLIE], {
+                templateKey: "insights:feature-announcement",
+                payload: { feature: "dark mode" },
+                dedupe: { kind: "one-time" },
+            });
+
+            expect(results).toHaveLength(2);
+            expect(results.map((n) => n.userId)).toEqual(
+                expect.arrayContaining([BOB, CHARLIE]),
+            );
+        });
+
+        // ── helper queries ────────────────────────────────────────────────────
+
+        it("wasSentEver returns false before first send and true after", async () => {
+            expect(await svc.wasSentEver({ trx }, ALICE, "insights:welcome")).toBe(false);
+            await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:welcome",
+                dedupe: { kind: "one-time" },
+            });
+            expect(await svc.wasSentEver({ trx }, ALICE, "insights:welcome")).toBe(true);
+        });
+
+        it("wasSentEver returns true even after dismiss", async () => {
+            const n = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:welcome",
+                dedupe: { kind: "one-time" },
+            });
+            expect(n).not.toBeNull();
+            if (!n) {
+                return;
+            }
+            await notifRepo.dismiss({ trx }, n.id);
+            expect(await svc.wasSentEver({ trx }, ALICE, "insights:welcome")).toBe(true);
+        });
+
+        it("hasPending returns false after dismiss and true when undismissed", async () => {
+            expect(await svc.hasPending({ trx }, ALICE, "insights:tip")).toBe(false);
+            const n = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:tip",
+                dedupe: { kind: "resettable" },
+            });
+            expect(await svc.hasPending({ trx }, ALICE, "insights:tip")).toBe(true);
+            expect(n).not.toBeNull();
+            if (!n) {
+                return;
+            }
+            await notifRepo.dismiss({ trx }, n.id);
+            expect(await svc.hasPending({ trx }, ALICE, "insights:tip")).toBe(false);
+        });
+
+        it("history returns all deliveries for a (user, templateKey), newest first", async () => {
+            for (let i = 0; i < 3; i++) {
+                await svc.send({ trx }, {
+                    userId: ALICE,
+                    templateKey: "insights:hourly",
+                    dedupe: { kind: "window", hours: 0 },
+                });
+            }
+            const h = await svc.history({ trx }, ALICE, "insights:hourly");
+            expect(h).toHaveLength(3);
+            expect(h[0].createdAt.getTime()).toBeGreaterThanOrEqual(h[1].createdAt.getTime());
+        });
+
+        // ── payload round-trip ────────────────────────────────────────────────
+
+        it("payload is stored as JSON and round-trips correctly", async () => {
+            const data = { count: 99, label: "active users", nested: { ok: true } };
+            const expected = JSON.stringify(data);
+
+            const n = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:stats",
+                payload: data,
+                dedupe: { kind: "window", hours: 0 },
+            });
+            expect(n).not.toBeNull();
+            if (!n) {
+                return;
+            }
+            expect(n.payload).toBe(expected);
+
+            const fetched = await notifRepo.findById({ trx }, n.id);
+            expect(fetched?.payload).toBe(expected);
+        });
+
+        // ── sourceIri optional ────────────────────────────────────────────────
+
+        it("sourceIri is optional — insight notifications work without it", async () => {
+            const n = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:welcome",
+                dedupe: { kind: "one-time" },
+            });
+            expect(n).not.toBeNull();
+            if (!n) {
+                return;
+            }
+            expect(n.sourceIri).toBeUndefined();
+        });
+
+        it("sourceIri is stored and returned when provided", async () => {
+            const n = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:link",
+                sourceIri: "http://tern.dev/events/ev123",
+                dedupe: { kind: "window", hours: 0 },
+            });
+            expect(n).not.toBeNull();
+            if (!n) {
+                return;
+            }
+            expect(n.sourceIri).toBe("http://tern.dev/events/ev123");
+        });
+
+        // ── notifType default ─────────────────────────────────────────────────
+
+        it("notifType defaults to 'insight' when not specified", async () => {
+            const n = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:welcome",
+                dedupe: { kind: "one-time" },
+            });
+            expect(n).not.toBeNull();
+            if (!n) {
+                return;
+            }
+            expect(n.notifType).toBe("insight");
+        });
+
+        it("notifType can be overridden by the caller", async () => {
+            const n = await svc.send({ trx }, {
+                userId: ALICE,
+                templateKey: "insights:digest",
+                notifType: "digest",
+                dedupe: { kind: "window", hours: 0 },
+            });
+            expect(n).not.toBeNull();
+            if (!n) {
+                return;
+            }
+            expect(n.notifType).toBe("digest");
+        });
+
+        // ── NPM-consumer pattern example ──────────────────────────────────────
+
+        it("downstream consumer pattern: send welcome once and daily digest with 24h window", async () => {
+            // Simulate an application insights extension using NotificationService
+            // as a standalone dep (no ConvoService needed).
+
+            async function sendWelcome(userId: string): Promise<boolean> {
+                const result = await svc.send({ trx }, {
+                    userId,
+                    templateKey: "myapp:insights:welcome",
+                    payload: { version: "2.0" },
+                    dedupe: { kind: "one-time" },
+                });
+                return result !== null;
+            }
+
+            async function sendDailyDigest(userId: string, stats: Record<string, number>): Promise<boolean> {
+                const result = await svc.send({ trx }, {
+                    userId,
+                    templateKey: "myapp:insights:daily-digest",
+                    payload: stats,
+                    dedupe: { kind: "window", hours: 24 },
+                });
+                return result !== null;
+            }
+
+            expect(await sendWelcome(ALICE)).toBe(true);   // delivered
+            expect(await sendWelcome(ALICE)).toBe(false);  // suppressed forever
+
+            expect(await sendDailyDigest(ALICE, { dau: 100 })).toBe(true);   // delivered
+            expect(await sendDailyDigest(ALICE, { dau: 101 })).toBe(false);  // within 24h
         });
     });
 }

@@ -3,18 +3,18 @@ import type { TripleStore } from "@jasonscharf/data";
 import type { ServerContext } from "@jasonscharf/server";
 import {
     authorIRI,
+    CONVOS_GRAPH,
     contentIRI,
     contentTypeIRI,
-    CONVOS_GRAPH,
     conversationRefIRI,
     convosCreatedAtIRI,
     convosUpdatedAtIRI,
     editedAtIRI,
     editedByIRI,
     isDeletedIRI,
-    messageRefIRI,
     MessageClassIRI,
     MessageRevisionClassIRI,
+    messageRefIRI,
     RDF_TYPE,
     replyToIRI,
     revisionCountIRI,
@@ -128,10 +128,7 @@ export class MessageRepository {
         return quads.length === 0 ? null : this._fromQuads(id, quads);
     }
 
-    async findByConversation(
-        ctx: ServerContext,
-        conversationId: string,
-    ): Promise<MessageEntity[]> {
+    async findByConversation(ctx: ServerContext, conversationId: string): Promise<MessageEntity[]> {
         const quads = await this._store.find(ctx, {
             predicate: conversationRefIRI,
             object: iriFor("conversation", conversationId),
@@ -331,10 +328,7 @@ export class MessageRepository {
         return revisions;
     }
 
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-    ): MessageEntity {
+    private _fromQuads(id: string, quads: Awaited<ReturnType<TripleStore["find"]>>): MessageEntity {
         const getLit = (pred: IRI): string | undefined => {
             const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
             return q ? literalValue(q.object) : undefined;

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import type React from "react";
+import { useState } from "react";
 import type { ConversationEntity } from "../types.js";
 import { MessageBubble } from "./MessageBubble.js";
 import { MessageComposer } from "./MessageComposer.js";
@@ -27,7 +28,9 @@ export function ConversationThread({
         <div className="convos-thread">
             <div className="convos-thread__header">
                 <h2 className="convos-thread__title">{conversation.title}</h2>
-                <span className={`convos-thread__status convos-thread__status--${conversation.status}`}>
+                <span
+                    className={`convos-thread__status convos-thread__status--${conversation.status}`}
+                >
                     {conversation.status}
                 </span>
             </div>

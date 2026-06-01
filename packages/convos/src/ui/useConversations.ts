@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type {
-    ConversationEntity,
-    MessageEntity,
-    NotificationEntity,
-} from "../types.js";
+import type { ConversationEntity, MessageEntity, NotificationEntity } from "../types.js";
 
 export interface UseConversationsOpts {
     /** IRI of the business object to load conversations for. */
@@ -16,7 +12,10 @@ export interface UseConversationsResult {
     conversations: ConversationEntity[];
     loading: boolean;
     error: string | null;
-    createConversation: (title: string, initialMessage?: string) => Promise<ConversationEntity | null>;
+    createConversation: (
+        title: string,
+        initialMessage?: string,
+    ) => Promise<ConversationEntity | null>;
     refresh: () => void;
 }
 
@@ -27,6 +26,7 @@ export function useConversations(opts: UseConversationsOpts): UseConversationsRe
     const [error, setError] = useState<string | null>(null);
     const [tick, setTick] = useState(0);
 
+    // biome-ignore lint/correctness/useExhaustiveDependencies: tick is a manual refresh counter; changing it triggers a re-fetch without being read inside the effect body
     useEffect(() => {
         setLoading(true);
         const url = `${apiBase}/api/convos/conversations?subjectIri=${encodeURIComponent(subjectIri)}`;
@@ -171,6 +171,7 @@ export function useMessages(opts: UseMessagesOpts): UseMessagesResult {
     const [loading, setLoading] = useState(true);
     const [tick, setTick] = useState(0);
 
+    // biome-ignore lint/correctness/useExhaustiveDependencies: tick is a manual refresh counter; changing it triggers a re-fetch without being read inside the effect body
     useEffect(() => {
         setLoading(true);
         fetch(`${apiBase}/api/convos/conversations/${conversationId}/messages`, {

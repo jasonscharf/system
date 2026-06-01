@@ -4,7 +4,6 @@
 export type { ConvoServiceOptions } from "./ConvoService.js";
 export { ConvoService } from "./ConvoService.js";
 export { CONVOS_GRAPH, CONVOS_NS } from "./constants.js";
-
 // ── Extension lifecycle ───────────────────────────────────────────────────────
 export type { ConvosInstallResult } from "./install.js";
 export {
@@ -13,6 +12,8 @@ export {
     installConvos,
     uninstallConvos,
 } from "./install.js";
+export type { NotificationServiceOptions } from "./NotificationService.js";
+export { NotificationService } from "./NotificationService.js";
 
 // ── Permissions ───────────────────────────────────────────────────────────────
 export {
@@ -39,15 +40,16 @@ export { ConversationRepository } from "./repository/ConversationRepository.js";
 export { DraftRepository } from "./repository/DraftRepository.js";
 export { InboxRepository } from "./repository/InboxRepository.js";
 export { MessageRepository } from "./repository/MessageRepository.js";
+export type { CreateNotificationInput } from "./repository/NotificationRepository.js";
 export { NotificationRepository } from "./repository/NotificationRepository.js";
 export { ParticipantRepository } from "./repository/ParticipantRepository.js";
 export { ReadReceiptRepository } from "./repository/ReadReceiptRepository.js";
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type {
     ContentType,
     ConversationEntity,
     ConversationStatus,
+    DedupePolicy,
     DraftEntity,
     InboxEntity,
     InboxMembershipEntity,
@@ -59,4 +61,5 @@ export type {
     ParticipantEntity,
     ParticipantRole,
     ReadReceiptEntity,
+    SendNotificationInput,
 } from "./types.js";

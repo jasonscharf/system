@@ -1,4 +1,5 @@
-import React, { useRef, useState } from "react";
+import type React from "react";
+import { useRef, useState } from "react";
 import type { MessageEntity } from "../types.js";
 
 export interface MessageComposerProps {
@@ -51,7 +52,9 @@ export function MessageComposer({
                     <span className="convos-composer__reply-label">
                         {`Replying to ${replyTo.authorId}`}
                     </span>
-                    <span className="convos-composer__reply-preview">{replyTo.content.slice(0, 80)}</span>
+                    <span className="convos-composer__reply-preview">
+                        {replyTo.content.slice(0, 80)}
+                    </span>
                     {onCancelReply && (
                         <button
                             type="button"

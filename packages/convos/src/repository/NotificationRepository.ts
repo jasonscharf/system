@@ -6,17 +6,27 @@ import {
     convosCreatedAtIRI,
     isDismissedIRI,
     isReadIRI,
+    NotificationClassIRI,
     notifTypeIRI,
     notifUserIRI,
-    NotificationClassIRI,
+    payloadIRI,
     RDF_TYPE,
     sourceIriIRI,
+    templateKeyIRI,
     XSD_BOOLEAN,
     XSD_DATETIME,
     XSD_STRING,
 } from "../constants.js";
 import type { NotificationEntity, NotificationType } from "../types.js";
 import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
+
+export interface CreateNotificationInput {
+    userId: string;
+    notifType: NotificationType;
+    sourceIri?: string;
+    templateKey?: string;
+    payload?: Record<string, unknown>;
+}
 
 export class NotificationRepository {
     private readonly _store: TripleStore;
@@ -25,15 +35,12 @@ export class NotificationRepository {
         this._store = store;
     }
 
-    async create(
-        ctx: ServerContext,
-        input: Pick<NotificationEntity, "userId" | "notifType" | "sourceIri">,
-    ): Promise<NotificationEntity> {
+    async create(ctx: ServerContext, input: CreateNotificationInput): Promise<NotificationEntity> {
         const id = newId();
         const now = new Date();
         const sub = iriFor("notification", id);
 
-        await this._store.insertMany(ctx, [
+        const quads = [
             {
                 subject: sub,
                 predicate: RDF_TYPE,
@@ -54,12 +61,6 @@ export class NotificationRepository {
             },
             {
                 subject: sub,
-                predicate: sourceIriIRI,
-                object: literal(input.sourceIri, XSD_STRING),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
                 predicate: isReadIRI,
                 object: literal("false", XSD_BOOLEAN),
                 graph: CONVOS_GRAPH,
@@ -76,7 +77,36 @@ export class NotificationRepository {
                 object: literal(now.toISOString(), XSD_DATETIME),
                 graph: CONVOS_GRAPH,
             },
-        ]);
+        ];
+
+        if (input.sourceIri) {
+            quads.push({
+                subject: sub,
+                predicate: sourceIriIRI,
+                object: literal(input.sourceIri, XSD_STRING),
+                graph: CONVOS_GRAPH,
+            });
+        }
+
+        if (input.templateKey) {
+            quads.push({
+                subject: sub,
+                predicate: templateKeyIRI,
+                object: literal(input.templateKey, XSD_STRING),
+                graph: CONVOS_GRAPH,
+            });
+        }
+
+        if (input.payload) {
+            quads.push({
+                subject: sub,
+                predicate: payloadIRI,
+                object: literal(JSON.stringify(input.payload), XSD_STRING),
+                graph: CONVOS_GRAPH,
+            });
+        }
+
+        await this._store.insertMany(ctx, quads);
 
         return {
             id,
@@ -84,6 +114,8 @@ export class NotificationRepository {
             userId: input.userId,
             notifType: input.notifType,
             sourceIri: input.sourceIri,
+            templateKey: input.templateKey,
+            payload: input.payload ? JSON.stringify(input.payload) : undefined,
             isRead: false,
             isDismissed: false,
             createdAt: now,
@@ -128,6 +160,42 @@ export class NotificationRepository {
         return notifications;
     }
 
+    /**
+     * Return all notifications for a user with the given templateKey.
+     * Used by NotificationService to evaluate deduplication policies.
+     */
+    async findByTemplateKey(
+        ctx: ServerContext,
+        userId: string,
+        templateKey: string,
+    ): Promise<NotificationEntity[]> {
+        const quads = await this._store.find(ctx, {
+            predicate: templateKeyIRI,
+            object: literal(templateKey, XSD_STRING),
+            graph: CONVOS_GRAPH,
+        });
+
+        const results: NotificationEntity[] = [];
+
+        for (const q of quads) {
+            const nid = idFrom((q.subject as IRI).value);
+            const all = await this._store.find(ctx, {
+                subject: q.subject as IRI,
+                graph: CONVOS_GRAPH,
+            });
+            if (all.length === 0) {
+                continue;
+            }
+            const entity = this._fromQuads(nid, all);
+            if (entity.userId === userId) {
+                results.push(entity);
+            }
+        }
+
+        results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        return results;
+    }
+
     async countUnread(ctx: ServerContext, userId: string): Promise<number> {
         const all = await this.findByUser(ctx, userId, { unreadOnly: true });
         return all.filter((n) => !n.isDismissed).length;
@@ -153,7 +221,7 @@ export class NotificationRepository {
         return this._setBooleanFlag(ctx, id, isDismissedIRI, true);
     }
 
-    /** Fan-out: create a notification for each recipient, skipping the author. */
+    /** Fan-out: create a notification for each recipient, skipping the excluded user. */
     async fanOut(
         ctx: ServerContext,
         recipientIds: string[],
@@ -219,10 +287,6 @@ export class NotificationRepository {
         if (notifType == null) {
             throw new Error(`NotificationRepository: missing notifType for id "${id}"`);
         }
-        const sourceIri = getLit(sourceIriIRI);
-        if (sourceIri == null) {
-            throw new Error(`NotificationRepository: missing sourceIri for id "${id}"`);
-        }
         const createdAtStr = getLit(convosCreatedAtIRI);
         if (createdAtStr == null) {
             throw new Error(`NotificationRepository: missing createdAt for id "${id}"`);
@@ -236,7 +300,9 @@ export class NotificationRepository {
             iri: iriFor("notification", id).value,
             userId: userIri,
             notifType: notifType as NotificationType,
-            sourceIri,
+            sourceIri: getLit(sourceIriIRI),
+            templateKey: getLit(templateKeyIRI),
+            payload: getLit(payloadIRI),
             isRead: isReadStr === "true",
             isDismissed: isDismissedStr === "true",
             createdAt: new Date(createdAtStr),

@@ -4,9 +4,9 @@ import type { ServerContext } from "@jasonscharf/server";
 import {
     assignedToIRI,
     CONVOS_GRAPH,
+    ConversationClassIRI,
     convoCreatedByIRI,
     convoInboxIRI,
-    ConversationClassIRI,
     convosCreatedAtIRI,
     convosUpdatedAtIRI,
     RDF_TYPE,
@@ -42,7 +42,12 @@ export class ConversationRepository {
         const sub = iriFor("conversation", id);
 
         const quads = [
-            { subject: sub, predicate: RDF_TYPE, object: ConversationClassIRI, graph: CONVOS_GRAPH },
+            {
+                subject: sub,
+                predicate: RDF_TYPE,
+                object: ConversationClassIRI,
+                graph: CONVOS_GRAPH,
+            },
             {
                 subject: sub,
                 predicate: subjectIriIRI,

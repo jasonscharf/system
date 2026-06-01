@@ -84,3 +84,10 @@ export const notifTypeIRI = new IRI(`${CONVOS_NS}notifType`);
 export const sourceIriIRI = new IRI(`${CONVOS_NS}sourceIri`);
 export const isReadIRI = new IRI(`${CONVOS_NS}isRead`);
 export const isDismissedIRI = new IRI(`${CONVOS_NS}isDismissed`);
+/**
+ * Stable string key identifying the notification template — e.g.
+ * "insights:welcome" or "insights:daily-digest".  Used for deduplication.
+ */
+export const templateKeyIRI = new IRI(`${CONVOS_NS}templateKey`);
+/** JSON-encoded arbitrary payload for rendering the notification. */
+export const payloadIRI = new IRI(`${CONVOS_NS}payload`);

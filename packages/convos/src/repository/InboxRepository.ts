@@ -5,10 +5,10 @@ import {
     CONVOS_GRAPH,
     convosCreatedAtIRI,
     grantedAtIRI,
-    inboxCreatedByIRI,
     InboxClassIRI,
-    inboxNameIRI,
     InboxMembershipClassIRI,
+    inboxCreatedByIRI,
+    inboxNameIRI,
     memberInboxIRI,
     memberUserIRI,
     RDF_TYPE,
@@ -186,10 +186,7 @@ export class InboxRepository {
         return members.find((m) => m.userId === userId) ?? null;
     }
 
-    async listMembers(
-        ctx: ServerContext,
-        inboxId: string,
-    ): Promise<InboxMembershipEntity[]> {
+    async listMembers(ctx: ServerContext, inboxId: string): Promise<InboxMembershipEntity[]> {
         const quads = await this._store.find(ctx, {
             predicate: memberInboxIRI,
             object: iriFor("inbox", inboxId),
@@ -212,10 +209,7 @@ export class InboxRepository {
         return members;
     }
 
-    async listInboxesForUser(
-        ctx: ServerContext,
-        userId: string,
-    ): Promise<InboxMembershipEntity[]> {
+    async listInboxesForUser(ctx: ServerContext, userId: string): Promise<InboxMembershipEntity[]> {
         const quads = await this._store.find(ctx, {
             predicate: memberUserIRI,
             object: new IRI(userId),
@@ -238,10 +232,7 @@ export class InboxRepository {
         return memberships;
     }
 
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-    ): InboxEntity {
+    private _fromQuads(id: string, quads: Awaited<ReturnType<TripleStore["find"]>>): InboxEntity {
         const getLit = (pred: IRI): string | undefined => {
             const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
             return q ? literalValue(q.object) : undefined;

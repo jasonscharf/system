@@ -61,9 +61,18 @@
     font-weight: 500;
 }
 
-.convos-thread__status--open { background: #dcfce7; color: #166534; }
-.convos-thread__status--closed { background: #f1f5f9; color: #475569; }
-.convos-thread__status--archived { background: #fef3c7; color: #92400e; }
+.convos-thread__status--open {
+    background: #dcfce7;
+    color: #166534;
+}
+.convos-thread__status--closed {
+    background: #f1f5f9;
+    color: #475569;
+}
+.convos-thread__status--archived {
+    background: #fef3c7;
+    color: #92400e;
+}
 
 .convos-thread__messages {
     flex: 1;
@@ -445,9 +454,18 @@
     flex-shrink: 0;
 }
 
-.convos-list__item-status--open { background: #dcfce7; color: #166534; }
-.convos-list__item-status--closed { background: #f1f5f9; color: #475569; }
-.convos-list__item-status--archived { background: #fef3c7; color: #92400e; }
+.convos-list__item-status--open {
+    background: #dcfce7;
+    color: #166534;
+}
+.convos-list__item-status--closed {
+    background: #f1f5f9;
+    color: #475569;
+}
+.convos-list__item-status--archived {
+    background: #fef3c7;
+    color: #92400e;
+}
 
 .convos-list__item-assignee {
     font-size: 0.7rem;
@@ -535,9 +553,18 @@
     flex-shrink: 0;
 }
 
-.convos-inbox__item-status--open { background: #dcfce7; color: #166534; }
-.convos-inbox__item-status--closed { background: #f1f5f9; color: #475569; }
-.convos-inbox__item-status--archived { background: #fef3c7; color: #92400e; }
+.convos-inbox__item-status--open {
+    background: #dcfce7;
+    color: #166534;
+}
+.convos-inbox__item-status--closed {
+    background: #f1f5f9;
+    color: #475569;
+}
+.convos-inbox__item-status--archived {
+    background: #fef3c7;
+    color: #92400e;
+}
 
 /* ── Notification badge ───────────────────────────────────────────────────────*/
 

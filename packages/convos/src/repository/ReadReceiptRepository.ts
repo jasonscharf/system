@@ -6,10 +6,10 @@ import {
     convosCreatedAtIRI,
     lastReadAtIRI,
     lastReadMessageIRI,
+    RDF_TYPE,
     ReadReceiptClassIRI,
     receiptConversationIRI,
     receiptUserIRI,
-    RDF_TYPE,
     XSD_DATETIME,
 } from "../constants.js";
 import type { ReadReceiptEntity } from "../types.js";

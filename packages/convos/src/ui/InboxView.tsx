@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import type React from "react";
+import { useEffect, useState } from "react";
 import type { ConversationEntity, InboxEntity } from "../types.js";
 import { ConversationThread } from "./ConversationThread.js";
 
@@ -79,9 +80,7 @@ export function InboxView({
                         apiBase={apiBase}
                     />
                 ) : (
-                    <div className="convos-inbox__placeholder">
-                        Select a conversation to view.
-                    </div>
+                    <div className="convos-inbox__placeholder">Select a conversation to view.</div>
                 )}
             </main>
         </div>

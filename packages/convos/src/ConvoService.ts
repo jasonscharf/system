@@ -24,7 +24,6 @@ import type { ReadReceiptRepository } from "./repository/ReadReceiptRepository.j
 import type {
     ContentType,
     ConversationEntity,
-    ConversationStatus,
     DraftEntity,
     InboxEntity,
     InboxMembershipEntity,
@@ -267,11 +266,7 @@ export class ConvoService {
         userId: string,
     ): Promise<void> {
         await this._assert(ctx, callerIri, PERM_PARTICIPANT_MANAGE, conversationId);
-        const p = await this._participants.findByConversationAndUser(
-            ctx,
-            conversationId,
-            userId,
-        );
+        const p = await this._participants.findByConversationAndUser(ctx, conversationId, userId);
         if (p) {
             await this._participants.remove(ctx, p.id);
         }
@@ -384,10 +379,7 @@ export class ConvoService {
         return this._inboxes.findById(ctx, inboxId);
     }
 
-    async getInboxesForSubject(
-        ctx: ServerContext,
-        subjectIri: string,
-    ): Promise<InboxEntity[]> {
+    async getInboxesForSubject(ctx: ServerContext, subjectIri: string): Promise<InboxEntity[]> {
         return this._inboxes.findBySubject(ctx, subjectIri);
     }
 
@@ -412,10 +404,7 @@ export class ConvoService {
         await this._inboxes.removeMember(ctx, inboxId, userId);
     }
 
-    async getInboxMembers(
-        ctx: ServerContext,
-        inboxId: string,
-    ): Promise<InboxMembershipEntity[]> {
+    async getInboxMembers(ctx: ServerContext, inboxId: string): Promise<InboxMembershipEntity[]> {
         return this._inboxes.listMembers(ctx, inboxId);
     }
 
@@ -441,12 +430,7 @@ export class ConvoService {
         conversationId: string,
         lastReadMessageId: string,
     ): Promise<ReadReceiptEntity> {
-        const receipt = await this._receipts.upsert(
-            ctx,
-            conversationId,
-            userId,
-            lastReadMessageId,
-        );
+        const receipt = await this._receipts.upsert(ctx, conversationId, userId, lastReadMessageId);
 
         // Dismiss any outstanding notifications sourced from this conversation
         // that pre-date the new watermark.
@@ -454,7 +438,10 @@ export class ConvoService {
         if (lastReadMsg) {
             const notifs = await this._notifications.findByUser(ctx, userId, { unreadOnly: true });
             for (const n of notifs) {
-                if (n.sourceIri === lastReadMsg.iri || n.sourceIri.includes(`/message/`)) {
+                if (
+                    n.sourceIri &&
+                    (n.sourceIri === lastReadMsg.iri || n.sourceIri.includes("/message/"))
+                ) {
                     await this._notifications.dismiss(ctx, n.id);
                 }
             }
@@ -487,11 +474,7 @@ export class ConvoService {
         conversationId: string,
         userId: string,
     ): Promise<number> {
-        const receipt = await this._receipts.findByConversationAndUser(
-            ctx,
-            conversationId,
-            userId,
-        );
+        const receipt = await this._receipts.findByConversationAndUser(ctx, conversationId, userId);
 
         const messages = await this._messages.findByConversation(ctx, conversationId);
         const visible = messages.filter((m) => !m.isDeleted);
@@ -505,9 +488,8 @@ export class ConvoService {
             return visible.length;
         }
 
-        return visible.filter(
-            (m) => m.createdAt.getTime() > watermarkMsg.createdAt.getTime(),
-        ).length;
+        return visible.filter((m) => m.createdAt.getTime() > watermarkMsg.createdAt.getTime())
+            .length;
     }
 
     // ── Notifications ─────────────────────────────────────────────────────────
@@ -531,10 +513,7 @@ export class ConvoService {
         return this._notifications.markRead(ctx, notificationId);
     }
 
-    async markAllNotificationsRead(
-        ctx: ServerContext,
-        userId: string,
-    ): Promise<number> {
+    async markAllNotificationsRead(ctx: ServerContext, userId: string): Promise<number> {
         return this._notifications.markAllReadForUser(ctx, userId);
     }
 
@@ -595,9 +574,7 @@ export class ConvoService {
                 scope: scopeIri,
             });
             if (!canEditOwn && !canEditAny) {
-                throw new Error(
-                    `Access denied: "${callerIri}" lacks permission to edit messages.`,
-                );
+                throw new Error(`Access denied: "${callerIri}" lacks permission to edit messages.`);
             }
         } else {
             await this._rbac.assert(ctx, {
@@ -668,10 +645,7 @@ export class ConvoService {
             );
             if (receipt) {
                 const watermark = await this._messages.findById(ctx, receipt.lastReadMessageId);
-                if (
-                    watermark &&
-                    watermark.createdAt.getTime() >= message.createdAt.getTime()
-                ) {
+                if (watermark && watermark.createdAt.getTime() >= message.createdAt.getTime()) {
                     continue;
                 }
             }

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import type React from "react";
+import { useState } from "react";
 import type { ConversationEntity } from "../types.js";
 import { useConversations } from "./useConversations.js";
 
@@ -55,10 +56,7 @@ export function ConversationList({
             </div>
 
             {creating && (
-                <form
-                    className="convos-list__new-form"
-                    onSubmit={(e) => void handleCreate(e)}
-                >
+                <form className="convos-list__new-form" onSubmit={(e) => void handleCreate(e)}>
                     <input
                         className="convos-list__new-title"
                         type="text"

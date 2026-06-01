@@ -141,11 +141,7 @@ export class DraftRepository {
         return all.filter((d) => d.conversationId === conversationId);
     }
 
-    async update(
-        ctx: ServerContext,
-        id: string,
-        content: string,
-    ): Promise<DraftEntity | null> {
+    async update(ctx: ServerContext, id: string, content: string): Promise<DraftEntity | null> {
         const existing = await this.findById(ctx, id);
         if (!existing) {
             return null;
@@ -181,10 +177,7 @@ export class DraftRepository {
         await this._store.delete(ctx, { subject: iriFor("draft", id), graph: CONVOS_GRAPH });
     }
 
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-    ): DraftEntity {
+    private _fromQuads(id: string, quads: Awaited<ReturnType<TripleStore["find"]>>): DraftEntity {
         const getLit = (pred: IRI): string | undefined => {
             const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
             return q ? literalValue(q.object) : undefined;

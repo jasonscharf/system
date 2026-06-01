@@ -1,4 +1,5 @@
-import React, { useRef, useState } from "react";
+import type React from "react";
+import { useRef, useState } from "react";
 import { useNotifications } from "./useConversations.js";
 
 export interface NotificationBadgeProps {

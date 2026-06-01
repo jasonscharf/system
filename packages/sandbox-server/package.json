@@ -17,6 +17,7 @@
         "@jasonscharf/core": "workspace:^",
         "@jasonscharf/data": "workspace:^",
         "@jasonscharf/flow": "workspace:^",
+        "@jasonscharf/rbac": "workspace:^",
         "@jasonscharf/server": "workspace:^",
         "@jasonscharf/vaults": "workspace:^",
         "better-sqlite3": "^11.10.0",

@@ -12,6 +12,7 @@
         { "path": "../core" },
         { "path": "../data" },
         { "path": "../flow" },
+        { "path": "../rbac" },
         { "path": "../server" },
         { "path": "../vaults" }
     ],

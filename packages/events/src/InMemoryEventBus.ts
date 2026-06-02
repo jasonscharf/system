@@ -16,7 +16,12 @@ export class InMemoryEventBus implements IDomainEventBus {
             return;
         }
         for (const handler of byName.values()) {
-            await handler(event as DomainEvent<unknown>);
+            try {
+                await handler(event as DomainEvent<unknown>);
+            } catch {
+                // Subscriber errors must not abort delivery to other subscribers
+                // or propagate through publish() — matches Redis Streams semantics.
+            }
         }
     }
 
@@ -28,7 +33,7 @@ export class InMemoryEventBus implements IDomainEventBus {
         if (!this._subs.has(typeIri)) {
             this._subs.set(typeIri, new Map());
         }
-        const byName = this._subs.get(typeIri)!;
+        const byName = this._subs.get(typeIri) as Map<string, AnyHandler>;
         byName.set(subscriptionName, handler as AnyHandler);
 
         return {

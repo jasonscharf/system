@@ -1,3 +1,4 @@
+export { AggregateRepository } from "./AggregateRepository.js";
 export type {
     CollectionViewItemRecord,
     CollectionViewOpts,

@@ -1020,8 +1020,8 @@ for (const db of providers) {
             await knex.destroy();
         });
 
-        it("EntityStore.updateGroup produces two history rows for the changed predicate", async () => {
-            const { UserSchema, CoreHandle } = await import("@jasonscharf/auth");
+        it("EntityStore.update produces two history rows for the changed predicate", async () => {
+            const { UserSchema } = await import("@jasonscharf/auth");
 
             const user = await es.create(ctx, UserSchema, {
                 email: "test@example.com",
@@ -1029,7 +1029,7 @@ for (const db of providers) {
             });
 
             // Update displayName — this should soft-delete the old edge and create a new one
-            await es.updateGroup(ctx, UserSchema, user.id, CoreHandle, { displayName: "New" });
+            await es.update(ctx, UserSchema, user.id, { displayName: "New" });
 
             const iri = `http://tern.dev/ns/auth/displayName`;
             const history = await store.findHistory(ctx);
@@ -1056,7 +1056,7 @@ for (const db of providers) {
             const totalAfter = (await store.stats(ctx)).edgesTotal;
 
             // findById returns null (active edges are soft-deleted)
-            expect(await es.findById(ctx, UserSchema, user.id, "*")).toBeNull();
+            expect(await es.findById(ctx, UserSchema, user.id)).toBeNull();
             // But total edge count stays the same (no hard deletes)
             expect(totalAfter).toBe(totalBefore);
         });

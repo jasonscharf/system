@@ -15,8 +15,6 @@ export {
     TERN_CVI_POS,
     TERN_CVI_REF,
     TERN_CVI_VIEW,
-    TERN_HANDLE,
-    TERN_PROP_GROUP,
     TERN_VIEW_NS,
     XSD_BOOLEAN,
     XSD_DATETIME,
@@ -25,16 +23,10 @@ export {
     XSD_STRING,
 } from "./constants.js";
 export type { EntityRecord } from "./EntityRecord.js";
-export { groupOf } from "./EntityRecord.js";
-export type { PropGroupDef } from "./EntitySchema.js";
-export { EntitySchema } from "./EntitySchema.js";
+export { type DefaultValue, EntitySchema } from "./EntitySchema.js";
 export { EntityValidationError } from "./EntityValidationError.js";
-
 export type { FilterOp } from "./FilterOp.js";
-export type { EntityHandle } from "./Handle.js";
-export { handle, handleSlug } from "./Handle.js";
 export { TernAggregate } from "./TernAggregate.js";
-
 export {
     entityIri,
     fromLiteral,
@@ -42,7 +34,6 @@ export {
     invertPropertyMap,
     localName,
     newId,
-    pgIri,
     propertyMapFor,
     toLiteral,
 } from "./util.js";

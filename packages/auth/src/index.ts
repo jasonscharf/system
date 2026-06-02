@@ -21,9 +21,9 @@ export type {
     ValidateResult,
 } from "./components/SessionComponent.js";
 export { SessionComponent } from "./components/SessionComponent.js";
-export { DeviceCoreHandle, UserDeviceSchema } from "./entities/UserDeviceSchema.js";
-export { CoreHandle, UserSchema } from "./entities/UserSchema.js";
-export { SessionCoreHandle, UserSessionSchema } from "./entities/UserSessionSchema.js";
+export { UserDeviceSchema } from "./entities/UserDeviceSchema.js";
+export { UserSchema } from "./entities/UserSchema.js";
+export { UserSessionSchema } from "./entities/UserSessionSchema.js";
 export { GitHubProvider } from "./oauth/GitHubProvider.js";
 // ── OAuth providers ───────────────────────────────────────────────────────────
 export { GoogleProvider } from "./oauth/GoogleProvider.js";

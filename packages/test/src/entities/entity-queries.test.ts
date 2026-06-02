@@ -19,8 +19,6 @@
  */
 
 import {
-    CoreHandle,
-    DeviceCoreHandle,
     findSessionsByTokens,
     findUserBySession,
     findUserWithRecentActivity,
@@ -28,7 +26,6 @@ import {
     listInactiveSessions,
     listUserDevices,
     listUsers,
-    SessionCoreHandle,
     UserDeviceSchema,
     UserSchema,
     UserSessionSchema,
@@ -141,8 +138,8 @@ for (const db of providers) {
             const [user] = await listUsers(ctx, es);
             expect(user?.id).toBeTruthy();
             expect(user?.iri).toContain("http://tern.dev/ns/auth/user/");
-            expect(user?.groups[CoreHandle.id]?.email).toBe("alice@test.com");
-            expect(user?.groups[CoreHandle.id]?.displayName).toBe("Alice");
+            expect(user?.props.email).toBe("alice@test.com");
+            expect(user?.props.displayName).toBe("Alice");
         });
     });
 
@@ -190,7 +187,7 @@ for (const db of providers) {
                 devicePlatform: "web",
             });
             const [device] = await listUserDevices(ctx, es);
-            const deviceUserIri = device?.groups[DeviceCoreHandle.id]?.deviceUser as string;
+            const deviceUserIri = device?.props.deviceUser as string;
             expect(deviceUserIri).toBe(user.iri);
         });
     });
@@ -220,10 +217,10 @@ for (const db of providers) {
             const active = await listActiveSessions(ctx, es);
             const inactive = await listInactiveSessions(ctx, es);
 
-            expect(active.every((s) => s.groups[SessionCoreHandle.id]?.isActive === true)).toBe(
+            expect(active.every((s) => s.props.isActive === true)).toBe(
                 true,
             );
-            expect(inactive.every((s) => s.groups[SessionCoreHandle.id]?.isActive === false)).toBe(
+            expect(inactive.every((s) => s.props.isActive === false)).toBe(
                 true,
             );
             expect(active.length + inactive.length).toBe(2);
@@ -240,8 +237,8 @@ for (const db of providers) {
         it("active session record has isActive = true and sessionUser IRI", async () => {
             const { user } = await makeUserWithSession(es, "z@test.com");
             const [sess] = await listActiveSessions(ctx, es);
-            expect(sess?.groups[SessionCoreHandle.id]?.isActive).toBe(true);
-            expect(sess?.groups[SessionCoreHandle.id]?.sessionUser).toBe(user.iri);
+            expect(sess?.props.isActive).toBe(true);
+            expect(sess?.props.sessionUser).toBe(user.iri);
         });
     });
 
@@ -321,7 +318,7 @@ for (const db of providers) {
             const result = await findUserWithRecentActivity(ctx, es, user.id);
             expect(result?.session?.id).toBe(newerSession.id);
             expect(result?.device?.id).toBe(device2.id);
-            const platform = result?.device?.groups[DeviceCoreHandle.id]?.devicePlatform;
+            const platform = result?.device?.props.devicePlatform;
             expect(platform).toBe("ios");
         });
     });
@@ -346,7 +343,7 @@ for (const db of providers) {
 
         it("finds a single session by token", async () => {
             const { session } = await makeUserWithSession(es, "e@test.com");
-            const token = session.groups[SessionCoreHandle.id]?.sessionToken as string;
+            const token = session.props.sessionToken as string;
 
             const results = await findSessionsByTokens(ctx, es, [token]);
             expect(results).toHaveLength(1);
@@ -356,8 +353,8 @@ for (const db of providers) {
         it("finds multiple sessions by their tokens", async () => {
             const { session: s1 } = await makeUserWithSession(es, "f1@test.com");
             const { session: s2 } = await makeUserWithSession(es, "f2@test.com");
-            const t1 = s1.groups[SessionCoreHandle.id]?.sessionToken as string;
-            const t2 = s2.groups[SessionCoreHandle.id]?.sessionToken as string;
+            const t1 = s1.props.sessionToken as string;
+            const t2 = s2.props.sessionToken as string;
 
             const results = await findSessionsByTokens(ctx, es, [t1, t2]);
             expect(results).toHaveLength(2);
@@ -368,7 +365,7 @@ for (const db of providers) {
 
         it("ignores tokens that do not exist", async () => {
             const { session } = await makeUserWithSession(es, "g@test.com");
-            const token = session.groups[SessionCoreHandle.id]?.sessionToken as string;
+            const token = session.props.sessionToken as string;
 
             const results = await findSessionsByTokens(ctx, es, [token, "ghost-token"]);
             expect(results).toHaveLength(1);
@@ -377,11 +374,11 @@ for (const db of providers) {
 
         it("session records include isActive and sessionUser for further joins", async () => {
             const { user, session } = await makeUserWithSession(es, "h@test.com");
-            const token = session.groups[SessionCoreHandle.id]?.sessionToken as string;
+            const token = session.props.sessionToken as string;
 
             const [found] = await findSessionsByTokens(ctx, es, [token]);
-            expect(found?.groups[SessionCoreHandle.id]?.isActive).toBe(true);
-            expect(found?.groups[SessionCoreHandle.id]?.sessionUser).toBe(user.iri);
+            expect(found?.props.isActive).toBe(true);
+            expect(found?.props.sessionUser).toBe(user.iri);
         });
     });
 
@@ -405,29 +402,29 @@ for (const db of providers) {
 
         it("resolves the owning user from a session token", async () => {
             const { user, session } = await makeUserWithSession(es, "i@test.com");
-            const token = session.groups[SessionCoreHandle.id]?.sessionToken as string;
+            const token = session.props.sessionToken as string;
 
             const found = await findUserBySession(ctx, es, token);
             expect(found).not.toBeNull();
             expect(found?.id).toBe(user.id);
-            expect(found?.groups[CoreHandle.id]?.email).toBe("i@test.com");
+            expect(found?.props.email).toBe("i@test.com");
         });
 
         it("returns the correct user when multiple users exist", async () => {
             const { session: _s1 } = await makeUserWithSession(es, "j1@test.com");
             const { user: u2, session: s2 } = await makeUserWithSession(es, "j2@test.com");
 
-            const token = s2.groups[SessionCoreHandle.id]?.sessionToken as string;
+            const token = s2.props.sessionToken as string;
             const found = await findUserBySession(ctx, es, token);
             expect(found?.id).toBe(u2.id);
-            expect(found?.groups[CoreHandle.id]?.email).toBe("j2@test.com");
+            expect(found?.props.email).toBe("j2@test.com");
         });
 
         it("works for inactive sessions (token still resolves user)", async () => {
             const { user, session } = await makeUserWithSession(es, "k@test.com", {
                 isActive: false,
             });
-            const token = session.groups[SessionCoreHandle.id]?.sessionToken as string;
+            const token = session.props.sessionToken as string;
 
             const found = await findUserBySession(ctx, es, token);
             expect(found?.id).toBe(user.id);

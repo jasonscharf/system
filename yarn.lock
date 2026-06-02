@@ -1221,6 +1221,7 @@ __metadata:
   dependencies:
     "@jasonscharf/core": "workspace:^"
     "@jasonscharf/flow": "workspace:^"
+    "@jasonscharf/gen": "workspace:^"
   languageName: unknown
   linkType: soft
 
@@ -1285,6 +1286,16 @@ __metadata:
   dependencies:
     "@jasonscharf/core": "workspace:^"
     "@jasonscharf/gen": "workspace:^"
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/events@workspace:^, @jasonscharf/events@workspace:packages/events":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/events@workspace:packages/events"
+  dependencies:
+    "@jasonscharf/core": "workspace:^"
+    "@types/node": "npm:^22.0.0"
+    ioredis: "npm:^5.6.1"
   languageName: unknown
   linkType: soft
 
@@ -1381,6 +1392,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@jasonscharf/server@workspace:packages/server"
   dependencies:
+    "@jasonscharf/app": "workspace:^"
     "@jasonscharf/core": "workspace:^"
     "@jasonscharf/data": "workspace:^"
     "@jasonscharf/entities": "workspace:^"
@@ -1401,6 +1413,7 @@ __metadata:
     "@jasonscharf/core": "workspace:^"
     "@jasonscharf/data": "workspace:^"
     "@jasonscharf/entities": "workspace:^"
+    "@jasonscharf/events": "workspace:^"
     "@jasonscharf/flow": "workspace:^"
     "@jasonscharf/gen": "workspace:^"
     "@jasonscharf/rbac": "workspace:^"

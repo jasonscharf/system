@@ -672,6 +672,126 @@ for (const db of providers) {
         });
     });
 
+    // ── Graph-scoped batch operations (new graph? parameter) ─────────────────
+
+    describe(`TripleStore — graph-scoped batch ops (${db.name})`, () => {
+        let knex: Knex;
+        let trx: Knex.Transaction;
+        let store: TripleStore;
+        let ctx: ServerContext;
+
+        const GRAPH_A = EX("graphA");
+        const GRAPH_B = EX("graphB");
+
+        beforeEach(async () => {
+            knex = await db.create();
+            trx = await knex.transaction();
+            store = new TripleStore(knex);
+            ctx = { trx };
+        });
+        afterEach(async () => {
+            await trx.rollback();
+            await knex.destroy();
+        });
+
+        it("findForSubjects returns quads from all graphs when graph param omitted", async () => {
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("A"), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("B"), graph: GRAPH_A });
+
+            const result = await store.findForSubjects(ctx, [EX("s1")]);
+            expect(result.get(EX("s1").value)?.length).toBe(2);
+        });
+
+        it("findForSubjects filters to null (default) graph when graph=null", async () => {
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Default"), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("GraphA"), graph: GRAPH_A });
+
+            const result = await store.findForSubjects(ctx, [EX("s1")], null);
+            const quads = result.get(EX("s1").value) ?? [];
+            expect(quads).toHaveLength(1);
+            expect((quads[0]?.object as Literal).value).toBe("Default");
+        });
+
+        it("findForSubjects filters to named graph when graph=IRI", async () => {
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Default"), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("GraphA"), graph: GRAPH_A });
+
+            const result = await store.findForSubjects(ctx, [EX("s1")], GRAPH_A);
+            const quads = result.get(EX("s1").value) ?? [];
+            expect(quads).toHaveLength(1);
+            expect((quads[0]?.object as Literal).value).toBe("GraphA");
+        });
+
+        it("findForSubjects graph filter means other tenants are invisible", async () => {
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("TenantA"), graph: GRAPH_A });
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("TenantB"), graph: GRAPH_B });
+
+            const resultA = await store.findForSubjects(ctx, [EX("s1")], GRAPH_A);
+            const resultB = await store.findForSubjects(ctx, [EX("s1")], GRAPH_B);
+
+            expect(resultA.get(EX("s1").value)?.length).toBe(1);
+            expect(resultB.get(EX("s1").value)?.length).toBe(1);
+            expect(resultA.get(EX("s1").value)?.[0]?.object).not.toEqual(
+                resultB.get(EX("s1").value)?.[0]?.object,
+            );
+        });
+
+        it("deleteSubjects with graph=null only soft-deletes from default graph", async () => {
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Default"), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Named"), graph: GRAPH_A });
+
+            await store.deleteSubjects(ctx, [EX("s1")], null);
+
+            const active = await store.find(ctx, { subject: EX("s1") });
+            // Only the named-graph quad survives
+            expect(active).toHaveLength(1);
+            expect((active[0]?.object as Literal).value).toBe("Named");
+        });
+
+        it("deleteSubjects with graph=IRI only soft-deletes from that named graph", async () => {
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Default"), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Named"), graph: GRAPH_A });
+
+            await store.deleteSubjects(ctx, [EX("s1")], GRAPH_A);
+
+            const active = await store.find(ctx, { subject: EX("s1") });
+            expect(active).toHaveLength(1);
+            expect((active[0]?.object as Literal).value).toBe("Default");
+        });
+
+        it("deleteBySubjectPredicates with graph=null only targets default graph", async () => {
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Default"), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Named"), graph: GRAPH_A });
+
+            await store.deleteBySubjectPredicates(ctx, EX("s1"), [NAME], null);
+
+            const active = await store.find(ctx, { subject: EX("s1") });
+            expect(active).toHaveLength(1);
+            expect((active[0]?.object as Literal).value).toBe("Named");
+        });
+
+        it("deleteBySubjectPredicates with graph=IRI only targets that named graph", async () => {
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Default"), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Named"), graph: GRAPH_A });
+
+            await store.deleteBySubjectPredicates(ctx, EX("s1"), [NAME], GRAPH_A);
+
+            const active = await store.find(ctx, { subject: EX("s1") });
+            expect(active).toHaveLength(1);
+            expect((active[0]?.object as Literal).value).toBe("Default");
+        });
+
+        it("deleteBySubjectPredicates without graph omitted deletes across all graphs", async () => {
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Default"), graph: DEFAULT_GRAPH });
+            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Named"), graph: GRAPH_A });
+
+            await store.deleteBySubjectPredicates(ctx, EX("s1"), [NAME]);
+
+            const active = await store.find(ctx, { subject: EX("s1") });
+            expect(active).toHaveLength(0);
+        });
+    });
+
     // ── Temporal invariants ───────────────────────────────────────────────────
 
     describe(`TripleStore — temporal invariants (${db.name})`, () => {

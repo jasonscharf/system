@@ -1,26 +1,24 @@
 import type { IRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { EntityHandle, EntityRecord, EntitySchema, FilterOp } from "@jasonscharf/entities";
-import { RDF_TYPE, TERN_PROP_GROUP, toLiteral } from "@jasonscharf/entities";
+import type { EntityRecord, EntitySchema, FilterOp } from "@jasonscharf/entities";
+import { RDF_TYPE, toLiteral } from "@jasonscharf/entities";
 import { EntityStore } from "./EntityStore.js";
 import type { ServerContext } from "./ServerContext.js";
 
 export type { FilterOp };
 
 interface Filter {
-    handle: EntityHandle;
     prop: string;
     op: FilterOp;
     value: unknown;
 }
 
 interface OrderClause {
-    handle: EntityHandle;
     prop: string;
     dir: "asc" | "desc";
 }
 
-export class EntityQuery<H extends EntityHandle[]> {
+export class EntityQuery {
     private readonly _es: EntityStore;
     private _filters: Filter[] = [];
     private _order?: OrderClause;
@@ -30,18 +28,17 @@ export class EntityQuery<H extends EntityHandle[]> {
     constructor(
         private readonly _store: TripleStore,
         private readonly _schema: EntitySchema,
-        private readonly _handles: H | "*",
     ) {
         this._es = new EntityStore(_store);
     }
 
-    where(handle: EntityHandle, prop: string, op: FilterOp, value: unknown): this {
-        this._filters.push({ handle, prop, op, value });
+    where(prop: string, op: FilterOp, value: unknown): this {
+        this._filters.push({ prop, op, value });
         return this;
     }
 
-    orderBy(handle: EntityHandle, prop: string, dir: "asc" | "desc" = "asc"): this {
-        this._order = { handle, prop, dir };
+    orderBy(prop: string, dir: "asc" | "desc" = "asc"): this {
+        this._order = { prop, dir };
         return this;
     }
 
@@ -49,6 +46,7 @@ export class EntityQuery<H extends EntityHandle[]> {
         this._limit = n;
         return this;
     }
+
     offset(n: number): this {
         this._offset = n;
         return this;
@@ -65,22 +63,17 @@ export class EntityQuery<H extends EntityHandle[]> {
                 candidateIris = await this._applyEqFilter(txCtx, candidateIris, f);
             }
 
-            let records = await this._es.hydrateMany(
-                txCtx,
-                this._schema,
-                candidateIris,
-                this._handles,
-            );
+            let records = await this._es.hydrateMany(txCtx, this._schema, candidateIris);
 
             for (const f of otherFilters) {
                 records = records.filter((r) => this._matchFilter(r, f));
             }
 
             if (this._order) {
-                const { handle, prop, dir } = this._order;
+                const { prop, dir } = this._order;
                 records.sort((a, b) => {
-                    const av = a.groups[handle.id]?.[prop];
-                    const bv = b.groups[handle.id]?.[prop];
+                    const av = a.props[prop];
+                    const bv = b.props[prop];
                     if (av === bv) {
                         return 0;
                     }
@@ -125,44 +118,20 @@ export class EntityQuery<H extends EntityHandle[]> {
     }
 
     private async _applyEqFilter(ctx: ServerContext, iris: string[], f: Filter): Promise<string[]> {
-        const groupDef = this._schema.group(f.handle);
-        if (!groupDef) {
-            return iris;
-        }
-        const propIri = (groupDef.properties as Record<string, IRI>)[f.prop];
+        const propIri = (this._schema.properties as Record<string, IRI>)[f.prop];
         if (!propIri) {
             return iris;
         }
 
         const valueNode = toLiteral(f.value);
         const propQuads = await this._store.find(ctx, { predicate: propIri, object: valueNode });
-        const matchingPg = new Set(propQuads.map((q) => (q.subject as IRI).value));
+        const matchingEntities = new Set(propQuads.map((q) => (q.subject as IRI).value));
 
-        if (matchingPg.size === 0) {
-            return [];
-        }
-
-        const entSet = new Set<string>();
-        for (const pgVal of matchingPg) {
-            const pgNode = { value: pgVal } as IRI;
-            const entQuads = await this._store.find(ctx, {
-                predicate: TERN_PROP_GROUP,
-                object: pgNode,
-            });
-            for (const q of entQuads) {
-                entSet.add((q.subject as IRI).value);
-            }
-        }
-
-        return iris.filter((iri) => entSet.has(iri));
+        return iris.filter((iri) => matchingEntities.has(iri));
     }
 
     private _matchFilter(record: EntityRecord, f: Filter): boolean {
-        const groupData = record.groups[f.handle.id];
-        if (!groupData) {
-            return false;
-        }
-        const value = groupData[f.prop];
+        const value = record.props[f.prop];
         switch (f.op) {
             case "!=":
                 return value !== f.value;
@@ -190,8 +159,8 @@ export class EntityQuery<H extends EntityHandle[]> {
 
 export function entities(store: TripleStore) {
     return {
-        find<H extends EntityHandle[]>(schema: EntitySchema, handles: H | "*"): EntityQuery<H> {
-            return new EntityQuery<H>(store, schema, handles);
+        find(schema: EntitySchema): EntityQuery {
+            return new EntityQuery(store, schema);
         },
     };
 }

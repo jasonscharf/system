@@ -1,6 +1,6 @@
 import { DEFAULT_GRAPH, type DefaultGraph, type IRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { EntityHandle, EntityRecord, EntitySchema, PropGroupDef } from "@jasonscharf/entities";
+import type { EntityRecord, EntitySchema } from "@jasonscharf/entities";
 import {
     EntityValidationError,
     entityIri,
@@ -8,11 +8,8 @@ import {
     idFromIri,
     invertPropertyMap,
     localName,
-    pgIri,
     propertyMapFor,
     RDF_TYPE,
-    TERN_HANDLE,
-    TERN_PROP_GROUP,
     toLiteral,
 } from "@jasonscharf/entities";
 import { validate } from "@jasonscharf/gen";
@@ -39,7 +36,6 @@ export class EntityStore {
         ctxOrFn: ServerContext | ((ctx: ServerContext) => Promise<T>),
         maybeFn?: (ctx: ServerContext) => Promise<T>,
     ): Promise<T> {
-        // Support both inTransaction(ctx, fn) and legacy inTransaction(fn).
         if (typeof ctxOrFn === "function") {
             return this._store.knex.transaction(async (trx) =>
                 ctxOrFn({ ...defaultServerContext, trx }),
@@ -62,67 +58,24 @@ export class EntityStore {
 
     // ── Create ────────────────────────────────────────────────────────────────
 
-    async create<CoreProps extends Record<string, unknown>>(
+    async create<Props extends Record<string, unknown>>(
         ctx: ServerContext,
-        schema: EntitySchema<CoreProps>,
-        data: Partial<CoreProps>,
+        schema: EntitySchema<Props>,
+        data: Partial<Props>,
     ): Promise<EntityRecord> {
-        const coreGroup = schema.allGroups()[0];
-        if (coreGroup == null) {
-            throw new Error("EntityStore.create: schema has no groups defined");
-        }
-        const withDefs = this._applyDefaults(coreGroup, data);
-        this._validate(coreGroup, withDefs);
+        const withDefs = this._applyDefaults(schema, data);
+        this._validate(schema, withDefs);
 
         const id = _newId();
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-        const pg = pgIri(ent.value, coreGroup.handle);
 
         return this._withTrx(ctx, async (txCtx) => {
             const graph = tenantGraphForInsert(txCtx);
             await this._store.insertMany(txCtx, [
                 { subject: ent, predicate: RDF_TYPE, object: schema.typeIRI, graph },
-                { subject: ent, predicate: TERN_PROP_GROUP, object: pg, graph },
-                {
-                    subject: pg,
-                    predicate: TERN_HANDLE,
-                    object: toLiteral(coreGroup.handle.toString()),
-                    graph,
-                },
-                ...this._propQuads(pg, coreGroup, withDefs, graph),
+                ...this._propQuads(ent, schema, withDefs, graph),
             ]);
-            return { id, iri: ent.value, groups: { [coreGroup.handle.id]: withDefs } };
-        });
-    }
-
-    // ── PropGroup management ─────────────────────────────────────────────────
-
-    async addGroup<Props extends Record<string, unknown>>(
-        ctx: ServerContext,
-        schema: EntitySchema,
-        id: string,
-        h: EntityHandle,
-        data: Partial<Props>,
-    ): Promise<void> {
-        const groupDef = this._requireGroup(schema, h);
-        const withDefs = this._applyDefaults(groupDef, data);
-        this._validate(groupDef, withDefs);
-
-        const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-        const pg = pgIri(ent.value, h);
-
-        return this._withTrx(ctx, async (txCtx) => {
-            const graph = tenantGraphForInsert(txCtx);
-            await this._store.insertMany(txCtx, [
-                { subject: ent, predicate: TERN_PROP_GROUP, object: pg, graph },
-                {
-                    subject: pg,
-                    predicate: TERN_HANDLE,
-                    object: toLiteral(h.toString()),
-                    graph,
-                },
-                ...this._propQuads(pg, groupDef, withDefs, graph),
-            ]);
+            return { id, iri: ent.value, props: withDefs };
         });
     }
 
@@ -132,7 +85,6 @@ export class EntityStore {
         ctx: ServerContext,
         schema: EntitySchema,
         id: string,
-        handles: EntityHandle[] | "*",
     ): Promise<EntityRecord | null> {
         return this._withTrx(ctx, async (txCtx) => {
             const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
@@ -141,56 +93,46 @@ export class EntityStore {
             if (typeQ.length === 0) {
                 return null;
             }
-            return this._hydrate(txCtx, schema, id, ent.value, handles, graph);
+            return this._hydrate(txCtx, schema, id, ent.value, graph);
         });
     }
 
     // ── Update ────────────────────────────────────────────────────────────────
 
-    async updateGroup<Props extends Record<string, unknown>>(
+    async update<Props extends Record<string, unknown>>(
         ctx: ServerContext,
-        schema: EntitySchema,
+        schema: EntitySchema<Props>,
         id: string,
-        h: EntityHandle,
         patch: Partial<Props>,
     ): Promise<void> {
-        const groupDef = this._requireGroup(schema, h);
-        this._validate(groupDef, patch);
+        this._validate(schema, patch);
 
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-        const pg = pgIri(ent.value, h);
-
         const patchEntries = Object.entries(patch).filter(
-            ([propName]) => !!(groupDef.properties as Record<string, IRI>)[propName],
+            ([propName]) => !!(schema.properties as Record<string, IRI>)[propName],
         );
-        const predIris = patchEntries
-            .map(([propName]) => {
-                const iri = (groupDef.properties as Record<string, IRI>)[propName];
-                if (iri == null) {
-                    throw new Error(
-                        `EntityStore.updateGroup: missing IRI for property "${propName}"`,
-                    );
-                }
-                return iri;
-            })
-            .filter(Boolean);
+        const predIris = patchEntries.map(([propName]) => {
+            const iri = (schema.properties as Record<string, IRI>)[propName];
+            if (iri == null) {
+                throw new Error(`EntityStore.update: missing IRI for property "${propName}"`);
+            }
+            return iri;
+        });
 
         return this._withTrx(ctx, async (txCtx) => {
             const filterGraph = tenantGraph(txCtx);
             const insertGraph = tenantGraphForInsert(txCtx);
             if (predIris.length > 0) {
-                await this._store.deleteBySubjectPredicates(txCtx, pg, predIris, filterGraph);
+                await this._store.deleteBySubjectPredicates(txCtx, ent, predIris, filterGraph);
             }
             const quads = patchEntries
                 .filter(([, value]) => value !== undefined)
                 .flatMap(([propName, value]) => {
-                    const propIri = (groupDef.properties as Record<string, IRI>)[propName];
+                    const propIri = (schema.properties as Record<string, IRI>)[propName];
                     if (propIri == null) {
-                        throw new Error(
-                            `EntityStore.updateGroup: missing IRI for property "${propName}"`,
-                        );
+                        throw new Error(`EntityStore.update: missing IRI for property "${propName}"`);
                     }
-                    return [{ subject: pg, predicate: propIri, object: toLiteral(value), graph: insertGraph }];
+                    return [{ subject: ent, predicate: propIri, object: toLiteral(value), graph: insertGraph }];
                 });
             if (quads.length > 0) {
                 await this._store.insertMany(txCtx, quads);
@@ -202,15 +144,8 @@ export class EntityStore {
 
     async delete(ctx: ServerContext, schema: EntitySchema, id: string): Promise<void> {
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-        const graph = tenantGraph(ctx);
-        const pgLinks = await this._store.find(ctx, { subject: ent, predicate: TERN_PROP_GROUP, graph });
-        const pgNodes = pgLinks.map((q) => q.object as IRI);
-
         return this._withTrx(ctx, async (txCtx) => {
-            if (pgNodes.length > 0) {
-                await this._store.deleteSubjects(txCtx, pgNodes, graph);
-            }
-            await this._store.delete(txCtx, { subject: ent, graph });
+            await this._store.delete(txCtx, { subject: ent, graph: tenantGraph(txCtx) });
         });
     }
 
@@ -220,19 +155,15 @@ export class EntityStore {
         ctx: ServerContext,
         schema: EntitySchema,
         id: string,
-        h: EntityHandle,
         prop: string,
     ): Promise<unknown[]> {
         return this._withTrx(ctx, async (txCtx) => {
-            const groupDef = this._requireGroup(schema, h);
-            const propIri = (groupDef.properties as Record<string, IRI>)[prop];
+            const propIri = (schema.properties as Record<string, IRI>)[prop];
             if (!propIri) {
                 return [];
             }
-
             const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-            const pg = pgIri(ent.value, h);
-            const quads = await this._store.findOrdered(txCtx, { subject: pg, predicate: propIri, graph: tenantGraph(txCtx) });
+            const quads = await this._store.findOrdered(txCtx, { subject: ent, predicate: propIri, graph: tenantGraph(txCtx) });
             return quads.map((q) => fromLiteral(q.object)).filter((v) => v !== undefined);
         });
     }
@@ -241,26 +172,23 @@ export class EntityStore {
         ctx: ServerContext,
         schema: EntitySchema,
         id: string,
-        h: EntityHandle,
         prop: string,
         ...values: unknown[]
     ): Promise<void> {
-        const groupDef = this._requireGroup(schema, h);
-        const propIri = (groupDef.properties as Record<string, IRI>)[prop];
+        const propIri = (schema.properties as Record<string, IRI>)[prop];
         if (!propIri) {
-            throw new Error(`Property '${prop}' not found in PropGroup '${h.id}'`);
+            throw new Error(`Property '${prop}' not found in schema`);
         }
 
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-        const pg = pgIri(ent.value, h);
 
         return this._withTrx(ctx, async (txCtx) => {
             const graph = tenantGraphForInsert(txCtx);
-            const viewIris = await this._cvs().findViewsForSource(txCtx, pg.value, propIri.value);
+            const viewIris = await this._cvs().findViewsForSource(txCtx, ent.value, propIri.value);
 
             await this._store.insertMany(
                 txCtx,
-                values.map((v) => ({ subject: pg, predicate: propIri, object: toLiteral(v), graph })),
+                values.map((v) => ({ subject: ent, predicate: propIri, object: toLiteral(v), graph })),
             );
             for (const v of values) {
                 for (const vIri of viewIris) {
@@ -274,23 +202,20 @@ export class EntityStore {
         ctx: ServerContext,
         schema: EntitySchema,
         id: string,
-        h: EntityHandle,
         prop: string,
         value: unknown,
     ): Promise<boolean> {
-        const groupDef = this._requireGroup(schema, h);
-        const propIri = (groupDef.properties as Record<string, IRI>)[prop];
+        const propIri = (schema.properties as Record<string, IRI>)[prop];
         if (!propIri) {
             return false;
         }
 
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-        const pg = pgIri(ent.value, h);
 
         let deleted = false;
         await this._withTrx(ctx, async (txCtx) => {
             const count = await this._store.delete(txCtx, {
-                subject: pg,
+                subject: ent,
                 predicate: propIri,
                 object: toLiteral(value),
                 graph: tenantGraph(txCtx),
@@ -299,7 +224,7 @@ export class EntityStore {
             if (deleted) {
                 const viewIris = await this._cvs().findViewsForSource(
                     txCtx,
-                    pg.value,
+                    ent.value,
                     propIri.value,
                 );
                 for (const vIri of viewIris) {
@@ -314,15 +239,14 @@ export class EntityStore {
         ctx: ServerContext,
         schema: EntitySchema,
         id: string,
-        h: EntityHandle,
         prop: string,
     ): Promise<unknown> {
-        const items = await this.collectionGet(ctx, schema, id, h, prop);
+        const items = await this.collectionGet(ctx, schema, id, prop);
         if (items.length === 0) {
             return undefined;
         }
         const last = items[items.length - 1];
-        await this.collectionRemove(ctx, schema, id, h, prop, last);
+        await this.collectionRemove(ctx, schema, id, prop, last);
         return last;
     }
 
@@ -330,30 +254,27 @@ export class EntityStore {
         ctx: ServerContext,
         schema: EntitySchema,
         id: string,
-        h: EntityHandle,
         prop: string,
         values: unknown[],
     ): Promise<void> {
-        const groupDef = this._requireGroup(schema, h);
-        const propIri = (groupDef.properties as Record<string, IRI>)[prop];
+        const propIri = (schema.properties as Record<string, IRI>)[prop];
         if (!propIri) {
-            throw new Error(`Property '${prop}' not found in PropGroup '${h.id}'`);
+            throw new Error(`Property '${prop}' not found in schema`);
         }
 
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-        const pg = pgIri(ent.value, h);
 
         return this._withTrx(ctx, async (txCtx) => {
             const filterGraph = tenantGraph(txCtx);
             const insertGraph = tenantGraphForInsert(txCtx);
-            await this._store.delete(txCtx, { subject: pg, predicate: propIri, graph: filterGraph });
+            await this._store.delete(txCtx, { subject: ent, predicate: propIri, graph: filterGraph });
             if (values.length > 0) {
                 await this._store.insertMany(
                     txCtx,
-                    values.map((v) => ({ subject: pg, predicate: propIri, object: toLiteral(v), graph: insertGraph })),
+                    values.map((v) => ({ subject: ent, predicate: propIri, object: toLiteral(v), graph: insertGraph })),
                 );
             }
-            const viewIris = await this._cvs().findViewsForSource(txCtx, pg.value, propIri.value);
+            const viewIris = await this._cvs().findViewsForSource(txCtx, ent.value, propIri.value);
             for (const vIri of viewIris) {
                 await this._cvs().sync(txCtx, vIri, values.map(String));
             }
@@ -364,15 +285,14 @@ export class EntityStore {
         ctx: ServerContext,
         schema: EntitySchema,
         id: string,
-        h: EntityHandle,
         prop: string,
         index: number,
         value: unknown,
     ): Promise<void> {
-        const current = await this.collectionGet(ctx, schema, id, h, prop);
+        const current = await this.collectionGet(ctx, schema, id, prop);
         const clamped = Math.max(0, Math.min(index, current.length));
         current.splice(clamped, 0, value);
-        await this.collectionSet(ctx, schema, id, h, prop, current);
+        await this.collectionSet(ctx, schema, id, prop, current);
     }
 
     // ── CollectionView convenience ────────────────────────────────────────────
@@ -381,22 +301,19 @@ export class EntityStore {
         ctx: ServerContext,
         schema: EntitySchema,
         id: string,
-        h: EntityHandle,
         prop: string,
         opts: CollectionViewOpts = {},
     ): Promise<string> {
-        const groupDef = this._requireGroup(schema, h);
-        const propIri = (groupDef.properties as Record<string, IRI>)[prop];
+        const propIri = (schema.properties as Record<string, IRI>)[prop];
         if (!propIri) {
-            throw new Error(`Property '${prop}' not found in PropGroup '${h.id}'`);
+            throw new Error(`Property '${prop}' not found in schema`);
         }
 
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-        const pg = pgIri(ent.value, h);
-        const currentRefs = (await this.collectionGet(ctx, schema, id, h, prop)).map(String);
+        const currentRefs = (await this.collectionGet(ctx, schema, id, prop)).map(String);
 
         return this._withTrx(ctx, async (txCtx) => {
-            return this._cvs().create(txCtx, pg.value, propIri.value, currentRefs, opts);
+            return this._cvs().create(txCtx, ent.value, propIri.value, currentRefs, opts);
         });
     }
 
@@ -410,14 +327,13 @@ export class EntityStore {
         ctx: ServerContext,
         schema: EntitySchema,
         iris: string[],
-        handles: EntityHandle[] | "*",
     ): Promise<EntityRecord[]> {
         return this._withTrx(ctx, async (txCtx) => {
             const graph = tenantGraph(txCtx);
             return Promise.all(
                 iris.map((iri) => {
                     const id = idFromIri(iri);
-                    return this._hydrate(txCtx, schema, id, iri, handles, graph);
+                    return this._hydrate(txCtx, schema, id, iri, graph);
                 }),
             );
         });
@@ -437,101 +353,84 @@ export class EntityStore {
         schema: EntitySchema,
         id: string,
         entIri: string,
-        handles: EntityHandle[] | "*",
         graph?: IRI | null,
     ): Promise<EntityRecord> {
-        const groups: Record<string, Record<string, unknown>> = {};
-        const defs = schema.resolveGroups(handles);
+        const iriToName = invertPropertyMap(schema.properties as Record<string, IRI>);
+        const entNode = { value: entIri } as IRI;
+        const quads = await this._store.find(ctx, { subject: entNode, graph });
 
-        const pgNodes = defs.map((def) => pgIri(entIri, def.handle));
-        const allQuads = await this._store.findForSubjects(ctx, pgNodes, graph);
-
-        for (const def of defs) {
-            const pg = pgIri(entIri, def.handle);
-            const quads = allQuads.get(pg.value) ?? [];
-            if (quads.length === 0) {
+        const raw: Record<string, unknown[]> = {};
+        for (const q of quads) {
+            const predStr = (q.predicate as IRI).value;
+            if (predStr === RDF_TYPE.value) {
                 continue;
             }
-
-            const iriToName = invertPropertyMap(def.properties as Record<string, IRI>);
-            const raw: Record<string, unknown[]> = {};
-            for (const q of quads) {
-                const predStr = (q.predicate as IRI).value;
-                if (predStr === TERN_HANDLE.value) {
-                    continue;
-                }
-                const propName = iriToName.get(predStr);
-                /* v8 ignore next -- defensive guard; PropGroup nodes only carry TERN_HANDLE and schema property predicates */
-                if (!propName) {
-                    continue;
-                }
-                if (!raw[propName]) {
-                    raw[propName] = [];
-                }
-                raw[propName]?.push(fromLiteral(q.object));
+            const propName = iriToName.get(predStr);
+            /* v8 ignore next -- defensive: unknown predicates on entity are skipped */
+            if (!propName) {
+                continue;
             }
-            const props: Record<string, unknown> = {};
-            for (const [k, vals] of Object.entries(raw)) {
-                props[k] = vals.length === 1 ? vals[0] : vals;
+            if (!raw[propName]) {
+                raw[propName] = [];
             }
-            groups[def.handle.id] = props;
+            raw[propName]?.push(fromLiteral(q.object));
         }
-        return { id, iri: entIri, groups };
+
+        const props: Record<string, unknown> = {};
+        for (const [k, vals] of Object.entries(raw)) {
+            props[k] = vals.length === 1 ? vals[0] : vals;
+        }
+        return { id, iri: entIri, props };
     }
 
     private _propQuads(
-        pg: IRI,
-        def: PropGroupDef,
+        ent: IRI,
+        schema: EntitySchema,
         data: Record<string, unknown>,
         graph: IRI | DefaultGraph = DEFAULT_GRAPH,
     ) {
         const results: Parameters<TripleStore["insert"]>[1][] = [];
-        for (const [propName, propIri] of Object.entries(def.properties)) {
+        for (const [propName, propIri] of Object.entries(schema.properties)) {
             const value = data[propName];
             if (value === undefined || value === null) {
                 continue;
             }
             if (Array.isArray(value)) {
                 for (const v of value) {
-                    results.push({ subject: pg, predicate: propIri as IRI, object: toLiteral(v), graph });
+                    results.push({ subject: ent, predicate: propIri as IRI, object: toLiteral(v), graph });
                 }
             } else {
-                results.push({ subject: pg, predicate: propIri as IRI, object: toLiteral(value), graph });
+                results.push({ subject: ent, predicate: propIri as IRI, object: toLiteral(value), graph });
             }
         }
         return results;
     }
 
-    private _applyDefaults<T extends Record<string, unknown>>(def: PropGroupDef, data: T): T {
-        if (!def.defaults) {
-            return data;
+    private _applyDefaults<Props extends Record<string, unknown>>(
+        schema: EntitySchema<Props>,
+        data: Partial<Props>,
+    ): Record<string, unknown> {
+        if (!schema.defaults) {
+            return data as Record<string, unknown>;
         }
         const result = { ...data } as Record<string, unknown>;
-        for (const [key, defaultVal] of Object.entries(def.defaults)) {
+        for (const [key, defaultVal] of Object.entries(schema.defaults)) {
             if (result[key] === undefined) {
                 result[key] =
                     typeof defaultVal === "function" ? (defaultVal as () => unknown)() : defaultVal;
             }
         }
-        return result as T;
+        return result;
     }
 
-    private _requireGroup(schema: EntitySchema, h: EntityHandle): PropGroupDef {
-        const g = schema.group(h);
-        if (!g) {
-            throw new Error(`PropGroup not registered on schema: ${h.id}`);
-        }
-        return g;
-    }
-
-    private _validate(def: PropGroupDef, data: Record<string, unknown>): void {
-        if (!def.shape) {
+    private _validate(schema: EntitySchema, data: Record<string, unknown>): void {
+        if (!schema.shape) {
             return;
         }
         const result = validate(
             data,
-            def.shape,
-            propertyMapFor(def.properties as Record<string, IRI>),
+            schema.shape,
+            propertyMapFor(schema.properties as Record<string, IRI>),
         );
         if (!result.valid) {
             throw new EntityValidationError(result.violations);

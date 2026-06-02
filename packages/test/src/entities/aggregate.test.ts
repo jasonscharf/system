@@ -11,10 +11,8 @@ import type { DomainEvent } from "@jasonscharf/core";
 import { IRI } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import {
-    type EntityHandle,
     type EntityRecord,
     EntitySchema,
-    handle,
     TernAggregate,
 } from "@jasonscharf/entities";
 import type { ServerContext } from "@jasonscharf/server";
@@ -29,66 +27,32 @@ const NS = "http://tern.dev/test/widget/";
 const WIDGET_IRI = new IRI(`${NS}Widget`);
 const NAME_IRI = new IRI(`${NS}name`);
 const COLOR_IRI = new IRI(`${NS}color`);
-const CORE_HANDLE = handle("tern:widget.core");
 
-// Extension PropGroup — simulates a third-party extension adding metadata
-const META_HANDLE = handle("ext.widget.meta");
-const TAGS_IRI = new IRI(`${NS}tags`);
-const PRIORITY_IRI = new IRI(`${NS}priority`);
-
-interface WidgetCoreProps extends Record<string, unknown> {
+interface WidgetProps extends Record<string, unknown> {
     name: string;
     color: string;
 }
 
-interface WidgetMetaProps extends Record<string, unknown> {
-    tags: string;
-    priority: number;
-}
-
-const WidgetSchema = new EntitySchema<WidgetCoreProps>({
+const WidgetSchema = new EntitySchema<WidgetProps>({
     typeIRI: WIDGET_IRI,
     ns: NS,
-    coreGroup: {
-        handle: CORE_HANDLE,
-        properties: { name: NAME_IRI, color: COLOR_IRI },
-    },
+    properties: { name: NAME_IRI, color: COLOR_IRI },
 });
 
-// Register the extension group
-WidgetSchema.register({
-    handle: META_HANDLE,
-    properties: { tags: TAGS_IRI, priority: PRIORITY_IRI },
-});
-
-class Widget extends TernAggregate<WidgetCoreProps> {
+class Widget extends TernAggregate<WidgetProps> {
     static readonly RENAMED = "http://tern.dev/test/widget.renamed";
 
     get name(): string | undefined {
-        return this._get(CORE_HANDLE, "name");
+        return this._get("name");
     }
 
     get color(): string | undefined {
-        return this._get(CORE_HANDLE, "color");
-    }
-
-    // Secondary group access via _getFrom / _setOn
-    get tags(): string | undefined {
-        return this._getFrom<WidgetMetaProps, "tags">(META_HANDLE, "tags");
-    }
-
-    get priority(): number | undefined {
-        return this._getFrom<WidgetMetaProps, "priority">(META_HANDLE, "priority");
-    }
-
-    setMeta(tags: string, priority: number): void {
-        this._setOn<WidgetMetaProps, "tags">(META_HANDLE, "tags", tags);
-        this._setOn<WidgetMetaProps, "priority">(META_HANDLE, "priority", priority);
+        return this._get("color");
     }
 
     rename(newName: string): void {
         const old = this.name;
-        this._set(CORE_HANDLE, "name", newName);
+        this._set("name", newName);
         this._emit<{ from: string | undefined; to: string }>({
             id: Math.random().toString(36).slice(2),
             type: Widget.RENAMED,
@@ -99,16 +63,13 @@ class Widget extends TernAggregate<WidgetCoreProps> {
     }
 
     recolor(newColor: string): void {
-        this._set(CORE_HANDLE, "color", newColor);
+        this._set("color", newColor);
     }
 }
 
 class WidgetRepository extends AggregateRepository<Widget> {
     get schema() {
         return WidgetSchema;
-    }
-    get handles(): EntityHandle[] | "*" {
-        return "*";
     }
     reconstruct(record: EntityRecord): Widget {
         return new Widget(record);
@@ -146,7 +107,7 @@ describe("TernAggregate + AggregateRepository", () => {
         const record: EntityRecord = {
             id: "test-id",
             iri: `${NS}widget/test-id`,
-            groups: { [CORE_HANDLE.id]: { name: "Sprocket", color: "blue" } },
+            props: { name: "Sprocket", color: "blue" },
         };
         const widget = new Widget(record);
         expect(widget.name).toBe("Sprocket");
@@ -157,7 +118,7 @@ describe("TernAggregate + AggregateRepository", () => {
         const record: EntityRecord = {
             id: "test-id",
             iri: `${NS}widget/test-id`,
-            groups: { [CORE_HANDLE.id]: { name: "Sprocket", color: "blue" } },
+            props: { name: "Sprocket", color: "blue" },
         };
         const widget = new Widget(record);
         widget.rename("Cog");
@@ -168,7 +129,7 @@ describe("TernAggregate + AggregateRepository", () => {
         const record: EntityRecord = {
             id: "test-id",
             iri: `${NS}widget/test-id`,
-            groups: { [CORE_HANDLE.id]: { name: "A", color: "red" } },
+            props: { name: "A", color: "red" },
         };
         const widget = new Widget(record);
         expect(widget.isDirty).toBe(false);
@@ -180,14 +141,14 @@ describe("TernAggregate + AggregateRepository", () => {
         const record: EntityRecord = {
             id: "test-id",
             iri: `${NS}widget/test-id`,
-            groups: { [CORE_HANDLE.id]: { name: "A", color: "red" } },
+            props: { name: "A", color: "red" },
         };
         const widget = new Widget(record);
         widget.rename("B");
         widget.recolor("green");
 
         const changes = widget.drainChanges();
-        expect(changes.get(CORE_HANDLE.id)).toEqual({ name: "B", color: "green" });
+        expect(changes).toEqual({ name: "B", color: "green" });
         expect(widget.isDirty).toBe(false);
     });
 
@@ -195,7 +156,7 @@ describe("TernAggregate + AggregateRepository", () => {
         const record: EntityRecord = {
             id: "test-id",
             iri: `${NS}widget/test-id`,
-            groups: { [CORE_HANDLE.id]: { name: "A", color: "red" } },
+            props: { name: "A", color: "red" },
         };
         const widget = new Widget(record);
         widget.rename("B");
@@ -210,7 +171,7 @@ describe("TernAggregate + AggregateRepository", () => {
         const record: EntityRecord = {
             id: "test-id",
             iri: `${NS}widget/test-id`,
-            groups: { [CORE_HANDLE.id]: { name: "A", color: "red" } },
+            props: { name: "A", color: "red" },
         };
         const widget = new Widget(record);
         widget.rename("B");
@@ -222,7 +183,7 @@ describe("TernAggregate + AggregateRepository", () => {
         const record: EntityRecord = {
             id: "test-id",
             iri: `${NS}widget/test-id`,
-            groups: { [CORE_HANDLE.id]: { name: "A", color: "red" } },
+            props: { name: "A", color: "red" },
         };
         const widget = new Widget(record);
         widget.recolor("green");
@@ -324,77 +285,9 @@ describe("TernAggregate + AggregateRepository", () => {
         expect(widget.isDirty).toBe(false);
     });
 
-    // ── Secondary PropGroup (_getFrom / _setOn) ───────────────────────────────
-
-    it("test set on and get from secondary group", () => {
-        const record: EntityRecord = {
-            id: "w1",
-            iri: `${NS}widget/w1`,
-            groups: {
-                [CORE_HANDLE.id]: { name: "Bolt", color: "silver" },
-            },
-        };
-        const widget = new Widget(record);
-
-        // Initially no meta group data
-        expect(widget.tags).toBeUndefined();
-        expect(widget.priority).toBeUndefined();
-
-        widget.setMeta("hardware,fastener", 1);
-
-        expect(widget.tags).toBe("hardware,fastener");
-        expect(widget.priority).toBe(1);
-        expect(widget.isDirty).toBe(true);
-    });
-
-    it("test set on tracks changes per group", () => {
-        const record: EntityRecord = {
-            id: "w2",
-            iri: `${NS}widget/w2`,
-            groups: { [CORE_HANDLE.id]: { name: "Nut", color: "gold" } },
-        };
-        const widget = new Widget(record);
-        widget.rename("NutV2");
-        widget.setMeta("fastener", 5);
-
-        const changes = widget.drainChanges();
-        expect(changes.has(CORE_HANDLE.id)).toBe(true);
-        expect(changes.has(META_HANDLE.id)).toBe(true);
-        expect(changes.get(CORE_HANDLE.id)).toEqual({ name: "NutV2" });
-        expect(changes.get(META_HANDLE.id)).toEqual({ tags: "fastener", priority: 5 });
-    });
-
-    it("test save persists secondary group changes", async () => {
-        // First create the entity, then add the extension group
-        const record = await entityStore.create(ctx, WidgetSchema, {
-            name: "Washer",
-            color: "zinc",
-        });
-        await entityStore.addGroup(ctx, WidgetSchema, record.id, META_HANDLE, {
-            tags: "hardware",
-            priority: 3,
-        });
-
-        const widget = await repo.findById(ctx, record.id);
-        if (widget === null) {
-            throw new Error("expected widget");
-        }
-        expect(widget.tags).toBe("hardware");
-        expect(widget.priority).toBe(3);
-
-        widget.setMeta("hardware,plumbing", 2);
-        await repo.save(ctx, widget);
-
-        const reloaded = await repo.findById(ctx, record.id);
-        expect(reloaded?.tags).toBe("hardware,plumbing");
-        expect(reloaded?.priority).toBe(2);
-    });
-
-    it("test save with unknown handle id in change set is no op", async () => {
-        // If drainChanges() returns a handleId not registered on the schema,
-        // AggregateRepository.save() must skip it silently rather than throw.
-        // This protects against race conditions where an extension was removed
-        // after data was loaded.
+    it("test save skips unknown props in change set silently", async () => {
+        // If drainChanges() somehow returns a prop name not in the schema,
+        // EntityStore.update() filters it out — no throw.
         const record = await entityStore.create(ctx, WidgetSchema, {
             name: "Rivet",
             color: "copper",
@@ -405,13 +298,9 @@ describe("TernAggregate + AggregateRepository", () => {
             throw new Error("expected widget");
         }
 
-        // Manually inject a change for an unregistered handle
-        (widget as unknown as { _changes: Map<string, Record<string, unknown>> })._changes.set(
-            "unregistered.handle",
-            { foo: "bar" },
-        );
+        // Inject a key that isn't in WidgetSchema.properties
+        (widget as unknown as { _changes: Record<string, unknown> })._changes.unknownProp = "bar";
 
-        // save() must not throw, and the real changes are still flushed
         widget.rename("RivetV2");
         await expect(repo.save(ctx, widget)).resolves.not.toThrow();
 

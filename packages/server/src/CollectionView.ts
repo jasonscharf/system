@@ -19,7 +19,6 @@ import {
     TERN_CVI_POS,
     TERN_CVI_REF,
     TERN_CVI_VIEW,
-    TERN_PROP_GROUP,
     TERN_VIEW_NS,
     toLiteral,
 } from "@jasonscharf/entities";
@@ -337,27 +336,12 @@ export class CollectionViewStore {
                 let sortVal: unknown;
                 try {
                     const refIri = new IRI(item.ref);
-                    const direct = await this._store.find(ctx, {
+                    const quads = await this._store.find(ctx, {
                         subject: refIri,
                         predicate: propIri,
                     });
-                    if (direct.length > 0) {
-                        sortVal = fromLiteral(direct[0]?.object);
-                    } else {
-                        const pgLinks = await this._store.find(ctx, {
-                            subject: refIri,
-                            predicate: TERN_PROP_GROUP,
-                        });
-                        for (const pg of pgLinks) {
-                            const propQ = await this._store.find(ctx, {
-                                subject: pg.object as IRI,
-                                predicate: propIri,
-                            });
-                            if (propQ.length > 0) {
-                                sortVal = fromLiteral(propQ[0]?.object);
-                                break;
-                            }
-                        }
+                    if (quads.length > 0) {
+                        sortVal = fromLiteral(quads[0]?.object);
                     }
                 } catch {
                     /* non-IRI ref — skip */

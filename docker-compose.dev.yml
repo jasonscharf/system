@@ -23,6 +23,11 @@ services:
     command: yarn test start:debug
     stop_grace_period: 1s
     tty: true
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      TERN_REDIS_URL: redis://redis:6379
     ports:
       - "9231:9231"
     volumes:
@@ -43,6 +48,19 @@ services:
       - "9230:9000"
     volumes:
       - ./:/app
+
+  #
+  # Redis  —  sessions + domain event streams
+  #
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   #
   # PostgreSQL  —  shared by sandbox-server

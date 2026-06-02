@@ -1,4 +1,5 @@
 import type { ServiceContainer } from "./container/index.js";
+import type { IDomainEventBus } from "./events/IDomainEventBus.js";
 
 /**
  * Minimal logger interface.  Any logger satisfying this shape (pino, winston,
@@ -26,6 +27,8 @@ export interface Logger {
 export interface ApplicationContext {
     logger?: Logger;
     config?: Record<string, unknown>;
+    /** Platform-wide event bus for decoupled cross-extension communication. */
+    events?: IDomainEventBus;
     /** Service container for typed dependency resolution across extensions. */
     services?: ServiceContainer;
 }

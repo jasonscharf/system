@@ -27,7 +27,6 @@ import {
     type OAuthProvider,
     RedisSessionStore,
     SessionComponent,
-    SessionCoreHandle,
     UserDeviceRepository,
     UserDeviceSchema,
     UserIdentityRepository,
@@ -1637,8 +1636,8 @@ for (const db of dbProviders) {
                 sessionDevice: devRec.iri,
                 expiresAt,
             });
-            const t1 = s1.groups[SessionCoreHandle.id]?.sessionToken as string;
-            const t2 = s2.groups[SessionCoreHandle.id]?.sessionToken as string;
+            const t1 = s1.props.sessionToken as string;
+            const t2 = s2.props.sessionToken as string;
 
             const results = await findSessionsByTokens(ctx, es, [t2, t1]);
             expect(results).toHaveLength(2);
@@ -1668,7 +1667,7 @@ for (const db of dbProviders) {
                 sessionDevice: devRec.iri,
                 expiresAt: new Date(Date.now() + 3600_000),
             });
-            const token = sess.groups[SessionCoreHandle.id]?.sessionToken as string;
+            const token = sess.props.sessionToken as string;
 
             const result = await findUserBySession(ctx, es, token);
             expect(result).not.toBeNull();
@@ -1695,7 +1694,7 @@ for (const db of dbProviders) {
             const sess = await es.create(ctx, UserSessionSchema, {
                 expiresAt: new Date(Date.now() + 3600_000),
             });
-            const token = sess.groups[SessionCoreHandle.id]?.sessionToken as string;
+            const token = sess.props.sessionToken as string;
             const result = await findUserBySession(ctx, es, token);
             expect(result).toBeNull();
         });

@@ -1,20 +1,17 @@
 /**
  * Higher-level query functions for auth entities.
  *
- * Each function takes an ServerContext and EntityStore and performs one or
+ * Each function takes a ServerContext and EntityStore and performs one or
  * more EntityQuery operations.  "Join" queries traverse entity references in-code:
- *   session.sessionUser  → User entity IRI  → findById(UserSchema, id)
- *   session.sessionDevice → UserDevice IRI  → findById(UserDeviceSchema, id)
- *
- * All queries run against the single TripleStore backing the EntityStore, so
- * they work transparently with both SQLite and PostgreSQL.
+ *   session.props.sessionUser  → User entity IRI  → findById(UserSchema, id)
+ *   session.props.sessionDevice → UserDevice IRI  → findById(UserDeviceSchema, id)
  */
 import type { EntityRecord } from "@jasonscharf/entities";
 import type { EntityStore, ServerContext } from "@jasonscharf/server";
 import { entities } from "@jasonscharf/server";
-import { DeviceCoreHandle, UserDeviceSchema } from "./entities/UserDeviceSchema.js";
-import { CoreHandle, UserSchema } from "./entities/UserSchema.js";
-import { SessionCoreHandle, UserSessionSchema } from "./entities/UserSessionSchema.js";
+import { UserDeviceSchema } from "./entities/UserDeviceSchema.js";
+import { UserSchema } from "./entities/UserSchema.js";
+import { UserSessionSchema } from "./entities/UserSessionSchema.js";
 
 // ── Type helpers ──────────────────────────────────────────────────────────────
 
@@ -33,9 +30,9 @@ function idOf(iri: string): string {
     return seg;
 }
 
-/** Coerce a groups property value to a string (IRI ref or plain value). */
-function strProp(record: EntityRecord, handle: string, prop: string): string | undefined {
-    const v = record.groups[handle]?.[prop];
+/** Coerce a props value to a string. */
+function strProp(record: EntityRecord, prop: string): string | undefined {
+    const v = record.props[prop];
     return v !== undefined ? String(v) : undefined;
 }
 
@@ -43,27 +40,27 @@ function strProp(record: EntityRecord, handle: string, prop: string): string | u
 
 /** Returns all User entities in insertion order. */
 export function listUsers(ctx: ServerContext, es: EntityStore): Promise<EntityRecord[]> {
-    return entities(es.store).find(UserSchema, [CoreHandle]).all(ctx);
+    return entities(es.store).find(UserSchema).all(ctx);
 }
 
 /** Returns all UserDevice entities in insertion order. */
 export function listUserDevices(ctx: ServerContext, es: EntityStore): Promise<EntityRecord[]> {
-    return entities(es.store).find(UserDeviceSchema, [DeviceCoreHandle]).all(ctx);
+    return entities(es.store).find(UserDeviceSchema).all(ctx);
 }
 
 /** Returns all UserSession entities where isActive = true. */
 export function listActiveSessions(ctx: ServerContext, es: EntityStore): Promise<EntityRecord[]> {
     return entities(es.store)
-        .find(UserSessionSchema, [SessionCoreHandle])
-        .where(SessionCoreHandle, "isActive", "=", true)
+        .find(UserSessionSchema)
+        .where("isActive", "=", true)
         .all(ctx);
 }
 
 /** Returns all UserSession entities where isActive = false. */
 export function listInactiveSessions(ctx: ServerContext, es: EntityStore): Promise<EntityRecord[]> {
     return entities(es.store)
-        .find(UserSessionSchema, [SessionCoreHandle])
-        .where(SessionCoreHandle, "isActive", "=", false)
+        .find(UserSessionSchema)
+        .where("isActive", "=", false)
         .all(ctx);
 }
 
@@ -72,35 +69,30 @@ export function listInactiveSessions(ctx: ServerContext, es: EntityStore): Promi
 /**
  * Finds a user and enriches the result with their most-recently-created
  * session and the device associated with that session.
- *
- * Join traversal:
- *   1. Fetch User by id.
- *   2. Filter sessions where sessionUser = user.iri, ordered by createdAt desc.
- *   3. From the most-recent session read sessionDevice IRI → fetch UserDevice.
  */
 export async function findUserWithRecentActivity(
     ctx: ServerContext,
     es: EntityStore,
     userId: string,
 ): Promise<UserWithActivity | null> {
-    const user = await es.findById(ctx, UserSchema, userId, [CoreHandle]);
+    const user = await es.findById(ctx, UserSchema, userId);
     if (!user) {
         return null;
     }
 
     const sessions = await entities(es.store)
-        .find(UserSessionSchema, [SessionCoreHandle])
-        .where(SessionCoreHandle, "sessionUser", "=", user.iri)
-        .orderBy(SessionCoreHandle, "createdAt", "desc")
+        .find(UserSessionSchema)
+        .where("sessionUser", "=", user.iri)
+        .orderBy("createdAt", "desc")
         .all(ctx);
 
     const session = sessions[0] ?? null;
 
     let device: EntityRecord | null = null;
     if (session) {
-        const deviceIri = strProp(session, SessionCoreHandle.id, "sessionDevice");
+        const deviceIri = strProp(session, "sessionDevice");
         if (deviceIri) {
-            device = await es.findById(ctx, UserDeviceSchema, idOf(deviceIri), [DeviceCoreHandle]);
+            device = await es.findById(ctx, UserDeviceSchema, idOf(deviceIri));
         }
     }
 
@@ -119,8 +111,8 @@ export async function findSessionsByTokens(
     const results: EntityRecord[] = [];
     for (const token of tokens) {
         const found = await entities(es.store)
-            .find(UserSessionSchema, [SessionCoreHandle])
-            .where(SessionCoreHandle, "sessionToken", "=", token)
+            .find(UserSessionSchema)
+            .where("sessionToken", "=", token)
             .first(ctx);
         if (found) {
             results.push(found);
@@ -131,9 +123,6 @@ export async function findSessionsByTokens(
 
 /**
  * Finds the User who owns the given session token.
- *
- * Join traversal:
- *   session.sessionUser IRI → idOf() → findById(UserSchema)
  */
 export async function findUserBySession(
     ctx: ServerContext,
@@ -141,18 +130,18 @@ export async function findUserBySession(
     sessionToken: string,
 ): Promise<EntityRecord | null> {
     const session = await entities(es.store)
-        .find(UserSessionSchema, [SessionCoreHandle])
-        .where(SessionCoreHandle, "sessionToken", "=", sessionToken)
+        .find(UserSessionSchema)
+        .where("sessionToken", "=", sessionToken)
         .first(ctx);
 
     if (!session) {
         return null;
     }
 
-    const userIri = strProp(session, SessionCoreHandle.id, "sessionUser");
+    const userIri = strProp(session, "sessionUser");
     if (!userIri) {
         return null;
     }
 
-    return es.findById(ctx, UserSchema, idOf(userIri), [CoreHandle]);
+    return es.findById(ctx, UserSchema, idOf(userIri));
 }

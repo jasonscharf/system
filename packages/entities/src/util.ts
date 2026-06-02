@@ -2,8 +2,6 @@ import { randomBytes } from "node:crypto";
 import type { Literal } from "@jasonscharf/core";
 import { IRI, literal } from "@jasonscharf/core";
 import { XSD_BOOLEAN, XSD_DATETIME, XSD_DECIMAL, XSD_INTEGER, XSD_STRING } from "./constants.js";
-import type { EntityHandle } from "./Handle.js";
-import { handleSlug } from "./Handle.js";
 
 export function newId(): string {
     return randomBytes(16).toString("hex");
@@ -19,11 +17,6 @@ export function localName(iri: string): string {
     const hash = iri.lastIndexOf("#");
     const slash = iri.lastIndexOf("/");
     return iri.slice(Math.max(hash, slash) + 1);
-}
-
-/** Build the PropGroup node IRI: entity IRI + `/pg/` + handle slug. */
-export function pgIri(entityIriVal: string, h: EntityHandle): IRI {
-    return new IRI(`${entityIriVal}/pg/${handleSlug(h)}`);
 }
 
 /** Extract the entity id from its IRI (last path segment). */
@@ -83,7 +76,7 @@ export function fromLiteral(term: unknown): unknown {
     return undefined;
 }
 
-/** Build a Record<propName, iriString> reverse-lookup from a PropGroupDef.properties map. */
+/** Build a Record<propName, iriString> reverse-lookup from an EntitySchema.properties map. */
 export function invertPropertyMap(props: Record<string, IRI>): Map<string, string> {
     return new Map(Object.entries(props).map(([name, iri]) => [iri.value, name]));
 }

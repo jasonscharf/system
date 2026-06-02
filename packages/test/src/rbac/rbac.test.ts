@@ -79,7 +79,7 @@ for (const provider of providers) {
             await seedRbac(knex); // inserts system tenant, superusers, superadmin, wildcard
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { trx };
+            ctx = { ...defaultServerContext, trx };
 
             const tenants = new TenantRepository(store);
             const groups = new UserGroupRepository(store);

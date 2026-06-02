@@ -9,7 +9,7 @@
 import { IRI } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import { EntitySchema, handle } from "@jasonscharf/entities";
-import { EntityStore, type ServerContext } from "@jasonscharf/server";
+import { defaultServerContext, EntityStore, type ServerContext } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { up as seedData } from "../../../data/src/migrations/001_init.js";
@@ -21,7 +21,7 @@ const WIDGET_IRI = new IRI(`${NS}Widget`);
 const NAME_IRI = new IRI(`${NS}name`);
 const CORE_HANDLE = handle("tern:widget.core");
 
-interface WidgetProps {
+interface WidgetProps extends Record<string, unknown> {
     name: string;
 }
 
@@ -43,7 +43,7 @@ describe("EntityStore — tenant isolation", () => {
     let trx: Knex.Transaction;
 
     function ctx(tenantId?: string): ServerContext {
-        return tenantId ? { trx, tenantId } : { trx };
+        return tenantId ? { ...defaultServerContext, trx, tenantId } : { ...defaultServerContext, trx };
     }
 
     beforeEach(async () => {
@@ -59,19 +59,19 @@ describe("EntityStore — tenant isolation", () => {
         await knex.destroy();
     });
 
-    it("testEntitiesCreatedInTenantGraphAreNotVisibleWithoutTenantId", async () => {
+    it("test entities created in tenant graph are not visible without tenant id", async () => {
         const record = await entityStore.create(ctx("tenant-a"), WidgetSchema, { name: "Alpha" });
         const found = await entityStore.findById(ctx(), WidgetSchema, record.id, "*");
         expect(found).toBeNull();
     });
 
-    it("testEntitiesCreatedWithoutTenantIdAreNotVisibleToTenants", async () => {
+    it("test entities created without tenant id are not visible to tenants", async () => {
         const record = await entityStore.create(ctx(), WidgetSchema, { name: "Global" });
         const found = await entityStore.findById(ctx("tenant-a"), WidgetSchema, record.id, "*");
         expect(found).toBeNull();
     });
 
-    it("testTenantOnlySeesOwnEntities", async () => {
+    it("test tenant only sees own entities", async () => {
         const a = await entityStore.create(ctx("tenant-a"), WidgetSchema, { name: "AlphaWidget" });
         const b = await entityStore.create(ctx("tenant-b"), WidgetSchema, { name: "BetaWidget" });
 
@@ -86,7 +86,7 @@ describe("EntityStore — tenant isolation", () => {
         expect(crossBA).toBeNull();
     });
 
-    it("testUpdateGroupRemainsWithinTenantGraph", async () => {
+    it("test update group remains within tenant graph", async () => {
         const record = await entityStore.create(ctx("tenant-a"), WidgetSchema, { name: "Before" });
 
         await entityStore.updateGroup(ctx("tenant-a"), WidgetSchema, record.id, CORE_HANDLE, {
@@ -106,7 +106,7 @@ describe("EntityStore — tenant isolation", () => {
         expect(crossLookup).toBeNull();
     });
 
-    it("testDeleteOnlyAffectsTenantGraph", async () => {
+    it("test delete only affects tenant graph", async () => {
         const a = await entityStore.create(ctx("tenant-a"), WidgetSchema, { name: "TenantA" });
         const b = await entityStore.create(ctx("tenant-b"), WidgetSchema, { name: "TenantB" });
 
@@ -117,13 +117,13 @@ describe("EntityStore — tenant isolation", () => {
         expect(await entityStore.findById(ctx("tenant-b"), WidgetSchema, b.id, "*")).not.toBeNull();
     });
 
-    it("testNoTenantContextContinuesToUseDefaultGraph", async () => {
+    it("test no tenant context continues to use default graph", async () => {
         const record = await entityStore.create(ctx(), WidgetSchema, { name: "Global" });
         const found = await entityStore.findById(ctx(), WidgetSchema, record.id, "*");
         expect(found?.id).toBe(record.id);
     });
 
-    it("testTenantIdWithSpecialCharactersIsEncoded", async () => {
+    it("test tenant id with special characters is encoded", async () => {
         // tenantId may contain URL-special characters (slashes, spaces, unicode).
         // encodeURIComponent must keep them safe inside the graph IRI.
         const weirdTenantId = "acme corp/division & branch";
@@ -137,7 +137,7 @@ describe("EntityStore — tenant isolation", () => {
         expect(notFound).toBeNull();
     });
 
-    it("testTenantGraphIriIsStableAcrossInstances", async () => {
+    it("test tenant graph iri is stable across instances", async () => {
         // The same tenantId must always resolve to the same graph IRI.
         // If two ServerContext objects share a tenantId, their writes must
         // be visible to each other.

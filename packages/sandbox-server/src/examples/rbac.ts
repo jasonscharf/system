@@ -22,6 +22,7 @@ import {
     TenantRepository,
     UserGroupRepository,
 } from "@jasonscharf/rbac";
+import { defaultServerContext } from "@jasonscharf/server";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -41,7 +42,7 @@ function ok(label: string, value: boolean) {
 
 const knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
 const store = new TripleStore(knex);
-const ctx = {}; // defaultServerContext — no active transaction (auto-commit)
+const ctx = defaultServerContext;
 await seedSystemData(ctx, store); // installs system root tenant, superusers group, wildcard
 
 const rbac = new RbacService({

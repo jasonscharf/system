@@ -45,7 +45,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
         await seedData(knex);
         trx = await knex.transaction();
-        ctx = { trx };
+        ctx = { ...defaultServerContext, trx };
         store = new TripleStore(knex);
         registry = new ExtensionRegistry(store);
         extCtx = {};
@@ -59,37 +59,37 @@ describe("ExtensionRegistry + ExtensionManager", () => {
 
     // ── Registry ──────────────────────────────────────────────────────────────
 
-    it("testIsInstalledReturnsFalseForUnknownExtension", async () => {
+    it("test is installed returns false for unknown extension", async () => {
         expect(await registry.isInstalled(ctx, "tern.rbac")).toBe(false);
     });
 
-    it("testRecordAndIsInstalled", async () => {
+    it("test record and is installed", async () => {
         await registry.record(ctx, "tern.rbac", "1.0.0");
         expect(await registry.isInstalled(ctx, "tern.rbac")).toBe(true);
     });
 
-    it("testGetVersionReturnsNullForUnrecorded", async () => {
+    it("test get version returns null for unrecorded", async () => {
         expect(await registry.getVersion(ctx, "tern.rbac")).toBeNull();
     });
 
-    it("testGetVersionReturnsRecordedVersion", async () => {
+    it("test get version returns recorded version", async () => {
         await registry.record(ctx, "tern.rbac", "1.2.3");
         expect(await registry.getVersion(ctx, "tern.rbac")).toBe("1.2.3");
     });
 
-    it("testRecordUpdatesVersionOnReRecord", async () => {
+    it("test record updates version on re record", async () => {
         await registry.record(ctx, "tern.rbac", "1.0.0");
         await registry.record(ctx, "tern.rbac", "2.0.0");
         expect(await registry.getVersion(ctx, "tern.rbac")).toBe("2.0.0");
     });
 
-    it("testRemoveUnregistersExtension", async () => {
+    it("test remove unregisters extension", async () => {
         await registry.record(ctx, "tern.rbac", "1.0.0");
         await registry.remove(ctx, "tern.rbac");
         expect(await registry.isInstalled(ctx, "tern.rbac")).toBe(false);
     });
 
-    it("testListReturnsAllInstalledExtensions", async () => {
+    it("test list returns all installed extensions", async () => {
         await registry.record(ctx, "tern.rbac", "1.0.0");
         await registry.record(ctx, "tern.convos", "0.5.0");
         const list = await registry.list(ctx);
@@ -98,13 +98,13 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         expect(names).toEqual(["tern.convos", "tern.rbac"]);
     });
 
-    it("testListReturnsEmptyWhenNothingInstalled", async () => {
+    it("test list returns empty when nothing installed", async () => {
         expect(await registry.list(ctx)).toHaveLength(0);
     });
 
     // ── Manager: install ──────────────────────────────────────────────────────
 
-    it("testInstallCallsInstallHookAndRecords", async () => {
+    it("test install calls install hook and records", async () => {
         const calls: string[] = [];
         const ext = makeExt("tern.rbac", "1.0.0", calls);
 
@@ -114,7 +114,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         expect(await registry.isInstalled(ctx, "tern.rbac")).toBe(true);
     });
 
-    it("testInstallIsIdempotentAtSameVersion", async () => {
+    it("test install is idempotent at same version", async () => {
         const calls: string[] = [];
         const ext = makeExt("tern.rbac", "1.0.0", calls);
 
@@ -124,7 +124,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         expect(calls).toHaveLength(1);
     });
 
-    it("testInstallCallsUpgradeWhenVersionChanges", async () => {
+    it("test install calls upgrade when version changes", async () => {
         const calls: string[] = [];
         await manager.install(makeExt("tern.rbac", "1.0.0", calls));
         await manager.install(makeExt("tern.rbac", "2.0.0", calls));
@@ -138,7 +138,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
 
     // ── Manager: uninstall ────────────────────────────────────────────────────
 
-    it("testUninstallCallsHookAndRemovesRecord", async () => {
+    it("test uninstall calls hook and removes record", async () => {
         const calls: string[] = [];
         const ext = makeExt("tern.rbac", "1.0.0", calls);
 
@@ -149,7 +149,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         expect(await registry.isInstalled(ctx, "tern.rbac")).toBe(false);
     });
 
-    it("testUninstallIsNoopWhenNotInstalled", async () => {
+    it("test uninstall is noop when not installed", async () => {
         const calls: string[] = [];
         const ext = makeExt("tern.rbac", "1.0.0", calls);
         await manager.uninstall(ext); // not installed — no error, no hook call
@@ -158,7 +158,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
 
     // ── Manager: dependency ordering ─────────────────────────────────────────
 
-    it("testInstallAllInstallsInDependencyOrder", async () => {
+    it("test install all installs in dependency order", async () => {
         const calls: string[] = [];
         const convos = makeExt("tern.convos", "1.0.0", calls, [{ name: "tern.rbac" }]);
         const rbac = makeExt("tern.rbac", "1.0.0", calls);
@@ -171,7 +171,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         expect(installOrder[1]).toBe("install:tern.convos@1.0.0");
     });
 
-    it("testInstallAllThrowsOnMissingDependency", async () => {
+    it("test install all throws on missing dependency", async () => {
         const calls: string[] = [];
         const convos = makeExt("tern.convos", "1.0.0", calls, [{ name: "tern.rbac" }]);
 
@@ -180,7 +180,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         );
     });
 
-    it("testInstallAllThrowsOnCircularDependency", async () => {
+    it("test install all throws on circular dependency", async () => {
         // A → B → A is a cycle; _topoSort must detect it and throw.
         // Bug: original implementation used a single 'visited' set which
         // served as both "in-progress" and "finished", so cycles were
@@ -192,7 +192,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         await expect(manager.installAll([a, b])).rejects.toThrow(/circular/i);
     });
 
-    it("testInstallHookThrowingDoesNotRecordExtension", async () => {
+    it("test install hook throwing does not record extension", async () => {
         // If install() throws, the extension must NOT be recorded in the
         // registry.  Otherwise the next boot would skip install() entirely
         // (idempotent at same version) and the setup would never succeed.
@@ -206,7 +206,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         expect(await registry.isInstalled(ctx, "ext.bad")).toBe(false);
     });
 
-    it("testUpgradeWithNoHookStillUpdatesVersion", async () => {
+    it("test upgrade with no hook still updates version", async () => {
         // An extension may bump its version without needing a migration.
         // If no upgrade() hook is defined, installAll should still record
         // the new version so subsequent boots don't attempt to run install().

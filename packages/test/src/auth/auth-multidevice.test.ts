@@ -30,6 +30,7 @@ import {
     UserSessionRepository,
 } from "@jasonscharf/auth";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
+import { defaultServerContext } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -154,7 +155,7 @@ for (const db of providers) {
                 redirectUri: "http://localhost/cb",
                 device: { userAgent: PC_UA, platform: "web" },
             });
-            const userDevices = await ctx.devices.findByUserId({}, user.id);
+            const userDevices = await ctx.devices.findByUserId({...defaultServerContext}, user.id);
             expect(userDevices).toHaveLength(1);
             expect(userDevices[0]?.deviceUserAgent).toBe(PC_UA);
         });
@@ -167,7 +168,7 @@ for (const db of providers) {
                 redirectUri: "http://localhost/cb",
                 device: { userAgent: PC_UA, platform: "web" },
             });
-            const devices = await ctx.devices.findByUserId({}, user.id);
+            const devices = await ctx.devices.findByUserId({...defaultServerContext}, user.id);
             expect(session.isActive).toBe(true);
             expect(session.userId).toBe(user.id);
             expect(session.deviceId).toBe(devices[0]?.id);
@@ -203,8 +204,8 @@ for (const db of providers) {
                 device: { userAgent: PC_UA, platform: "web" },
             });
 
-            const devices = await ctx.devices.findByUserId({}, u2.id);
-            const sessions = await ctx.sessions.findByUserId({}, u2.id);
+            const devices = await ctx.devices.findByUserId({...defaultServerContext}, u2.id);
+            const sessions = await ctx.sessions.findByUserId({...defaultServerContext}, u2.id);
 
             expect(devices).toHaveLength(1); // reused — same UA
             expect(sessions).toHaveLength(2); // two sessions on same device
@@ -261,7 +262,7 @@ for (const db of providers) {
         });
 
         it("creates two distinct device records", async () => {
-            const devices = await ctx.devices.findByUserId({}, userId);
+            const devices = await ctx.devices.findByUserId({...defaultServerContext}, userId);
             expect(devices).toHaveLength(2);
             const agents = devices.map((d) => d.deviceUserAgent);
             expect(agents).toContain(PC_UA);
@@ -269,14 +270,14 @@ for (const db of providers) {
         });
 
         it("creates two distinct sessions, both active", async () => {
-            const sessions = await ctx.sessions.findByUserId({}, userId);
+            const sessions = await ctx.sessions.findByUserId({...defaultServerContext}, userId);
             expect(sessions).toHaveLength(2);
             expect(sessions.every((s) => s.isActive)).toBe(true);
         });
 
         it("sessions are linked to different devices", async () => {
-            const devices = await ctx.devices.findByUserId({}, userId);
-            const sessions = await ctx.sessions.findByUserId({}, userId);
+            const devices = await ctx.devices.findByUserId({...defaultServerContext}, userId);
+            const sessions = await ctx.sessions.findByUserId({...defaultServerContext}, userId);
             const deviceIds = new Set(sessions.map((s) => s.deviceId));
             expect(deviceIds.size).toBe(2);
             const existingDeviceIds = new Set(devices.map((d) => d.id));
@@ -351,7 +352,7 @@ for (const db of providers) {
                 device: {}, // no userAgent, same user
             });
 
-            const devices = await ctx.devices.findByUserId({}, u1.id);
+            const devices = await ctx.devices.findByUserId({...defaultServerContext}, u1.id);
             // Two distinct anonymous devices — not reused
             expect(devices).toHaveLength(2);
         });
@@ -374,7 +375,7 @@ for (const db of providers) {
                 device: { userAgent: PC_UA },
             });
 
-            const devices = await ctx.devices.findByUserId({}, user.id);
+            const devices = await ctx.devices.findByUserId({...defaultServerContext}, user.id);
             expect(devices).toHaveLength(1);
         });
 
@@ -396,7 +397,7 @@ for (const db of providers) {
                 device: { userAgent: PHONE_UA },
             });
 
-            const devices = await ctx.devices.findByUserId({}, user.id);
+            const devices = await ctx.devices.findByUserId({...defaultServerContext}, user.id);
             expect(devices).toHaveLength(2);
         });
     });
@@ -444,7 +445,7 @@ for (const db of providers) {
 
         it("session is marked isActive=false in DB after revoke", async () => {
             await ctx.service.revokeToken(token);
-            const session = await ctx.sessions.findByToken({}, token);
+            const session = await ctx.sessions.findByToken({...defaultServerContext}, token);
             expect(session?.isActive).toBe(false);
         });
     });

@@ -1,6 +1,7 @@
 export * from "./ApplicationContext.js";
 export * from "./auth/index.js";
 export * from "./container/index.js";
+export * from "./events/index.js";
 export * from "./hydration/index.js";
 export * from "./messages/TernMessage.js";
 export * from "./rbac/index.js";

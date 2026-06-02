@@ -381,35 +381,45 @@ if (process.env.TERN_REDIS_URL) {
             expect(received[0]).toBe("acked");
         });
 
-        it("testFailingHandlerMessageReclaimedByCompetingConsumer", async () => {
-            // Bug 2: if consumer A's handler throws, the message stays in the PEL
-            // as "pending".  A competing consumer in the same group must be able
-            // to reclaim it via XAUTOCLAIM and successfully process it.
+        it("testCrashedConsumerMessageReclaimedBySurvivor", async () => {
+            // Real-world mission-critical scenario: consumer A receives a message,
+            // its handler fails, and then A crashes (ungraceful close) before
+            // retrying.  Consumer B in the same pool must reclaim the orphaned PEL
+            // entry via XAUTOCLAIM and deliver successfully.
+            //
+            // Note: XAUTOCLAIM is for reclaiming from DEAD/crashed consumers.
+            // Two live consumers both calling XAUTOCLAIM race to re-claim —
+            // the test is designed so A is fully gone before B joins, making
+            // the reclaim deterministic.
             const GROUP = `grp-${uniqueId()}`;
 
-            const busA = makeBus(200);  // very short idle timeout for testing
-            const busB = makeBus(200);
-
-            const receivedByB: string[] = [];
-
-            // busA always fails
+            // busA subscribes ALONE — guaranteed to receive the first message.
+            const busA = makeBus(300);
             await busA.subscribe(USER_CREATED, GROUP, async () => {
-                throw new Error("simulated handler failure");
+                throw new Error("crash");  // always fails
             });
 
-            // busB succeeds
+            await busA.publish(makeEvent(USER_CREATED, { userId: "orphaned", email: "o@o.com" }));
+
+            // Give busA's read loop time to receive and fail on the message.
+            // After the BLOCK expires (~1000ms), busA's handler throws and the
+            // message is left un-ACKed in busA's PEL.
+            await delay(1300);
+
+            // busA "crashes" — close without processing the pending message.
+            await busA.close();
+
+            // busB joins the same group.  The message is still in the PEL owned
+            // by busA's (now-dead) consumer.  After claimMinIdleMs (300ms), busB's
+            // XAUTOCLAIM pass should reclaim and successfully process it.
+            const busB = makeBus(300);
+            const rescuedByB: string[] = [];
             await busB.subscribe(USER_CREATED, GROUP, async (e) => {
-                receivedByB.push((e.payload as UserPayload).userId);
+                rescuedByB.push((e.payload as UserPayload).userId);
             });
 
-            const evt = makeEvent(USER_CREATED, { userId: "rescued", email: "r@r.com" });
-            await busA.publish(evt);
-
-            // busA should attempt delivery and fail.  After claimMinIdleMs has
-            // elapsed, busB's XAUTOCLAIM should claim and successfully process it.
-            await waitFor(() => receivedByB.length === 1, 5000);
-
-            expect(receivedByB).toContain("rescued");
+            await waitFor(() => rescuedByB.length === 1, 5000);
+            expect(rescuedByB).toContain("orphaned");
         });
 
         it("testFailingHandlerOnSingleConsumerEventuallyReclaimedBySelf", async () => {

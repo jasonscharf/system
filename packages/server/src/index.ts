@@ -5,6 +5,9 @@ export type {
     CollectionViewRecord,
 } from "./CollectionView.js";
 export { CollectionViewStore } from "./CollectionView.js";
+export { ExtensionManager } from "./ExtensionManager.js";
+export { ExtensionRegistry } from "./ExtensionRegistry.js";
+export type { ExtensionRecord } from "./ExtensionRegistry.js";
 export type { FilterOp } from "./EntityQuery.js";
 export { EntityQuery, entities } from "./EntityQuery.js";
 export { EntityStore } from "./EntityStore.js";

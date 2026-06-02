@@ -2,6 +2,7 @@ export * from "./config/loader.js";
 export * from "./config/parseTurtle.js";
 export * from "./config/parseYaml.js";
 export * from "./config/types.js";
+export * from "./extension/index.js";
 export * from "./registry/HandlerRegistry.js";
 export * from "./routing/compose.js";
 export * from "./routing/Dispatcher.js";

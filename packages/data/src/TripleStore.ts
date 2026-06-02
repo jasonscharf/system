@@ -457,6 +457,7 @@ export class TripleStore {
     async deleteSubjects(
         ctx: ServerContext,
         subjects: readonly (IRI | BlankNode)[],
+        graph?: IRI | null,
     ): Promise<number> {
         if (subjects.length === 0) {
             return 0;
@@ -467,10 +468,11 @@ export class TripleStore {
             return 0;
         }
 
-        return this._db(ctx)(T.edges)
-            .whereIn(C.subject, validIds)
-            .where(C.isDeleted, false)
-            .update({ [C.isDeleted]: true });
+        let q = this._db(ctx)(T.edges).whereIn(C.subject, validIds).where(C.isDeleted, false);
+        if (graph !== undefined) {
+            q = graph === null ? q.whereNull(C.graph) : q.where(C.graph, await this._nodeId(ctx, graph));
+        }
+        return q.update({ [C.isDeleted]: true });
     }
 
     /**
@@ -482,6 +484,7 @@ export class TripleStore {
         ctx: ServerContext,
         subject: IRI | BlankNode,
         predicates: readonly IRI[],
+        graph?: IRI | null,
     ): Promise<number> {
         if (predicates.length === 0) {
             return 0;
@@ -496,11 +499,14 @@ export class TripleStore {
             return 0;
         }
 
-        return this._db(ctx)(T.edges)
+        let q = this._db(ctx)(T.edges)
             .where(C.subject, sId)
             .whereIn(C.predicate, validPIds)
-            .where(C.isDeleted, false)
-            .update({ [C.isDeleted]: true });
+            .where(C.isDeleted, false);
+        if (graph !== undefined) {
+            q = graph === null ? q.whereNull(C.graph) : q.where(C.graph, await this._nodeId(ctx, graph));
+        }
+        return q.update({ [C.isDeleted]: true });
     }
 
     // ── Batch read ────────────────────────────────────────────────────────────
@@ -512,6 +518,7 @@ export class TripleStore {
     async findForSubjects(
         ctx: ServerContext,
         subjects: readonly (IRI | BlankNode)[],
+        graph?: IRI | null,
     ): Promise<Map<string, Quad[]>> {
         if (subjects.length === 0) {
             return new Map();
@@ -526,13 +533,20 @@ export class TripleStore {
         }
 
         const idToSubject = new Map(validPairs.map(([term, id]) => [id, term]));
-        const edges = await this._db(ctx)(T.edges)
+        const graphId = graph !== undefined
+            ? (graph === null ? null : await this._nodeId(ctx, graph))
+            : undefined;
+
+        let edgesQ = this._db(ctx)(T.edges)
             .whereIn(
                 C.subject,
                 validPairs.map(([, id]) => id),
             )
-            .where(C.isDeleted, false)
-            .select<EdgeRow[]>("*");
+            .where(C.isDeleted, false);
+        if (graphId !== undefined) {
+            edgesQ = graphId === null ? edgesQ.whereNull(C.graph) : edgesQ.where(C.graph, graphId);
+        }
+        const edges = await edgesQ.select<EdgeRow[]>("*");
 
         if (edges.length === 0) {
             return new Map();

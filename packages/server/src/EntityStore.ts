@@ -1,5 +1,4 @@
-import type { IRI } from "@jasonscharf/core";
-import { DEFAULT_GRAPH } from "@jasonscharf/core";
+import { DEFAULT_GRAPH, type DefaultGraph, type IRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import type { EntityHandle, EntityRecord, EntitySchema, PropGroupDef } from "@jasonscharf/entities";
 import {
@@ -20,6 +19,7 @@ import { validate } from "@jasonscharf/gen";
 import type { CollectionViewOpts } from "./CollectionView.js";
 import { CollectionViewStore } from "./CollectionView.js";
 import type { ServerContext } from "./ServerContext.js";
+import { tenantGraph, tenantGraphForInsert } from "./tenancy.js";
 
 // ── EntityStore ───────────────────────────────────────────────────────────────
 
@@ -65,16 +65,17 @@ export class EntityStore {
         const pg = pgIri(ent.value, coreGroup.handle);
 
         return this._withTrx(ctx, async (txCtx) => {
+            const graph = tenantGraphForInsert(txCtx);
             await this._store.insertMany(txCtx, [
-                { subject: ent, predicate: RDF_TYPE, object: schema.typeIRI, graph: DEFAULT_GRAPH },
-                { subject: ent, predicate: TERN_PROP_GROUP, object: pg, graph: DEFAULT_GRAPH },
+                { subject: ent, predicate: RDF_TYPE, object: schema.typeIRI, graph },
+                { subject: ent, predicate: TERN_PROP_GROUP, object: pg, graph },
                 {
                     subject: pg,
                     predicate: TERN_HANDLE,
                     object: toLiteral(coreGroup.handle.toString()),
-                    graph: DEFAULT_GRAPH,
+                    graph,
                 },
-                ...this._propQuads(pg, coreGroup, withDefs),
+                ...this._propQuads(pg, coreGroup, withDefs, graph),
             ]);
             return { id, iri: ent.value, groups: { [coreGroup.handle.id]: withDefs } };
         });
@@ -97,15 +98,16 @@ export class EntityStore {
         const pg = pgIri(ent.value, h);
 
         return this._withTrx(ctx, async (txCtx) => {
+            const graph = tenantGraphForInsert(txCtx);
             await this._store.insertMany(txCtx, [
-                { subject: ent, predicate: TERN_PROP_GROUP, object: pg, graph: DEFAULT_GRAPH },
+                { subject: ent, predicate: TERN_PROP_GROUP, object: pg, graph },
                 {
                     subject: pg,
                     predicate: TERN_HANDLE,
                     object: toLiteral(h.toString()),
-                    graph: DEFAULT_GRAPH,
+                    graph,
                 },
-                ...this._propQuads(pg, groupDef, withDefs),
+                ...this._propQuads(pg, groupDef, withDefs, graph),
             ]);
         });
     }
@@ -120,11 +122,12 @@ export class EntityStore {
     ): Promise<EntityRecord | null> {
         return this._withTrx(ctx, async (txCtx) => {
             const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-            const typeQ = await this._store.find(txCtx, { subject: ent, predicate: RDF_TYPE });
+            const graph = tenantGraph(txCtx);
+            const typeQ = await this._store.find(txCtx, { subject: ent, predicate: RDF_TYPE, graph });
             if (typeQ.length === 0) {
                 return null;
             }
-            return this._hydrate(txCtx, schema, id, ent.value, handles);
+            return this._hydrate(txCtx, schema, id, ent.value, handles, graph);
         });
     }
 
@@ -159,8 +162,10 @@ export class EntityStore {
             .filter(Boolean);
 
         return this._withTrx(ctx, async (txCtx) => {
+            const filterGraph = tenantGraph(txCtx);
+            const insertGraph = tenantGraphForInsert(txCtx);
             if (predIris.length > 0) {
-                await this._store.deleteBySubjectPredicates(txCtx, pg, predIris);
+                await this._store.deleteBySubjectPredicates(txCtx, pg, predIris, filterGraph);
             }
             const quads = patchEntries
                 .filter(([, value]) => value !== undefined)
@@ -171,14 +176,7 @@ export class EntityStore {
                             `EntityStore.updateGroup: missing IRI for property "${propName}"`,
                         );
                     }
-                    return [
-                        {
-                            subject: pg,
-                            predicate: propIri,
-                            object: toLiteral(value),
-                            graph: DEFAULT_GRAPH,
-                        },
-                    ];
+                    return [{ subject: pg, predicate: propIri, object: toLiteral(value), graph: insertGraph }];
                 });
             if (quads.length > 0) {
                 await this._store.insertMany(txCtx, quads);
@@ -190,14 +188,15 @@ export class EntityStore {
 
     async delete(ctx: ServerContext, schema: EntitySchema, id: string): Promise<void> {
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-        const pgLinks = await this._store.find(ctx, { subject: ent, predicate: TERN_PROP_GROUP });
+        const graph = tenantGraph(ctx);
+        const pgLinks = await this._store.find(ctx, { subject: ent, predicate: TERN_PROP_GROUP, graph });
         const pgNodes = pgLinks.map((q) => q.object as IRI);
 
         return this._withTrx(ctx, async (txCtx) => {
             if (pgNodes.length > 0) {
-                await this._store.deleteSubjects(txCtx, pgNodes);
+                await this._store.deleteSubjects(txCtx, pgNodes, graph);
             }
-            await this._store.delete(txCtx, { subject: ent });
+            await this._store.delete(txCtx, { subject: ent, graph });
         });
     }
 
@@ -219,7 +218,7 @@ export class EntityStore {
 
             const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
             const pg = pgIri(ent.value, h);
-            const quads = await this._store.findOrdered(txCtx, { subject: pg, predicate: propIri });
+            const quads = await this._store.findOrdered(txCtx, { subject: pg, predicate: propIri, graph: tenantGraph(txCtx) });
             return quads.map((q) => fromLiteral(q.object)).filter((v) => v !== undefined);
         });
     }
@@ -242,6 +241,7 @@ export class EntityStore {
         const pg = pgIri(ent.value, h);
 
         return this._withTrx(ctx, async (txCtx) => {
+            const graph = tenantGraphForInsert(txCtx);
             const viewIris = await this._cvs().findViewsForSource(txCtx, pg.value, propIri.value);
 
             for (const v of values) {
@@ -249,7 +249,7 @@ export class EntityStore {
                     subject: pg,
                     predicate: propIri,
                     object: toLiteral(v),
-                    graph: DEFAULT_GRAPH,
+                    graph,
                 });
                 for (const vIri of viewIris) {
                     await this._cvs().addItem(txCtx, vIri, String(v));
@@ -281,6 +281,7 @@ export class EntityStore {
                 subject: pg,
                 predicate: propIri,
                 object: toLiteral(value),
+                graph: tenantGraph(txCtx),
             });
             deleted = count > 0;
             if (deleted) {
@@ -331,13 +332,15 @@ export class EntityStore {
         const pg = pgIri(ent.value, h);
 
         return this._withTrx(ctx, async (txCtx) => {
-            await this._store.delete(txCtx, { subject: pg, predicate: propIri });
+            const filterGraph = tenantGraph(txCtx);
+            const insertGraph = tenantGraphForInsert(txCtx);
+            await this._store.delete(txCtx, { subject: pg, predicate: propIri, graph: filterGraph });
             for (const v of values) {
                 await this._store.insert(txCtx, {
                     subject: pg,
                     predicate: propIri,
                     object: toLiteral(v),
-                    graph: DEFAULT_GRAPH,
+                    graph: insertGraph,
                 });
             }
             const viewIris = await this._cvs().findViewsForSource(txCtx, pg.value, propIri.value);
@@ -400,10 +403,11 @@ export class EntityStore {
         handles: EntityHandle[] | "*",
     ): Promise<EntityRecord[]> {
         return this._withTrx(ctx, async (txCtx) => {
+            const graph = tenantGraph(txCtx);
             return Promise.all(
                 iris.map((iri) => {
                     const id = idFromIri(iri);
-                    return this._hydrate(txCtx, schema, id, iri, handles);
+                    return this._hydrate(txCtx, schema, id, iri, handles, graph);
                 }),
             );
         });
@@ -424,12 +428,13 @@ export class EntityStore {
         id: string,
         entIri: string,
         handles: EntityHandle[] | "*",
+        graph?: IRI | null,
     ): Promise<EntityRecord> {
         const groups: Record<string, Record<string, unknown>> = {};
         const defs = schema.resolveGroups(handles);
 
         const pgNodes = defs.map((def) => pgIri(entIri, def.handle));
-        const allQuads = await this._store.findForSubjects(ctx, pgNodes);
+        const allQuads = await this._store.findForSubjects(ctx, pgNodes, graph);
 
         for (const def of defs) {
             const pg = pgIri(entIri, def.handle);
@@ -464,7 +469,12 @@ export class EntityStore {
         return { id, iri: entIri, groups };
     }
 
-    private _propQuads(pg: IRI, def: PropGroupDef, data: Record<string, unknown>) {
+    private _propQuads(
+        pg: IRI,
+        def: PropGroupDef,
+        data: Record<string, unknown>,
+        graph: IRI | DefaultGraph = DEFAULT_GRAPH,
+    ) {
         const results: Parameters<TripleStore["insert"]>[1][] = [];
         for (const [propName, propIri] of Object.entries(def.properties)) {
             const value = data[propName];
@@ -473,20 +483,10 @@ export class EntityStore {
             }
             if (Array.isArray(value)) {
                 for (const v of value) {
-                    results.push({
-                        subject: pg,
-                        predicate: propIri as IRI,
-                        object: toLiteral(v),
-                        graph: DEFAULT_GRAPH,
-                    });
+                    results.push({ subject: pg, predicate: propIri as IRI, object: toLiteral(v), graph });
                 }
             } else {
-                results.push({
-                    subject: pg,
-                    predicate: propIri as IRI,
-                    object: toLiteral(value),
-                    graph: DEFAULT_GRAPH,
-                });
+                results.push({ subject: pg, predicate: propIri as IRI, object: toLiteral(value), graph });
             }
         }
         return results;

@@ -28,12 +28,12 @@ export type { EntityRecord } from "./EntityRecord.js";
 export { groupOf } from "./EntityRecord.js";
 export type { PropGroupDef } from "./EntitySchema.js";
 export { EntitySchema } from "./EntitySchema.js";
-
 export { EntityValidationError } from "./EntityValidationError.js";
 
 export type { FilterOp } from "./FilterOp.js";
 export type { EntityHandle } from "./Handle.js";
 export { handle, handleSlug } from "./Handle.js";
+export { TernAggregate } from "./TernAggregate.js";
 
 export {
     entityIri,

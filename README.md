@@ -16,6 +16,17 @@ The architecture expressed here is directly influenced by J. Paul Morrison's wor
 For more info and useful context, read [Out of the Tar Pit](https://github.com/papers-we-love/papers-we-love/blob/main/design/out-of-the-tar-pit.pdf) (PDF) and [Flow-based Programming](https://jpaulm.github.io/fbp/).
 
 
+## Core Principles
+
+**Graph-native.** All data — entities, configuration, extension metadata — is stored as RDF quads `(subject, predicate, object, graph)` in a relational database. There is no fixed schema to ALTER; adding a property means defining an IRI. Any package can extend any entity without a migration.
+
+**Time-series and soft-delete.** Writes are never destructive. Every quad write is timestamped; deletes mark records as soft-deleted rather than removing them. The entire store can be queried at any point in time, which means undo/redo is a first-class platform capability and audit trails are free.
+
+**Semantic Web native.** Ontologies are expressed in standard OWL/SHACL Turtle files. This makes the schema machine-readable, interoperable, and natively understood by AI agents and language models without any custom translation layer.
+
+**Loose coupling.** Components communicate only through typed FBP ports and domain events. Unknown implementations produce empty results, not errors. Extensions hang their own data off entities as independent named subgraphs and never modify another package's data.
+
+
 ## Prerequisites
 - [Node.js](https://nodejs.org/) 22+
 - [Yarn](https://yarnpkg.com/) 4 (`corepack enable`)

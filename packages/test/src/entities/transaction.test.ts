@@ -25,7 +25,7 @@
 import { IRI } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import { EntitySchema, handle } from "@jasonscharf/entities";
-import { EntityStore, entities } from "@jasonscharf/server";
+import { defaultServerContext, EntityStore, entities } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -109,22 +109,22 @@ for (const db of providers) {
 
         // ── Write: auto-commit ────────────────────────────────────────────────
 
-        it("testWriteWithoutTrxAutoCommits", async () => {
+        it("test write without trx auto commits", async () => {
             const { es, schema } = env;
-            const rec = await es.create({}, schema, { title: "auto-commit" });
+            const rec = await es.create(defaultServerContext, schema, { title: "auto-commit" });
 
             // Immediately visible on a fresh read — data was committed
-            const found = await es.findById({}, schema, rec.id, "*");
+            const found = await es.findById(defaultServerContext, schema, rec.id, "*");
             expect(found).not.toBeNull();
             expect(found?.groups[TrxHandle.id]?.title).toBe("auto-commit");
         });
 
         // ── Write: chaining ───────────────────────────────────────────────────
 
-        it("testWriteWithTrxChainsIntoCallerTransaction", async () => {
+        it("test write with trx chains into caller transaction", async () => {
             const { knex, es, schema } = env;
             const outerTrx = await knex.transaction();
-            const txCtx = { trx: outerTrx };
+            const txCtx = { ...defaultServerContext, trx: outerTrx };
 
             const rec = await es.create(txCtx, schema, { title: "chained" });
 
@@ -136,14 +136,14 @@ for (const db of providers) {
             await outerTrx.rollback();
 
             // Not visible after rollback
-            const afterRollback = await es.findById({}, schema, rec.id, "*");
+            const afterRollback = await es.findById(defaultServerContext, schema, rec.id, "*");
             expect(afterRollback).toBeNull();
         });
 
-        it("testMultipleWritesChainAtomically", async () => {
+        it("test multiple writes chain atomically", async () => {
             const { knex, es, schema } = env;
             const outerTrx = await knex.transaction();
-            const txCtx = { trx: outerTrx };
+            const txCtx = { ...defaultServerContext, trx: outerTrx };
 
             const a = await es.create(txCtx, schema, { title: "a" });
             const b = await es.create(txCtx, schema, { title: "b" });
@@ -151,18 +151,18 @@ for (const db of providers) {
             await outerTrx.rollback();
 
             // Neither entity committed
-            expect(await es.findById({}, schema, a.id, "*")).toBeNull();
-            expect(await es.findById({}, schema, b.id, "*")).toBeNull();
+            expect(await es.findById(defaultServerContext, schema, a.id, "*")).toBeNull();
+            expect(await es.findById(defaultServerContext, schema, b.id, "*")).toBeNull();
         });
 
-        it("testUpdateGroupChainsIntoCallerTransaction", async () => {
+        it("test update group chains into caller transaction", async () => {
             const { knex, es, schema } = env;
 
             // Commit the entity first (outside the chained trx)
-            const rec = await es.create({}, schema, { title: "original" });
+            const rec = await es.create(defaultServerContext, schema, { title: "original" });
 
             const outerTrx = await knex.transaction();
-            const txCtx = { trx: outerTrx };
+            const txCtx = { ...defaultServerContext, trx: outerTrx };
 
             await es.updateGroup(txCtx, schema, rec.id, TrxHandle, { title: "updated" });
 
@@ -173,18 +173,18 @@ for (const db of providers) {
             await outerTrx.rollback();
 
             // Original value restored after rollback
-            const afterRollback = await es.findById({}, schema, rec.id, "*");
+            const afterRollback = await es.findById(defaultServerContext, schema, rec.id, "*");
             expect(afterRollback?.groups[TrxHandle.id]?.title).toBe("original");
         });
 
-        it("testDeleteChainsIntoCallerTransaction", async () => {
+        it("test delete chains into caller transaction", async () => {
             const { knex, es, schema } = env;
 
             // Commit first
-            const rec = await es.create({}, schema, { title: "will-delete" });
+            const rec = await es.create(defaultServerContext, schema, { title: "will-delete" });
 
             const outerTrx = await knex.transaction();
-            const txCtx = { trx: outerTrx };
+            const txCtx = { ...defaultServerContext, trx: outerTrx };
 
             await es.delete(txCtx, schema, rec.id);
 
@@ -194,15 +194,15 @@ for (const db of providers) {
             await outerTrx.rollback();
 
             // Restored after rollback
-            expect(await es.findById({}, schema, rec.id, "*")).not.toBeNull();
+            expect(await es.findById(defaultServerContext, schema, rec.id, "*")).not.toBeNull();
         });
 
         // ── Read: chaining ────────────────────────────────────────────────────
 
-        it("testFindByIdChainsIntoCallerTrxSeesUncommittedWrites", async () => {
+        it("test find by id chains into caller trx sees uncommitted writes", async () => {
             const { knex, es, schema } = env;
             const outerTrx = await knex.transaction();
-            const txCtx = { trx: outerTrx };
+            const txCtx = { ...defaultServerContext, trx: outerTrx };
 
             // Write within the transaction (uncommitted)
             const rec = await es.create(txCtx, schema, { title: "uncommitted" });
@@ -215,7 +215,7 @@ for (const db of providers) {
             await outerTrx.rollback();
         });
 
-        it("testCollectionGetChainsIntoCallerTrx", async () => {
+        it("test collection get chains into caller trx", async () => {
             const tagIRI = new IRI("http://test.dev/trx/tag");
             const tagHandle = handle("test:trx:tagged");
             const taggedSchema = new EntitySchema({
@@ -229,7 +229,7 @@ for (const db of providers) {
 
             const { knex, es } = env;
             const outerTrx = await knex.transaction();
-            const txCtx = { trx: outerTrx };
+            const txCtx = { ...defaultServerContext, trx: outerTrx };
 
             const rec = await es.create(txCtx, taggedSchema, {});
             await es.collectionPush(
@@ -251,19 +251,19 @@ for (const db of providers) {
 
         // ── Isolation (Postgres only) ─────────────────────────────────────────
 
-        it("testReadWithoutTrxDoesNotSeeOtherConnectionsUncommittedData", async () => {
+        it("test read without trx does not see other connections uncommitted data", async () => {
             if (!db.isPg) {
                 return;
             }
 
             const { knex, es, schema } = env;
             const outerTrx = await knex.transaction();
-            const txCtx = { trx: outerTrx };
+            const txCtx = { ...defaultServerContext, trx: outerTrx };
 
             const rec = await es.create(txCtx, schema, { title: "isolated" });
 
             // Read via a fresh ctx (new connection, READ COMMITTED) — must NOT see uncommitted data
-            const found = await es.findById({}, schema, rec.id, "*");
+            const found = await es.findById(defaultServerContext, schema, rec.id, "*");
             expect(found).toBeNull();
 
             await outerTrx.rollback();
@@ -282,23 +282,23 @@ for (const db of providers) {
             await teardown(env);
         });
 
-        it("testQueryAllWithoutTrxAutoCommitsReadsCommittedData", async () => {
+        it("test query all without trx auto commits reads committed data", async () => {
             const { es, store, schema } = env;
 
             // Commit two entities
-            const a = await es.create({}, schema, { title: "qa" });
-            const b = await es.create({}, schema, { title: "qb" });
+            const a = await es.create(defaultServerContext, schema, { title: "qa" });
+            const b = await es.create(defaultServerContext, schema, { title: "qb" });
 
-            const results = await entities(store).find(schema, "*").all({});
+            const results = await entities(store).find(schema, "*").all(defaultServerContext);
             const ids = results.map((r) => r.id);
             expect(ids).toContain(a.id);
             expect(ids).toContain(b.id);
         });
 
-        it("testQueryAllChainsIntoCallerTrxSeesUncommittedWrites", async () => {
+        it("test query all chains into caller trx sees uncommitted writes", async () => {
             const { knex, es, store, schema } = env;
             const outerTrx = await knex.transaction();
-            const txCtx = { trx: outerTrx };
+            const txCtx = { ...defaultServerContext, trx: outerTrx };
 
             const rec = await es.create(txCtx, schema, { title: "queried-uncommitted" });
 
@@ -309,10 +309,10 @@ for (const db of providers) {
             await outerTrx.rollback();
         });
 
-        it("testQueryAllChainsRollbackRemovesResults", async () => {
+        it("test query all chains rollback removes results", async () => {
             const { knex, es, store, schema } = env;
             const outerTrx = await knex.transaction();
-            const txCtx = { trx: outerTrx };
+            const txCtx = { ...defaultServerContext, trx: outerTrx };
 
             const rec = await es.create(txCtx, schema, { title: "gone-after-rollback" });
             expect((await entities(store).find(schema, "*").all(txCtx)).map((r) => r.id)).toContain(
@@ -322,14 +322,14 @@ for (const db of providers) {
             await outerTrx.rollback();
 
             // Not in results after rollback
-            const results = await entities(store).find(schema, "*").all({});
+            const results = await entities(store).find(schema, "*").all(defaultServerContext);
             expect(results.map((r) => r.id)).not.toContain(rec.id);
         });
 
-        it("testQueryCountChainsIntoCallerTrx", async () => {
+        it("test query count chains into caller trx", async () => {
             const { knex, es, store, schema } = env;
             const outerTrx = await knex.transaction();
-            const txCtx = { trx: outerTrx };
+            const txCtx = { ...defaultServerContext, trx: outerTrx };
 
             const before = await entities(store).find(schema, "*").count(txCtx);
 
@@ -341,23 +341,23 @@ for (const db of providers) {
             await outerTrx.rollback();
 
             // Back to the original count after rollback
-            const after = await entities(store).find(schema, "*").count({});
+            const after = await entities(store).find(schema, "*").count(defaultServerContext);
             expect(after).toBe(before);
         });
 
-        it("testQueryIsolationOnPostgres", async () => {
+        it("test query isolation on postgres", async () => {
             if (!db.isPg) {
                 return;
             }
 
             const { knex, es, store, schema } = env;
             const outerTrx = await knex.transaction();
-            const txCtx = { trx: outerTrx };
+            const txCtx = { ...defaultServerContext, trx: outerTrx };
 
             await es.create(txCtx, schema, { title: "isolated-query" });
 
             // Query without trx must not see uncommitted write
-            const results = await entities(store).find(schema, "*").all({});
+            const results = await entities(store).find(schema, "*").all(defaultServerContext);
             expect(results.every((r) => r.groups[TrxHandle.id]?.title !== "isolated-query")).toBe(
                 true,
             );

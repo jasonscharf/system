@@ -1,5 +1,6 @@
+import { InMemorySystemBus } from "./bus/InMemorySystemBus.js";
+import type { ISystemBus } from "./bus/ISystemBus.js";
 import type { ServiceContainer } from "./container/index.js";
-import type { IDomainEventBus } from "./events/IDomainEventBus.js";
 
 /**
  * Minimal logger interface.  Any logger satisfying this shape (pino, winston,
@@ -18,7 +19,7 @@ export interface Logger {
  *
  * Use module augmentation to add application-specific fields:
  *
- *   declare module '@system/core' {
+ *   declare module '@jasonscharf/core' {
  *     interface ApplicationContext {
  *       tenantId?: string;
  *     }
@@ -27,11 +28,19 @@ export interface Logger {
 export interface ApplicationContext {
     logger?: Logger;
     config?: Record<string, unknown>;
-    /** Platform-wide event bus for decoupled cross-extension communication. */
-    events?: IDomainEventBus;
+    /**
+     * Unified messaging bus — always present.  Provides:
+     *   events:     pub/sub DomainEvent delivery (publish/subscribe)
+     *   commands:   void RPC (mutates state, awaits acknowledgement)
+     *   queries:    data RPC (read-only, returns T)
+     *   operations: data RPC (mutates state, returns T)
+     */
+    readonly bus: ISystemBus;
     /** Service container for typed dependency resolution across extensions. */
     services?: ServiceContainer;
 }
 
-/** Named empty context — no logger, no config. */
-export const defaultCtx: ApplicationContext = Object.freeze({});
+/** Default context — in-memory bus, no logger.  Use in tests and bootstrapping. */
+export const defaultCtx: ApplicationContext = Object.freeze({
+    bus: new InMemorySystemBus(),
+});

@@ -17,9 +17,8 @@ import {
     handle,
     TernAggregate,
 } from "@jasonscharf/entities";
-import { InMemoryEventBus } from "@jasonscharf/events";
 import type { ServerContext } from "@jasonscharf/server";
-import { AggregateRepository, EntityStore } from "@jasonscharf/server";
+import { AggregateRepository, defaultServerContext, EntityStore } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { up as seedData } from "../../../data/src/migrations/001_init.js";
@@ -37,12 +36,12 @@ const META_HANDLE = handle("ext.widget.meta");
 const TAGS_IRI = new IRI(`${NS}tags`);
 const PRIORITY_IRI = new IRI(`${NS}priority`);
 
-interface WidgetCoreProps {
+interface WidgetCoreProps extends Record<string, unknown> {
     name: string;
     color: string;
 }
 
-interface WidgetMetaProps {
+interface WidgetMetaProps extends Record<string, unknown> {
     tags: string;
     priority: number;
 }
@@ -130,7 +129,7 @@ describe("TernAggregate + AggregateRepository", () => {
         knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
         await seedData(knex);
         trx = await knex.transaction();
-        ctx = { trx };
+        ctx = { ...defaultServerContext, trx };
         store = new TripleStore(knex);
         entityStore = new EntityStore(store);
         repo = new WidgetRepository(entityStore);
@@ -143,7 +142,7 @@ describe("TernAggregate + AggregateRepository", () => {
 
     // ── Unit behaviour (no store) ─────────────────────────────────────────────
 
-    it("testGetReturnsConstructorProps", () => {
+    it("test get returns constructor props", () => {
         const record: EntityRecord = {
             id: "test-id",
             iri: `${NS}widget/test-id`,
@@ -154,7 +153,7 @@ describe("TernAggregate + AggregateRepository", () => {
         expect(widget.color).toBe("blue");
     });
 
-    it("testSetMutatesInMemoryState", () => {
+    it("test set mutates in memory state", () => {
         const record: EntityRecord = {
             id: "test-id",
             iri: `${NS}widget/test-id`,
@@ -165,7 +164,7 @@ describe("TernAggregate + AggregateRepository", () => {
         expect(widget.name).toBe("Cog");
     });
 
-    it("testIsDirtyAfterMutation", () => {
+    it("test is dirty after mutation", () => {
         const record: EntityRecord = {
             id: "test-id",
             iri: `${NS}widget/test-id`,
@@ -177,7 +176,7 @@ describe("TernAggregate + AggregateRepository", () => {
         expect(widget.isDirty).toBe(true);
     });
 
-    it("testDrainChangesReturnsAndClearsChanges", () => {
+    it("test drain changes returns and clears changes", () => {
         const record: EntityRecord = {
             id: "test-id",
             iri: `${NS}widget/test-id`,
@@ -192,7 +191,7 @@ describe("TernAggregate + AggregateRepository", () => {
         expect(widget.isDirty).toBe(false);
     });
 
-    it("testDomainEventEmittedOnRename", () => {
+    it("test domain event emitted on rename", () => {
         const record: EntityRecord = {
             id: "test-id",
             iri: `${NS}widget/test-id`,
@@ -207,7 +206,7 @@ describe("TernAggregate + AggregateRepository", () => {
         expect((events[0]?.payload as { to: string }).to).toBe("B");
     });
 
-    it("testDrainEventsClearsBuffer", () => {
+    it("test drain events clears buffer", () => {
         const record: EntityRecord = {
             id: "test-id",
             iri: `${NS}widget/test-id`,
@@ -219,7 +218,7 @@ describe("TernAggregate + AggregateRepository", () => {
         expect(widget.drainEvents()).toHaveLength(0);
     });
 
-    it("testNoEventEmittedForRecolor", () => {
+    it("test no event emitted for recolor", () => {
         const record: EntityRecord = {
             id: "test-id",
             iri: `${NS}widget/test-id`,
@@ -232,12 +231,12 @@ describe("TernAggregate + AggregateRepository", () => {
 
     // ── Repository round-trips (real SQLite store) ────────────────────────────
 
-    it("testFindByIdReturnsNullForMissingEntity", async () => {
+    it("test find by id returns null for missing entity", async () => {
         const result = await repo.findById(ctx, "nonexistent");
         expect(result).toBeNull();
     });
 
-    it("testFindByIdReconstitutesAggregate", async () => {
+    it("test find by id reconstitutes aggregate", async () => {
         const record = await entityStore.create(ctx, WidgetSchema, {
             name: "Sprocket",
             color: "blue",
@@ -250,7 +249,7 @@ describe("TernAggregate + AggregateRepository", () => {
         expect(widget?.color).toBe("blue");
     });
 
-    it("testSavePersistsChanges", async () => {
+    it("test save persists changes", async () => {
         const record = await entityStore.create(ctx, WidgetSchema, {
             name: "Sprocket",
             color: "blue",
@@ -268,31 +267,33 @@ describe("TernAggregate + AggregateRepository", () => {
         expect(reloaded?.color).toBe("blue");
     });
 
-    it("testSavePublishesDomainEventsToEventBus", async () => {
-        const record = await entityStore.create(ctx, WidgetSchema, {
-            name: "Sprocket",
-            color: "blue",
-        });
-
-        const bus = new InMemoryEventBus();
+    it("test save publishes domain events to ctx bus", async () => {
+        const { InMemorySystemBus } = await import("@jasonscharf/core");
+        const bus = new InMemorySystemBus();
         const received: DomainEvent[] = [];
         await bus.subscribe(Widget.RENAMED, "test", async (e) => {
             received.push(e);
         });
 
-        const widget = await repo.findById(ctx, record.id);
+        const ctxWithBus = { ...ctx, bus };
+        const record = await entityStore.create(ctxWithBus, WidgetSchema, {
+            name: "Sprocket",
+            color: "blue",
+        });
+
+        const widget = await repo.findById(ctxWithBus, record.id);
         if (widget === null) {
             throw new Error("expected widget");
         }
         widget.rename("Cog");
-        await repo.save(ctx, widget, bus);
+        await repo.save(ctxWithBus, widget);
 
         expect(received).toHaveLength(1);
         expect(received[0]?.type).toBe(Widget.RENAMED);
         await bus.close();
     });
 
-    it("testSaveWithNoPendingChangesIsNoop", async () => {
+    it("test save with no pending changes is noop", async () => {
         const record = await entityStore.create(ctx, WidgetSchema, {
             name: "Sprocket",
             color: "blue",
@@ -308,7 +309,7 @@ describe("TernAggregate + AggregateRepository", () => {
         expect(reloaded?.name).toBe("Sprocket");
     });
 
-    it("testSaveNoEventBusDropsEventsSilently", async () => {
+    it("test save no event bus drops events silently", async () => {
         const record = await entityStore.create(ctx, WidgetSchema, {
             name: "Sprocket",
             color: "blue",
@@ -325,7 +326,7 @@ describe("TernAggregate + AggregateRepository", () => {
 
     // ── Secondary PropGroup (_getFrom / _setOn) ───────────────────────────────
 
-    it("testSetOnAndGetFromSecondaryGroup", () => {
+    it("test set on and get from secondary group", () => {
         const record: EntityRecord = {
             id: "w1",
             iri: `${NS}widget/w1`,
@@ -346,7 +347,7 @@ describe("TernAggregate + AggregateRepository", () => {
         expect(widget.isDirty).toBe(true);
     });
 
-    it("testSetOnTracksChangesPerGroup", () => {
+    it("test set on tracks changes per group", () => {
         const record: EntityRecord = {
             id: "w2",
             iri: `${NS}widget/w2`,
@@ -363,7 +364,7 @@ describe("TernAggregate + AggregateRepository", () => {
         expect(changes.get(META_HANDLE.id)).toEqual({ tags: "fastener", priority: 5 });
     });
 
-    it("testSavePersistsSecondaryGroupChanges", async () => {
+    it("test save persists secondary group changes", async () => {
         // First create the entity, then add the extension group
         const record = await entityStore.create(ctx, WidgetSchema, {
             name: "Washer",
@@ -389,7 +390,7 @@ describe("TernAggregate + AggregateRepository", () => {
         expect(reloaded?.priority).toBe(2);
     });
 
-    it("testSaveWithUnknownHandleIdInChangeSetIsNoOp", async () => {
+    it("test save with unknown handle id in change set is no op", async () => {
         // If drainChanges() returns a handleId not registered on the schema,
         // AggregateRepository.save() must skip it silently rather than throw.
         // This protects against race conditions where an extension was removed

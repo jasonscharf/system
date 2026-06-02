@@ -23,6 +23,7 @@
 import { type BlankNode, DEFAULT_GRAPH, type IRI, type Literal } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import type { ServerContext } from "@jasonscharf/server";
+import { defaultServerContext } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -144,7 +145,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { trx };
+            ctx = { ...defaultServerContext, trx };
         });
         afterEach(async () => {
             await trx.rollback();
@@ -196,7 +197,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { trx };
+            ctx = { ...defaultServerContext, trx };
         });
         afterEach(async () => {
             await trx.rollback();
@@ -313,7 +314,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { trx };
+            ctx = { ...defaultServerContext, trx };
         });
         afterEach(async () => {
             await trx.rollback();
@@ -369,7 +370,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { trx };
+            ctx = { ...defaultServerContext, trx };
         });
         afterEach(async () => {
             await trx.rollback();
@@ -479,7 +480,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { trx };
+            ctx = { ...defaultServerContext, trx };
         });
         afterEach(async () => {
             await trx.rollback();
@@ -602,7 +603,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { trx };
+            ctx = { ...defaultServerContext, trx };
         });
         afterEach(async () => {
             await trx.rollback();
@@ -687,7 +688,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { trx };
+            ctx = { ...defaultServerContext, trx };
         });
         afterEach(async () => {
             await trx.rollback();
@@ -695,16 +696,36 @@ for (const db of providers) {
         });
 
         it("findForSubjects returns quads from all graphs when graph param omitted", async () => {
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("A"), graph: DEFAULT_GRAPH });
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("B"), graph: GRAPH_A });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("A"),
+                graph: DEFAULT_GRAPH,
+            });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("B"),
+                graph: GRAPH_A,
+            });
 
             const result = await store.findForSubjects(ctx, [EX("s1")]);
             expect(result.get(EX("s1").value)?.length).toBe(2);
         });
 
         it("findForSubjects filters to null (default) graph when graph=null", async () => {
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Default"), graph: DEFAULT_GRAPH });
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("GraphA"), graph: GRAPH_A });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("Default"),
+                graph: DEFAULT_GRAPH,
+            });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("GraphA"),
+                graph: GRAPH_A,
+            });
 
             const result = await store.findForSubjects(ctx, [EX("s1")], null);
             const quads = result.get(EX("s1").value) ?? [];
@@ -713,8 +734,18 @@ for (const db of providers) {
         });
 
         it("findForSubjects filters to named graph when graph=IRI", async () => {
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Default"), graph: DEFAULT_GRAPH });
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("GraphA"), graph: GRAPH_A });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("Default"),
+                graph: DEFAULT_GRAPH,
+            });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("GraphA"),
+                graph: GRAPH_A,
+            });
 
             const result = await store.findForSubjects(ctx, [EX("s1")], GRAPH_A);
             const quads = result.get(EX("s1").value) ?? [];
@@ -723,8 +754,18 @@ for (const db of providers) {
         });
 
         it("findForSubjects graph filter means other tenants are invisible", async () => {
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("TenantA"), graph: GRAPH_A });
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("TenantB"), graph: GRAPH_B });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("TenantA"),
+                graph: GRAPH_A,
+            });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("TenantB"),
+                graph: GRAPH_B,
+            });
 
             const resultA = await store.findForSubjects(ctx, [EX("s1")], GRAPH_A);
             const resultB = await store.findForSubjects(ctx, [EX("s1")], GRAPH_B);
@@ -737,8 +778,18 @@ for (const db of providers) {
         });
 
         it("deleteSubjects with graph=null only soft-deletes from default graph", async () => {
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Default"), graph: DEFAULT_GRAPH });
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Named"), graph: GRAPH_A });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("Default"),
+                graph: DEFAULT_GRAPH,
+            });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("Named"),
+                graph: GRAPH_A,
+            });
 
             await store.deleteSubjects(ctx, [EX("s1")], null);
 
@@ -749,8 +800,18 @@ for (const db of providers) {
         });
 
         it("deleteSubjects with graph=IRI only soft-deletes from that named graph", async () => {
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Default"), graph: DEFAULT_GRAPH });
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Named"), graph: GRAPH_A });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("Default"),
+                graph: DEFAULT_GRAPH,
+            });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("Named"),
+                graph: GRAPH_A,
+            });
 
             await store.deleteSubjects(ctx, [EX("s1")], GRAPH_A);
 
@@ -760,8 +821,18 @@ for (const db of providers) {
         });
 
         it("deleteBySubjectPredicates with graph=null only targets default graph", async () => {
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Default"), graph: DEFAULT_GRAPH });
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Named"), graph: GRAPH_A });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("Default"),
+                graph: DEFAULT_GRAPH,
+            });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("Named"),
+                graph: GRAPH_A,
+            });
 
             await store.deleteBySubjectPredicates(ctx, EX("s1"), [NAME], null);
 
@@ -771,8 +842,18 @@ for (const db of providers) {
         });
 
         it("deleteBySubjectPredicates with graph=IRI only targets that named graph", async () => {
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Default"), graph: DEFAULT_GRAPH });
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Named"), graph: GRAPH_A });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("Default"),
+                graph: DEFAULT_GRAPH,
+            });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("Named"),
+                graph: GRAPH_A,
+            });
 
             await store.deleteBySubjectPredicates(ctx, EX("s1"), [NAME], GRAPH_A);
 
@@ -782,8 +863,18 @@ for (const db of providers) {
         });
 
         it("deleteBySubjectPredicates without graph omitted deletes across all graphs", async () => {
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Default"), graph: DEFAULT_GRAPH });
-            await store.insert(ctx, { subject: EX("s1"), predicate: NAME, object: literal("Named"), graph: GRAPH_A });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("Default"),
+                graph: DEFAULT_GRAPH,
+            });
+            await store.insert(ctx, {
+                subject: EX("s1"),
+                predicate: NAME,
+                object: literal("Named"),
+                graph: GRAPH_A,
+            });
 
             await store.deleteBySubjectPredicates(ctx, EX("s1"), [NAME]);
 
@@ -804,7 +895,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { trx };
+            ctx = { ...defaultServerContext, trx };
         });
         afterEach(async () => {
             await trx.rollback();
@@ -914,7 +1005,7 @@ for (const db of providers) {
         let trx: Knex.Transaction;
         let store: TripleStore;
         let es: import("@jasonscharf/server").EntityStore;
-        let ctx: { trx: Knex.Transaction };
+        let ctx: import("@jasonscharf/server").ServerContext;
 
         beforeEach(async () => {
             knex = await db.create();
@@ -922,7 +1013,7 @@ for (const db of providers) {
             store = new TripleStore(knex);
             const { EntityStore } = await import("@jasonscharf/server");
             es = new EntityStore(store);
-            ctx = { trx };
+            ctx = { ...defaultServerContext, trx };
         });
         afterEach(async () => {
             await trx.rollback();
@@ -985,7 +1076,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { trx };
+            ctx = { ...defaultServerContext, trx };
         });
         afterEach(async () => {
             await trx.rollback();

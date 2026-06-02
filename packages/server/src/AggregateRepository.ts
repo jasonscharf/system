@@ -1,4 +1,3 @@
-import type { IDomainEventBus } from "@jasonscharf/core";
 import type { EntityHandle, EntityRecord, EntitySchema, TernAggregate } from "@jasonscharf/entities";
 import type { EntityStore } from "./EntityStore.js";
 import type { ServerContext } from "./ServerContext.js";
@@ -7,8 +6,8 @@ import type { ServerContext } from "./ServerContext.js";
  * Abstract base repository for TernAggregate subclasses.
  *
  * Subclasses declare their schema, handles, and reconstruct() factory.
- * save() flushes pending changes to the store and optionally publishes
- * drained domain events to an IDomainEventBus.
+ * save() flushes pending changes to the store and publishes drained domain
+ * events through ctx.bus.
  *
  * Example:
  *
@@ -33,7 +32,7 @@ export abstract class AggregateRepository<A extends TernAggregate> {
         return this.reconstruct(record);
     }
 
-    async save(ctx: ServerContext, aggregate: A, bus?: IDomainEventBus): Promise<void> {
+    async save(ctx: ServerContext, aggregate: A): Promise<void> {
         const changes = aggregate.drainChanges();
         for (const [handleId, patch] of changes) {
             const groupDef = this.schema.allGroups().find((g) => g.handle.id === handleId);
@@ -42,11 +41,8 @@ export abstract class AggregateRepository<A extends TernAggregate> {
             }
             await this._store.updateGroup(ctx, this.schema, aggregate.id, groupDef.handle, patch);
         }
-        const events = aggregate.drainEvents();
-        if (bus) {
-            for (const domainEvent of events) {
-                await bus.publish(domainEvent);
-            }
+        for (const domainEvent of aggregate.drainEvents()) {
+            await ctx.bus.publish(domainEvent);
         }
     }
 }

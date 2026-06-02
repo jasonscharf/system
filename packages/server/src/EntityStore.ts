@@ -18,7 +18,7 @@ import {
 import { validate } from "@jasonscharf/gen";
 import type { CollectionViewOpts } from "./CollectionView.js";
 import { CollectionViewStore } from "./CollectionView.js";
-import type { ServerContext } from "./ServerContext.js";
+import { defaultServerContext, type ServerContext } from "./ServerContext.js";
 import { tenantGraph, tenantGraphForInsert } from "./tenancy.js";
 
 // ── EntityStore ───────────────────────────────────────────────────────────────
@@ -35,8 +35,22 @@ export class EntityStore {
 
     // ── Transaction helpers ───────────────────────────────────────────────────
 
-    async inTransaction<T>(fn: (ctx: ServerContext) => Promise<T>): Promise<T> {
-        return this._store.knex.transaction(async (trx) => fn({ trx }));
+    async inTransaction<T>(
+        ctxOrFn: ServerContext | ((ctx: ServerContext) => Promise<T>),
+        maybeFn?: (ctx: ServerContext) => Promise<T>,
+    ): Promise<T> {
+        // Support both inTransaction(ctx, fn) and legacy inTransaction(fn).
+        if (typeof ctxOrFn === "function") {
+            return this._store.knex.transaction(async (trx) =>
+                ctxOrFn({ ...defaultServerContext, trx }),
+            );
+        }
+        if (!maybeFn) {
+            throw new Error("inTransaction(ctx, fn): fn is required when ctx is provided");
+        }
+        return this._store.knex.transaction(async (trx) =>
+            maybeFn({ ...ctxOrFn, trx }),
+        );
     }
 
     private async _withTrx<T>(

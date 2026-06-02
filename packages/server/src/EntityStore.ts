@@ -258,13 +258,11 @@ export class EntityStore {
             const graph = tenantGraphForInsert(txCtx);
             const viewIris = await this._cvs().findViewsForSource(txCtx, pg.value, propIri.value);
 
+            await this._store.insertMany(
+                txCtx,
+                values.map((v) => ({ subject: pg, predicate: propIri, object: toLiteral(v), graph })),
+            );
             for (const v of values) {
-                await this._store.insert(txCtx, {
-                    subject: pg,
-                    predicate: propIri,
-                    object: toLiteral(v),
-                    graph,
-                });
                 for (const vIri of viewIris) {
                     await this._cvs().addItem(txCtx, vIri, String(v));
                 }
@@ -349,13 +347,11 @@ export class EntityStore {
             const filterGraph = tenantGraph(txCtx);
             const insertGraph = tenantGraphForInsert(txCtx);
             await this._store.delete(txCtx, { subject: pg, predicate: propIri, graph: filterGraph });
-            for (const v of values) {
-                await this._store.insert(txCtx, {
-                    subject: pg,
-                    predicate: propIri,
-                    object: toLiteral(v),
-                    graph: insertGraph,
-                });
+            if (values.length > 0) {
+                await this._store.insertMany(
+                    txCtx,
+                    values.map((v) => ({ subject: pg, predicate: propIri, object: toLiteral(v), graph: insertGraph })),
+                );
             }
             const viewIris = await this._cvs().findViewsForSource(txCtx, pg.value, propIri.value);
             for (const vIri of viewIris) {

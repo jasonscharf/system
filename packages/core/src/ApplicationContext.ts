@@ -1,3 +1,5 @@
+import type { ServiceContainer } from "./container/index.js";
+
 /**
  * Minimal logger interface.  Any logger satisfying this shape (pino, winston,
  * console-based, etc.) can be placed on ApplicationContext.
@@ -24,6 +26,8 @@ export interface Logger {
 export interface ApplicationContext {
     logger?: Logger;
     config?: Record<string, unknown>;
+    /** Service container for typed dependency resolution across extensions. */
+    services?: ServiceContainer;
 }
 
 /** Named empty context — no logger, no config. */

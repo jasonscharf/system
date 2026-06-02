@@ -179,4 +179,50 @@ describe("ExtensionRegistry + ExtensionManager", () => {
             /tern.convos.*requires.*tern.rbac/i,
         );
     });
+
+    it("testInstallAllThrowsOnCircularDependency", async () => {
+        // A → B → A is a cycle; _topoSort must detect it and throw.
+        // Bug: original implementation used a single 'visited' set which
+        // served as both "in-progress" and "finished", so cycles were
+        // silently accepted and returned [B, A] instead of throwing.
+        const calls: string[] = [];
+        const a = makeExt("ext.a", "1.0.0", calls, [{ name: "ext.b" }]);
+        const b = makeExt("ext.b", "1.0.0", calls, [{ name: "ext.a" }]);
+
+        await expect(manager.installAll([a, b])).rejects.toThrow(/circular/i);
+    });
+
+    it("testInstallHookThrowingDoesNotRecordExtension", async () => {
+        // If install() throws, the extension must NOT be recorded in the
+        // registry.  Otherwise the next boot would skip install() entirely
+        // (idempotent at same version) and the setup would never succeed.
+        const badExt: import("@jasonscharf/app").TernExtension = {
+            name: "ext.bad",
+            version: "1.0.0",
+            async install() { throw new Error("setup failed"); },
+        };
+
+        await expect(manager.install(badExt)).rejects.toThrow("setup failed");
+        expect(await registry.isInstalled(ctx, "ext.bad")).toBe(false);
+    });
+
+    it("testUpgradeWithNoHookStillUpdatesVersion", async () => {
+        // An extension may bump its version without needing a migration.
+        // If no upgrade() hook is defined, installAll should still record
+        // the new version so subsequent boots don't attempt to run install().
+        const calls: string[] = [];
+        const v1 = makeExt("ext.no-migrate", "1.0.0", calls);
+        const v2: import("@jasonscharf/app").TernExtension = {
+            name: "ext.no-migrate",
+            version: "2.0.0",
+            async install() { calls.push("install:v2"); },
+            // No upgrade() hook
+        };
+
+        await manager.install(v1);
+        await manager.install(v2);
+
+        expect(calls).toEqual(["install:ext.no-migrate@1.0.0"]);
+        expect(await registry.getVersion(ctx, "ext.no-migrate")).toBe("2.0.0");
+    });
 });

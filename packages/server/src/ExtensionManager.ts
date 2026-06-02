@@ -58,13 +58,21 @@ export class ExtensionManager {
 
 function _topoSort(exts: TernExtension[]): TernExtension[] {
     const byName = new Map(exts.map((e) => [e.name, e]));
-    const visited = new Set<string>();
+    // Two-set DFS: "inProgress" detects back-edges (cycles); "finished" skips done nodes.
+    const inProgress = new Set<string>();
+    const finished = new Set<string>();
     const result: TernExtension[] = [];
 
     function visit(ext: TernExtension): void {
-        if (visited.has(ext.name)) {
+        if (finished.has(ext.name)) {
             return;
         }
+        if (inProgress.has(ext.name)) {
+            throw new Error(
+                `Circular dependency detected: "${ext.name}" is in its own dependency chain`,
+            );
+        }
+        inProgress.add(ext.name);
         for (const req of ext.requires ?? []) {
             const dep = byName.get(req.name);
             if (!dep) {
@@ -74,7 +82,8 @@ function _topoSort(exts: TernExtension[]): TernExtension[] {
             }
             visit(dep);
         }
-        visited.add(ext.name);
+        inProgress.delete(ext.name);
+        finished.add(ext.name);
         result.push(ext);
     }
 

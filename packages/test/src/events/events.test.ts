@@ -63,7 +63,7 @@ function eventBusSuite(name: string, factory: () => IDomainEventBus) {
         beforeEach(() => { bus = factory(); });
         afterEach(async () => { await bus.close(); });
 
-        it("testSubscriberReceivesPublishedEvent", async () => {
+        it("test subscriber receives published event", async () => {
             const received: DomainEvent<unknown>[] = [];
             await bus.subscribe(USER_CREATED, `sub-${uniqueId()}`, async (e) => { received.push(e); });
 
@@ -75,11 +75,11 @@ function eventBusSuite(name: string, factory: () => IDomainEventBus) {
             expect((received[0]?.payload as UserPayload).email).toBe("a@b.com");
         });
 
-        it("testPublishWithNoSubscribersIsNoop", async () => {
+        it("test publish with no subscribers is noop", async () => {
             await expect(bus.publish(makeEvent(USER_CREATED, { userId: "u2" }))).resolves.not.toThrow();
         });
 
-        it("testPublishDoesNotThrowWhenSubscriberHandlerThrows", async () => {
+        it("test publish does not throw when subscriber handler throws", async () => {
             // Bug 6: publish must isolate subscriber exceptions
             await bus.subscribe(USER_CREATED, `sub-${uniqueId()}`, async () => {
                 throw new Error("subscriber failure");
@@ -87,7 +87,7 @@ function eventBusSuite(name: string, factory: () => IDomainEventBus) {
             await expect(bus.publish(makeEvent(USER_CREATED, {}))).resolves.not.toThrow();
         });
 
-        it("testDifferentSubscriptionNamesBothReceiveEvent", async () => {
+        it("test different subscription names both receive event", async () => {
             const aIds: string[] = [];
             const bIds: string[] = [];
             const suffix = uniqueId();
@@ -106,7 +106,7 @@ function eventBusSuite(name: string, factory: () => IDomainEventBus) {
             expect(bIds).toEqual(["u3"]);
         });
 
-        it("testSubscriberOnlyReceivesMatchingEventType", async () => {
+        it("test subscriber only receives matching event type", async () => {
             const received: DomainEvent<unknown>[] = [];
             await bus.subscribe(USER_CREATED, `sub-${uniqueId()}`, async (e) => { received.push(e); });
 
@@ -118,7 +118,7 @@ function eventBusSuite(name: string, factory: () => IDomainEventBus) {
             expect((received[0]?.payload as UserPayload).userId).toBe("u5");
         });
 
-        it("testCancelPreventsSubsequentDelivery", async () => {
+        it("test cancel prevents subsequent delivery", async () => {
             const received: string[] = [];
             const sub = await bus.subscribe(USER_CREATED, `sub-${uniqueId()}`, async (e) => {
                 received.push((e.payload as UserPayload).userId);
@@ -137,7 +137,7 @@ function eventBusSuite(name: string, factory: () => IDomainEventBus) {
             expect(received[0]).toBe("before");
         });
 
-        it("testMultipleEventsDeliveredInOrder", async () => {
+        it("test multiple events delivered in order", async () => {
             const received: string[] = [];
             await bus.subscribe(USER_CREATED, `sub-${uniqueId()}`, async (e) => {
                 received.push((e.payload as UserPayload).userId);
@@ -151,7 +151,7 @@ function eventBusSuite(name: string, factory: () => IDomainEventBus) {
             expect(received).toEqual(["u10", "u11", "u12"]);
         });
 
-        it("testSubscriptionExposesMetadata", async () => {
+        it("test subscription exposes metadata", async () => {
             const sub = await bus.subscribe(USER_CREATED, "meta-sub", async () => {});
             expect(sub.typeIri).toBe(USER_CREATED);
             expect(sub.subscriptionName).toBe("meta-sub");
@@ -207,7 +207,7 @@ if (process.env.TERN_REDIS_URL) {
             await cleanupRedisKeys(redisUrl, prefix);
         });
 
-        it("testCompetingConsumersEachMessageDeliveredOnce", async () => {
+        it("test competing consumers each message delivered once", async () => {
             // Two bus instances with the SAME subscriptionName form a competing
             // consumer group.  Each of the 10 published messages must be
             // processed by exactly one consumer — never both, never neither.
@@ -246,7 +246,7 @@ if (process.env.TERN_REDIS_URL) {
             expect(receivedB.length).toBeGreaterThan(0);
         });
 
-        it("testDifferentGroupsEachReceiveAllMessages", async () => {
+        it("test different groups each receive all messages", async () => {
             // Two buses with DIFFERENT subscriptionNames are independent groups —
             // fan-out means both groups receive every message.
             const busA = makeBus();
@@ -271,7 +271,7 @@ if (process.env.TERN_REDIS_URL) {
             expect(bIds.sort()).toEqual(["x1", "x2", "x3"]);
         });
 
-        it("testConsumerIdsAreUnique", async () => {
+        it("test consumer ids are unique", async () => {
             // Bug 3: Math.random() consumer IDs are not unique enough.
             // Two subscriptions must have distinct consumer IDs, otherwise Redis
             // treats them as the same consumer and only one gets messages.
@@ -288,7 +288,7 @@ if (process.env.TERN_REDIS_URL) {
             await subB.cancel();
         });
 
-        it("testCancelReturnsAfterLoopFullyExits", async () => {
+        it("test cancel returns after loop fully exits", async () => {
             // Bug 4: cancel() must await the read loop so no handler calls
             // happen after it returns.
             const received: string[] = [];
@@ -309,7 +309,7 @@ if (process.env.TERN_REDIS_URL) {
             expect(received[0]).toBe("before");
         });
 
-        it("testHighVolumeMessagesAllDeliveredOnce", async () => {
+        it("test high volume messages all delivered once", async () => {
             // 3 competing consumers, 30 messages — every message delivered exactly once.
             const buses = [makeBus(), makeBus(), makeBus()];
             const GROUP = `pool-${uniqueId()}`;
@@ -361,7 +361,7 @@ if (process.env.TERN_REDIS_URL) {
             await cleanupRedisKeys(redisUrl, prefix);
         });
 
-        it("testSuccessfulHandlerAcksMessageNoRedelivery", async () => {
+        it("test successful handler acks message no redelivery", async () => {
             // A message processed by a succeeding handler must not be
             // redelivered by XAUTOCLAIM (it should be ACKed and gone).
             const bus = makeBus();
@@ -381,7 +381,7 @@ if (process.env.TERN_REDIS_URL) {
             expect(received[0]).toBe("acked");
         });
 
-        it("testCrashedConsumerMessageReclaimedBySurvivor", async () => {
+        it("test crashed consumer message reclaimed by survivor", async () => {
             // Real-world mission-critical scenario: consumer A receives a message,
             // its handler fails, and then A crashes (ungraceful close) before
             // retrying.  Consumer B in the same pool must reclaim the orphaned PEL
@@ -422,7 +422,7 @@ if (process.env.TERN_REDIS_URL) {
             expect(rescuedByB).toContain("orphaned");
         });
 
-        it("testFailingHandlerOnSingleConsumerEventuallyReclaimedBySelf", async () => {
+        it("test failing handler on single consumer eventually reclaimed by self", async () => {
             // When there is only one consumer and its handler fails, XAUTOCLAIM
             // should redeliver the message to that same consumer on the next cycle.
             let callCount = 0;
@@ -449,6 +449,6 @@ if (process.env.TERN_REDIS_URL) {
 
 } else {
     describe("RedisStreamEventBus (skipped — set TERN_REDIS_URL to enable)", () => {
-        it("testSkipped", () => { /* no-op */ });
+        it("test skipped", () => { /* no-op */ });
     });
 }

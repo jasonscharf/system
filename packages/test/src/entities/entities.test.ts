@@ -18,7 +18,7 @@ import { IRI } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import { EntitySchema, groupOf, handle, handleSlug } from "@jasonscharf/entities";
 import type { ShaclNodeShape } from "@jasonscharf/gen";
-import { EntityStore, EntityValidationError, entities } from "@jasonscharf/server";
+import { defaultServerContext, EntityStore, EntityValidationError, entities } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fromLiteral, invertPropertyMap, propertyMapFor } from "../../../entities/src/util.js";
@@ -91,7 +91,7 @@ async function setup(db: DbProvider) {
     const trx = await knex.transaction();
     const store = new TripleStore(knex);
     const es = new EntityStore(store);
-    return { knex, trx, store, es };
+    return { ...defaultServerContext, knex, trx, store, es };
 }
 
 async function teardown(ctx: Awaited<ReturnType<typeof setup>>) {
@@ -737,7 +737,7 @@ describe("EntityStore — defensive throw paths", () => {
         knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
         es = new EntityStore(new TripleStore(knex));
         schema = makeTestSchema();
-        const rec = await es.create({}, schema, { name: "Item" });
+        const rec = await es.create(defaultServerContext, schema, { name: "Item" });
         itemId = rec.id;
     });
     afterEach(async () => {
@@ -746,20 +746,20 @@ describe("EntityStore — defensive throw paths", () => {
 
     it("collectionSet throws when prop not in schema (line 311)", async () => {
         await expect(
-            es.collectionSet({}, schema, itemId, TestCoreHandle, "nonExistentProp", ["x"]),
+            es.collectionSet(defaultServerContext, schema, itemId, TestCoreHandle, "nonExistentProp", ["x"]),
         ).rejects.toThrow();
     });
 
     it("createCollectionView throws when prop not in schema (line 363)", async () => {
         await expect(
-            es.createCollectionView({}, schema, itemId, TestCoreHandle, "nonExistentProp"),
+            es.createCollectionView(defaultServerContext, schema, itemId, TestCoreHandle, "nonExistentProp"),
         ).rejects.toThrow();
     });
 
     it("collectionPush throws when handle not registered on schema (line 466)", async () => {
         const ghostHandle = handle("ghost:handle");
         await expect(
-            es.collectionPush({}, schema, itemId, ghostHandle, "member", "val"),
+            es.collectionPush(defaultServerContext, schema, itemId, ghostHandle, "member", "val"),
         ).rejects.toThrow("PropGroup not registered on schema");
     });
 });
@@ -784,7 +784,7 @@ describe("EntityStore — collectionGet/Remove with unknown prop returns early",
         knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
         es = new EntityStore(new TripleStore(knex));
         schema = makeTestSchema();
-        const rec = await es.create({}, schema, { name: "Item" });
+        const rec = await es.create(defaultServerContext, schema, { name: "Item" });
         itemId = rec.id;
     });
     afterEach(async () => {
@@ -792,13 +792,13 @@ describe("EntityStore — collectionGet/Remove with unknown prop returns early",
     });
 
     it("collectionGet returns [] when prop is not in the group", async () => {
-        const result = await es.collectionGet({}, schema, itemId, TestCoreHandle, "unknownProp");
+        const result = await es.collectionGet(defaultServerContext, schema, itemId, TestCoreHandle, "unknownProp");
         expect(result).toEqual([]);
     });
 
     it("collectionRemove returns false when prop is not in the group", async () => {
         const removed = await es.collectionRemove(
-            {},
+            defaultServerContext,
             schema,
             itemId,
             TestCoreHandle,
@@ -810,7 +810,7 @@ describe("EntityStore — collectionGet/Remove with unknown prop returns early",
 
     it("collectionPush throws when prop is not in the group", async () => {
         await expect(
-            es.collectionPush({}, schema, itemId, TestCoreHandle, "unknownProp", "value"),
+            es.collectionPush(defaultServerContext, schema, itemId, TestCoreHandle, "unknownProp", "value"),
         ).rejects.toThrow("unknownProp");
     });
 });
@@ -827,7 +827,7 @@ describe("EntityStore — inTransaction wraps work in a DB transaction", () => {
         });
 
         expect(result.id).toBeTruthy();
-        const found = await es.findById({}, schema, result.id, [TestCoreHandle]);
+        const found = await es.findById(defaultServerContext, schema, result.id, [TestCoreHandle]);
         expect(found?.groups[TestCoreHandle.id]?.name).toBe("TxItem");
         await knex.destroy();
     });
@@ -855,7 +855,7 @@ describe("EntityStore._validate — schema with shape", () => {
         const store = new TripleStore(knex);
         const es = new EntityStore(store);
         // Should NOT throw — name is provided
-        const rec = await es.create({}, schemaWithShape, { name: "ValidName" });
+        const rec = await es.create(defaultServerContext, schemaWithShape, { name: "ValidName" });
         expect(rec.id).toBeTruthy();
         await knex.destroy();
     });
@@ -865,7 +865,7 @@ describe("EntityStore._validate — schema with shape", () => {
         const store = new TripleStore(knex);
         const es = new EntityStore(store);
         // Should throw — name is missing and minCount=1
-        await expect(es.create({}, schemaWithShape, {})).rejects.toBeInstanceOf(
+        await expect(es.create(defaultServerContext, schemaWithShape, {})).rejects.toBeInstanceOf(
             EntityValidationError,
         );
         await knex.destroy();

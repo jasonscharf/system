@@ -17,6 +17,7 @@ const CREATE_WIDGET = typeRef("http://tern.dev/test/widget.create");
 const PING = typeRef("http://tern.dev/test/ping");
 
 const WIDGET_SHAPE: ShaclNodeShape = {
+    iri: "http://tern.dev/test/WidgetShape",
     targetClass: "http://tern.dev/test/Widget",
     properties: [
         {
@@ -54,31 +55,31 @@ function buildRouter(registry: PayloadSchemaRegistry): TernRouter {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("PayloadSchemaRegistry", () => {
-    it("testHasShapeReturnsFalseForUnregisteredType", () => {
+    it("test has shape returns false for unregistered type", () => {
         const reg = new PayloadSchemaRegistry();
         expect(reg.hasShape(CREATE_WIDGET.iri)).toBe(false);
     });
 
-    it("testHasShapeReturnsTrueAfterRegister", () => {
+    it("test has shape returns true after register", () => {
         const reg = new PayloadSchemaRegistry();
         reg.register(CREATE_WIDGET, WIDGET_SHAPE, WIDGET_PROP_MAP);
         expect(reg.hasShape(CREATE_WIDGET.iri)).toBe(true);
     });
 
-    it("testValidateReturnsNullForUnregisteredType", () => {
+    it("test validate returns null for unregistered type", () => {
         const reg = new PayloadSchemaRegistry();
         const result = reg.validate(CREATE_WIDGET.iri, { name: "x", color: "red" });
         expect(result).toBeNull();
     });
 
-    it("testValidateReturnsValidForConformingPayload", () => {
+    it("test validate returns valid for conforming payload", () => {
         const reg = new PayloadSchemaRegistry();
         reg.register(CREATE_WIDGET, WIDGET_SHAPE, WIDGET_PROP_MAP);
         const result = reg.validate(CREATE_WIDGET.iri, { name: "Cog", color: "blue" });
         expect(result?.valid).toBe(true);
     });
 
-    it("testValidateReturnsViolationsForMissingRequiredField", () => {
+    it("test validate returns violations for missing required field", () => {
         const reg = new PayloadSchemaRegistry();
         reg.register(CREATE_WIDGET, WIDGET_SHAPE, WIDGET_PROP_MAP);
         const result = reg.validate(CREATE_WIDGET.iri, { name: "Cog" }); // missing color
@@ -88,7 +89,7 @@ describe("PayloadSchemaRegistry", () => {
 });
 
 describe("payloadValidation middleware", () => {
-    it("testPassesThroughWhenNoShapeRegistered", async () => {
+    it("test passes through when no shape registered", async () => {
         const reg = new PayloadSchemaRegistry();
         const router = buildRouter(reg);
         const req = command(PING, { anything: true });
@@ -96,7 +97,7 @@ describe("payloadValidation middleware", () => {
         expect(res.ok).toBe(true);
     });
 
-    it("testPassesThroughWhenPayloadIsValidAgainstShape", async () => {
+    it("test passes through when payload is valid against shape", async () => {
         const reg = new PayloadSchemaRegistry();
         reg.register(CREATE_WIDGET, WIDGET_SHAPE, WIDGET_PROP_MAP);
         const router = buildRouter(reg);
@@ -107,7 +108,7 @@ describe("payloadValidation middleware", () => {
         expect((res.data as Record<string, unknown>).ok).toBe(true);
     });
 
-    it("testRejectsPayloadViolatingShape", async () => {
+    it("test rejects payload violating shape", async () => {
         const reg = new PayloadSchemaRegistry();
         reg.register(CREATE_WIDGET, WIDGET_SHAPE, WIDGET_PROP_MAP);
         const router = buildRouter(reg);
@@ -118,7 +119,7 @@ describe("payloadValidation middleware", () => {
         expect(res.error).toMatch(/color/i);
     });
 
-    it("testRejectsNonObjectPayloadWhenShapeRegistered", async () => {
+    it("test rejects non object payload when shape registered", async () => {
         const reg = new PayloadSchemaRegistry();
         reg.register(CREATE_WIDGET, WIDGET_SHAPE, WIDGET_PROP_MAP);
         const router = buildRouter(reg);
@@ -129,7 +130,7 @@ describe("payloadValidation middleware", () => {
         expect(res.error).toMatch(/payload must be an object/i);
     });
 
-    it("testRejectsMissingPayloadWhenShapeRegistered", async () => {
+    it("test rejects missing payload when shape registered", async () => {
         const reg = new PayloadSchemaRegistry();
         reg.register(CREATE_WIDGET, WIDGET_SHAPE, WIDGET_PROP_MAP);
         const router = buildRouter(reg);
@@ -140,7 +141,7 @@ describe("payloadValidation middleware", () => {
         expect(res.error).toMatch(/payload must be an object/i);
     });
 
-    it("testUnregisteredTypePassesThroughEvenWithNoPayload", async () => {
+    it("test unregistered type passes through even with no payload", async () => {
         const reg = new PayloadSchemaRegistry();
         const router = buildRouter(reg);
         const req = command(PING); // no payload, no shape
@@ -148,7 +149,7 @@ describe("payloadValidation middleware", () => {
         expect(res.ok).toBe(true);
     });
 
-    it("testErrorIncludesAllViolationFields", async () => {
+    it("test error includes all violation fields", async () => {
         const reg = new PayloadSchemaRegistry();
         reg.register(CREATE_WIDGET, WIDGET_SHAPE, WIDGET_PROP_MAP);
         const router = buildRouter(reg);

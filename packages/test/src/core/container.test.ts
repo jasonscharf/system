@@ -14,15 +14,15 @@ const CounterToken = new ServiceToken<ICounter>("Counter");
 const GreeterToken = new ServiceToken<IGreeter>("Greeter");
 
 describe("ServiceToken", () => {
-    it("testTokenHasName", () => {
+    it("test token has name", () => {
         expect(CounterToken.name).toBe("Counter");
     });
 
-    it("testTokenToString", () => {
+    it("test token to string", () => {
         expect(String(CounterToken)).toBe("ServiceToken(Counter)");
     });
 
-    it("testTokensWithSameNameAreDistinct", () => {
+    it("test tokens with same name are distinct", () => {
         const a = new ServiceToken<string>("foo");
         const b = new ServiceToken<string>("foo");
         expect(a.key).not.toBe(b.key);
@@ -30,7 +30,7 @@ describe("ServiceToken", () => {
 });
 
 describe("ServiceContainer", () => {
-    it("testResolvesBoundService", () => {
+    it("test resolves bound service", () => {
         let count = 0;
         const counter: ICounter = { increment: () => { count++; }, value: () => count };
         const container = new ServiceContainer();
@@ -40,17 +40,17 @@ describe("ServiceContainer", () => {
         expect(count).toBe(1);
     });
 
-    it("testResolveThrowsForUnregisteredToken", () => {
+    it("test resolve throws for unregistered token", () => {
         const container = new ServiceContainer();
         expect(() => container.resolve(CounterToken)).toThrow("Service not registered: ServiceToken(Counter)");
     });
 
-    it("testTryResolveReturnsUndefinedForUnregistered", () => {
+    it("test try resolve returns undefined for unregistered", () => {
         const container = new ServiceContainer();
         expect(container.tryResolve(CounterToken)).toBeUndefined();
     });
 
-    it("testTryResolveReturnsInstanceWhenBound", () => {
+    it("test try resolve returns instance when bound", () => {
         let count = 0;
         const counter: ICounter = { increment: () => { count++; }, value: () => count };
         const container = new ServiceContainer();
@@ -58,19 +58,19 @@ describe("ServiceContainer", () => {
         expect(container.tryResolve(CounterToken)).toBe(counter);
     });
 
-    it("testHasReturnsFalseBeforeBind", () => {
+    it("test has returns false before bind", () => {
         const container = new ServiceContainer();
         expect(container.has(CounterToken)).toBe(false);
     });
 
-    it("testHasReturnsTrueAfterBind", () => {
+    it("test has returns true after bind", () => {
         const counter: ICounter = { increment: () => {}, value: () => 0 };
         const container = new ServiceContainer();
         container.bind(CounterToken, counter);
         expect(container.has(CounterToken)).toBe(true);
     });
 
-    it("testMultipleServicesAreIndependent", () => {
+    it("test multiple services are independent", () => {
         let count = 0;
         const counter: ICounter = { increment: () => { count++; }, value: () => count };
         const greeter: IGreeter = { greet: (name) => `Hello, ${name}!` };
@@ -84,7 +84,7 @@ describe("ServiceContainer", () => {
         expect(container.resolve(GreeterToken).greet("World")).toBe("Hello, World!");
     });
 
-    it("testBindReturnsContainerForChaining", () => {
+    it("test bind returns container for chaining", () => {
         const counter: ICounter = { increment: () => {}, value: () => 0 };
         const greeter: IGreeter = { greet: () => "" };
         const container = new ServiceContainer();
@@ -92,7 +92,7 @@ describe("ServiceContainer", () => {
         expect(result).toBe(container);
     });
 
-    it("testRebindOverwritesPreviousService", () => {
+    it("test rebind overwrites previous service", () => {
         const first: ICounter = { increment: () => {}, value: () => 1 };
         const second: ICounter = { increment: () => {}, value: () => 2 };
         const container = new ServiceContainer();
@@ -101,7 +101,7 @@ describe("ServiceContainer", () => {
         expect(container.resolve(CounterToken).value()).toBe(2);
     });
 
-    it("testDistinctTokensWithSameNameAreIndependent", () => {
+    it("test distinct tokens with same name are independent", () => {
         const t1 = new ServiceToken<string>("shared");
         const t2 = new ServiceToken<string>("shared");
         const container = new ServiceContainer();

@@ -87,7 +87,7 @@ for (const provider of providers) {
             knex = await provider.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { trx };
+            ctx = { ...defaultServerContext, trx };
         });
 
         afterEach(async () => {
@@ -473,7 +473,7 @@ describe("TripleStore: find/delete with non-existent nodes return early", () => 
             beforeEach(async () => {
                 knex = await provider.factory();
                 store = new TripleStore(knex);
-                ctx = {};
+                ctx = defaultServerContext;
             });
 
             afterEach(async () => {

@@ -1,4 +1,4 @@
-import type { ApplicationContext, UserSession } from "@jasonscharf/core";
+import { type ApplicationContext, defaultCtx, type UserSession } from "@jasonscharf/core";
 import type { Knex } from "knex";
 
 export interface ServerContext extends ApplicationContext {
@@ -12,4 +12,6 @@ export interface ServerContext extends ApplicationContext {
     tenantId?: string;
 }
 
-export const defaultServerContext: ServerContext = Object.freeze({});
+export const defaultServerContext: ServerContext = Object.freeze({
+    bus: defaultCtx.bus,
+});

@@ -4,7 +4,7 @@ import { uuidv4Binary } from "../util/random.js";
 // All messages that cross process boundaries (WebSocket, etc.) are serialised
 // to this shape.  IDs are UUID v4 strings so JSON round-trips are lossless.
 
-export type TernKind = "command" | "query" | "event" | "result";
+export type TernKind = "command" | "query" | "operation" | "event" | "result";
 
 /**
  * A reference to a well-known message type registered in the datastore.
@@ -50,7 +50,7 @@ export interface TernMessage {
 }
 
 export interface TernRequest extends TernMessage {
-    readonly kind: "command" | "query" | "event";
+    readonly kind: "command" | "query" | "operation" | "event";
     readonly payload?: unknown;
 }
 
@@ -64,6 +64,10 @@ export interface TernQuery extends TernRequest {
 
 export interface TernEvent extends TernRequest {
     readonly kind: "event";
+}
+
+export interface TernOperation extends TernRequest {
+    readonly kind: "operation";
 }
 
 export interface TernResult extends TernMessage {
@@ -98,6 +102,11 @@ export function command(type: TernTypeRef, payload?: unknown): TernCommand {
 /** Create a TernQuery from a well-known TernTypeRef. */
 export function query(type: TernTypeRef, payload?: unknown): TernQuery {
     return { id: newId(), kind: "query", type, payload };
+}
+
+/** Create a TernOperation from a well-known TernTypeRef. */
+export function operation(type: TernTypeRef, payload?: unknown): TernOperation {
+    return { id: newId(), kind: "operation", type, payload };
 }
 
 /** Create a TernEvent from a well-known TernTypeRef. */
@@ -136,7 +145,7 @@ export function isTernRequest(msg: unknown): msg is TernRequest {
         typeof m.type === "object" &&
         m.type !== null &&
         typeof (m.type as Record<string, unknown>).iri === "string" &&
-        (m.kind === "command" || m.kind === "query" || m.kind === "event")
+        (m.kind === "command" || m.kind === "query" || m.kind === "operation" || m.kind === "event")
     );
 }
 

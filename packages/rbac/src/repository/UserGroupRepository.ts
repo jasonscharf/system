@@ -132,11 +132,16 @@ export class UserGroupRepository {
             object: UserGroupIRI,
             graph: RBAC_GRAPH,
         });
+        if (typeQuads.length === 0) {
+            return [];
+        }
+        const subjects = typeQuads.map((tq) => tq.subject as IRI);
+        const bySubject = await this._store.findForSubjects(ctx, subjects, RBAC_GRAPH);
         const results: UserGroupEntity[] = [];
-        for (const tq of typeQuads) {
-            const sub = tq.subject as IRI;
-            const quads = await this._store.find(ctx, { subject: sub, graph: RBAC_GRAPH });
-            results.push(this._fromQuads(idFrom(sub.value), quads));
+        for (const [iriStr, quads] of bySubject) {
+            if (quads.length > 0) {
+                results.push(this._fromQuads(idFrom(iriStr), quads));
+            }
         }
         return results;
     }
@@ -148,20 +153,21 @@ export class UserGroupRepository {
             object: tenantNode,
             graph: RBAC_GRAPH,
         });
+        if (tenantEdges.length === 0) {
+            return [];
+        }
+        const subjects = tenantEdges.map((te) => te.subject as IRI);
+        const bySubject = await this._store.findForSubjects(ctx, subjects, RBAC_GRAPH);
         const results: UserGroupEntity[] = [];
-        for (const te of tenantEdges) {
-            const sub = te.subject as IRI;
-            const typeQ = await this._store.find(ctx, {
-                subject: sub,
-                predicate: RDF_TYPE,
-                object: UserGroupIRI,
-                graph: RBAC_GRAPH,
-            });
-            if (typeQ.length === 0) {
-                continue;
+        for (const [iriStr, quads] of bySubject) {
+            const isGroup = quads.some(
+                (q) =>
+                    (q.predicate as IRI).value === RDF_TYPE.value &&
+                    (q.object as IRI).value === UserGroupIRI.value,
+            );
+            if (isGroup) {
+                results.push(this._fromQuads(idFrom(iriStr), quads));
             }
-            const quads = await this._store.find(ctx, { subject: sub, graph: RBAC_GRAPH });
-            results.push(this._fromQuads(idFrom(sub.value), quads));
         }
         return results;
     }

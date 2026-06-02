@@ -86,22 +86,27 @@ export class InboxRepository {
             graph: CONVOS_GRAPH,
         });
 
-        const inboxes: InboxEntity[] = [];
         const seen = new Set<string>();
-
-        for (const q of quads) {
-            const subjIri = (q.subject as IRI).value;
-            if (!subjIri.includes("/inbox/") || seen.has(subjIri)) {
-                continue;
-            }
-            seen.add(subjIri);
-            const inboxId = idFrom(subjIri);
-            const all = await this._store.find(ctx, {
-                subject: q.subject as IRI,
-                graph: CONVOS_GRAPH,
+        const subjects = quads
+            .map((q) => q.subject as IRI)
+            .filter((s) => {
+                if (!s.value.includes("/inbox/") || seen.has(s.value)) {
+                    return false;
+                }
+                seen.add(s.value);
+                return true;
             });
+
+        if (subjects.length === 0) {
+            return [];
+        }
+
+        const bySubject = await this._store.findForSubjects(ctx, subjects, CONVOS_GRAPH);
+        const inboxes: InboxEntity[] = [];
+
+        for (const [subjIri, all] of bySubject) {
             if (all.length > 0) {
-                inboxes.push(this._fromQuads(inboxId, all));
+                inboxes.push(this._fromQuads(idFrom(subjIri), all));
             }
         }
 
@@ -193,16 +198,17 @@ export class InboxRepository {
             graph: CONVOS_GRAPH,
         });
 
+        if (quads.length === 0) {
+            return [];
+        }
+
+        const subjects = quads.map((q) => q.subject as IRI);
+        const bySubject = await this._store.findForSubjects(ctx, subjects, CONVOS_GRAPH);
         const members: InboxMembershipEntity[] = [];
 
-        for (const q of quads) {
-            const mid = idFrom((q.subject as IRI).value);
-            const all = await this._store.find(ctx, {
-                subject: q.subject as IRI,
-                graph: CONVOS_GRAPH,
-            });
+        for (const [subjIri, all] of bySubject) {
             if (all.length > 0) {
-                members.push(this._memberFromQuads(mid, all));
+                members.push(this._memberFromQuads(idFrom(subjIri), all));
             }
         }
 
@@ -216,16 +222,17 @@ export class InboxRepository {
             graph: CONVOS_GRAPH,
         });
 
+        if (quads.length === 0) {
+            return [];
+        }
+
+        const subjects = quads.map((q) => q.subject as IRI);
+        const bySubject = await this._store.findForSubjects(ctx, subjects, CONVOS_GRAPH);
         const memberships: InboxMembershipEntity[] = [];
 
-        for (const q of quads) {
-            const mid = idFrom((q.subject as IRI).value);
-            const all = await this._store.find(ctx, {
-                subject: q.subject as IRI,
-                graph: CONVOS_GRAPH,
-            });
+        for (const [subjIri, all] of bySubject) {
             if (all.length > 0) {
-                memberships.push(this._memberFromQuads(mid, all));
+                memberships.push(this._memberFromQuads(idFrom(subjIri), all));
             }
         }
 

@@ -190,26 +190,14 @@ export class RbacInspector {
     ): Promise<UserGroupEntity[]> {
         if (opts?.transitive) {
             const allIris = await this._resolvePrincipalSet(ctx, principalIri);
-            allIris.delete(principalIri); // remove the principal itself
-            const groups: UserGroupEntity[] = [];
-            for (const iri of allIris) {
-                const g = await this._groups.findByIri(ctx, iri);
-                if (g) {
-                    groups.push(g);
-                }
-            }
-            return groups;
+            allIris.delete(principalIri);
+            const results = await Promise.all([...allIris].map((iri) => this._groups.findByIri(ctx, iri)));
+            return results.filter((g): g is UserGroupEntity => g != null);
         }
 
         const directIris = await this._groups.listGroupsForPrincipal(ctx, principalIri);
-        const groups: UserGroupEntity[] = [];
-        for (const iri of directIris) {
-            const g = await this._groups.findByIri(ctx, iri);
-            if (g) {
-                groups.push(g);
-            }
-        }
-        return groups;
+        const results = await Promise.all(directIris.map((iri) => this._groups.findByIri(ctx, iri)));
+        return results.filter((g): g is UserGroupEntity => g != null);
     }
 
     /**
@@ -261,12 +249,8 @@ export class RbacInspector {
         tenantId?: string,
     ): Promise<UserGroupWithMembers[]> {
         const groups = await this._groups.listAll(ctx, tenantId);
-        const result: UserGroupWithMembers[] = [];
-        for (const g of groups) {
-            const members = await this._groups.listMembers(ctx, g.iri);
-            result.push({ ...g, members });
-        }
-        return result;
+        const memberLists = await Promise.all(groups.map((g) => this._groups.listMembers(ctx, g.iri)));
+        return groups.map((g, i) => ({ ...g, members: memberLists[i] ?? [] }));
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

@@ -92,20 +92,20 @@ export class ParticipantRepository {
             graph: CONVOS_GRAPH,
         });
 
+        const subjects = quads
+            .map((q) => q.subject as IRI)
+            .filter((s) => s.value.includes("/participant/"));
+
+        if (subjects.length === 0) {
+            return [];
+        }
+
+        const bySubject = await this._store.findForSubjects(ctx, subjects, CONVOS_GRAPH);
         const participants: ParticipantEntity[] = [];
 
-        for (const q of quads) {
-            const subjIri = (q.subject as IRI).value;
-            if (!subjIri.includes("/participant/")) {
-                continue;
-            }
-            const pid = idFrom(subjIri);
-            const all = await this._store.find(ctx, {
-                subject: q.subject as IRI,
-                graph: CONVOS_GRAPH,
-            });
+        for (const [subjIri, all] of bySubject) {
             if (all.length > 0) {
-                participants.push(this._fromQuads(pid, all));
+                participants.push(this._fromQuads(idFrom(subjIri), all));
             }
         }
 

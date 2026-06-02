@@ -173,24 +173,32 @@ export class AccessChecker {
         ctx: ServerContext,
         grants: PolicyGrantEntity[],
     ): Promise<Set<string>> {
-        const keys = new Set<string>();
+        const keySets = await Promise.all(
+            grants.map(async (grant) => {
+                const keys = new Set<string>();
+                if (grant.roleIri) {
+                    const roleKeys = await this._expandRoleToKeys(ctx, grant.roleIri, new Set());
+                    for (const k of roleKeys) {
+                        keys.add(k);
+                    }
+                }
+                if (grant.permissionIri) {
+                    const key = await this._permissionKey(ctx, grant.permissionIri);
+                    if (key) {
+                        keys.add(key);
+                    }
+                }
+                return keys;
+            }),
+        );
 
-        for (const grant of grants) {
-            if (grant.roleIri) {
-                const roleKeys = await this._expandRoleToKeys(ctx, grant.roleIri, new Set());
-                for (const k of roleKeys) {
-                    keys.add(k);
-                }
-            }
-            if (grant.permissionIri) {
-                const key = await this._permissionKey(ctx, grant.permissionIri);
-                if (key) {
-                    keys.add(key);
-                }
+        const result = new Set<string>();
+        for (const s of keySets) {
+            for (const k of s) {
+                result.add(k);
             }
         }
-
-        return keys;
+        return result;
     }
 
     /**

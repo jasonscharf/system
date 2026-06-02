@@ -32,6 +32,7 @@
     },
     "dependencies": {
         "@jasonscharf/core": "workspace:^",
-        "@jasonscharf/flow": "workspace:^"
+        "@jasonscharf/flow": "workspace:^",
+        "@jasonscharf/gen": "workspace:^"
     }
 }

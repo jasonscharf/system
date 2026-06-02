@@ -5,6 +5,6 @@
         "rootDir": "src",
         "outDir": "dist"
     },
-    "references": [{ "path": "../core" }, { "path": "../flow" }],
+    "references": [{ "path": "../core" }, { "path": "../flow" }, { "path": "../gen" }],
     "include": ["src"]
 }

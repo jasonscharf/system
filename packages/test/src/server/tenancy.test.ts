@@ -122,4 +122,27 @@ describe("EntityStore — tenant isolation", () => {
         const found = await entityStore.findById(ctx(), WidgetSchema, record.id, "*");
         expect(found?.id).toBe(record.id);
     });
+
+    it("testTenantIdWithSpecialCharactersIsEncoded", async () => {
+        // tenantId may contain URL-special characters (slashes, spaces, unicode).
+        // encodeURIComponent must keep them safe inside the graph IRI.
+        const weirdTenantId = "acme corp/division & branch";
+        const record = await entityStore.create(ctx(weirdTenantId), WidgetSchema, { name: "Quirky" });
+
+        const found = await entityStore.findById(ctx(weirdTenantId), WidgetSchema, record.id, "*");
+        expect(found?.id).toBe(record.id);
+
+        // Other tenants cannot see it
+        const notFound = await entityStore.findById(ctx("acme-corp"), WidgetSchema, record.id, "*");
+        expect(notFound).toBeNull();
+    });
+
+    it("testTenantGraphIriIsStableAcrossInstances", async () => {
+        // The same tenantId must always resolve to the same graph IRI.
+        // If two ServerContext objects share a tenantId, their writes must
+        // be visible to each other.
+        const r1 = await entityStore.create(ctx("stable"), WidgetSchema, { name: "First" });
+        const r2 = await entityStore.findById(ctx("stable"), WidgetSchema, r1.id, "*");
+        expect(r2?.groups[CORE_HANDLE.id]?.name).toBe("First");
+    });
 });

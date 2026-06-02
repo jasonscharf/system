@@ -77,6 +77,7 @@ export class RedisStreamEventBus implements IDomainEventBus {
     private readonly _claimBatchSize: number;
     private readonly _publishRedis: Redis;
     private readonly _activeSubs: ActiveSub[] = [];
+    private _closed = false;
 
     constructor(redisUrl: string, options: RedisStreamEventBusOptions = {}) {
         this._url = redisUrl;
@@ -153,14 +154,18 @@ export class RedisStreamEventBus implements IDomainEventBus {
     }
 
     async close(): Promise<void> {
+        if (this._closed) {
+            return;
+        }
+        this._closed = true;
         const subs = [...this._activeSubs];
         for (const sub of subs) {
             sub.running = false;
-            await sub.redis.quit();
+            await sub.redis.quit().catch(() => {});
         }
         await Promise.all(subs.map((s) => s.loopDone));
         this._activeSubs.length = 0;
-        await this._publishRedis.quit();
+        await this._publishRedis.quit().catch(() => {});
     }
 
     // ── Private ───────────────────────────────────────────────────────────────

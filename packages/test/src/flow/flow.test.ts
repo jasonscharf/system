@@ -17,7 +17,7 @@ import {
     TickEvent,
     wire,
 } from "@jasonscharf/flow";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Reusable components ───────────────────────────────────────────────────────
 //
@@ -690,12 +690,16 @@ describe("FlowApp: full graph wiring and execution", () => {
 // unbound ports (inControl — read directly) silently discard them.
 
 describe("TickEvent: timing signals", () => {
+    // Fake timers are used for the Clock-driven test; afterEach ensures they
+    // are always restored even if an assertion fails mid-test.
+    beforeEach(() => { vi.useFakeTimers(); });
+    afterEach(() => { vi.useRealTimers(); });
+
     it("carries a numeric timestamp", () => {
         expect(typeof new TickEvent().timestamp).toBe("number");
     });
 
     it("TickEvent delivered to a bound port is collected normally", async () => {
-        vi.useFakeTimers();
         const app = new FlowApp();
         const clock = new Clock(app.context, { intervalMs: 100 });
         const collector = new Collector<TickEvent>(app.context);
@@ -705,18 +709,20 @@ describe("TickEvent: timing signals", () => {
         await app.drain();
         await app.stop();
         expect(collector.received).toHaveLength(2);
-        vi.useRealTimers();
     });
 });
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
 //
 // Clock emits TickEvents at a fixed interval. Controlled via start/stop/pause/
-// resume methods (which put ControlSignals on inControl). Tests use fake timers.
+// resume methods. All tests run under fake timers restored after every test,
+// so a mid-test failure never leaves fake timers in place for other suites.
 
 describe("Clock: start, stop, pause, resume", () => {
+    beforeEach(() => { vi.useFakeTimers(); });
+    afterEach(() => { vi.useRealTimers(); });
+
     it("auto-starts on app.init() and auto-stops on app.stop()", async () => {
-        vi.useFakeTimers();
         const app = new FlowApp();
         const clock = new Clock(app.context, { intervalMs: 100 });
         const collector = new Collector<TickEvent>(app.context);
@@ -728,11 +734,9 @@ describe("Clock: start, stop, pause, resume", () => {
         await app.stop();
         expect(clock.running).toBe(false);
         expect(collector.received).toHaveLength(2);
-        vi.useRealTimers();
     });
 
     it("stop() halts emission — no further ticks after drain", async () => {
-        vi.useFakeTimers();
         const app = new FlowApp();
         const clock = new Clock(app.context, { intervalMs: 100 });
         const collector = new Collector<TickEvent>(app.context);
@@ -740,16 +744,14 @@ describe("Clock: start, stop, pause, resume", () => {
         await app.init();
         vi.advanceTimersByTime(250); // 2 ticks
         clock.stop();
-        await app.drain(); // processes stop signal + 2 ticks
+        await app.drain();
         vi.advanceTimersByTime(300); // stopped — 0 new ticks
         await app.drain();
         await app.stop();
         expect(collector.received).toHaveLength(2);
-        vi.useRealTimers();
     });
 
     it("start() is idempotent — calling twice does not double the emission rate", async () => {
-        vi.useFakeTimers();
         const app = new FlowApp();
         const clock = new Clock(app.context, { intervalMs: 100 });
         const collector = new Collector<TickEvent>(app.context);
@@ -761,11 +763,9 @@ describe("Clock: start, stop, pause, resume", () => {
         await app.drain();
         await app.stop();
         expect(collector.received).toHaveLength(2);
-        vi.useRealTimers();
     });
 
     it("pause() halts emission; resume() restores it", async () => {
-        vi.useFakeTimers();
         const app = new FlowApp();
         const clock = new Clock(app.context, { intervalMs: 100 });
         const collector = new Collector<TickEvent>(app.context);
@@ -788,11 +788,9 @@ describe("Clock: start, stop, pause, resume", () => {
         await app.drain();
         await app.stop();
         expect(collector.received).toHaveLength(2);
-        vi.useRealTimers();
     });
 
     it("stop() clears paused state — distinct from pause()", async () => {
-        vi.useFakeTimers();
         const app = new FlowApp();
         const clock = new Clock(app.context, { intervalMs: 100 });
         app.addComponent(clock);
@@ -805,7 +803,6 @@ describe("Clock: start, stop, pause, resume", () => {
         expect(clock.paused).toBe(false);
         expect(clock.running).toBe(false);
         await app.stop();
-        vi.useRealTimers();
     });
 });
 

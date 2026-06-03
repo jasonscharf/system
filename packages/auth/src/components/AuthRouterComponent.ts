@@ -5,7 +5,7 @@ import {
     type FlowPort,
     type HttpMiddlewareFn,
     HttpRouter,
-    LocalTransport,
+    wire,
 } from "@jasonscharf/flow";
 import { AuthService } from "../AuthService.js";
 import { OAUTH_STATE_COOKIE, SESSION_COOKIE, SESSION_TTL_SECS } from "../constants.js";
@@ -209,9 +209,7 @@ export class AuthRouterComponent extends FlowComponent {
 
     private _registerRoutes(): void {
         // Wire router responses to our output port
-        this.httpRouter.responses._addTransport(
-            new LocalTransport(this.httpRouter.responses, this.responses),
-        );
+        wire(this.httpRouter.responses, this.responses);
 
         // ── GET /auth/me ──────────────────────────────────────────────────────
         this.httpRouter.get("/auth/me", async (ctx) => {

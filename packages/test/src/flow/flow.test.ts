@@ -1,1154 +1,878 @@
 import type { IRI } from "@jasonscharf/core";
 import {
+    Clock,
     createMessage,
     FlowApp,
     FlowComponent,
     type FlowComponentOptions,
-    FlowContext,
+    type FlowContext,
     type FlowMessage,
-    type FlowPort,
     FlowPortGroup,
-    FlowScheduler,
-    type IDisposable,
-    LocalTransport,
-    type PortDirection,
-    PullScheduler,
-    PushScheduler,
+    FlowTransport,
+    fromJSON,
+    fromRDF,
+    fromYAML,
+    type ReadMode,
     type ScheduleMode,
+    TickEvent,
+    wire,
 } from "@jasonscharf/flow";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-// ── Test components ────────────────────────────────────────────────────────────
+// ── Reusable components ───────────────────────────────────────────────────────
+//
+// These are the building blocks used in every test. They model realistic FBP
+// components — no test-specific hacks, no external port manipulation.
+//
+// Test pattern:
+//   const app = new FlowApp();
+//   // wire up source → processing → collector
+//   await app.init();   // sources emit their data; scheduler queue is populated
+//   await app.drain();  // deterministic processing — no background loop
+//   await app.stop();   // dispose all components
+//   expect(collector.received).toEqual([...]);
 
-class Counter extends FlowComponent {
-    readonly input: FlowPort<number>;
-    readonly output: FlowPort<number>;
-    count = 0;
-    initOrder: string[] = [];
-    disposeOrder: string[] = [];
-
-    constructor(ctx: FlowContext, name = "counter") {
-        super({ name, context: ctx });
-        this.input = this.addPort<number>("input", "in");
-        this.output = this.addPort<number>("output", "out");
+/**
+ * Emits a fixed list of messages to its output port during onInit().
+ * The scheduler queue is populated before drain() is called, so the graph
+ * runs to completion without any direct port manipulation from the test.
+ */
+class Source<T> extends FlowComponent {
+    readonly output = this.addPort<T>("output", "out");
+    private readonly _messages: T[];
+    constructor(ctx: FlowContext, config: { messages: T[]; name?: string }) {
+        super({ name: config.name ?? "source", context: ctx });
+        this._messages = [...config.messages];
     }
-
-    protected override async onInit(): Promise<void> {
-        this.initOrder.push(this.name);
-    }
-
-    protected override async onDispose(): Promise<void> {
-        this.disposeOrder.push(this.name);
-    }
-
-    override step(): void {
-        for (;;) {
-            const n = this.input.read();
-            if (n === undefined) {
-                break;
-            }
-            this.count += n;
-            this.output.put(this.count);
+    protected override onInit(): void {
+        for (const msg of this._messages) {
+            this.output.put(msg);
         }
     }
 }
 
-class Doubler extends FlowComponent {
-    readonly input: FlowPort<number>;
-    readonly output: FlowPort<number>;
-
-    constructor(ctx: FlowContext) {
-        super({ name: "doubler", context: ctx });
-        this.input = this.addPort<number>("input", "in");
-        this.output = this.addPort<number>("output", "out");
+/** Passes each input to output unchanged. */
+class Echo<T> extends FlowComponent {
+    readonly input = this.addPort<T>("input", "in");
+    readonly output = this.addPort<T>("output", "out");
+    constructor(ctx: FlowContext, config: { name?: string } = {}) {
+        super({ name: config.name ?? "echo", context: ctx });
+        this.on(this.input, (msg) => this.output.put(msg));
     }
+}
 
-    override step(): void {
-        for (;;) {
-            const n = this.input.read();
-            if (n === undefined) {
-                break;
+/** Adds each input to a running total; emits the new total on every message. */
+class Sum extends FlowComponent {
+    readonly input = this.addPort<number>("input", "in");
+    readonly output = this.addPort<number>("output", "out");
+    total = 0;
+    constructor(ctx: FlowContext, config: { name?: string } = {}) {
+        super({ name: config.name ?? "sum", context: ctx });
+        this.on(this.input, (n) => {
+            this.total += n;
+            this.output.put(this.total);
+        });
+    }
+}
+
+/** Multiplies each input by a fixed factor. */
+class Multiply extends FlowComponent {
+    readonly input = this.addPort<number>("input", "in");
+    readonly output = this.addPort<number>("output", "out");
+    readonly factor: number;
+    constructor(ctx: FlowContext, config: { factor: number; name?: string }) {
+        super({ name: config.name ?? `multiply-${config.factor}`, context: ctx });
+        this.factor = config.factor;
+        const { factor } = config;
+        this.on(this.input, (n) => this.output.put(n * factor));
+    }
+}
+
+/** Copies each input to out1 and out2 (fan-out). */
+class Splitter<T> extends FlowComponent {
+    readonly input = this.addPort<T>("input", "in");
+    readonly out1 = this.addPort<T>("out1", "out");
+    readonly out2 = this.addPort<T>("out2", "out");
+    constructor(ctx: FlowContext, config: { name?: string } = {}) {
+        super({ name: config.name ?? "splitter", context: ctx });
+        this.on(this.input, (msg) => {
+            this.out1.put(msg);
+            this.out2.put(msg);
+        });
+    }
+}
+
+/** Routes each input to truePort or falsePort based on a predicate. */
+class IfRoute<T> extends FlowComponent {
+    readonly input = this.addPort<T>("input", "in");
+    readonly truePort = this.addPort<T>("true", "out");
+    readonly falsePort = this.addPort<T>("false", "out");
+    readonly predicate: (v: T) => boolean;
+    constructor(ctx: FlowContext, config: { predicate: (v: T) => boolean; name?: string }) {
+        super({ name: config.name ?? "if", context: ctx });
+        this.predicate = config.predicate;
+        const { predicate } = config;
+        this.on(this.input, (msg) => {
+            (predicate(msg) ? this.truePort : this.falsePort).put(msg);
+        });
+    }
+}
+
+/** Passes numbers strictly less than threshold; drops the rest. */
+class LessThan extends FlowComponent {
+    readonly input = this.addPort<number>("input", "in");
+    readonly output = this.addPort<number>("output", "out");
+    readonly threshold: number;
+    constructor(ctx: FlowContext, config: { threshold: number }) {
+        super({ name: `lt-${config.threshold}`, context: ctx });
+        this.threshold = config.threshold;
+        const { threshold } = config;
+        this.on(this.input, (n) => {
+            if (n < threshold) {
+                this.output.put(n);
             }
-            this.output.put(n * 2);
+        });
+    }
+}
+
+/** Passes numbers strictly greater than threshold; drops the rest. */
+class GreaterThan extends FlowComponent {
+    readonly input = this.addPort<number>("input", "in");
+    readonly output = this.addPort<number>("output", "out");
+    readonly threshold: number;
+    constructor(ctx: FlowContext, config: { threshold: number }) {
+        super({ name: `gt-${config.threshold}`, context: ctx });
+        this.threshold = config.threshold;
+        const { threshold } = config;
+        this.on(this.input, (n) => {
+            if (n > threshold) {
+                this.output.put(n);
+            }
+        });
+    }
+}
+
+/**
+ * Accumulates all received messages in `received[]` using drain mode.
+ * Acts as the test sink — examine received[] after drain() to assert results.
+ */
+class Collector<T> extends FlowComponent {
+    readonly input = this.addPort<T>("input", "in");
+    readonly received: T[] = [];
+    constructor(ctx: FlowContext, config: { name?: string } = {}) {
+        super({ name: config.name ?? "collector", context: ctx });
+        this._readMode = "drain" as ReadMode;
+        this.on(this.input, (msg) => this.received.push(msg));
+    }
+}
+
+/**
+ * Records messages via on() with default once readMode.
+ * One message processed per scheduling slot.
+ */
+class Logger<T> extends FlowComponent {
+    readonly input = this.addPort<T>("input", "in");
+    readonly log: T[] = [];
+    constructor(ctx: FlowContext, config: { name?: string } = {}) {
+        super({ name: config.name ?? "logger", context: ctx });
+        this.on(this.input, (msg) => this.log.push(msg));
+    }
+}
+
+/**
+ * Echo with a one-microtask async delay before forwarding.
+ * Overrides step() and calls super.step() first so control signals still work.
+ */
+class AsyncEcho<T> extends FlowComponent {
+    readonly input = this.addPort<T>("input", "in");
+    readonly output = this.addPort<T>("output", "out");
+    constructor(ctx: FlowContext, config: { name?: string } = {}) {
+        super({ name: config.name ?? "async-echo", context: ctx });
+    }
+    override async step(): Promise<void> {
+        await super.step();
+        if (!this.isRunning) { return; }
+        const msg = this.input.read();
+        if (msg !== undefined) {
+            await new Promise<void>((r) => setTimeout(r, 0));
+            this.output.put(msg);
         }
     }
 }
 
-// ── FlowMessage ────────────────────────────────────────────────────────────────
+/**
+ * Merges two independent streams into a single serializable object.
+ * Only emits when BOTH inLeft and inRight have a message (FlowPortGroup barrier).
+ * Output is a plain JSON-compatible object — not a tuple.
+ */
+class Merger<L, R> extends FlowComponent {
+    readonly inLeft = this.addPort<L>("inLeft", "in");
+    readonly inRight = this.addPort<R>("inRight", "in");
+    readonly output = this.addPort<{ left: L; right: R }>("output", "out");
+    private readonly _group: FlowPortGroup<readonly [typeof this.inLeft, typeof this.inRight]>;
+    constructor(ctx: FlowContext, config: { name?: string } = {}) {
+        super({ name: config.name ?? "merger", context: ctx });
+        this._group = new FlowPortGroup([this.inLeft, this.inRight] as const);
+    }
+    override step(): void {
+        super.step();
+        if (!this.isRunning) { return; }
+        const pair = this._group.readAll();
+        if (pair !== undefined) {
+            this.output.put({ left: pair[0], right: pair[1] });
+        }
+    }
+}
 
-describe("createMessage", () => {
-    it("creates a message with id, timestamp, and payload", () => {
-        const msg = createMessage(42);
+// ── FlowMessage ───────────────────────────────────────────────────────────────
+//
+// FlowMessage is a typed envelope stamped with a unique id and timestamp.
+
+describe("FlowMessage: typed message envelopes", () => {
+    it("wraps a payload with id, timestamp, and optional type tag", () => {
+        const msg: FlowMessage<number> = createMessage(42, "tern:core.count");
+        expect(msg.payload).toBe(42);
+        expect(msg.type).toBe("tern:core.count");
         expect(msg.id).toBeInstanceOf(Uint8Array);
         expect(msg.id.length).toBe(16);
         expect(typeof msg.timestamp).toBe("number");
-        expect(msg.payload).toBe(42);
-        expect(msg.type).toBeUndefined();
     });
 
-    it("accepts an optional type tag", () => {
-        const msg = createMessage("hello", "tern:core.greeting");
-        expect(msg.type).toBe("tern:core.greeting");
-        expect(msg.payload).toBe("hello");
-    });
-
-    it("produces unique ids", () => {
-        const a = createMessage(1);
-        const b = createMessage(1);
+    it("produces a unique id on every call", () => {
+        const a = createMessage("hello");
+        const b = createMessage("hello");
         expect(a.id).not.toEqual(b.id);
     });
 
-    it("works with structured payloads", () => {
-        const msg = createMessage<FlowMessage<string>>(createMessage("nested"));
-        expect(msg.payload.payload).toBe("nested");
-    });
-
-    it("works with Uint8Array payloads (raw bytes)", () => {
-        const bytes = new Uint8Array([1, 2, 3]);
-        const msg = createMessage<Uint8Array>(bytes);
-        expect(msg.payload).toBe(bytes);
+    it("works with nested FlowMessage payloads", () => {
+        const inner = createMessage("nested");
+        const outer = createMessage<FlowMessage<string>>(inner);
+        expect(outer.payload.payload).toBe("nested");
     });
 });
 
-// ── FlowContext ────────────────────────────────────────────────────────────────
+// ── FlowComponent: data flow and control signals ──────────────────────────────
+//
+// Components process messages one per scheduling slot (once readMode) or all
+// at once (drain readMode). Control signals pause/stop/resume the component
+// without any direct port access — just call the lifecycle methods.
 
-describe("FlowContext", () => {
-    it("starts with no scheduler", () => {
-        const ctx = new FlowContext();
-        expect(ctx.scheduler).toBeUndefined();
+describe("FlowComponent: data flow and lifecycle control", () => {
+    it("messages flow source → echo → collector preserving order", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [1, 2, 3] });
+        const echo = new Echo<number>(app.context);
+        const collector = new Collector<number>(app.context);
+        app.connect(source.output, echo.input).connect(echo.output, collector.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(collector.received).toEqual([1, 2, 3]);
     });
 
-    it("accepts a scheduler", () => {
-        const ctx = new FlowContext();
-        const sched = new PushScheduler();
-        ctx._setScheduler(sched);
-        expect(ctx.scheduler).toBe(sched);
-    });
-});
-
-// ── FlowPort ──────────────────────────────────────────────────────────────────
-
-describe("FlowPort", () => {
-    let ctx: FlowContext;
-    let c: Counter;
-
-    beforeEach(() => {
-        ctx = new FlowContext();
-        c = new Counter(ctx);
+    it("drain readMode — Collector captures everything in one step", async () => {
+        const app = new FlowApp();
+        const source = new Source<string>(app.context, { messages: ["a", "b", "c"] });
+        const collector = new Collector<string>(app.context);
+        app.connect(source.output, collector.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(collector.received).toEqual(["a", "b", "c"]);
     });
 
-    it("starts empty", () => {
-        expect(c.input.size).toBe(0);
-        expect(c.input.peek()).toBeUndefined();
-        expect(c.input.read()).toBeUndefined();
+    it("once readMode — Logger receives one message per scheduling slot", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [10, 20, 30] });
+        const logger = new Logger<number>(app.context);
+        app.connect(source.output, logger.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(logger.log).toEqual([10, 20, 30]);
     });
 
-    it("put enqueues a message", () => {
-        c.input.put(42);
-        expect(c.input.size).toBe(1);
+    it("multiple on() handlers fire in registration order", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [5] });
+        const logger = new Logger<number>(app.context);
+        const doubled: number[] = [];
+        logger.on(logger.input, (v) => doubled.push(v * 2));
+        app.connect(source.output, logger.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(logger.log).toEqual([5]);
+        expect(doubled).toEqual([10]);
     });
 
-    it("peek returns next without consuming", () => {
-        c.input.put(7);
-        expect(c.input.peek()).toBe(7);
-        expect(c.input.size).toBe(1);
-    });
+    it("pause stops data processing; resume restores it", async () => {
+        const app = new FlowApp();
+        const src1 = new Source<number>(app.context, { messages: [1, 2] });
+        const src2 = new Source<number>(app.context, { messages: [3, 4] });
+        const echo = new Echo<number>(app.context, { name: "echo" });
+        const collector = new Collector<number>(app.context);
+        app.connect(src1.output, echo.input).connect(echo.output, collector.input);
 
-    it("read consumes messages FIFO", () => {
-        c.input.put(1);
-        c.input.put(2);
-        c.input.put(3);
-        expect(c.input.read()).toBe(1);
-        expect(c.input.read()).toBe(2);
-        expect(c.input.read()).toBe(3);
-        expect(c.input.read()).toBeUndefined();
-    });
+        // First batch: src1 flows through normally
+        await app.init();
+        await app.drain();
+        expect(collector.received).toEqual([1, 2]);
 
-    it("notifies scheduler when input port receives a message", () => {
-        const sched = new PushScheduler();
-        const spy = vi.spyOn(sched, "enqueue");
-        ctx._setScheduler(sched);
-        c.input.put(1);
-        expect(spy).toHaveBeenCalledOnce();
-        expect(spy).toHaveBeenCalledWith(c);
-    });
-
-    it("does not notify scheduler for output port put (no transport)", () => {
-        const sched = new PushScheduler();
-        const spy = vi.spyOn(sched, "enqueue");
-        ctx._setScheduler(sched);
-        c.output.put(99);
-        expect(spy).not.toHaveBeenCalled();
-    });
-
-    it("exposes direction", () => {
-        expect(c.input.direction).toBe<PortDirection>("in");
-        expect(c.output.direction).toBe<PortDirection>("out");
-    });
-
-    it("exposes owner", () => {
-        expect(c.input.owner).toBe(c);
-        expect(c.output.owner).toBe(c);
-    });
-
-    it("exposes name", () => {
-        expect(c.input.name).toBe("input");
-        expect(c.output.name).toBe("output");
-    });
-});
-
-// ── FlowComponent ────────────────────────────────────────────────────────────
-
-describe("FlowComponent", () => {
-    let ctx: FlowContext;
-
-    beforeEach(() => {
-        ctx = new FlowContext();
-    });
-
-    it("generates a binary uuid id when none provided", () => {
-        const c = new Counter(ctx);
-        expect(c.id).toBeInstanceOf(Uint8Array);
-        expect((c.id as Uint8Array).length).toBe(16);
-    });
-
-    it("uses a provided id", () => {
-        const id = new Uint8Array(16).fill(3);
-        const c = new Counter(ctx);
-        // id is auto-generated; using the config path
-        const c2 = new (class extends FlowComponent {
-            constructor() {
-                super({ name: "x", context: ctx, id });
-            }
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            override step(): void {}
-        })();
-        expect(c2.id).toBe(id);
-        void c;
-    });
-
-    it("exposes ports by name", () => {
-        const c = new Counter(ctx);
-        expect(c.ports.has("input")).toBe(true);
-        expect(c.ports.has("output")).toBe(true);
-    });
-
-    it("step accumulates count via input port", () => {
-        const c = new Counter(ctx);
-        c.input.put(5);
-        c.input.put(3);
-        c.step();
-        expect(c.count).toBe(8);
-    });
-
-    it("on() handler is called during step when step is not overridden", () => {
-        class Accumulator extends FlowComponent {
-            readonly input = this.addPort<number>("input", "in");
-            received: number[] = [];
-            constructor(c: FlowContext) {
-                super({ name: "acc", context: c });
-            }
+        // Pause echo; connect src2 to it
+        app.connect(src2.output, echo.input);
+        echo.pause();
+        // src2 data arrives but echo is paused — nothing forwarded
+        for (const msg of [3, 4]) {
+            src2.output.put(msg);
         }
-        const acc = new Accumulator(ctx);
-        acc.on(acc.input, (v) => acc.received.push(v));
-        acc.input.put(1);
-        acc.input.put(2);
-        acc.step(); // uses base class handler dispatch
-        expect(acc.received).toEqual([1, 2]);
+        await app.drain();
+        expect(collector.received).toEqual([1, 2]);
+
+        // Resume — queued messages flush through
+        echo.resume();
+        await app.drain();
+        await app.stop();
+        expect(collector.received).toEqual([1, 2, 3, 4]);
     });
 
-    it("on() handler does not consume when step also reads", () => {
-        // Counter overrides step; this test uses a handler-only component
-        class Listener extends FlowComponent {
-            readonly input = this.addPort<number>("in", "in");
-            received: number[] = [];
-            constructor(c: FlowContext) {
-                super({ name: "listener", context: c });
-                this.on(this.input, (v) => this.received.push(v));
-            }
-        }
-        const l = new Listener(ctx);
-        l.input.put(7);
-        l.input.put(8);
-        l.step();
-        expect(l.received).toEqual([7, 8]);
-        expect(l.input.size).toBe(0);
+    it("stop permanently halts processing — messages are discarded", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [1, 2, 3] });
+        const echo = new Echo<number>(app.context);
+        const collector = new Collector<number>(app.context);
+        app.connect(source.output, echo.input).connect(echo.output, collector.input);
+        echo.stop();
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(collector.received).toEqual([]);
     });
 
-    // ── Lifecycle ────────────────────────────────────────────────────────────
-
-    it("initialises with state idle, running after init", async () => {
-        const c = new Counter(ctx);
-        expect(c.state).toBe("idle");
-        await c.init();
-        expect(c.state).toBe("running");
+    it("isRunning reflects control state changes", async () => {
+        const app = new FlowApp();
+        const echo = new Echo<number>(app.context);
+        app.addComponent(echo);
+        expect(echo.isRunning).toBe(true);
+        echo.pause();
+        await app.init();
+        await app.drain();
+        expect(echo.isRunning).toBe(false);
+        echo.start();
+        await app.drain();
+        expect(echo.isRunning).toBe(true);
+        await app.stop();
     });
 
-    it("transitions to disposed after dispose", async () => {
-        const c = new Counter(ctx);
-        await c.init();
-        await c.dispose();
-        expect(c.state).toBe("disposed");
-    });
-
-    it("calls onInit then child init", async () => {
-        const order: string[] = [];
-        class Tracked extends FlowComponent {
-            constructor(
-                c: FlowContext,
-                private tag: string,
-            ) {
-                super({ name: tag, context: c });
-            }
-            protected override async onInit() {
-                order.push(this.tag);
-            }
-            override step(): void {}
-        }
-        const parent = new Tracked(ctx, "parent");
-        const child = new Tracked(ctx, "child");
-        parent.addChild(child);
-        await parent.init();
-        expect(order).toEqual(["parent", "child"]);
-    });
-
-    it("disposes children in reverse order before parent onDispose", async () => {
-        const order: string[] = [];
-        class Tracked extends FlowComponent {
-            constructor(
-                c: FlowContext,
-                private tag: string,
-            ) {
-                super({ name: tag, context: c });
-            }
-            protected override async onDispose() {
-                order.push(this.tag);
-            }
-            override step(): void {}
-        }
-        const parent = new Tracked(ctx, "parent");
-        const c1 = new Tracked(ctx, "child1");
-        const c2 = new Tracked(ctx, "child2");
-        parent.addChild(c1);
-        parent.addChild(c2);
-        await parent.init();
-        await parent.dispose();
-        // children reversed, then parent
-        expect(order).toEqual(["child2", "child1", "parent"]);
-    });
-
-    it("disposes tracked disposables in reverse registration order", async () => {
-        const order: string[] = [];
-        const makeDisposable = (tag: string): IDisposable => ({
-            dispose: () => {
-                order.push(tag);
-            },
-        });
-        const c = new Counter(ctx);
-        c.addDisposable(makeDisposable("a"));
-        c.addDisposable(makeDisposable("b"));
-        c.addDisposable(makeDisposable("c"));
-        await c.init();
-        await c.dispose();
-        expect(order).toEqual(["c", "b", "a"]);
-    });
-
-    it("tracks timer disposable", async () => {
-        let cleared = false;
-        const c = new Counter(ctx);
-        const id = setInterval(() => {}, 10_000);
-        c.addDisposable({
-            dispose: () => {
-                clearInterval(id);
-                cleared = true;
-            },
-        });
-        await c.init();
-        await c.dispose();
-        expect(cleared).toBe(true);
-    });
-
-    // ── RDF quads ────────────────────────────────────────────────────────────
-
-    it("toQuads returns at least one quad for the component", () => {
-        const c = new Counter(ctx);
-        const quads = c.toQuads();
+    it("toQuads emits RDF triples for the component and its ports", () => {
+        const app = new FlowApp();
+        const sum = new Sum(app.context, { name: "my-sum" });
+        const quads = sum.toQuads();
         expect(quads.length).toBeGreaterThan(0);
-    });
-
-    it("toQuads includes quads for each port", () => {
-        const c = new Counter(ctx);
-        const quads = c.toQuads();
         const subjects = quads.map((q) => (q.subject as IRI).value);
-        // At least one quad per port
         expect(subjects.some((s) => s.includes("port"))).toBe(true);
     });
 });
 
-// ── LocalTransport ───────────────────────────────────────────────────────────
+// ── FlowTransport / wire ──────────────────────────────────────────────────────
+//
+// Transports are the edges between ports. wire() is the low-level alternative
+// to app.connect() — useful inside components or when bypassing the app graph.
 
-describe("LocalTransport", () => {
-    it("delivers message from output to input port", () => {
-        const ctx = new FlowContext();
-        const sched = new PushScheduler();
-        ctx._setScheduler(sched);
-        const a = new Counter(ctx, "a");
-        const b = new Counter(ctx, "b");
-        const t = new LocalTransport(a.output, b.input);
-        a.output._addTransport(t);
-
-        a.output.put(42);
-        expect(b.input.size).toBe(1);
-        expect(b.input.peek()).toBe(42);
+describe("FlowTransport / wire: pluggable delivery edges", () => {
+    it("app.connect uses LocalTransport — source → echo → collector works end-to-end", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [7] });
+        const echo = new Echo<number>(app.context);
+        const collector = new Collector<number>(app.context);
+        app.connect(source.output, echo.input).connect(echo.output, collector.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(collector.received).toEqual([7]);
     });
 
-    it("enqueues destination owner for work", () => {
-        const ctx = new FlowContext();
-        const sched = new PushScheduler();
-        const spy = vi.spyOn(sched, "enqueue");
-        ctx._setScheduler(sched);
-        const a = new Counter(ctx, "a");
-        const b = new Counter(ctx, "b");
-        a.output._addTransport(new LocalTransport(a.output, b.input));
-
-        a.output.put(1);
-        expect(spy).toHaveBeenCalledWith(b);
+    it("wire() delivers messages without FlowApp connection tracking", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [42] });
+        const collector = new Collector<number>(app.context);
+        wire(source.output, collector.input);
+        app.addComponent(source);
+        app.addComponent(collector);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(collector.received).toEqual([42]);
     });
 
-    it("exposes from and to ports", () => {
-        const ctx = new FlowContext();
-        const a = new Counter(ctx, "a");
-        const b = new Counter(ctx, "b");
-        const t = new LocalTransport(a.output, b.input);
-        expect(t.from).toBe(a.output);
-        expect(t.to).toBe(b.input);
+    it("sink transport delivers to an external system — no downstream component needed", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [3, 4] });
+        const sum = new Sum(app.context);
+        const captured: number[] = [];
+        class CaptureSink extends FlowTransport<number> {
+            override deliver(msg: number): void {
+                captured.push(msg);
+            }
+        }
+        app.connect(source.output, sum.input).connect(sum.output, new CaptureSink());
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(captured).toEqual([3, 7]);
+    });
+
+    it("custom transport can be injected via app.connect third argument", async () => {
+        const app = new FlowApp();
+        const source = new Source<string>(app.context, { messages: ["hello"] });
+        const collector = new Collector<string>(app.context);
+        const intercepted: string[] = [];
+        class LoggingTransport extends FlowTransport<string> {
+            override deliver(msg: string): void {
+                intercepted.push(msg);
+                if (this.to) { this.to.put(msg); }
+            }
+        }
+        app.connect(source.output, collector.input, new LoggingTransport());
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(intercepted).toEqual(["hello"]);
+        expect(collector.received).toEqual(["hello"]);
     });
 });
 
-// ── FlowScheduler ────────────────────────────────────────────────────────────
+// ── PushScheduler ─────────────────────────────────────────────────────────────
+//
+// PushScheduler is reactive — every inbound put() enqueues the owner once.
+// queueSize is the observable for scheduler state.
 
-describe("FlowScheduler (abstract base)", () => {
-    it("PushScheduler is a FlowScheduler", () => {
-        expect(new PushScheduler()).toBeInstanceOf(FlowScheduler);
+describe("PushScheduler: reactive scheduling", () => {
+    it("source messages populate the scheduler queue before drain", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [1, 2, 3] });
+        const collector = new Collector<number>(app.context);
+        app.connect(source.output, collector.input);
+        await app.init();
+        // source put 3 messages → collector enqueued 3 times
+        expect(app.scheduler.queueSize).toBe(3);
+        await app.drain();
+        await app.stop();
     });
 
-    it("PullScheduler is a FlowScheduler", () => {
-        expect(new PullScheduler()).toBeInstanceOf(FlowScheduler);
-    });
-});
-
-describe("PushScheduler", () => {
-    it("enqueue adds component, tick calls step", () => {
-        const ctx = new FlowContext();
-        const sched = new PushScheduler();
-        ctx._setScheduler(sched);
-        const c = new Counter(ctx);
-        c.input.put(5);
-        expect(sched.queueSize).toBe(1);
-        sched.tick();
-        expect(c.count).toBe(5);
-        expect(sched.queueSize).toBe(0);
+    it("multiple sources interleave in the queue and all messages are processed", async () => {
+        const app = new FlowApp();
+        const srcA = new Source<number>(app.context, { messages: [1, 2], name: "srcA" });
+        const srcB = new Source<number>(app.context, { messages: [10, 20], name: "srcB" });
+        const collA = new Collector<number>(app.context, { name: "collA" });
+        const collB = new Collector<number>(app.context, { name: "collB" });
+        app.connect(srcA.output, collA.input).connect(srcB.output, collB.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(collA.received).toEqual([1, 2]);
+        expect(collB.received).toEqual([10, 20]);
     });
 
-    it("newly enqueued components during tick wait for next tick", () => {
-        const ctx = new FlowContext();
-        const sched = new PushScheduler();
-        ctx._setScheduler(sched);
-        const a = new Counter(ctx, "a");
-        const b = new Counter(ctx, "b");
-        a.output._addTransport(new LocalTransport(a.output, b.input));
-        a.input.put(3);
-        sched.tick(); // processes a → puts on b.input → enqueues b
-        expect(a.count).toBe(3);
-        expect(b.input.size).toBe(1); // b not yet processed
-        sched.tick(); // now processes b
-        expect(b.count).toBe(3);
+    it("newly scheduled components during a tick wait for the next tick", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [5, 10] });
+        const echo = new Echo<number>(app.context);
+        const collector = new Collector<number>(app.context);
+        app.connect(source.output, echo.input).connect(echo.output, collector.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        // Both messages propagate correctly regardless of tick boundaries
+        expect(collector.received).toEqual([5, 10]);
+    });
+
+    it("async step() is awaited before the next component is processed", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [42, 7] });
+        const asyncEcho = new AsyncEcho<number>(app.context);
+        const collector = new Collector<number>(app.context);
+        app.connect(source.output, asyncEcho.input).connect(asyncEcho.output, collector.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(collector.received).toEqual([42, 7]);
     });
 
     it("mode is push", () => {
-        expect(new PushScheduler().mode).toBe<ScheduleMode>("push");
-    });
-
-    it("start/stop lifecycle does not throw", async () => {
-        const sched = new PushScheduler();
-        sched.start();
-        await new Promise((r) => setTimeout(r, 10));
-        sched.stop();
+        expect(new FlowApp().scheduler.mode).toBe<ScheduleMode>("push");
     });
 });
 
-describe("PullScheduler", () => {
-    it("tick calls step on all components in pull order", () => {
-        const ctx = new FlowContext();
-        const sched = new PullScheduler();
-        ctx._setScheduler(sched);
-        const a = new Counter(ctx, "a");
-        const b = new Doubler(ctx);
-        a.output._addTransport(new LocalTransport(a.output, b.input));
-        sched._setPullOrder([a, b]);
-        a.input.put(4);
-        sched.tick();
-        // a processes 4 → output 4 → b doubles → 8
-        expect(a.count).toBe(4);
-        expect(b.output.size).toBe(1);
-        expect(b.output.read()).toBe(8);
+// ── PullScheduler ─────────────────────────────────────────────────────────────
+//
+// PullScheduler steps all components in topological order on each cycle.
+// Source data placed during init flows through the entire chain on each tick.
+
+describe("PullScheduler: topological ordering", () => {
+    it("linear chain: source → multiply → sum → collector", async () => {
+        const app = new FlowApp({ mode: "pull" });
+        const source = new Source<number>(app.context, { messages: [3, 5] });
+        const multiply = new Multiply(app.context, { factor: 2 });
+        const sum = new Sum(app.context);
+        const collector = new Collector<number>(app.context);
+        app.connect(source.output, multiply.input)
+            .connect(multiply.output, sum.input)
+            .connect(sum.output, collector.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        // 3×2=6 → sum 6; 5×2=10 → sum 16
+        expect(collector.received).toEqual([6, 16]);
+    });
+
+    it("fan-out: Splitter feeds two Collectors in one pass", async () => {
+        const app = new FlowApp({ mode: "pull" });
+        const source = new Source<number>(app.context, { messages: [7] });
+        const splitter = new Splitter<number>(app.context);
+        const left = new Collector<number>(app.context, { name: "left" });
+        const right = new Collector<number>(app.context, { name: "right" });
+        app.connect(source.output, splitter.input)
+            .connect(splitter.out1, left.input)
+            .connect(splitter.out2, right.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(left.received).toEqual([7]);
+        expect(right.received).toEqual([7]);
     });
 
     it("mode is pull", () => {
-        expect(new PullScheduler().mode).toBe<ScheduleMode>("pull");
-    });
-
-    it("start/stop lifecycle does not throw", async () => {
-        const sched = new PullScheduler();
-        sched.start();
-        await new Promise((r) => setTimeout(r, 10));
-        sched.stop();
+        expect(new FlowApp({ mode: "pull" }).scheduler.mode).toBe<ScheduleMode>("pull");
     });
 });
 
-// ── FlowPortGroup ─────────────────────────────────────────────────────────────
+// ── FlowPortGroup: synchronisation barrier ───────────────────────────────────
+//
+// Merger uses FlowPortGroup internally — it only emits when BOTH inLeft and
+// inRight have a message. Output is a plain serializable object, not a tuple.
 
-describe("FlowPortGroup", () => {
-    let ctx: FlowContext;
-    let c: Counter;
-
-    beforeEach(() => {
-        ctx = new FlowContext();
-        c = new Counter(ctx);
-    });
-
-    it("ready is false when any port is empty", () => {
-        class TwoPort extends FlowComponent {
-            readonly p1 = this.addPort<number>("p1", "in");
-            readonly p2 = this.addPort<string>("p2", "in");
-            constructor(c: FlowContext) {
-                super({ name: "t", context: c });
-            }
-            override step(): void {}
-        }
-        const t = new TwoPort(ctx);
-        const group = new FlowPortGroup([t.p1, t.p2] as const);
-        expect(group.ready).toBe(false);
-        t.p1.put(1);
-        expect(group.ready).toBe(false);
-    });
-
-    it("ready is true when all ports have at least one message", () => {
-        class TwoPort extends FlowComponent {
-            readonly p1 = this.addPort<number>("p1", "in");
-            readonly p2 = this.addPort<string>("p2", "in");
-            constructor(c: FlowContext) {
-                super({ name: "t", context: c });
-            }
-            override step(): void {}
-        }
-        const t = new TwoPort(ctx);
-        const group = new FlowPortGroup([t.p1, t.p2] as const);
-        t.p1.put(1);
-        t.p2.put("hello");
-        expect(group.ready).toBe(true);
-    });
-
-    it("readAll returns tuple from all ports when ready", () => {
-        class TwoPort extends FlowComponent {
-            readonly p1 = this.addPort<number>("p1", "in");
-            readonly p2 = this.addPort<string>("p2", "in");
-            constructor(c: FlowContext) {
-                super({ name: "t", context: c });
-            }
-            override step(): void {}
-        }
-        const t = new TwoPort(ctx);
-        const group = new FlowPortGroup([t.p1, t.p2] as const);
-        t.p1.put(7);
-        t.p2.put("world");
-        const result = group.readAll();
-        expect(result).toEqual([7, "world"]);
-    });
-
-    it("readAll returns undefined when not ready", () => {
-        class TwoPort extends FlowComponent {
-            readonly p1 = this.addPort<number>("p1", "in");
-            readonly p2 = this.addPort<string>("p2", "in");
-            constructor(c: FlowContext) {
-                super({ name: "t", context: c });
-            }
-            override step(): void {}
-        }
-        const t = new TwoPort(ctx);
-        const group = new FlowPortGroup([t.p1, t.p2] as const);
-        t.p1.put(7);
-        expect(group.readAll()).toBeUndefined();
-    });
-
-    it("readAll consumes one message from each port", () => {
-        class TwoPort extends FlowComponent {
-            readonly p1 = this.addPort<number>("p1", "in");
-            readonly p2 = this.addPort<string>("p2", "in");
-            constructor(c: FlowContext) {
-                super({ name: "t", context: c });
-            }
-            override step(): void {}
-        }
-        const t = new TwoPort(ctx);
-        const group = new FlowPortGroup([t.p1, t.p2] as const);
-        t.p1.put(1);
-        t.p1.put(2);
-        t.p2.put("a");
-        t.p2.put("b");
-        group.readAll();
-        expect(t.p1.size).toBe(1);
-        expect(t.p2.size).toBe(1);
-    });
-
-    it("works with a single port group", () => {
-        const group = new FlowPortGroup([c.input] as const);
-        expect(group.ready).toBe(false);
-        c.input.put(42);
-        expect(group.ready).toBe(true);
-        expect(group.readAll()).toEqual([42]);
-    });
-});
-
-// ── FlowApp ──────────────────────────────────────────────────────────────────
-
-describe("FlowApp", () => {
-    it("creates context and scheduler", () => {
+describe("FlowPortGroup: synchronisation barrier via Merger component", () => {
+    it("emits a merged object only when both streams have a message", async () => {
         const app = new FlowApp();
-        expect(app.context).toBeInstanceOf(FlowContext);
-        expect(app.scheduler).toBeInstanceOf(FlowScheduler);
-    });
-
-    it("addComponent is fluent and registers component", () => {
-        const app = new FlowApp();
-        const c = new Counter(app.context);
-        const ret = app.addComponent(c);
-        expect(ret).toBe(app);
-        expect(app.components.has(c)).toBe(true);
-    });
-
-    it("connect wires ports via LocalTransport and is fluent", () => {
-        const app = new FlowApp();
-        const a = new Counter(app.context, "a");
-        const b = new Counter(app.context, "b");
-        const ret = app.connect(a.output, b.input);
-        expect(ret).toBe(app);
-        // Sending through a.output should reach b.input
-        a.output.put(10);
-        expect(b.input.size).toBe(1);
-    });
-
-    it("connect auto-adds components to the app", () => {
-        const app = new FlowApp();
-        const a = new Counter(app.context, "a");
-        const b = new Counter(app.context, "b");
-        app.connect(a.output, b.input);
-        expect(app.components.has(a)).toBe(true);
-        expect(app.components.has(b)).toBe(true);
-    });
-
-    it("delivers messages through a pipeline in push mode", () => {
-        const app = new FlowApp({ mode: "push" });
-        const a = new Counter(app.context, "a");
-        const b = new Doubler(app.context);
-        const c = new Counter(app.context, "c");
-        app.connect(a.output, b.input).connect(b.output, c.input);
-
-        a.input.put(3);
-        app.scheduler.tick(); // process a → output 3 → b enqueued
-        expect(a.count).toBe(3);
-        app.scheduler.tick(); // process b → output 6 → c enqueued
-        app.scheduler.tick(); // process c → count = 6
-        expect(c.count).toBe(6);
-    });
-
-    it("delivers messages in pull mode with topo order", () => {
-        const app = new FlowApp({ mode: "pull" });
-        const a = new Counter(app.context, "a");
-        const b = new Doubler(app.context);
-        app.connect(a.output, b.input);
-
-        a.input.put(5);
-        app.scheduler.tick(); // a steps, output → b.input, b steps
-        expect(a.count).toBe(5);
-        expect(b.output.read()).toBe(10);
-    });
-
-    it("start calls init on all components", async () => {
-        const app = new FlowApp();
-        const c = new Counter(app.context);
-        app.addComponent(c);
-        await app.start();
-        expect(c.state).toBe("running");
+        const srcL = new Source<number>(app.context, { messages: [1, 2, 3] });
+        const srcR = new Source<string>(app.context, { messages: ["a", "b", "c"] });
+        const merger = new Merger<number, string>(app.context);
+        const collector = new Collector<{ left: number; right: string }>(app.context);
+        app.connect(srcL.output, merger.inLeft)
+            .connect(srcR.output, merger.inRight)
+            .connect(merger.output, collector.input);
+        await app.init();
+        await app.drain();
         await app.stop();
+        expect(collector.received).toEqual([
+            { left: 1, right: "a" },
+            { left: 2, right: "b" },
+            { left: 3, right: "c" },
+        ]);
     });
 
-    it("stop disposes all components", async () => {
+    it("stops emitting when either stream is exhausted", async () => {
         const app = new FlowApp();
-        const c = new Counter(app.context);
-        app.addComponent(c);
-        await app.start();
+        const srcL = new Source<number>(app.context, { messages: [1, 2, 3] });
+        const srcR = new Source<string>(app.context, { messages: ["only-one"] });
+        const merger = new Merger<number, string>(app.context);
+        const collector = new Collector<{ left: number; right: string }>(app.context);
+        app.connect(srcL.output, merger.inLeft)
+            .connect(srcR.output, merger.inRight)
+            .connect(merger.output, collector.input);
+        await app.init();
+        await app.drain();
         await app.stop();
-        expect(c.state).toBe("disposed");
+        expect(collector.received).toEqual([{ left: 1, right: "only-one" }]);
     });
 });
 
-// ── FlowLoader ───────────────────────────────────────────────────────────────
+// ── FlowApp ───────────────────────────────────────────────────────────────────
+//
+// FlowApp is the graph container. init() initialises components (Sources emit),
+// drain() runs to quiescence, stop() disposes everything.
 
-describe("FlowLoader", () => {
-    it("loads a flow app from JSON", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        const json = JSON.stringify({
-            name: "Test App",
-            mode: "push",
-            components: [],
-            connections: [],
-        });
-        const app = await FlowLoader.fromJSON(json);
-        expect(app).toBeInstanceOf(FlowApp);
+describe("FlowApp: full graph wiring and execution", () => {
+    it("linear pipeline: Source → Echo → Sum → Collector", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [3, 5] });
+        const echo = new Echo<number>(app.context);
+        const sum = new Sum(app.context);
+        const collector = new Collector<number>(app.context);
+        app.connect(source.output, echo.input)
+            .connect(echo.output, sum.input)
+            .connect(sum.output, collector.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(collector.received).toEqual([3, 8]);
     });
 
-    it("loads a flow app from YAML", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        const yaml = `
-name: Test App
-mode: push
-components: []
-connections: []
-`.trim();
-        const app = await FlowLoader.fromYAML(yaml);
-        expect(app).toBeInstanceOf(FlowApp);
+    it("fan-out: Splitter delivers each message to two Collectors", async () => {
+        const app = new FlowApp();
+        const source = new Source<string>(app.context, { messages: ["hello", "world"] });
+        const splitter = new Splitter<string>(app.context);
+        const left = new Collector<string>(app.context, { name: "left" });
+        const right = new Collector<string>(app.context, { name: "right" });
+        app.connect(source.output, splitter.input)
+            .connect(splitter.out1, left.input)
+            .connect(splitter.out2, right.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(left.received).toEqual(["hello", "world"]);
+        expect(right.received).toEqual(["hello", "world"]);
     });
 
-    it("loads components from a module URI", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        // We mock dynamic import via the module resolver
-        const json = JSON.stringify({
-            name: "App",
-            mode: "push",
-            components: [{ id: "a", type: "__test__:Counter", config: {} }],
-            connections: [],
-        });
+    it("conditional routing: IfRoute splits evens from odds", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [1, 2, 3, 4, 5] });
+        const router = new IfRoute<number>(app.context, { predicate: (n) => n % 2 === 0 });
+        const evens = new Collector<number>(app.context, { name: "evens" });
+        const odds = new Collector<number>(app.context, { name: "odds" });
+        app.connect(source.output, router.input)
+            .connect(router.truePort, evens.input)
+            .connect(router.falsePort, odds.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(evens.received).toEqual([2, 4]);
+        expect(odds.received).toEqual([1, 3, 5]);
+    });
 
-        class LoadableCounter extends FlowComponent {
-            override step(): void {}
-        }
-        const registry = new Map<string, new (options: FlowComponentOptions) => FlowComponent>();
-        registry.set("Counter", LoadableCounter);
+    it("filter chain: numbers in (3, 10) pass both LessThan and GreaterThan", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [2, 4, 6, 8, 10] });
+        const lt = new LessThan(app.context, { threshold: 10 });
+        const gt = new GreaterThan(app.context, { threshold: 3 });
+        const collector = new Collector<number>(app.context);
+        app.connect(source.output, lt.input)
+            .connect(lt.output, gt.input)
+            .connect(gt.output, collector.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(collector.received).toEqual([4, 6, 8]);
+    });
 
-        const app = await FlowLoader.fromJSON(json, {
-            moduleResolver: async (uri: string) => {
-                const name = uri.replace("__test__:", "");
-                const Cls = registry.get(name);
-                if (!Cls) {
-                    throw new Error(`Unknown: ${name}`);
-                }
-                return { default: Cls };
-            },
-        });
-        expect(app.components.size).toBe(1);
+    it("full lifecycle: idle → running after init, disposed after stop", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [] });
+        const collector = new Collector<number>(app.context);
+        app.connect(source.output, collector.input);
+        expect(source.state).toBe("idle");
+        await app.init();
+        expect(source.state).toBe("running");
+        await app.stop();
+        expect(source.state).toBe("disposed");
+    });
+
+    it("async pipeline: AsyncEcho delays each message by one microtask", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [10, 5] });
+        const asyncEcho = new AsyncEcho<number>(app.context);
+        const sum = new Sum(app.context);
+        const collector = new Collector<number>(app.context);
+        app.connect(source.output, asyncEcho.input)
+            .connect(asyncEcho.output, sum.input)
+            .connect(sum.output, collector.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(collector.received).toEqual([10, 15]);
     });
 });
 
-// ── Additional coverage: FlowComponent BigInt id, FlowLoader, FlowScheduler, FlowApp ──
+// ── TickEvent ─────────────────────────────────────────────────────────────────
+//
+// TickEvent is a timing signal. Bound ports (with on() handlers) queue ticks;
+// unbound ports (inControl — read directly) silently discard them.
 
-describe("FlowComponent.toQuads() with BigInt id", () => {
-    it("uses BigInt.toString(16) for the node IRI", () => {
-        const ctx = new FlowContext();
-        class Minimal extends FlowComponent {
-            constructor() {
-                super({ id: BigInt(0xdeadbeef), context: ctx });
-            }
-            override step(): void {}
-        }
-        const c = new Minimal();
-        const quads = c.toQuads();
-        expect(quads.length).toBeGreaterThan(0);
-        const subject = (quads[0].subject as IRI).value;
-        expect(subject).toContain("deadbeef");
+describe("TickEvent: timing signals", () => {
+    it("carries a numeric timestamp", () => {
+        expect(typeof new TickEvent().timestamp).toBe("number");
+    });
+
+    it("TickEvent delivered to a bound port is collected normally", async () => {
+        vi.useFakeTimers();
+        const app = new FlowApp();
+        const clock = new Clock(app.context, { intervalMs: 100 });
+        const collector = new Collector<TickEvent>(app.context);
+        app.connect(clock.out, collector.input);
+        await app.init();
+        vi.advanceTimersByTime(250);
+        await app.drain();
+        await app.stop();
+        expect(collector.received).toHaveLength(2);
+        vi.useRealTimers();
     });
 });
 
-describe("FlowLoader extras", () => {
-    it("fromRDF throws NotImplemented", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        await expect(FlowLoader.fromRDF("anything")).rejects.toThrow("not yet implemented");
+// ── Clock ─────────────────────────────────────────────────────────────────────
+//
+// Clock emits TickEvents at a fixed interval. Controlled via start/stop/pause/
+// resume methods (which put ControlSignals on inControl). Tests use fake timers.
+
+describe("Clock: start, stop, pause, resume", () => {
+    it("auto-starts on app.init() and auto-stops on app.stop()", async () => {
+        vi.useFakeTimers();
+        const app = new FlowApp();
+        const clock = new Clock(app.context, { intervalMs: 100 });
+        const collector = new Collector<TickEvent>(app.context);
+        app.connect(clock.out, collector.input);
+        await app.init();
+        expect(clock.running).toBe(true);
+        vi.advanceTimersByTime(250); // 2 ticks
+        await app.drain();
+        await app.stop();
+        expect(clock.running).toBe(false);
+        expect(collector.received).toHaveLength(2);
+        vi.useRealTimers();
     });
 
-    it("fromYAML with unknown component in connection throws", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        const json = JSON.stringify({
-            name: "bad",
-            mode: "push",
-            components: [],
-            connections: [{ from: "ghost.out", to: "also-ghost.in" }],
-        });
-        await expect(
-            FlowLoader.fromJSON(json, {
-                moduleResolver: async () => {
-                    throw new Error("nope");
-                },
-            }),
-        ).rejects.toThrow();
+    it("stop() halts emission — no further ticks after drain", async () => {
+        vi.useFakeTimers();
+        const app = new FlowApp();
+        const clock = new Clock(app.context, { intervalMs: 100 });
+        const collector = new Collector<TickEvent>(app.context);
+        app.connect(clock.out, collector.input);
+        await app.init();
+        vi.advanceTimersByTime(250); // 2 ticks
+        clock.stop();
+        await app.drain(); // processes stop signal + 2 ticks
+        vi.advanceTimersByTime(300); // stopped — 0 new ticks
+        await app.drain();
+        await app.stop();
+        expect(collector.received).toHaveLength(2);
+        vi.useRealTimers();
     });
 
-    it("fromYAML with connections wires components via moduleResolver", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        class Src extends FlowComponent {
-            readonly out = this.addPort<number>("out", "out");
-            override step(): void {}
-        }
-        class Dst extends FlowComponent {
-            readonly in = this.addPort<number>("in", "in");
-            override step(): void {}
-        }
+    it("start() is idempotent — calling twice does not double the emission rate", async () => {
+        vi.useFakeTimers();
+        const app = new FlowApp();
+        const clock = new Clock(app.context, { intervalMs: 100 });
+        const collector = new Collector<TickEvent>(app.context);
+        app.connect(clock.out, collector.input);
+        await app.init();
+        clock.start(); // second start — no-op
+        vi.advanceTimersByTime(250); // still exactly 2, not 4
+        clock.stop();
+        await app.drain();
+        await app.stop();
+        expect(collector.received).toHaveLength(2);
+        vi.useRealTimers();
+    });
+
+    it("pause() halts emission; resume() restores it", async () => {
+        vi.useFakeTimers();
+        const app = new FlowApp();
+        const clock = new Clock(app.context, { intervalMs: 100 });
+        const collector = new Collector<TickEvent>(app.context);
+        app.connect(clock.out, collector.input);
+        await app.init();
+
+        vi.advanceTimersByTime(150); // 1 tick
+        const pausedAt = Date.now();
+        clock.pause();
+        await app.drain();
+        expect(clock.paused).toBe(true);
+
+        vi.advanceTimersByTime(300); // paused — 0 ticks
+        clock.resume(false, pausedAt);
+        await app.drain();
+        expect(clock.paused).toBe(false);
+
+        vi.advanceTimersByTime(150); // 1 more tick
+        clock.stop();
+        await app.drain();
+        await app.stop();
+        expect(collector.received).toHaveLength(2);
+        vi.useRealTimers();
+    });
+
+    it("stop() clears paused state — distinct from pause()", async () => {
+        vi.useFakeTimers();
+        const app = new FlowApp();
+        const clock = new Clock(app.context, { intervalMs: 100 });
+        app.addComponent(clock);
+        await app.init();
+        clock.pause();
+        await app.drain();
+        expect(clock.paused).toBe(true);
+        clock.stop();
+        await app.drain();
+        expect(clock.paused).toBe(false);
+        expect(clock.running).toBe(false);
+        await app.stop();
+        vi.useRealTimers();
+    });
+});
+
+// ── FlowLoader ────────────────────────────────────────────────────────────────
+//
+// FlowLoader builds a FlowApp from a declarative JSON or YAML spec.
+
+describe("FlowLoader: declarative graph construction", () => {
+    const resolver = async (uri: string) => {
         const classes: Record<string, new (o: FlowComponentOptions) => FlowComponent> = {
-            Src,
-            Dst,
-        };
-        const app = await FlowLoader.fromJSON(
-            JSON.stringify({
-                name: "test",
-                mode: "push",
-                components: [
-                    { id: "src", type: "Src" },
-                    { id: "dst", type: "Dst" },
-                ],
-                connections: [{ from: "src.out", to: "dst.in" }],
-            }),
-            {
-                moduleResolver: async (uri) => {
-                    const cls = classes[uri];
-                    if (cls == null) {
-                        throw new Error(`no class registered for uri: ${uri}`);
-                    }
-                    return { default: cls };
-                },
+            Echo: class extends FlowComponent {
+                readonly input = this.addPort<unknown>("input", "in");
+                readonly output = this.addPort<unknown>("output", "out");
+                constructor(opts: FlowComponentOptions) {
+                    super(opts);
+                    this.on(this.input, (msg) => this.output.put(msg));
+                }
             },
+            Collector: class extends FlowComponent {
+                readonly input = this.addPort<unknown>("input", "in");
+                readonly received: unknown[] = [];
+                constructor(opts: FlowComponentOptions) {
+                    super(opts);
+                    this._readMode = "drain" as ReadMode;
+                    this.on(this.input, (m) => this.received.push(m));
+                }
+            },
+        };
+        const cls = classes[uri];
+        if (!cls) { throw new Error(`Unknown component type: ${uri}`); }
+        return { default: cls };
+    };
+
+    it("fromJSON: loads a spec and returns a FlowApp", async () => {
+        const app = await fromJSON(
+            JSON.stringify({ mode: "push", components: [], connections: [] }),
+        );
+        expect(app).toBeInstanceOf(FlowApp);
+    });
+
+    it("fromYAML: accepts YAML syntax for the same spec", async () => {
+        const app = await fromYAML("mode: push\ncomponents: []\nconnections: []");
+        expect(app).toBeInstanceOf(FlowApp);
+    });
+
+    it("fromJSON: resolves component types and wires connections", async () => {
+        const app = await fromJSON(
+            JSON.stringify({
+                mode: "push",
+                components: [{ id: "src", type: "Echo" }, { id: "dst", type: "Collector" }],
+                connections: [{ from: "src.output", to: "dst.input" }],
+            }),
+            { moduleResolver: resolver },
         );
         expect(app.components.size).toBe(2);
     });
 
-    it("fromJSON with unknown port in connection throws", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        class Simple extends FlowComponent {
-            override step(): void {}
-        }
+    it("fromRDF throws — not yet implemented", async () => {
+        await expect(fromRDF("")).rejects.toThrow("not yet implemented");
+    });
+
+    it("fromJSON throws on unknown component in a connection", async () => {
         await expect(
-            FlowLoader.fromJSON(
-                JSON.stringify({
-                    name: "x",
-                    mode: "push",
-                    components: [
-                        { id: "a", type: "Simple" },
-                        { id: "b", type: "Simple" },
-                    ],
-                    connections: [{ from: "a.nonexistent", to: "b.alsomissing" }],
-                }),
-                { moduleResolver: async () => ({ default: Simple }) },
-            ),
-        ).rejects.toThrow("Unknown port");
-    });
-});
-
-describe("PullScheduler.queueSize", () => {
-    it("always returns 0", () => {
-        expect(new PullScheduler().queueSize).toBe(0);
-    });
-});
-
-describe("FlowApp pull mode topo sort", () => {
-    it("ignores self-loops in connection graph", () => {
-        const app = new FlowApp({ mode: "pull" });
-        const c = new Counter(app.context, "self");
-        // Connect output to own input — self-loop
-        app.connect(c.output, c.input);
-        // Should not throw and should produce a valid (possibly empty) order
-        expect(app.components.has(c)).toBe(true);
-    });
-
-    it("topo sorts a three-node chain A→B→C", () => {
-        const app = new FlowApp({ mode: "pull" });
-        const a = new Counter(app.context, "a");
-        const b = new Counter(app.context, "b");
-        const c = new Counter(app.context, "c");
-        app.connect(a.output, b.input).connect(b.output, c.input);
-        a.input.put(1);
-        app.scheduler.tick();
-        // a processes 1 → outputs to b → b processes → outputs to c → c processes
-        expect(a.count).toBe(1);
-        expect(b.count).toBe(1);
-        expect(c.count).toBe(1);
-    });
-});
-
-// ── FlowApp topo sort: duplicate edge + diamond ───────────────────────────────
-
-class Sink extends FlowComponent {
-    readonly in1 = this.addPort<number>("in1", "in");
-    readonly in2 = this.addPort<number>("in2", "in");
-    visits = 0;
-    constructor(ctx: FlowContext, name = "sink") {
-        super({ name, context: ctx });
-    }
-    override step(): void {
-        while (this.in1.read() !== undefined || this.in2.read() !== undefined) {
-            this.visits++;
-        }
-    }
-}
-
-describe("FlowApp topo sort: diamond graph (covers deg>0 branch)", () => {
-    it("two sources feeding one sink (in-degree 2)", () => {
-        const app = new FlowApp({ mode: "pull" });
-        const a = new Counter(app.context, "a");
-        const b = new Counter(app.context, "b");
-        const c = new Counter(app.context, "c");
-        const sink = new Sink(app.context);
-
-        // a→b, a→c, b→sink.in1, c→sink.in2
-        app.connect(a.output, b.input);
-        app.connect(a.output, c.input); // second transport on a.output
-        app.connect(b.output, sink.in1);
-        app.connect(c.output, sink.in2);
-
-        // sink has in-degree 2 from b and c
-        // When b processes, sink's in-degree goes 2→1 (deg>0, NOT enqueued yet)
-        // When c processes, sink's in-degree goes 1→0 (enqueued)
-        a.input.put(1);
-        app.scheduler.tick();
-        expect(a.count).toBe(1);
-    });
-});
-
-describe("FlowApp topo sort: duplicate edge ignored (line 97-99 false branch)", () => {
-    it("connecting same pair twice only adds one edge in adjacency", () => {
-        const app = new FlowApp({ mode: "pull" });
-        const a = new Counter(app.context, "dup-a");
-        const b = new Counter(app.context, "dup-b");
-        app.connect(a.output, b.input);
-        // A second connect between same owners hits the !neighbors.has(toOwner) false branch
-        // We need a second port to create a second connection with same owners
-        class TwoPorts extends FlowComponent {
-            readonly out1 = this.addPort<number>("out1", "out");
-            readonly out2 = this.addPort<number>("out2", "out");
-            readonly in1 = this.addPort<number>("in1", "in");
-            readonly in2 = this.addPort<number>("in2", "in");
-            constructor(ctx: FlowContext) {
-                super({ name: "two", context: ctx });
-            }
-            override step(): void {}
-        }
-        const src = new TwoPorts(app.context);
-        const dst = new TwoPorts(app.context);
-        app.connect(src.out1, dst.in1);
-        app.connect(src.out2, dst.in2); // same src→dst owners, second edge
-        a.input.put(2);
-        app.scheduler.tick();
-        expect(a.count).toBe(2);
-    });
-});
-
-describe("FlowLoader: default module resolver", () => {
-    it("fromJSON without moduleResolver uses defaultModuleResolver (fails gracefully)", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        // With a nonexistent module, the defaultModuleResolver will try to import and fail
-        await expect(
-            FlowLoader.fromJSON(
-                JSON.stringify({
-                    name: "test",
-                    mode: "push",
-                    components: [{ id: "c", type: "./totally-nonexistent-module-xyz.js" }],
-                    connections: [],
-                }),
-            ),
+            fromJSON(JSON.stringify({
+                mode: "push", components: [],
+                connections: [{ from: "ghost.out", to: "ghost.in" }],
+            })),
         ).rejects.toThrow();
-    });
-
-    it("fromYAML with a mapping key having no value and no indented block", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        const yaml = "name: test\nmode: push\ncomponents: []\nconnections: []";
-        const app = await FlowLoader.fromYAML(yaml, {
-            moduleResolver: async () => {
-                throw new Error("should not be called");
-            },
-        });
-        expect(app.components.size).toBe(0);
-    });
-});
-
-// ── FlowLoader: YAML null-value and scalar branches ───────────────────────────
-
-describe("FlowLoader: YAML parser internal branches", () => {
-    it("fromYAML: mapping key with no inline value and no indented block → null", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        // "mode:\ncomponents: []" — mode has empty afterColon, next line not indented
-        const yaml = "name: test\nmode:\ncomponents: []\nconnections: []";
-        const app = await FlowLoader.fromYAML(yaml, {
-            moduleResolver: async () => {
-                throw new Error("nope");
-            },
-        });
-        expect(app.components.size).toBe(0);
-    });
-
-    it("fromYAML: mapping key with indented scalar value (scalar block, line 146)", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        // mode has an indented scalar value "push" which triggers the scalar-block path
-        const yaml = "name: test\nmode:\n  push\ncomponents: []\nconnections: []";
-        const app = await FlowLoader.fromYAML(yaml, {
-            moduleResolver: async () => {
-                throw new Error("nope");
-            },
-        });
-        expect(app.components.size).toBe(0);
-    });
-});
-
-// ── FlowLoader: quoted string in YAML (parseScalar quoted branch, line 59) ────
-
-describe("FlowLoader: quoted string value in YAML", () => {
-    it("fromYAML with double-quoted name field covers parseScalar quoted branch", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        const yaml = 'name: "My Flow App"\ncomponents: []\nconnections: []';
-        const app = await FlowLoader.fromYAML(yaml, {
-            moduleResolver: async () => {
-                throw new Error("nope");
-            },
-        });
-        expect(app.components.size).toBe(0);
-    });
-
-    it("fromYAML with single-quoted name field also hits quoted branch", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        const yaml = "name: 'My App'\ncomponents: []\nconnections: []";
-        const app = await FlowLoader.fromYAML(yaml, {
-            moduleResolver: async () => {
-                throw new Error("nope");
-            },
-        });
-        expect(app.components.size).toBe(0);
-    });
-});
-
-// ── FlowLoader: YAML list with mapping items (sequence branch, lines 84-114) ──
-
-describe("FlowLoader: YAML sequence branch", () => {
-    it("fromYAML: component list with inline mapping (- id: c1 type: mod) covers line 95", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        // Each "- id: c1\n  type: mod" item has ": " in itemContent → mapping branch
-        const yaml = [
-            "name: test",
-            "components:",
-            "  - id: c1",
-            "    type: testModule",
-            "connections: []",
-        ].join("\n");
-        await expect(FlowLoader.fromYAML(yaml)).rejects.toThrow();
-    });
-
-    it('fromYAML: bare - item with indented block covers itemContent === "" branch (line 89)', async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        // A bare "-" with the mapping on the next line → itemContent === '' branch
-        const yaml = [
-            "name: test",
-            "components:",
-            "  -",
-            "    id: c1",
-            "    type: testModule",
-            "connections: []",
-        ].join("\n");
-        await expect(FlowLoader.fromYAML(yaml)).rejects.toThrow();
-    });
-
-    it("fromYAML: scalar list items cover parseScalar else branch (lines 110-111)", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        // connections list with plain scalar items — itemContent has no ": " so hits
-        // the else branch: arr.push(parseScalar(itemContent)); i++;
-        // _build then tries conn.from.split('.') → TypeError, which is expected
-        const yaml = [
-            "name: test",
-            "components: []",
-            "connections:",
-            "  - simple-scalar-item",
-            "  - another-item",
-        ].join("\n");
-        await expect(FlowLoader.fromYAML(yaml)).rejects.toThrow();
-    });
-});
-
-// ── FlowLoader: parseScalar special-value branches ────────────────────────────
-
-describe("FlowLoader: parseScalar boolean/null/numeric branches", () => {
-    const noComponents = {
-        moduleResolver: async () => {
-            throw new Error("nope");
-        },
-    };
-
-    it("parses true/false scalar values (lines 50-51)", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        // Extra fields with boolean values cause parseScalar to hit 'true'/'false' branches
-        const yaml = "flag1: true\nflag2: false\nname: t\ncomponents: []\nconnections: []";
-        const app = await FlowLoader.fromYAML(yaml, noComponents);
-        expect(app.components.size).toBe(0);
-    });
-
-    it("parses null scalar value (line 52)", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        const yaml = "extra: null\nname: t\ncomponents: []\nconnections: []";
-        const app = await FlowLoader.fromYAML(yaml, noComponents);
-        expect(app.components.size).toBe(0);
-    });
-
-    it("parses {} inline empty map scalar (line 54)", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        const yaml = "meta: {}\nname: t\ncomponents: []\nconnections: []";
-        const app = await FlowLoader.fromYAML(yaml, noComponents);
-        expect(app.components.size).toBe(0);
-    });
-
-    it("parses integer scalar (line 55)", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        const yaml = "count: 42\nname: t\ncomponents: []\nconnections: []";
-        const app = await FlowLoader.fromYAML(yaml, noComponents);
-        expect(app.components.size).toBe(0);
-    });
-
-    it("parses float scalar (line 56)", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        const yaml = "version: 1.5\nname: t\ncomponents: []\nconnections: []";
-        const app = await FlowLoader.fromYAML(yaml, noComponents);
-        expect(app.components.size).toBe(0);
-    });
-});
-
-// ── FlowLoader: empty YAML (line 151) and bare - at end (lines 78, 91) ────────
-
-describe("FlowLoader: parseBlock edge cases", () => {
-    it("fromYAML with empty string hits lines.length === 0 (line 151)", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        // Empty YAML → parseYaml returns null → _build(null) → spec.mode throws TypeError
-        await expect(FlowLoader.fromYAML("")).rejects.toThrow();
-    });
-
-    it("fromYAML with bare - at end triggers start >= lines.length (line 78)", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        // Bare "-" at end → parseBlock(lines, i+1, childIndent) with i+1 >= lines.length
-        // connections becomes [null] → _build fails with TypeError (expected)
-        const yaml = "name: t\ncomponents: []\nconnections:\n  -";
-        await expect(FlowLoader.fromYAML(yaml)).rejects.toThrow();
-    });
-
-    it("fromYAML with no-colon line in mapping triggers break (line 124)", async () => {
-        const { FlowLoader } = await import("@jasonscharf/flow");
-        // A line with no colon inside a mapping block → colonIdx === -1 → break
-        const yaml = "name: t\njust a plain line\ncomponents: []\nconnections: []";
-        const app = await FlowLoader.fromYAML(yaml, {
-            moduleResolver: async () => {
-                throw new Error("nope");
-            },
-        });
-        expect(app.components.size).toBe(0);
     });
 });

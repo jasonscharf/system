@@ -1,6 +1,7 @@
 import type { FlowComponent } from "./FlowComponent.js";
 import type { FlowTransport } from "./FlowTransport.js";
-import type { PortDirection } from "./types.js";
+import { isTickEvent } from "./TickEvent.js";
+import type { PortDirection, ReadMode } from "./types.js";
 
 export class FlowPort<T> {
     readonly name: string;
@@ -9,6 +10,7 @@ export class FlowPort<T> {
 
     private readonly _queue: T[] = [];
     private readonly _transports: FlowTransport<T>[] = [];
+    private readonly _handlers: Array<(msg: T) => void> = [];
 
     constructor(name: string, direction: PortDirection, owner: FlowComponent) {
         this.name = name;
@@ -20,6 +22,23 @@ export class FlowPort<T> {
         return this._queue.length;
     }
 
+    /**
+     * True when at least one listener has been registered via `on()`.
+     * Unbound inbound ports silently discard TickEvents.
+     */
+    get isBound(): boolean {
+        return this._handlers.length > 0;
+    }
+
+    /**
+     * Register a handler to be called during the owning component's step().
+     * If a component overrides step() directly, handlers registered here
+     * are only invoked if super.step() is called.
+     */
+    on(handler: (msg: T) => void): void {
+        this._handlers.push(handler);
+    }
+
     peek(): T | undefined {
         return this._queue[0];
     }
@@ -29,6 +48,9 @@ export class FlowPort<T> {
     }
 
     put(msg: T): void {
+        if (this.direction === "in" && isTickEvent(msg) && !this.isBound) {
+            return;
+        }
         this._queue.push(msg);
         if (this.direction === "in") {
             this.owner.context.scheduler?.enqueue(this.owner);
@@ -39,7 +61,35 @@ export class FlowPort<T> {
         }
     }
 
-    _addTransport(transport: FlowTransport<T>): void {
+    /**
+     * Called by FlowComponent.step() to dispatch queued messages to registered
+     * handlers. If no handlers are registered this is a no-op.
+     */
+    dispatch(readMode: ReadMode): void {
+        if (this._handlers.length === 0) {
+            return;
+        }
+        if (readMode === "drain") {
+            for (;;) {
+                const msg = this._queue.shift();
+                if (msg === undefined) {
+                    break;
+                }
+                for (const h of this._handlers) {
+                    h(msg);
+                }
+            }
+        } else {
+            const msg = this._queue.shift();
+            if (msg !== undefined) {
+                for (const h of this._handlers) {
+                    h(msg);
+                }
+            }
+        }
+    }
+
+    addTransport(transport: FlowTransport<T>): void {
         this._transports.push(transport);
     }
 }

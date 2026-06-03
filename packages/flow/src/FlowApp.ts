@@ -2,7 +2,7 @@ import type { FlowComponent } from "./FlowComponent.js";
 import { FlowContext } from "./FlowContext.js";
 import type { FlowPort } from "./FlowPort.js";
 import { type FlowScheduler, PullScheduler, PushScheduler } from "./FlowScheduler.js";
-import { type FlowTransport, LocalTransport } from "./FlowTransport.js";
+import { FlowTransport, LocalTransport } from "./FlowTransport.js";
 import type { ScheduleMode } from "./types.js";
 
 export interface FlowAppOptions {
@@ -41,24 +41,63 @@ export class FlowApp {
         return this;
     }
 
-    connect<T>(from: FlowPort<T>, to: FlowPort<T>, transport?: FlowTransport<T>): this {
-        const t = transport ?? new LocalTransport(from, to);
-        from._addTransport(t);
-        this._components.add(from.owner);
-        this._components.add(to.owner);
-        this._connections.push({
-            transport: t as FlowTransport<unknown>,
-            fromOwner: from.owner,
-            toOwner: to.owner,
-        });
-        this._updatePullOrder();
+    /**
+     * Wire an outbound port to a destination.
+     *
+     * Full connection (local):
+     *   app.connect(out, in)                   — LocalTransport (in-memory)
+     *   app.connect(out, in, new RedisTransport()) — custom transport
+     *
+     * Sink connection (external):
+     *   app.connect(out, new RedisTransport("stream-id"))
+     *   The transport owns delivery; no local inbound port is involved.
+     */
+    connect<T>(from: FlowPort<T>, to: FlowPort<T>, transport?: FlowTransport<T>): this;
+    connect<T>(from: FlowPort<T>, transport: FlowTransport<T>): this;
+    connect<T>(
+        from: FlowPort<T>,
+        toOrTransport: FlowPort<T> | FlowTransport<T>,
+        transport?: FlowTransport<T>,
+    ): this {
+        if (toOrTransport instanceof FlowTransport) {
+            // Sink form: connect(out, transport)
+            toOrTransport._attach(from, undefined);
+            from.addTransport(toOrTransport);
+            this._components.add(from.owner);
+        } else {
+            // Full form: connect(out, in, transport?)
+            const t = transport ?? new LocalTransport<T>();
+            t._attach(from, toOrTransport);
+            from.addTransport(t);
+            this._components.add(from.owner);
+            this._components.add(toOrTransport.owner);
+            this._connections.push({
+                transport: t as FlowTransport<unknown>,
+                fromOwner: from.owner,
+                toOwner: toOrTransport.owner,
+            });
+            this._updatePullOrder();
+        }
         return this;
     }
 
-    async start(): Promise<void> {
+    /**
+     * Initialise all components without starting the background scheduler loop.
+     * Source components emit their data during onInit(), so the scheduler queue
+     * is populated and ready for a subsequent drain() call.
+     *
+     * Prefer this over start() in tests — drain() is then the single controlled
+     * processing step, with no concurrent background loop to race against.
+     */
+    async init(): Promise<void> {
         for (const component of this._components) {
             await component.init();
         }
+    }
+
+    /** Initialise all components and start the continuous background scheduler loop. */
+    async start(): Promise<void> {
+        await this.init();
         this.scheduler.start();
     }
 
@@ -68,6 +107,43 @@ export class FlowApp {
         for (const component of all) {
             await component.dispose();
         }
+    }
+
+    /**
+     * Process a single scheduling cycle. Delegates to the active scheduler.
+     * Useful when you want precise tick-by-tick control in tests or pull mode.
+     */
+    async tick(): Promise<void> {
+        await this.scheduler.tick();
+    }
+
+    /**
+     * Run the graph to quiescence — ticks until no component has pending
+     * scheduled work AND no inbound port holds unprocessed messages.
+     * Guards against cycles with maxTicks (default 1000).
+     */
+    async drain(maxTicks = 1000): Promise<void> {
+        let remaining = maxTicks;
+        while (remaining-- > 0) {
+            if (this.scheduler.queueSize === 0 && !this._hasPendingMessages()) {
+                break;
+            }
+            await this.scheduler.tick();
+        }
+    }
+
+    private _hasPendingMessages(): boolean {
+        for (const c of this._components) {
+            if (!c.isRunning) {
+                continue; // paused/stopped components won't process their queued data
+            }
+            for (const [, port] of c.ports) {
+                if (port.direction === "in" && port.size > 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private _updatePullOrder(): void {

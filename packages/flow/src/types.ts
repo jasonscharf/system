@@ -1,5 +1,7 @@
 export type PortDirection = "in" | "out";
 
+export type ReadMode = "once" | "drain";
+
 export type ScheduleMode = "push" | "pull";
 
 export type ComponentState = "idle" | "running" | "disposed";

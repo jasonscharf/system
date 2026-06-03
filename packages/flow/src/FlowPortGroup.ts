@@ -1,9 +1,17 @@
-import type { FlowPort } from "./FlowPort.js";
+/**
+ * Minimal covariant view of a port — only the reading side.
+ * Using this interface instead of FlowPort<T> directly avoids the invariance
+ * caused by FlowTransport._attach's contravariant port parameters.
+ */
+interface ReadablePort<T> {
+    readonly size: number;
+    read(): T | undefined;
+}
 
-type PortTuple = readonly FlowPort<unknown>[];
+type PortTuple = readonly ReadablePort<unknown>[];
 
 type UnwrapPorts<T extends PortTuple> = {
-    [K in keyof T]: T[K] extends FlowPort<infer U> ? U : never;
+    [K in keyof T]: T[K] extends ReadablePort<infer U> ? U : never;
 };
 
 /**

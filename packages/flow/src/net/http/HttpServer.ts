@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { uuidv4Binary } from "@jasonscharf/core";
 import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
 import type { FlowPort } from "../../FlowPort.js";
-import { LocalTransport } from "../../FlowTransport.js";
+import { wire } from "../../FlowTransport.js";
 import { HttpRequestReader } from "./HttpRequestReader.js";
 import { HttpResponseWriter } from "./HttpResponseWriter.js";
 import type {
@@ -89,7 +89,7 @@ export class HttpServer extends FlowComponent {
         this.addChild(this.reader);
         this.addChild(this.writer);
 
-        this.reader.out._addTransport(new LocalTransport(this.reader.out, this.requests));
+        wire(this.reader.out, this.requests);
 
         this.writer._setSend((response) => {
             const requestId = response.requestId ?? "";

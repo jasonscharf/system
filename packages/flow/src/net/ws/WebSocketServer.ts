@@ -2,7 +2,7 @@ import { uuidv4Binary } from "@jasonscharf/core";
 import type { WebSocket as WsSocket } from "ws";
 import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
 import type { FlowPort } from "../../FlowPort.js";
-import { LocalTransport } from "../../FlowTransport.js";
+import { wire } from "../../FlowTransport.js";
 import { WebSocketReader } from "./WebSocketReader.js";
 import { WebSocketWriter } from "./WebSocketWriter.js";
 import type { WsMessage } from "./WsMessage.js";
@@ -71,7 +71,7 @@ export class WebSocketServer extends FlowComponent {
         this.addChild(this.writer);
 
         // Internal routing: reader.out → this.received
-        this.reader.out._addTransport(new LocalTransport(this.reader.out, this.received));
+        wire(this.reader.out, this.received);
     }
 
     protected override async onInit(): Promise<void> {

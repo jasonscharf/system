@@ -4,10 +4,9 @@
  * Uses a real SQLite in-memory store.  No mocks.
  */
 
-import type { TernExtension, TernExtensionContext } from "@jasonscharf/app";
+import type { ExtensionInstallContext, TernExtension } from "@jasonscharf/app";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { ExtensionManager, ExtensionRegistry } from "@jasonscharf/server";
-import { defaultServerContext, type ServerContext } from "@jasonscharf/server";
+import { defaultServerContext, ExtensionManager, ExtensionRegistry, type ServerContext } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { up as seedData } from "../../../data/src/migrations/001_init.js";
@@ -24,7 +23,7 @@ function makeExt(
         name,
         version,
         requires,
-        async install() { calls.push(`install:${name}@${version}`); },
+        async install() { calls.push(`install:${name}@${version}`); return {}; },
         async uninstall() { calls.push(`uninstall:${name}@${version}`); },
         async upgrade(from, to) { calls.push(`upgrade:${name}:${from}->${to}`); },
     };
@@ -39,7 +38,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
     let ctx: ServerContext;
     let registry: ExtensionRegistry;
     let manager: ExtensionManager;
-    let extCtx: TernExtensionContext;
+    let extCtx: ExtensionInstallContext;
 
     beforeEach(async () => {
         knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
@@ -48,7 +47,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         ctx = { ...defaultServerContext, trx };
         store = new TripleStore(knex);
         registry = new ExtensionRegistry(store);
-        extCtx = {};
+        extCtx = { store, context: {}, extensions: new Map() };
         manager = new ExtensionManager(registry, ctx, extCtx);
     });
 
@@ -160,7 +159,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
 
     it("test install all installs in dependency order", async () => {
         const calls: string[] = [];
-        const convos = makeExt("tern.convos", "1.0.0", calls, [{ name: "tern.rbac" }]);
+        const convos = makeExt("tern.convos", "1.0.0", calls, ["tern.rbac"]);
         const rbac = makeExt("tern.rbac", "1.0.0", calls);
 
         // Pass in reverse order — manager must sort by deps
@@ -173,7 +172,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
 
     it("test install all throws on missing dependency", async () => {
         const calls: string[] = [];
-        const convos = makeExt("tern.convos", "1.0.0", calls, [{ name: "tern.rbac" }]);
+        const convos = makeExt("tern.convos", "1.0.0", calls, ["tern.rbac"]);
 
         await expect(manager.installAll([convos])).rejects.toThrow(
             /tern.convos.*requires.*tern.rbac/i,
@@ -182,20 +181,14 @@ describe("ExtensionRegistry + ExtensionManager", () => {
 
     it("test install all throws on circular dependency", async () => {
         // A → B → A is a cycle; _topoSort must detect it and throw.
-        // Bug: original implementation used a single 'visited' set which
-        // served as both "in-progress" and "finished", so cycles were
-        // silently accepted and returned [B, A] instead of throwing.
         const calls: string[] = [];
-        const a = makeExt("ext.a", "1.0.0", calls, [{ name: "ext.b" }]);
-        const b = makeExt("ext.b", "1.0.0", calls, [{ name: "ext.a" }]);
+        const a = makeExt("ext.a", "1.0.0", calls, ["ext.b"]);
+        const b = makeExt("ext.b", "1.0.0", calls, ["ext.a"]);
 
         await expect(manager.installAll([a, b])).rejects.toThrow(/circular/i);
     });
 
     it("test install hook throwing does not record extension", async () => {
-        // If install() throws, the extension must NOT be recorded in the
-        // registry.  Otherwise the next boot would skip install() entirely
-        // (idempotent at same version) and the setup would never succeed.
         const badExt: import("@jasonscharf/app").TernExtension = {
             name: "ext.bad",
             version: "1.0.0",
@@ -215,7 +208,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         const v2: import("@jasonscharf/app").TernExtension = {
             name: "ext.no-migrate",
             version: "2.0.0",
-            async install() { calls.push("install:v2"); },
+            async install() { calls.push("install:v2"); return {}; },
             // No upgrade() hook
         };
 

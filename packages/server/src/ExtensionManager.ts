@@ -1,4 +1,4 @@
-import type { TernExtension, TernExtensionContext } from "@jasonscharf/app";
+import type { ExtensionInstallContext, TernExtension } from "@jasonscharf/app";
 import type { ExtensionRegistry } from "./ExtensionRegistry.js";
 import type { ServerContext } from "./ServerContext.js";
 
@@ -14,25 +14,28 @@ export class ExtensionManager {
     constructor(
         private readonly _registry: ExtensionRegistry,
         private readonly _ctx: ServerContext,
-        private readonly _extCtx: TernExtensionContext,
+        private readonly _extCtx: ExtensionInstallContext,
     ) {}
 
     async install(ext: TernExtension): Promise<void> {
         const existing = await this._registry.getVersion(this._ctx, ext.name);
+        const version = ext.version ?? "";
 
-        if (existing === ext.version) {
+        if (existing === version) {
             return;
         }
 
         if (existing !== null) {
             if (ext.upgrade) {
-                await ext.upgrade(existing, ext.version, this._extCtx);
+                await ext.upgrade(existing, version, this._extCtx);
             }
         } else {
-            await ext.install(this._extCtx);
+            if (ext.install) {
+                await ext.install(this._extCtx);
+            }
         }
 
-        await this._registry.record(this._ctx, ext.name, ext.version);
+        await this._registry.record(this._ctx, ext.name, version);
     }
 
     async uninstall(ext: TernExtension): Promise<void> {
@@ -58,7 +61,6 @@ export class ExtensionManager {
 
 function _topoSort(exts: TernExtension[]): TernExtension[] {
     const byName = new Map(exts.map((e) => [e.name, e]));
-    // Two-set DFS: "inProgress" detects back-edges (cycles); "finished" skips done nodes.
     const inProgress = new Set<string>();
     const finished = new Set<string>();
     const result: TernExtension[] = [];
@@ -74,10 +76,10 @@ function _topoSort(exts: TernExtension[]): TernExtension[] {
         }
         inProgress.add(ext.name);
         for (const req of ext.requires ?? []) {
-            const dep = byName.get(req.name);
+            const dep = byName.get(req);
             if (!dep) {
                 throw new Error(
-                    `Extension "${ext.name}" requires "${req.name}" which is not in the install set`,
+                    `Extension "${ext.name}" requires "${req}" which is not in the install set`,
                 );
             }
             visit(dep);

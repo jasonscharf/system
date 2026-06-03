@@ -123,6 +123,8 @@ export interface TernExtension {
      * so message handlers can access them as ctx.rbac, ctx.convos, etc.
      */
     install?(ctx: ExtensionInstallContext): Promise<Record<string, unknown>>;
+    upgrade?(from: string, to: string, ctx: ExtensionInstallContext): Promise<void>;
+    uninstall?(ctx: ExtensionInstallContext): Promise<void>;
     /** Optional message handlers this extension contributes to the dispatcher. */
     handlers?: HandlerEntry[];
 }

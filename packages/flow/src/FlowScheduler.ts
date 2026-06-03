@@ -8,30 +8,28 @@ export abstract class FlowScheduler {
     abstract get queueSize(): number;
     abstract enqueue(component: FlowComponent): void;
 
-    /** Process one scheduling cycle. May be async if any component's step() is async. */
+    /** Process one scheduling cycle. */
     abstract tick(): Promise<void>;
 
     start(): void {
-        if (this._running) {
-            return;
-        }
         this._running = true;
-        void this._loop();
     }
 
     stop(): void {
         this._running = false;
     }
-
-    private async _loop(): Promise<void> {
-        while (this._running) {
-            await this.tick();
-        }
-    }
 }
 
+/**
+ * Reactive push scheduler — only processes work when components are enqueued.
+ *
+ * Each enqueue() schedules a flush via setTimeout(fn, 0) so the flush runs as
+ * a macrotask. This lets the Node.js event loop handle I/O (HTTP, WebSockets,
+ * timers) between scheduler ticks — no tight microtask loop, no I/O starvation.
+ */
 export class PushScheduler extends FlowScheduler {
     private readonly _queue: FlowComponent[] = [];
+    private _flushPending = false;
 
     override get mode(): ScheduleMode {
         return "push";
@@ -43,6 +41,24 @@ export class PushScheduler extends FlowScheduler {
 
     override enqueue(component: FlowComponent): void {
         this._queue.push(component);
+        this._scheduleFlush();
+    }
+
+    private _scheduleFlush(): void {
+        if (this._flushPending) {
+            return;
+        }
+        this._flushPending = true;
+        setTimeout(() => {
+            this._flushPending = false;
+            if (this._running) {
+                void this.tick().then(() => {
+                    if (this._queue.length > 0) {
+                        this._scheduleFlush();
+                    }
+                });
+            }
+        }, 0);
     }
 
     override async tick(): Promise<void> {
@@ -56,6 +72,11 @@ export class PushScheduler extends FlowScheduler {
     }
 }
 
+/**
+ * Pull scheduler — steps all components in topological order on each tick().
+ * Intended for controlled, deterministic pipelines; call tick() manually or
+ * via drain() rather than relying on background scheduling.
+ */
 export class PullScheduler extends FlowScheduler {
     private _order: FlowComponent[] = [];
 

@@ -13,6 +13,8 @@ export { ExtensionManager } from "./ExtensionManager.js";
 export type { ExtensionRecord } from "./ExtensionRegistry.js";
 export { ExtensionRegistry } from "./ExtensionRegistry.js";
 export * from "./env.js";
+export type { SecurityContext } from "./SecurityContext.js";
+export { anonymousSec, systemSec } from "./SecurityContext.js";
 export type { ServerContext } from "./ServerContext.js";
 export { defaultServerContext } from "./ServerContext.js";
 export { tenantGraph, tenantGraphForInsert } from "./tenancy.js";

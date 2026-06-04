@@ -7,6 +7,12 @@ import {
     HttpRouter,
     wire,
 } from "@jasonscharf/flow";
+import {
+    anonymousSec,
+    defaultServerContext,
+    type SecurityContext,
+    systemSec,
+} from "@jasonscharf/server";
 import { AuthService } from "../AuthService.js";
 import { OAUTH_STATE_COOKIE, SESSION_COOKIE, SESSION_TTL_SECS } from "../constants.js";
 import type { IOAuthProvider } from "../oauth/types.js";
@@ -183,12 +189,13 @@ export class AuthRouterComponent extends FlowComponent {
      * Bearer token).  Returns the user entity or null.
      */
     validateToken(token: string): Promise<UserEntity | null> {
-        return this._service.validateToken(token);
+        return this._service.validateToken(defaultServerContext, systemSec, { token });
     }
 
     /**
      * Koa-style session middleware for use with external HttpRouters.
-     * Resolves the session cookie / Bearer token and attaches `ctx.user`.
+     * Resolves the session cookie / Bearer token, attaches `ctx.user` and
+     * `ctx.sec` (SecurityContext) for use by downstream route handlers.
      */
     sessionMiddleware(): HttpMiddlewareFn {
         return async (ctx, next) => {
@@ -197,12 +204,26 @@ export class AuthRouterComponent extends FlowComponent {
                 getBearer(ctx.req.headers as Record<string, string | undefined>);
 
             if (token) {
-                const user = await this._service.validateToken(token);
+                const user = await this._service.validateToken(defaultServerContext, systemSec, {
+                    token,
+                });
                 if (user) {
+                    const sessions = await this._service.listSessions(
+                        defaultServerContext,
+                        systemSec,
+                        { userId: user.id },
+                    );
+                    const session = sessions.find((s) => s.sessionToken === token && s.isActive);
                     ctx.user = user;
+                    ctx.sec = session
+                        ? AuthService.buildSecurityContext({ user, session })
+                        : (anonymousSec as SecurityContext);
+                    await next();
+                    return;
                 }
             }
 
+            ctx.sec = anonymousSec as SecurityContext;
             await next();
         };
     }
@@ -222,7 +243,9 @@ export class AuthRouterComponent extends FlowComponent {
                 return;
             }
 
-            const user = await this._service.validateToken(token);
+            const user = await this._service.validateToken(defaultServerContext, systemSec, {
+                token,
+            });
             if (!user) {
                 ctx.unauthorized();
                 return;
@@ -247,13 +270,17 @@ export class AuthRouterComponent extends FlowComponent {
                 return;
             }
 
-            const user = await this._service.validateToken(token);
+            const user = await this._service.validateToken(defaultServerContext, systemSec, {
+                token,
+            });
             if (!user) {
                 ctx.unauthorized();
                 return;
             }
 
-            const sessions = await this._service.listSessions(user.id);
+            const sessions = await this._service.listSessions(defaultServerContext, systemSec, {
+                userId: user.id,
+            });
             ctx.body = sessions.map((s) => ({
                 id: s.id,
                 isActive: s.isActive,
@@ -265,13 +292,12 @@ export class AuthRouterComponent extends FlowComponent {
 
         // ── POST /auth/logout — revoke current session ────────────────────────
         this.httpRouter.post("/auth/logout", async (ctx) => {
-            // Accept both cookie (browser) and Bearer (mobile / API)
             const token =
                 getCookie(ctx.req.headers as Record<string, string | undefined>, SESSION_COOKIE) ??
                 getBearer(ctx.req.headers as Record<string, string | undefined>);
 
             if (token) {
-                await this._service.revokeToken(token);
+                await this._service.revokeToken(defaultServerContext, systemSec, { token });
             }
 
             ctx.status = 200;
@@ -290,13 +316,17 @@ export class AuthRouterComponent extends FlowComponent {
                 return;
             }
 
-            const user = await this._service.validateToken(token);
+            const user = await this._service.validateToken(defaultServerContext, systemSec, {
+                token,
+            });
             if (!user) {
                 ctx.unauthorized();
                 return;
             }
 
-            const revoked = await this._service.revokeAllSessions(user.id);
+            const revoked = await this._service.revokeAllSessions(defaultServerContext, systemSec, {
+                userId: user.id,
+            });
 
             ctx.status = 200;
             ctx.headers["set-cookie"] = cookieClear(SESSION_COOKIE);

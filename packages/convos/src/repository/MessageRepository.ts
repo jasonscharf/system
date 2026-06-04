@@ -1,6 +1,6 @@
 import { IRI, literal } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import {
     authorIRI,
     CONVOS_GRAPH,
@@ -27,6 +27,24 @@ import {
 import type { ContentType, MessageEntity, MessageRevisionEntity } from "../types.js";
 import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
 
+export interface IdArgs {
+    id: string;
+}
+
+export interface ConversationIdArgs {
+    conversationId: string;
+}
+
+export interface EditMessageArgs {
+    id: string;
+    newContent: string;
+    editorId: string;
+}
+
+export interface MessageIdArgs {
+    messageId: string;
+}
+
 export class MessageRepository {
     private readonly _store: TripleStore;
 
@@ -34,9 +52,11 @@ export class MessageRepository {
         this._store = store;
     }
 
+    /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        input: Pick<MessageEntity, "conversationId" | "authorId" | "content" | "contentType"> & {
+        _sec: SecurityContext,
+        args: Pick<MessageEntity, "conversationId" | "authorId" | "content" | "contentType"> & {
             replyToId?: string;
         },
     ): Promise<MessageEntity> {
@@ -49,25 +69,25 @@ export class MessageRepository {
             {
                 subject: sub,
                 predicate: conversationRefIRI,
-                object: iriFor("conversation", input.conversationId),
+                object: iriFor("conversation", args.conversationId),
                 graph: CONVOS_GRAPH,
             },
             {
                 subject: sub,
                 predicate: authorIRI,
-                object: new IRI(input.authorId),
+                object: new IRI(args.authorId),
                 graph: CONVOS_GRAPH,
             },
             {
                 subject: sub,
                 predicate: contentIRI,
-                object: literal(input.content, XSD_STRING),
+                object: literal(args.content, XSD_STRING),
                 graph: CONVOS_GRAPH,
             },
             {
                 subject: sub,
                 predicate: contentTypeIRI,
-                object: literal(input.contentType, XSD_STRING),
+                object: literal(args.contentType, XSD_STRING),
                 graph: CONVOS_GRAPH,
             },
             {
@@ -96,11 +116,11 @@ export class MessageRepository {
             },
         ];
 
-        if (input.replyToId) {
+        if (args.replyToId) {
             quads.push({
                 subject: sub,
                 predicate: replyToIRI,
-                object: iriFor("message", input.replyToId),
+                object: iriFor("message", args.replyToId),
                 graph: CONVOS_GRAPH,
             });
         }
@@ -110,11 +130,11 @@ export class MessageRepository {
         return {
             id,
             iri: sub.value,
-            conversationId: input.conversationId,
-            replyToId: input.replyToId ?? null,
-            authorId: input.authorId,
-            content: input.content,
-            contentType: input.contentType,
+            conversationId: args.conversationId,
+            replyToId: args.replyToId ?? null,
+            authorId: args.authorId,
+            content: args.content,
+            contentType: args.contentType,
             isDeleted: false,
             revisionCount: 0,
             createdAt: now,
@@ -122,16 +142,26 @@ export class MessageRepository {
         };
     }
 
-    async findById(ctx: ServerContext, id: string): Promise<MessageEntity | null> {
-        const sub = iriFor("message", id);
+    /** @insecure @nochecks */
+    async findById(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<MessageEntity | null> {
+        const sub = iriFor("message", args.id);
         const quads = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(id, quads);
+        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
     }
 
-    async findByConversation(ctx: ServerContext, conversationId: string): Promise<MessageEntity[]> {
+    /** @insecure @nochecks */
+    async findByConversation(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: ConversationIdArgs,
+    ): Promise<MessageEntity[]> {
         const quads = await this._store.find(ctx, {
             predicate: conversationRefIRI,
-            object: iriFor("conversation", conversationId),
+            object: iriFor("conversation", args.conversationId),
             graph: CONVOS_GRAPH,
         });
 
@@ -156,158 +186,172 @@ export class MessageRepository {
         return messages;
     }
 
+    /** @insecure @nochecks */
     async edit(
         ctx: ServerContext,
-        id: string,
-        newContent: string,
-        editorId: string,
+        sec: SecurityContext,
+        args: EditMessageArgs,
     ): Promise<{ message: MessageEntity; revision: MessageRevisionEntity } | null> {
-        const existing = await this.findById(ctx, id);
-        if (!existing || existing.isDeleted) {
-            return null;
-        }
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const existing = await this.findById(ctx, sec, { id: args.id });
+            if (!existing || existing.isDeleted) {
+                return null;
+            }
 
-        const sub = iriFor("message", id);
-        const now = new Date();
-        const nextRevision = existing.revisionCount + 1;
+            const sub = iriFor("message", args.id);
+            const now = new Date();
+            const nextRevision = existing.revisionCount + 1;
 
-        // Save revision snapshot before overwriting
-        const revId = newId();
-        const revSub = iriFor("revision", revId);
-        await this._store.insertMany(ctx, [
-            {
-                subject: revSub,
-                predicate: RDF_TYPE,
-                object: MessageRevisionClassIRI,
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: revSub,
-                predicate: messageRefIRI,
-                object: sub,
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: revSub,
+            // Save revision snapshot before overwriting
+            const revId = newId();
+            const revSub = iriFor("revision", revId);
+            await this._store.insertMany(ctx, [
+                {
+                    subject: revSub,
+                    predicate: RDF_TYPE,
+                    object: MessageRevisionClassIRI,
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: revSub,
+                    predicate: messageRefIRI,
+                    object: sub,
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: revSub,
+                    predicate: contentIRI,
+                    object: literal(existing.content, XSD_STRING),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: revSub,
+                    predicate: revisionIRI,
+                    object: literal(String(existing.revisionCount), XSD_INTEGER),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: revSub,
+                    predicate: editedByIRI,
+                    object: new IRI(args.editorId),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: revSub,
+                    predicate: editedAtIRI,
+                    object: literal(now.toISOString(), XSD_DATETIME),
+                    graph: CONVOS_GRAPH,
+                },
+            ]);
+
+            await this._store.delete(ctx, {
+                subject: sub,
                 predicate: contentIRI,
-                object: literal(existing.content, XSD_STRING),
                 graph: CONVOS_GRAPH,
-            },
-            {
-                subject: revSub,
-                predicate: revisionIRI,
-                object: literal(String(existing.revisionCount), XSD_INTEGER),
+            });
+            await this._store.insert(ctx, {
+                subject: sub,
+                predicate: contentIRI,
+                object: literal(args.newContent, XSD_STRING),
                 graph: CONVOS_GRAPH,
-            },
-            {
-                subject: revSub,
-                predicate: editedByIRI,
-                object: new IRI(editorId),
+            });
+
+            await this._store.delete(ctx, {
+                subject: sub,
+                predicate: revisionCountIRI,
                 graph: CONVOS_GRAPH,
-            },
-            {
-                subject: revSub,
-                predicate: editedAtIRI,
+            });
+            await this._store.insert(ctx, {
+                subject: sub,
+                predicate: revisionCountIRI,
+                object: literal(String(nextRevision), XSD_INTEGER),
+                graph: CONVOS_GRAPH,
+            });
+
+            await this._store.delete(ctx, {
+                subject: sub,
+                predicate: convosUpdatedAtIRI,
+                graph: CONVOS_GRAPH,
+            });
+            await this._store.insert(ctx, {
+                subject: sub,
+                predicate: convosUpdatedAtIRI,
                 object: literal(now.toISOString(), XSD_DATETIME),
                 graph: CONVOS_GRAPH,
-            },
-        ]);
+            });
 
-        // Update message content and revision count
-        await this._store.delete(ctx, { subject: sub, predicate: contentIRI, graph: CONVOS_GRAPH });
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: contentIRI,
-            object: literal(newContent, XSD_STRING),
-            graph: CONVOS_GRAPH,
-        });
+            const updated = await this.findById(ctx, sec, { id: args.id });
+            if (!updated) {
+                throw new Error(`MessageRepository: message ${args.id} vanished after edit`);
+            }
 
-        await this._store.delete(ctx, {
-            subject: sub,
-            predicate: revisionCountIRI,
-            graph: CONVOS_GRAPH,
+            return {
+                message: updated,
+                revision: {
+                    id: revId,
+                    iri: revSub.value,
+                    messageId: args.id,
+                    content: existing.content,
+                    revision: existing.revisionCount,
+                    editedBy: args.editorId,
+                    editedAt: now,
+                },
+            };
         });
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: revisionCountIRI,
-            object: literal(String(nextRevision), XSD_INTEGER),
-            graph: CONVOS_GRAPH,
-        });
-
-        await this._store.delete(ctx, {
-            subject: sub,
-            predicate: convosUpdatedAtIRI,
-            graph: CONVOS_GRAPH,
-        });
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: convosUpdatedAtIRI,
-            object: literal(now.toISOString(), XSD_DATETIME),
-            graph: CONVOS_GRAPH,
-        });
-
-        const updated = await this.findById(ctx, id);
-        if (!updated) {
-            throw new Error(`MessageRepository: message ${id} vanished after edit`);
-        }
-
-        return {
-            message: updated,
-            revision: {
-                id: revId,
-                iri: revSub.value,
-                messageId: id,
-                content: existing.content,
-                revision: existing.revisionCount,
-                editedBy: editorId,
-                editedAt: now,
-            },
-        };
     }
 
-    async softDelete(ctx: ServerContext, id: string): Promise<MessageEntity | null> {
-        const existing = await this.findById(ctx, id);
-        if (!existing) {
-            return null;
-        }
+    /** @insecure @nochecks */
+    async softDelete(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<MessageEntity | null> {
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const existing = await this.findById(ctx, sec, { id: args.id });
+            if (!existing) {
+                return null;
+            }
 
-        const sub = iriFor("message", id);
-        const now = new Date();
+            const sub = iriFor("message", args.id);
+            const now = new Date();
 
-        await this._store.delete(ctx, {
-            subject: sub,
-            predicate: isDeletedIRI,
-            graph: CONVOS_GRAPH,
-        });
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: isDeletedIRI,
-            object: literal("true", XSD_BOOLEAN),
-            graph: CONVOS_GRAPH,
-        });
+            await this._store.delete(ctx, {
+                subject: sub,
+                predicate: isDeletedIRI,
+                graph: CONVOS_GRAPH,
+            });
+            await this._store.insert(ctx, {
+                subject: sub,
+                predicate: isDeletedIRI,
+                object: literal("true", XSD_BOOLEAN),
+                graph: CONVOS_GRAPH,
+            });
 
-        await this._store.delete(ctx, {
-            subject: sub,
-            predicate: convosUpdatedAtIRI,
-            graph: CONVOS_GRAPH,
-        });
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: convosUpdatedAtIRI,
-            object: literal(now.toISOString(), XSD_DATETIME),
-            graph: CONVOS_GRAPH,
-        });
+            await this._store.delete(ctx, {
+                subject: sub,
+                predicate: convosUpdatedAtIRI,
+                graph: CONVOS_GRAPH,
+            });
+            await this._store.insert(ctx, {
+                subject: sub,
+                predicate: convosUpdatedAtIRI,
+                object: literal(now.toISOString(), XSD_DATETIME),
+                graph: CONVOS_GRAPH,
+            });
 
-        return this.findById(ctx, id);
+            return this.findById(ctx, sec, { id: args.id });
+        });
     }
 
+    /** @insecure @nochecks */
     async findRevisionsForMessage(
         ctx: ServerContext,
-        messageId: string,
+        _sec: SecurityContext,
+        args: MessageIdArgs,
     ): Promise<MessageRevisionEntity[]> {
         const quads = await this._store.find(ctx, {
             predicate: messageRefIRI,
-            object: iriFor("message", messageId),
+            object: iriFor("message", args.messageId),
             graph: CONVOS_GRAPH,
         });
 

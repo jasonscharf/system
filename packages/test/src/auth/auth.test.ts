@@ -43,7 +43,12 @@ import {
     type ParsedHttpRequest,
     PushScheduler,
 } from "@jasonscharf/flow";
-import { defaultServerContext, EntityStore } from "@jasonscharf/server";
+import {
+    defaultServerContext,
+    EntityStore,
+    type ServerContext,
+    systemSec,
+} from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -240,12 +245,14 @@ for (const db of dbProviders) {
     describe(`UserRepository — ${db.name}`, () => {
         let knex: Knex;
         let trx: Knex.Transaction;
+        let ctx: ServerContext;
         let store: TripleStore;
         let repo: UserRepository;
 
         beforeEach(async () => {
             knex = await db.create();
             trx = await knex.transaction();
+            ctx = { ...defaultServerContext, trx };
             store = new TripleStore(knex);
             repo = new UserRepository(store);
         });
@@ -255,50 +262,50 @@ for (const db of dbProviders) {
         });
 
         it("creates a user and retrieves it by id", async () => {
-            const user = await repo.create({ ...defaultServerContext, trx }, { email: "a@test.com", displayName: "Alice" });
+            const user = await repo.create(ctx, systemSec, { email: "a@test.com", displayName: "Alice" });
             expect(user.id).toBeTruthy();
             expect(user.email).toBe("a@test.com");
             expect(user.displayName).toBe("Alice");
             expect(user.createdAt).toBeInstanceOf(Date);
 
-            const found = await repo.findById({ ...defaultServerContext, trx }, user.id);
+            const found = await repo.findById(ctx, systemSec, { id: user.id });
             expect(found?.email).toBe("a@test.com");
         });
 
         it("finds a user by email", async () => {
-            await repo.create({ ...defaultServerContext, trx }, { email: "b@test.com" });
-            const found = await repo.findByEmail({ ...defaultServerContext, trx }, "b@test.com");
+            await repo.create(ctx, systemSec, { email: "b@test.com" });
+            const found = await repo.findByEmail(ctx, systemSec, { email: "b@test.com" });
             expect(found?.email).toBe("b@test.com");
         });
 
         it("returns null for unknown id / email", async () => {
-            expect(await repo.findById({ ...defaultServerContext, trx }, "nonexistent")).toBeNull();
-            expect(await repo.findByEmail({ ...defaultServerContext, trx }, "ghost@test.com")).toBeNull();
+            expect(await repo.findById(ctx, systemSec, { id: "nonexistent" })).toBeNull();
+            expect(await repo.findByEmail(ctx, systemSec, { email: "ghost@test.com" })).toBeNull();
         });
 
         it("updates displayName and avatarUrl", async () => {
-            const user = await repo.create({ ...defaultServerContext, trx }, { email: "c@test.com" });
-            const updated = await repo.update({ ...defaultServerContext, trx }, user.id, {
+            const user = await repo.create(ctx, systemSec, { email: "c@test.com" });
+            const updated = await repo.update(ctx, systemSec, { id: user.id, patch: {
                 displayName: "Charlie",
                 avatarUrl: "http://avatar",
-            });
+            } });
             expect(updated?.displayName).toBe("Charlie");
             expect(updated?.avatarUrl).toBe("http://avatar");
             expect(updated?.updatedAt.getTime()).toBeGreaterThanOrEqual(user.updatedAt.getTime());
         });
 
         it("update returns null for unknown id", async () => {
-            expect(await repo.update({ ...defaultServerContext, trx }, "ghost", { displayName: "X" })).toBeNull();
+            expect(await repo.update(ctx, systemSec, { id: "ghost", patch: { displayName: "X" } })).toBeNull();
         });
 
         it("deletes a user", async () => {
-            const user = await repo.create({ ...defaultServerContext, trx }, { email: "d@test.com" });
-            await repo.delete({ ...defaultServerContext, trx }, user.id);
-            expect(await repo.findById({ ...defaultServerContext, trx }, user.id)).toBeNull();
+            const user = await repo.create(ctx, systemSec, { email: "d@test.com" });
+            await repo.delete(ctx, systemSec, { id: user.id });
+            expect(await repo.findById(ctx, systemSec, { id: user.id })).toBeNull();
         });
 
         it("stores the user IRI in the graph", async () => {
-            const user = await repo.create({ ...defaultServerContext, trx }, { email: "e@test.com" });
+            const user = await repo.create(ctx, systemSec, { email: "e@test.com" });
             expect(user.iri).toContain("http://tern.dev/ns/auth/user/");
             expect(user.iri).toContain(user.id);
         });
@@ -307,6 +314,7 @@ for (const db of dbProviders) {
     describe(`UserIdentityRepository — ${db.name}`, () => {
         let knex: Knex;
         let trx: Knex.Transaction;
+        let ctx: ServerContext;
         let store: TripleStore;
         let userRepo: UserRepository;
         let idRepo: UserIdentityRepository;
@@ -314,6 +322,7 @@ for (const db of dbProviders) {
         beforeEach(async () => {
             knex = await db.create();
             trx = await knex.transaction();
+            ctx = { ...defaultServerContext, trx };
             store = new TripleStore(knex);
             userRepo = new UserRepository(store);
             idRepo = new UserIdentityRepository(store);
@@ -324,9 +333,10 @@ for (const db of dbProviders) {
         });
 
         it("creates an identity and links it to a user", async () => {
-            const user = await userRepo.create({ ...defaultServerContext, trx }, { email: "f@test.com" });
+            const user = await userRepo.create(ctx, systemSec, { email: "f@test.com" });
             const identity = await idRepo.create(
-                { ...defaultServerContext, trx },
+                ctx,
+                systemSec,
                 {
                     provider: "google",
                     providerUserId: "g-001",
@@ -341,9 +351,10 @@ for (const db of dbProviders) {
         });
 
         it("finds identity by provider + providerUserId", async () => {
-            const user = await userRepo.create({ ...defaultServerContext, trx }, { email: "g@test.com" });
+            const user = await userRepo.create(ctx, systemSec, { email: "g@test.com" });
             await idRepo.create(
-                { ...defaultServerContext, trx },
+                ctx,
+                systemSec,
                 {
                     provider: "github",
                     providerUserId: "gh-42",
@@ -353,18 +364,19 @@ for (const db of dbProviders) {
                 },
             );
 
-            const found = await idRepo.findByProvider({ ...defaultServerContext, trx }, "github", "gh-42");
+            const found = await idRepo.findByProvider(ctx, systemSec, { provider: "github", providerUserId: "gh-42" });
             expect(found?.providerUserId).toBe("gh-42");
         });
 
         it("returns null when provider identity not found", async () => {
-            expect(await idRepo.findByProvider({ ...defaultServerContext, trx }, "google", "nobody")).toBeNull();
+            expect(await idRepo.findByProvider(ctx, systemSec, { provider: "google", providerUserId: "nobody" })).toBeNull();
         });
 
         it("finds all identities for a user", async () => {
-            const user = await userRepo.create({ ...defaultServerContext, trx }, { email: "h@test.com" });
+            const user = await userRepo.create(ctx, systemSec, { email: "h@test.com" });
             await idRepo.create(
-                { ...defaultServerContext, trx },
+                ctx,
+                systemSec,
                 {
                     provider: "google",
                     providerUserId: "g1",
@@ -374,7 +386,8 @@ for (const db of dbProviders) {
                 },
             );
             await idRepo.create(
-                { ...defaultServerContext, trx },
+                ctx,
+                systemSec,
                 {
                     provider: "github",
                     providerUserId: "gh1",
@@ -384,14 +397,15 @@ for (const db of dbProviders) {
                 },
             );
 
-            const all = await idRepo.findByUserId({ ...defaultServerContext, trx }, user.id);
+            const all = await idRepo.findByUserId(ctx, systemSec, { userId: user.id });
             expect(all).toHaveLength(2);
         });
 
         it("updates tokens on an existing identity", async () => {
-            const user = await userRepo.create({ ...defaultServerContext, trx }, { email: "i@test.com" });
+            const user = await userRepo.create(ctx, systemSec, { email: "i@test.com" });
             const identity = await idRepo.create(
-                { ...defaultServerContext, trx },
+                ctx,
+                systemSec,
                 {
                     provider: "google",
                     providerUserId: "g2",
@@ -401,13 +415,13 @@ for (const db of dbProviders) {
                 },
             );
 
-            await idRepo.updateTokens({ ...defaultServerContext, trx }, identity.id, {
+            await idRepo.updateTokens(ctx, systemSec, { id: identity.id, tokens: {
                 accessToken: "new-at",
                 refreshToken: "new-rt",
                 tokenExpiresAt: undefined,
-            });
+            } });
 
-            const found = await idRepo.findByProvider({ ...defaultServerContext, trx }, "google", "g2");
+            const found = await idRepo.findByProvider(ctx, systemSec, { provider: "google", providerUserId: "g2" });
             expect(found?.accessToken).toBe("new-at");
             expect(found?.refreshToken).toBe("new-rt");
         });
@@ -416,6 +430,7 @@ for (const db of dbProviders) {
     describe(`UserDeviceRepository — ${db.name}`, () => {
         let knex: Knex;
         let trx: Knex.Transaction;
+        let ctx: ServerContext;
         let store: TripleStore;
         let userRepo: UserRepository;
         let devRepo: UserDeviceRepository;
@@ -423,6 +438,7 @@ for (const db of dbProviders) {
         beforeEach(async () => {
             knex = await db.create();
             trx = await knex.transaction();
+            ctx = { ...defaultServerContext, trx };
             store = new TripleStore(knex);
             userRepo = new UserRepository(store);
             devRepo = new UserDeviceRepository(store);
@@ -433,38 +449,39 @@ for (const db of dbProviders) {
         });
 
         it("creates a device on first findOrCreate", async () => {
-            const user = await userRepo.create({ ...defaultServerContext, trx }, { email: "j@test.com" });
-            const device = await devRepo.findOrCreate({ ...defaultServerContext, trx }, user.id, {
+            const user = await userRepo.create(ctx, systemSec, { email: "j@test.com" });
+            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {
                 userAgent: "Chrome/120",
                 platform: "web",
-            });
+            } });
             expect(device.userId).toBe(user.id);
             expect(device.deviceUserAgent).toBe("Chrome/120");
         });
 
         it("returns existing device on second findOrCreate with same userAgent", async () => {
-            const user = await userRepo.create({ ...defaultServerContext, trx }, { email: "k@test.com" });
-            const d1 = await devRepo.findOrCreate({ ...defaultServerContext, trx }, user.id, { userAgent: "Firefox/118" });
-            const d2 = await devRepo.findOrCreate({ ...defaultServerContext, trx }, user.id, { userAgent: "Firefox/118" });
+            const user = await userRepo.create(ctx, systemSec, { email: "k@test.com" });
+            const d1 = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: { userAgent: "Firefox/118" } });
+            const d2 = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: { userAgent: "Firefox/118" } });
             expect(d1.id).toBe(d2.id);
         });
 
         it("finds all devices for a user", async () => {
-            const user = await userRepo.create({ ...defaultServerContext, trx }, { email: "l@test.com" });
-            await devRepo.findOrCreate({ ...defaultServerContext, trx }, user.id, { userAgent: "Safari/17" });
-            await devRepo.findOrCreate({ ...defaultServerContext, trx }, user.id, { userAgent: "Edge/118" });
-            const all = await devRepo.findByUserId({ ...defaultServerContext, trx }, user.id);
+            const user = await userRepo.create(ctx, systemSec, { email: "l@test.com" });
+            await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: { userAgent: "Safari/17" } });
+            await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: { userAgent: "Edge/118" } });
+            const all = await devRepo.findByUserId(ctx, systemSec, { userId: user.id });
             expect(all).toHaveLength(2);
         });
 
         it("findById returns null for unknown device", async () => {
-            expect(await devRepo.findById({ ...defaultServerContext, trx }, "ghost")).toBeNull();
+            expect(await devRepo.findById(ctx, systemSec, { id: "ghost" })).toBeNull();
         });
     });
 
     describe(`UserSessionRepository — ${db.name}`, () => {
         let knex: Knex;
         let trx: Knex.Transaction;
+        let ctx: ServerContext;
         let store: TripleStore;
         let userRepo: UserRepository;
         let devRepo: UserDeviceRepository;
@@ -473,6 +490,7 @@ for (const db of dbProviders) {
         beforeEach(async () => {
             knex = await db.create();
             trx = await knex.transaction();
+            ctx = { ...defaultServerContext, trx };
             store = new TripleStore(knex);
             userRepo = new UserRepository(store);
             devRepo = new UserDeviceRepository(store);
@@ -490,14 +508,15 @@ for (const db of dbProviders) {
         ) {
             const offset = (opts.daysFromNow ?? 7) * 24 * 3600 * 1000;
             return sessRepo.create(
-                { ...defaultServerContext, trx },
+                ctx,
+                systemSec,
                 { userId, deviceId, expiresAt: new Date(Date.now() + offset) },
             );
         }
 
         it("creates a session with a secure token", async () => {
-            const user = await userRepo.create({ ...defaultServerContext, trx }, { email: "m@test.com" });
-            const device = await devRepo.findOrCreate({ ...defaultServerContext, trx }, user.id, {});
+            const user = await userRepo.create(ctx, systemSec, { email: "m@test.com" });
+            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {} });
             const sess = await makeSession(user.id, device.id);
 
             expect(sess.sessionToken).toHaveLength(64);
@@ -506,61 +525,61 @@ for (const db of dbProviders) {
         });
 
         it("finds session by token", async () => {
-            const user = await userRepo.create({ ...defaultServerContext, trx }, { email: "n@test.com" });
-            const device = await devRepo.findOrCreate({ ...defaultServerContext, trx }, user.id, {});
+            const user = await userRepo.create(ctx, systemSec, { email: "n@test.com" });
+            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {} });
             const sess = await makeSession(user.id, device.id);
 
-            const found = await sessRepo.findByToken({ ...defaultServerContext, trx }, sess.sessionToken);
+            const found = await sessRepo.findByToken(ctx, systemSec, { token: sess.sessionToken });
             expect(found?.id).toBe(sess.id);
         });
 
         it("returns null for unknown token", async () => {
-            expect(await sessRepo.findByToken({ ...defaultServerContext, trx }, "not-a-real-token")).toBeNull();
+            expect(await sessRepo.findByToken(ctx, systemSec, { token: "not-a-real-token" })).toBeNull();
         });
 
         it("finds all sessions for a user", async () => {
-            const user = await userRepo.create({ ...defaultServerContext, trx }, { email: "o@test.com" });
-            const device = await devRepo.findOrCreate({ ...defaultServerContext, trx }, user.id, {});
+            const user = await userRepo.create(ctx, systemSec, { email: "o@test.com" });
+            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {} });
             await makeSession(user.id, device.id);
             await makeSession(user.id, device.id);
-            const all = await sessRepo.findByUserId({ ...defaultServerContext, trx }, user.id);
+            const all = await sessRepo.findByUserId(ctx, systemSec, { userId: user.id });
             expect(all).toHaveLength(2);
         });
 
         it("revoke() marks session inactive", async () => {
-            const user = await userRepo.create({ ...defaultServerContext, trx }, { email: "p@test.com" });
-            const device = await devRepo.findOrCreate({ ...defaultServerContext, trx }, user.id, {});
+            const user = await userRepo.create(ctx, systemSec, { email: "p@test.com" });
+            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {} });
             const sess = await makeSession(user.id, device.id);
 
-            const ok = await sessRepo.revoke({ ...defaultServerContext, trx }, sess.sessionToken);
+            const ok = await sessRepo.revoke(ctx, systemSec, { token: sess.sessionToken });
             expect(ok).toBe(true);
 
-            const after = await sessRepo.findByToken({ ...defaultServerContext, trx }, sess.sessionToken);
+            const after = await sessRepo.findByToken(ctx, systemSec, { token: sess.sessionToken });
             expect(after?.isActive).toBe(false);
         });
 
         it("revoke() returns false for unknown token", async () => {
-            expect(await sessRepo.revoke({ ...defaultServerContext, trx }, "ghost-token")).toBe(false);
+            expect(await sessRepo.revoke(ctx, systemSec, { token: "ghost-token" })).toBe(false);
         });
 
         it("revokeAllForUser() revokes all active sessions", async () => {
-            const user = await userRepo.create({ ...defaultServerContext, trx }, { email: "q@test.com" });
-            const device = await devRepo.findOrCreate({ ...defaultServerContext, trx }, user.id, {});
+            const user = await userRepo.create(ctx, systemSec, { email: "q@test.com" });
+            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {} });
             await makeSession(user.id, device.id);
             await makeSession(user.id, device.id);
-            const count = await sessRepo.revokeAllForUser({ ...defaultServerContext, trx }, user.id);
+            const count = await sessRepo.revokeAllForUser(ctx, systemSec, { userId: user.id });
             expect(count).toBe(2);
         });
 
         it("deleteExpired() removes expired sessions", async () => {
-            const user = await userRepo.create({ ...defaultServerContext, trx }, { email: "r@test.com" });
-            const device = await devRepo.findOrCreate({ ...defaultServerContext, trx }, user.id, {});
+            const user = await userRepo.create(ctx, systemSec, { email: "r@test.com" });
+            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {} });
             await makeSession(user.id, device.id, { daysFromNow: -1 }); // already expired
             await makeSession(user.id, device.id, { daysFromNow: 7 }); // valid
 
-            const deleted = await sessRepo.deleteExpired({ ...defaultServerContext, trx });
+            const deleted = await sessRepo.deleteExpired(ctx, systemSec);
             expect(deleted).toBe(1);
-            const remaining = await sessRepo.findByUserId({ ...defaultServerContext, trx }, user.id);
+            const remaining = await sessRepo.findByUserId(ctx, systemSec, { userId: user.id });
             expect(remaining).toHaveLength(1);
         });
     });
@@ -654,12 +673,12 @@ describe("AuthService", () => {
             device: {},
         });
 
-        const user = await service.validateToken(session.sessionToken);
+        const user = await service.validateToken(defaultServerContext, systemSec, { token: session.sessionToken });
         expect(user?.email).toBe("svc@test.com");
     });
 
     it("validateToken() returns null for unknown token", async () => {
-        expect(await service.validateToken("fake-token")).toBeNull();
+        expect(await service.validateToken(defaultServerContext, systemSec, { token: "fake-token" })).toBeNull();
     });
 
     it("revokeToken() invalidates the session", async () => {
@@ -671,8 +690,8 @@ describe("AuthService", () => {
             device: {},
         });
 
-        await service.revokeToken(session.sessionToken);
-        expect(await service.validateToken(session.sessionToken)).toBeNull();
+        await service.revokeToken(defaultServerContext, systemSec, { token: session.sessionToken });
+        expect(await service.validateToken(defaultServerContext, systemSec, { token: session.sessionToken })).toBeNull();
     });
 
     it("buildAuthUrl() returns a URL with correct state", () => {
@@ -807,8 +826,8 @@ describe("SessionComponent", () => {
         const userRepo = new UserRepository(store);
         const sessRepo = new UserSessionRepository(store);
         const ctx = defaultServerContext;
-        const user = await userRepo.create(ctx, { email: "slow@test.com", displayName: "Slow" });
-        const session = await sessRepo.create(ctx, {
+        const user = await userRepo.create(ctx, systemSec, { email: "slow@test.com", displayName: "Slow" });
+        const session = await sessRepo.create(ctx, systemSec, {
             userId: user.id,
             deviceId: "d-slow",
             expiresAt: new Date(Date.now() + 60_000),
@@ -825,8 +844,8 @@ describe("SessionComponent", () => {
         const userRepo = new UserRepository(store);
         const sessRepo = new UserSessionRepository(store);
         const ctx = defaultServerContext;
-        const user = await userRepo.create(ctx, { email: "fast@test.com", displayName: "Fast" });
-        const session = await sessRepo.create(ctx, {
+        const user = await userRepo.create(ctx, systemSec, { email: "fast@test.com", displayName: "Fast" });
+        const session = await sessRepo.create(ctx, systemSec, {
             userId: user.id,
             deviceId: "d-fast",
             expiresAt: new Date(Date.now() + 60_000),
@@ -1016,7 +1035,7 @@ describe("AuthService.validateToken — fallback path", () => {
         // Simulate session store miss (e.g. Redis restart)
         memStore.clear();
 
-        const user = await svc.validateToken(session.sessionToken);
+        const user = await svc.validateToken(defaultServerContext, systemSec, { token: session.sessionToken });
         expect(user?.email).toBe("fb@test.com");
 
         vi.unstubAllGlobals();
@@ -1459,7 +1478,7 @@ describe("AuthService.validateToken — cache hit", () => {
         });
 
         // Token is already cached from handleCallback — validateToken should use the cache
-        const validated = await svc.validateToken(session.sessionToken);
+        const validated = await svc.validateToken(defaultServerContext, systemSec, { token: session.sessionToken });
         expect(validated?.email).toBe("cache@test.com");
         expect(validated?.id).toBe(user.id);
 
@@ -1490,7 +1509,7 @@ describe("AuthService.validateToken — cache hit", () => {
         );
 
         // validateToken should detect the expiry, delete it from cache, and return null
-        const result = await svc.validateToken(fakeToken);
+        const result = await svc.validateToken(defaultServerContext, systemSec, { token: fakeToken });
         expect(result).toBeNull();
 
         await knex.destroy();
@@ -1503,6 +1522,7 @@ for (const db of dbProviders) {
     describe(`Auth queries — ${db.name}`, () => {
         let knex: Knex;
         let trx: Knex.Transaction;
+        let ctx: ServerContext;
         let store: TripleStore;
         let userRepo: UserRepository;
         let devRepo: UserDeviceRepository;
@@ -1512,6 +1532,7 @@ for (const db of dbProviders) {
         beforeEach(async () => {
             knex = await db.create();
             trx = await knex.transaction();
+            ctx = { ...defaultServerContext, trx };
             store = new TripleStore(knex);
             userRepo = new UserRepository(store);
             devRepo = new UserDeviceRepository(store);
@@ -1524,36 +1545,36 @@ for (const db of dbProviders) {
         });
 
         it("listUsers returns all created users", async () => {
-            await userRepo.create({ ...defaultServerContext, trx }, { email: "lu1@test.com" });
-            await userRepo.create({ ...defaultServerContext, trx }, { email: "lu2@test.com" });
-            const result = await listUsers({ ...defaultServerContext, trx }, es);
+            await userRepo.create(ctx, systemSec, { email: "lu1@test.com" });
+            await userRepo.create(ctx, systemSec, { email: "lu2@test.com" });
+            const result = await listUsers(ctx, es);
             expect(result.length).toBeGreaterThanOrEqual(2);
         });
 
         it("listUserDevices returns all created devices", async () => {
-            const user = await userRepo.create({ ...defaultServerContext, trx }, { email: "lud@test.com" });
-            await devRepo.findOrCreate({ ...defaultServerContext, trx }, user.id, { userAgent: "Chrome" });
-            const result = await listUserDevices({ ...defaultServerContext, trx }, es);
+            const user = await userRepo.create(ctx, systemSec, { email: "lud@test.com" });
+            await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: { userAgent: "Chrome" } });
+            const result = await listUserDevices(ctx, es);
             expect(result.length).toBeGreaterThanOrEqual(1);
         });
 
         it("listActiveSessions returns only active sessions", async () => {
-            const user = await userRepo.create({ ...defaultServerContext, trx }, { email: "las@test.com" });
-            const device = await devRepo.findOrCreate({ ...defaultServerContext, trx }, user.id, {});
+            const user = await userRepo.create(ctx, systemSec, { email: "las@test.com" });
+            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {} });
             const expiresAt = new Date(Date.now() + 3600_000);
             const sess = await sessRepo.create(
-                { ...defaultServerContext, trx },
+                ctx,
+                systemSec,
                 { userId: user.id, deviceId: device.id, expiresAt },
             );
-            await sessRepo.revoke({ ...defaultServerContext, trx }, sess.sessionToken);
+            await sessRepo.revoke(ctx, systemSec, { token: sess.sessionToken });
 
-            const active = await listActiveSessions({ ...defaultServerContext, trx }, es);
+            const active = await listActiveSessions(ctx, es);
             const activeIds = active.map((r) => r.id);
             expect(activeIds).not.toContain(sess.id);
         });
 
         it("listInactiveSessions returns only inactive sessions", async () => {
-            const ctx = { ...defaultServerContext, trx };
             const userRec = await es.create(ctx, UserSchema, { email: "lis@test.com" });
             const devRec = await es.create(ctx, UserDeviceSchema, {
                 deviceUser: userRec.iri,
@@ -1571,7 +1592,6 @@ for (const db of dbProviders) {
         });
 
         it("findUserWithRecentActivity returns user + session + device", async () => {
-            const ctx = { ...defaultServerContext, trx };
             const userRec = await es.create(ctx, UserSchema, { email: "fwa@test.com" });
             const devRec = await es.create(ctx, UserDeviceSchema, {
                 deviceUser: userRec.iri,
@@ -1590,12 +1610,11 @@ for (const db of dbProviders) {
         });
 
         it("findUserWithRecentActivity returns null for unknown user", async () => {
-            const result = await findUserWithRecentActivity({ ...defaultServerContext, trx }, es, "no-such-id");
+            const result = await findUserWithRecentActivity(ctx, es, "no-such-id");
             expect(result).toBeNull();
         });
 
         it("findUserWithRecentActivity returns null device when session references non-existent device", async () => {
-            const ctx = { ...defaultServerContext, trx };
             const userRec = await es.create(ctx, UserSchema, { email: "fwanod@test.com" });
             // Store a session whose sessionDevice IRI points to a non-existent entity
             await es.create(ctx, UserSessionSchema, {
@@ -1611,7 +1630,6 @@ for (const db of dbProviders) {
         });
 
         it("findUserWithRecentActivity returns null session when user has no sessions", async () => {
-            const ctx = { ...defaultServerContext, trx };
             const userRec = await es.create(ctx, UserSchema, { email: "nosess@test.com" });
             const result = await findUserWithRecentActivity(ctx, es, userRec.id);
             expect(result?.session).toBeNull();
@@ -1619,7 +1637,6 @@ for (const db of dbProviders) {
         });
 
         it("findSessionsByTokens returns sessions in order", async () => {
-            const ctx = { ...defaultServerContext, trx };
             const userRec = await es.create(ctx, UserSchema, { email: "fst@test.com" });
             const devRec = await es.create(ctx, UserDeviceSchema, {
                 deviceUser: userRec.iri,
@@ -1646,17 +1663,16 @@ for (const db of dbProviders) {
         });
 
         it("findSessionsByTokens omits unknown tokens", async () => {
-            const results = await findSessionsByTokens({ ...defaultServerContext, trx }, es, ["ghost-token"]);
+            const results = await findSessionsByTokens(ctx, es, ["ghost-token"]);
             expect(results).toHaveLength(0);
         });
 
         it("findUserBySession returns null for unknown token", async () => {
-            const result = await findUserBySession({ ...defaultServerContext, trx }, es, "no-such-token");
+            const result = await findUserBySession(ctx, es, "no-such-token");
             expect(result).toBeNull();
         });
 
         it("findUserBySession returns user for valid token", async () => {
-            const ctx = { ...defaultServerContext, trx };
             const userRec = await es.create(ctx, UserSchema, { email: "fubs@test.com" });
             const devRec = await es.create(ctx, UserDeviceSchema, {
                 deviceUser: userRec.iri,
@@ -1675,7 +1691,6 @@ for (const db of dbProviders) {
         });
 
         it("findUserWithRecentActivity: session with no sessionDevice → device is null (line 94 false branch)", async () => {
-            const ctx = { ...defaultServerContext, trx };
             const userRec = await es.create(ctx, UserSchema, { email: "nodev@test.com" });
             // Create session without sessionDevice — strProp returns undefined, deviceIri is falsy
             await es.create(ctx, UserSessionSchema, {
@@ -1689,7 +1704,6 @@ for (const db of dbProviders) {
         });
 
         it("findUserBySession: session with no sessionUser → returns null (line 141 branch)", async () => {
-            const ctx = { ...defaultServerContext, trx };
             // Create a session without sessionUser — strProp will return undefined
             const sess = await es.create(ctx, UserSessionSchema, {
                 expiresAt: new Date(Date.now() + 3600_000),

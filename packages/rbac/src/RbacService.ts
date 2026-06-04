@@ -1,6 +1,6 @@
 import { actsForIRI, IRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import { AccessChecker } from "./AccessChecker.js";
 import { RBAC_GRAPH } from "./constants.js";
 import { RbacInspector } from "./RbacInspector.js";
@@ -18,9 +18,9 @@ import type { ServiceAccountRepository } from "./repository/ServiceAccountReposi
 import type { TenantRepository } from "./repository/TenantRepository.js";
 import type { UserGroupRepository } from "./repository/UserGroupRepository.js";
 import type {
-    CheckOptions,
     PermissionEntity,
     PolicyGrantEntity,
+    RbacCheckArgs,
     ResourceNodeEntity,
     RoleEntity,
     ServiceAccountEntity,
@@ -37,6 +37,69 @@ export interface RbacServiceOptions {
     permissions: PermissionRepository;
     resources: ResourceNodeRepository;
     serviceAccounts: ServiceAccountRepository;
+}
+
+export interface IdArgs {
+    id: string;
+}
+
+export interface ScopeArgs {
+    scope?: string;
+}
+
+export interface CreateTenantArgs {
+    name: string;
+}
+
+export interface PermissionKeyArgs {
+    key: string;
+}
+
+export interface FindUserGroupByNameArgs {
+    name: string;
+    tenantId?: string;
+}
+
+export interface TenantFilterArgs {
+    tenantId?: string;
+}
+
+export interface UpdateUserGroupArgs {
+    id: string;
+    patch: { groupName?: string };
+}
+
+export interface GroupMemberArgs {
+    groupIri: string;
+    memberIri: string;
+}
+
+export interface GroupIriArgs {
+    groupIri: string;
+}
+
+export interface RolePermissionArgs {
+    roleIri: string;
+    permissionIri: string;
+}
+
+export interface RoleInheritanceArgs {
+    childRoleIri: string;
+    parentRoleIri: string;
+}
+
+export interface GrantIriArgs {
+    grantIri: string;
+}
+
+export interface SetResourceParentArgs {
+    resourceIri: string;
+    parentIri: string;
+}
+
+export interface ImpersonationArgs {
+    fromIri: string;
+    toIri: string;
 }
 
 /**
@@ -71,199 +134,298 @@ export class RbacService {
 
     // ── Authorization ─────────────────────────────────────────────────────────
 
-    /** Returns true if the principal has the permission in the given scope. */
-    async can(ctx: ServerContext, opts: CheckOptions): Promise<boolean> {
-        return this._checker.check(ctx, opts);
+    /** Returns true if the principal in sec has the permission in the given scope. */
+    async can(ctx: ServerContext, sec: SecurityContext, args: RbacCheckArgs): Promise<boolean> {
+        if (!sec.principalIri) {
+            return false;
+        }
+        return this._checker.check(ctx, {
+            principal: sec.principalIri,
+            permission: args.permission,
+            scope: args.scope,
+            actingAs: sec.isImpersonating ? sec.actingAsIri : undefined,
+        });
     }
 
-    /** Throws if the principal lacks the permission. */
-    async assert(ctx: ServerContext, opts: CheckOptions): Promise<void> {
-        const allowed = await this._checker.check(ctx, opts);
+    /** Throws if the principal in sec lacks the permission. */
+    async assert(ctx: ServerContext, sec: SecurityContext, args: RbacCheckArgs): Promise<void> {
+        const allowed = await this.can(ctx, sec, args);
         if (!allowed) {
-            throw new Error(
-                `Access denied: "${opts.principal}" lacks "${opts.permission}"${opts.scope ? ` on "${opts.scope}"` : ""}.`,
-            );
+            const who = sec.principalIri ?? "anonymous";
+            const where = args.scope ? ` on "${args.scope}"` : "";
+            throw new Error(`Access denied: "${who}" lacks "${args.permission}"${where}.`);
         }
     }
 
     /** Returns the full set of permission keys available to the principal in scope. */
     async resolvePermissions(
         ctx: ServerContext,
-        principalIri: string,
-        scopeIri?: string,
+        sec: SecurityContext,
+        args: ScopeArgs,
     ): Promise<Set<string>> {
-        return this._checker.resolvePermissions(ctx, principalIri, scopeIri);
+        if (!sec.principalIri) {
+            return new Set();
+        }
+        return this._checker.resolvePermissions(ctx, sec.principalIri, args.scope);
     }
 
     // ── Tenants ───────────────────────────────────────────────────────────────
 
-    async createTenant(ctx: ServerContext, name: string): Promise<TenantEntity> {
-        return this._tenants.create(ctx, { tenantName: name });
+    /** @insecure @nochecks */
+    async createTenant(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: CreateTenantArgs,
+    ): Promise<TenantEntity> {
+        return this._tenants.create(ctx, sec, { tenantName: args.name });
     }
 
-    async getTenant(ctx: ServerContext, id: string): Promise<TenantEntity | null> {
-        return this._tenants.findById(ctx, id);
+    /** @insecure @nochecks */
+    async getTenant(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<TenantEntity | null> {
+        return this._tenants.findById(ctx, sec, args);
     }
 
-    async listTenants(ctx: ServerContext): Promise<TenantEntity[]> {
-        return this._tenants.listAll(ctx);
+    /** @insecure @nochecks */
+    async listTenants(ctx: ServerContext, sec: SecurityContext): Promise<TenantEntity[]> {
+        return this._tenants.listAll(ctx, sec);
     }
 
     // ── Permissions ───────────────────────────────────────────────────────────
 
-    async createPermission(ctx: ServerContext, key: string): Promise<PermissionEntity> {
-        return this._permissions.create(ctx, { permissionKey: key });
+    /** @insecure @nochecks */
+    async createPermission(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: PermissionKeyArgs,
+    ): Promise<PermissionEntity> {
+        return this._permissions.create(ctx, sec, { permissionKey: args.key });
     }
 
-    async findPermissionByKey(ctx: ServerContext, key: string): Promise<PermissionEntity | null> {
-        return this._permissions.findByKey(ctx, key);
+    /** @insecure @nochecks */
+    async findPermissionByKey(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: PermissionKeyArgs,
+    ): Promise<PermissionEntity | null> {
+        return this._permissions.findByKey(ctx, sec, args);
     }
 
     // ── UserGroups ────────────────────────────────────────────────────────────
 
+    /** @insecure @nochecks */
     async createUserGroup(
         ctx: ServerContext,
-        input: Pick<UserGroupEntity, "groupName" | "tenantId">,
+        sec: SecurityContext,
+        args: Pick<UserGroupEntity, "groupName" | "tenantId">,
     ): Promise<UserGroupEntity> {
-        return this._groups.create(ctx, input);
+        return this._groups.create(ctx, sec, args);
     }
 
-    async getUserGroup(ctx: ServerContext, id: string): Promise<UserGroupEntity | null> {
-        return this._groups.findById(ctx, id);
+    /** @insecure @nochecks */
+    async getUserGroup(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<UserGroupEntity | null> {
+        return this._groups.findById(ctx, sec, args);
     }
 
+    /** @insecure @nochecks */
     async findUserGroupByName(
         ctx: ServerContext,
-        name: string,
-        tenantId?: string,
+        sec: SecurityContext,
+        args: FindUserGroupByNameArgs,
     ): Promise<UserGroupEntity | null> {
-        return this._groups.findByName(ctx, name, tenantId);
+        return this._groups.findByName(ctx, sec, args);
     }
 
-    async listUserGroups(ctx: ServerContext, tenantId?: string): Promise<UserGroupEntity[]> {
-        return this._groups.listAll(ctx, tenantId);
+    /** @insecure @nochecks */
+    async listUserGroups(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: TenantFilterArgs = {},
+    ): Promise<UserGroupEntity[]> {
+        return this._groups.listAll(ctx, sec, args);
     }
 
+    /** @insecure @nochecks */
     async updateUserGroup(
         ctx: ServerContext,
-        id: string,
-        patch: { groupName?: string },
+        sec: SecurityContext,
+        args: UpdateUserGroupArgs,
     ): Promise<UserGroupEntity | null> {
-        return this._groups.update(ctx, id, patch);
+        return this._groups.update(ctx, sec, args);
     }
 
-    async deleteUserGroup(ctx: ServerContext, id: string): Promise<void> {
-        return this._groups.delete(ctx, id);
+    /** @insecure @nochecks */
+    async deleteUserGroup(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<void> {
+        return this._groups.delete(ctx, sec, args);
     }
 
-    async addMember(ctx: ServerContext, groupIri: string, memberIri: string): Promise<void> {
-        return this._groups.addMember(ctx, groupIri, memberIri);
+    /** @insecure @nochecks */
+    async addMember(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: GroupMemberArgs,
+    ): Promise<void> {
+        return this._groups.addMember(ctx, sec, args);
     }
 
-    async removeMember(ctx: ServerContext, groupIri: string, memberIri: string): Promise<void> {
-        return this._groups.removeMember(ctx, groupIri, memberIri);
+    /** @insecure @nochecks */
+    async removeMember(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: GroupMemberArgs,
+    ): Promise<void> {
+        return this._groups.removeMember(ctx, sec, args);
     }
 
-    async listMembers(ctx: ServerContext, groupIri: string): Promise<string[]> {
-        return this._groups.listMembers(ctx, groupIri);
+    /** @insecure @nochecks */
+    async listMembers(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: GroupIriArgs,
+    ): Promise<string[]> {
+        return this._groups.listMembers(ctx, sec, args);
     }
 
     // ── Roles ─────────────────────────────────────────────────────────────────
 
+    /** @insecure @nochecks */
     async createRole(
         ctx: ServerContext,
-        input: Pick<RoleEntity, "roleName" | "tenantId">,
+        sec: SecurityContext,
+        args: Pick<RoleEntity, "roleName" | "tenantId">,
     ): Promise<RoleEntity> {
-        return this._roles.create(ctx, input);
+        return this._roles.create(ctx, sec, args);
     }
 
+    /** @insecure @nochecks */
     async addPermissionToRole(
         ctx: ServerContext,
-        roleIri: string,
-        permissionIri: string,
+        sec: SecurityContext,
+        args: RolePermissionArgs,
     ): Promise<void> {
-        return this._roles.addPermission(ctx, roleIri, permissionIri);
+        return this._roles.addPermission(ctx, sec, args);
     }
 
+    /** @insecure @nochecks */
     async removePermissionFromRole(
         ctx: ServerContext,
-        roleIri: string,
-        permissionIri: string,
+        sec: SecurityContext,
+        args: RolePermissionArgs,
     ): Promise<void> {
-        return this._roles.removePermission(ctx, roleIri, permissionIri);
+        return this._roles.removePermission(ctx, sec, args);
     }
 
+    /** @insecure @nochecks */
     async addRoleInheritance(
         ctx: ServerContext,
-        childRoleIri: string,
-        parentRoleIri: string,
+        sec: SecurityContext,
+        args: RoleInheritanceArgs,
     ): Promise<void> {
-        return this._roles.addInheritance(ctx, childRoleIri, parentRoleIri);
+        return this._roles.addInheritance(ctx, sec, {
+            roleIri: args.childRoleIri,
+            parentRoleIri: args.parentRoleIri,
+        });
     }
 
     // ── PolicyGrants ──────────────────────────────────────────────────────────
 
-    async grant(ctx: ServerContext, input: CreateGrantInput): Promise<PolicyGrantEntity> {
-        return this._grants.create(ctx, input);
+    /** @insecure @nochecks */
+    async grant(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: CreateGrantInput,
+    ): Promise<PolicyGrantEntity> {
+        return this._grants.create(ctx, sec, args);
     }
 
-    async revoke(ctx: ServerContext, grantIri: string): Promise<void> {
-        return this._grants.revoke(ctx, grantIri);
+    /** @insecure @nochecks */
+    async revoke(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: GrantIriArgs,
+    ): Promise<void> {
+        return this._grants.revoke(ctx, sec, args);
     }
 
     // ── Resources ─────────────────────────────────────────────────────────────
 
+    /** @insecure @nochecks */
     async createResource(
         ctx: ServerContext,
-        input: CreateResourceInput,
+        sec: SecurityContext,
+        args: CreateResourceInput,
     ): Promise<ResourceNodeEntity> {
-        return this._resources.create(ctx, input);
+        return this._resources.create(ctx, sec, args);
     }
 
+    /** @insecure @nochecks */
     async setResourceParent(
         ctx: ServerContext,
-        resourceIri: string,
-        parentIri: string,
+        sec: SecurityContext,
+        args: SetResourceParentArgs,
     ): Promise<void> {
-        return this._resources.setParent(ctx, resourceIri, parentIri);
+        return this._resources.setParent(ctx, sec, args);
     }
 
     // ── Impersonation / delegation ────────────────────────────────────────────
 
-    /** Allow `fromIri` to act as `toIri`. */
-    async allowImpersonation(ctx: ServerContext, fromIri: string, toIri: string): Promise<void> {
+    /** @insecure @nochecks Allow `fromIri` to act as `toIri`. */
+    async allowImpersonation(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: ImpersonationArgs,
+    ): Promise<void> {
         await this._store.insert(ctx, {
-            subject: new IRI(fromIri),
+            subject: new IRI(args.fromIri),
             predicate: actsForIRI,
-            object: new IRI(toIri),
+            object: new IRI(args.toIri),
             graph: RBAC_GRAPH,
         });
     }
 
-    /** Revoke impersonation rights. */
-    async revokeImpersonation(ctx: ServerContext, fromIri: string, toIri: string): Promise<void> {
+    /** @insecure @nochecks Revoke impersonation rights. */
+    async revokeImpersonation(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: ImpersonationArgs,
+    ): Promise<void> {
         await this._store.delete(ctx, {
-            subject: new IRI(fromIri),
+            subject: new IRI(args.fromIri),
             predicate: actsForIRI,
-            object: new IRI(toIri),
+            object: new IRI(args.toIri),
             graph: RBAC_GRAPH,
         });
     }
 
     // ── Service accounts ──────────────────────────────────────────────────────
 
+    /** @insecure @nochecks */
     async createServiceAccount(
         ctx: ServerContext,
-        input: Pick<
-            ServiceAccountEntity,
-            "serviceAccountName" | "serviceAccountToken" | "tenantId"
-        >,
+        sec: SecurityContext,
+        args: Pick<ServiceAccountEntity, "serviceAccountName" | "serviceAccountToken" | "tenantId">,
     ): Promise<ServiceAccountEntity> {
-        return this._serviceAccounts.create(ctx, input);
+        return this._serviceAccounts.create(ctx, sec, args);
     }
 
-    async deactivateServiceAccount(ctx: ServerContext, id: string): Promise<void> {
-        return this._serviceAccounts.deactivate(ctx, id);
+    /** @insecure @nochecks */
+    async deactivateServiceAccount(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<void> {
+        return this._serviceAccounts.deactivate(ctx, sec, args);
     }
 
     // ── Inspector ─────────────────────────────────────────────────────────────

@@ -2,30 +2,29 @@
  * Discussions API routes mounted at /api/convos.
  *
  * Access model:
- *   - Unauthenticated requests have no convos permissions → 403.
+ *   - Unauthenticated requests get anonymousSec → RBAC denies mutation routes.
  *   - Authenticated users are lazily provisioned with ConvoUser on their first
  *     request so they can participate without manual setup.
  *   - RBAC is enforced inside ConvoService; permission errors surface as 403.
  */
 
-import type { AuthRouterComponent, UserEntity } from "@jasonscharf/auth";
+import type { AuthRouterComponent } from "@jasonscharf/auth";
 import type { ConvoService } from "@jasonscharf/convos";
 import type { HttpCtx, HttpRouter } from "@jasonscharf/flow";
 import type { RbacService } from "@jasonscharf/rbac";
-import { defaultServerContext } from "@jasonscharf/server";
-
-export const ANON_IRI = "http://tern.dev/sandbox/user/anon";
+import {
+    anonymousSec,
+    defaultServerContext,
+    type SecurityContext,
+    systemSec,
+} from "@jasonscharf/server";
 
 const ctx = defaultServerContext;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function sessionUser(c: HttpCtx): UserEntity | undefined {
-    return c.user as UserEntity | undefined;
-}
-
-function callerIri(c: HttpCtx): string {
-    return sessionUser(c)?.iri ?? ANON_IRI;
+function sec(c: HttpCtx): SecurityContext {
+    return (c.sec as SecurityContext | undefined) ?? anonymousSec;
 }
 
 function body(c: HttpCtx): Record<string, unknown> {
@@ -40,16 +39,21 @@ function q(c: HttpCtx, key: string): string | undefined {
 
 async function ensureUserProvisioned(
     rbac: RbacService,
-    userIri: string,
+    userSec: SecurityContext,
     userRoleIri: string,
 ): Promise<void> {
-    const alreadyGranted = await rbac.can(ctx, {
-        principal: userIri,
+    if (!userSec.principalIri) {
+        return;
+    }
+    const alreadyGranted = await rbac.can(ctx, userSec, {
         permission: "tern.convos:conversation.create",
     });
     if (!alreadyGranted) {
-        await rbac.grant(ctx, { principalIri: userIri, roleIri: userRoleIri });
-        console.log(`[convos] auto-provisioned ConvoUser for ${userIri}`);
+        await rbac.grant(ctx, systemSec, {
+            principalIri: userSec.principalIri,
+            roleIri: userRoleIri,
+        });
+        console.log(`[convos] auto-provisioned ConvoUser for ${userSec.principalIri}`);
     }
 }
 
@@ -66,9 +70,9 @@ export function mountDiscussionsRoutes(
 
     async function handle(c: HttpCtx, handler: (c: HttpCtx) => Promise<void>): Promise<void> {
         await sessionMW(c, async () => {});
-        const user = sessionUser(c);
-        if (user) {
-            await ensureUserProvisioned(rbac, user.iri, userRoleIri);
+        const userSec = sec(c);
+        if (userSec.principalIri) {
+            await ensureUserProvisioned(rbac, userSec, userRoleIri);
         }
         try {
             await handler(c);
@@ -95,7 +99,7 @@ export function mountDiscussionsRoutes(
                 c.body = { error: "subjectIri query param required" };
                 return;
             }
-            c.body = await svc.getConversationsForSubject(ctx, subjectIri);
+            c.body = await svc.getConversationsForSubject(ctx, sec(c), { subjectIri });
         }),
     );
 
@@ -109,7 +113,7 @@ export function mountDiscussionsRoutes(
                 c.body = { error: "subjectIri and title required" };
                 return;
             }
-            const result = await svc.createConversation(ctx, callerIri(c), {
+            const result = await svc.createConversation(ctx, sec(c), {
                 subjectIri,
                 title,
                 initialMessage: b.initialMessage as string | undefined,
@@ -121,7 +125,9 @@ export function mountDiscussionsRoutes(
 
     router.get("/api/convos/conversations/:id", (c) =>
         handle(c, async (c) => {
-            const convo = await svc.getConversation(ctx, c.params.id);
+            const convo = await svc.getConversation(ctx, sec(c), {
+                conversationId: c.params.id,
+            });
             if (!convo) {
                 c.status = 404;
                 c.body = { error: "not found" };
@@ -133,9 +139,9 @@ export function mountDiscussionsRoutes(
 
     router.post("/api/convos/conversations/:id/close", (c) =>
         handle(c, async (c) => {
-            c.body = (await svc.closeConversation(ctx, callerIri(c), c.params.id)) ?? {
-                error: "not found",
-            };
+            c.body = (await svc.closeConversation(ctx, sec(c), {
+                conversationId: c.params.id,
+            })) ?? { error: "not found" };
         }),
     );
 
@@ -143,7 +149,9 @@ export function mountDiscussionsRoutes(
 
     router.get("/api/convos/conversations/:id/messages", (c) =>
         handle(c, async (c) => {
-            c.body = await svc.getMessagesForConversation(ctx, c.params.id);
+            c.body = await svc.getMessagesForConversation(ctx, sec(c), {
+                conversationId: c.params.id,
+            });
         }),
     );
 
@@ -156,7 +164,7 @@ export function mountDiscussionsRoutes(
                 c.body = { error: "content required" };
                 return;
             }
-            const message = await svc.postMessage(ctx, callerIri(c), {
+            const message = await svc.postMessage(ctx, sec(c), {
                 conversationId: c.params.id,
                 content,
                 replyToId: b.replyToId as string | undefined,
@@ -175,7 +183,10 @@ export function mountDiscussionsRoutes(
                 c.body = { error: "content required" };
                 return;
             }
-            const result = await svc.editMessage(ctx, callerIri(c), c.params.id, content);
+            const result = await svc.editMessage(ctx, sec(c), {
+                messageId: c.params.id,
+                newContent: content,
+            });
             if (!result) {
                 c.status = 404;
                 c.body = { error: "not found or deleted" };
@@ -187,7 +198,7 @@ export function mountDiscussionsRoutes(
 
     router.delete("/api/convos/messages/:id", (c) =>
         handle(c, async (c) => {
-            c.body = (await svc.deleteMessage(ctx, callerIri(c), c.params.id)) ?? {
+            c.body = (await svc.deleteMessage(ctx, sec(c), { messageId: c.params.id })) ?? {
                 error: "not found",
             };
         }),
@@ -198,21 +209,30 @@ export function mountDiscussionsRoutes(
     router.post("/api/convos/conversations/:id/read", (c) =>
         handle(c, async (c) => {
             const b = body(c);
-            const userId = (b.userId as string | undefined) ?? callerIri(c);
+            const userId = (b.userId as string | undefined) ?? sec(c).principalIri ?? "";
             const lastReadMessageId = b.lastReadMessageId as string | undefined;
             if (!lastReadMessageId) {
                 c.status = 400;
                 c.body = { error: "lastReadMessageId required" };
                 return;
             }
-            c.body = await svc.markConversationRead(ctx, userId, c.params.id, lastReadMessageId);
+            c.body = await svc.markConversationRead(ctx, sec(c), {
+                conversationId: c.params.id,
+                userId,
+                lastReadMessageId,
+            });
         }),
     );
 
     router.get("/api/convos/conversations/:id/unread", (c) =>
         handle(c, async (c) => {
-            const userId = q(c, "userId") ?? callerIri(c);
-            c.body = { unread: await svc.getUnreadMessageCount(ctx, c.params.id, userId) };
+            const userId = q(c, "userId") ?? sec(c).principalIri ?? "";
+            c.body = {
+                unread: await svc.getUnreadMessageCount(ctx, sec(c), {
+                    conversationId: c.params.id,
+                    userId,
+                }),
+            };
         }),
     );
 
@@ -220,7 +240,7 @@ export function mountDiscussionsRoutes(
 
     router.get("/api/convos/conversations/:id/participants", (c) =>
         handle(c, async (c) => {
-            c.body = await svc.getParticipants(ctx, c.params.id);
+            c.body = await svc.getParticipants(ctx, sec(c), { conversationId: c.params.id });
         }),
     );
 
@@ -228,28 +248,32 @@ export function mountDiscussionsRoutes(
 
     router.get("/api/convos/notifications", (c) =>
         handle(c, async (c) => {
-            const userId = q(c, "userId") ?? callerIri(c);
+            const userId = q(c, "userId") ?? sec(c).principalIri ?? "";
             const unreadOnly = q(c, "unreadOnly") === "true";
-            c.body = await svc.getNotificationsForUser(ctx, userId, { unreadOnly });
+            c.body = await svc.getNotificationsForUser(ctx, sec(c), { userId, unreadOnly });
         }),
     );
 
     router.post("/api/convos/notifications/:id/read", (c) =>
         handle(c, async (c) => {
-            c.body = await svc.markNotificationRead(ctx, c.params.id);
+            c.body = await svc.markNotificationRead(ctx, sec(c), {
+                notificationId: c.params.id,
+            });
         }),
     );
 
     router.post("/api/convos/notifications/read-all", (c) =>
         handle(c, async (c) => {
-            const userId = (body(c).userId as string | undefined) ?? callerIri(c);
-            c.body = { marked: await svc.markAllNotificationsRead(ctx, userId) };
+            const userId = (body(c).userId as string | undefined) ?? sec(c).principalIri ?? "";
+            c.body = { marked: await svc.markAllNotificationsRead(ctx, sec(c), { userId }) };
         }),
     );
 
     router.post("/api/convos/notifications/:id/dismiss", (c) =>
         handle(c, async (c) => {
-            c.body = await svc.dismissNotification(ctx, c.params.id);
+            c.body = await svc.dismissNotification(ctx, sec(c), {
+                notificationId: c.params.id,
+            });
         }),
     );
 
@@ -257,12 +281,10 @@ export function mountDiscussionsRoutes(
 
     router.get("/api/convos/me", (c) =>
         handle(c, async (c) => {
-            const user = sessionUser(c);
+            const s = sec(c);
             c.body = {
-                iri: callerIri(c),
-                authenticated: user != null,
-                email: user?.email,
-                displayName: user?.displayName,
+                iri: s.principalIri,
+                authenticated: s.principalIri != null,
             };
         }),
     );

@@ -1,9 +1,21 @@
 import { IRI, literal, PermissionIRI, permissionKeyIRI, rbacCreatedAtIRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import { RBAC_GRAPH, RDF_TYPE, XSD_DATETIME, XSD_STRING } from "../constants.js";
 import type { PermissionEntity } from "../types.js";
 import { idFrom, iriFor, literalValue, newId } from "./util.js";
+
+export interface IdArgs {
+    id: string;
+}
+
+export interface IriStrArgs {
+    iriStr: string;
+}
+
+export interface KeyArgs {
+    key: string;
+}
 
 export class PermissionRepository {
     private readonly _store: TripleStore;
@@ -12,9 +24,11 @@ export class PermissionRepository {
         this._store = store;
     }
 
+    /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        input: Pick<PermissionEntity, "permissionKey">,
+        _sec: SecurityContext,
+        args: Pick<PermissionEntity, "permissionKey">,
     ): Promise<PermissionEntity> {
         const id = newId();
         const now = new Date();
@@ -25,7 +39,7 @@ export class PermissionRepository {
             {
                 subject: sub,
                 predicate: permissionKeyIRI,
-                object: literal(input.permissionKey, XSD_STRING),
+                object: literal(args.permissionKey, XSD_STRING),
                 graph: RBAC_GRAPH,
             },
             {
@@ -36,25 +50,42 @@ export class PermissionRepository {
             },
         ]);
 
-        return { id, iri: sub.value, permissionKey: input.permissionKey, createdAt: now };
+        return { id, iri: sub.value, permissionKey: args.permissionKey, createdAt: now };
     }
 
-    async findById(ctx: ServerContext, id: string): Promise<PermissionEntity | null> {
-        const sub = iriFor("permission", id);
+    /** @insecure @nochecks */
+    async findById(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<PermissionEntity | null> {
+        const sub = iriFor("permission", args.id);
         const quads = await this._store.find(ctx, { subject: sub, graph: RBAC_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(id, quads);
+        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
     }
 
-    async findByIri(ctx: ServerContext, iriStr: string): Promise<PermissionEntity | null> {
-        const quads = await this._store.find(ctx, { subject: new IRI(iriStr), graph: RBAC_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(idFrom(iriStr), quads);
+    /** @insecure @nochecks */
+    async findByIri(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IriStrArgs,
+    ): Promise<PermissionEntity | null> {
+        const quads = await this._store.find(ctx, {
+            subject: new IRI(args.iriStr),
+            graph: RBAC_GRAPH,
+        });
+        return quads.length === 0 ? null : this._fromQuads(idFrom(args.iriStr), quads);
     }
 
-    /** Find a permission by its dot-separated key (e.g. "invoice.read"). */
-    async findByKey(ctx: ServerContext, key: string): Promise<PermissionEntity | null> {
+    /** @insecure @nochecks Find a permission by its dot-separated key (e.g. "invoice.read"). */
+    async findByKey(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: KeyArgs,
+    ): Promise<PermissionEntity | null> {
         const quads = await this._store.find(ctx, {
             predicate: permissionKeyIRI,
-            object: literal(key, XSD_STRING),
+            object: literal(args.key, XSD_STRING),
             graph: RBAC_GRAPH,
         });
         if (quads.length === 0) {

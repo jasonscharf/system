@@ -8,10 +8,23 @@ import {
     tenantNameIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import { RBAC_GRAPH, RDF_TYPE, XSD_BOOLEAN, XSD_DATETIME, XSD_STRING } from "../constants.js";
 import type { TenantEntity } from "../types.js";
 import { idFrom, iriFor, literalValue, newId } from "./util.js";
+
+export interface IdArgs {
+    id: string;
+}
+
+export interface IriStrArgs {
+    iriStr: string;
+}
+
+export interface UpdateTenantArgs {
+    id: string;
+    patch: { tenantName?: string };
+}
 
 export class TenantRepository {
     private readonly _store: TripleStore;
@@ -24,9 +37,11 @@ export class TenantRepository {
         return this._store;
     }
 
+    /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        input: Pick<TenantEntity, "tenantName">,
+        _sec: SecurityContext,
+        args: Pick<TenantEntity, "tenantName">,
     ): Promise<TenantEntity> {
         const id = newId();
         const now = new Date();
@@ -37,7 +52,7 @@ export class TenantRepository {
             {
                 subject: sub,
                 predicate: tenantNameIRI,
-                object: literal(input.tenantName, XSD_STRING),
+                object: literal(args.tenantName, XSD_STRING),
                 graph: RBAC_GRAPH,
             },
             {
@@ -63,26 +78,37 @@ export class TenantRepository {
         return {
             id,
             iri: sub.value,
-            tenantName: input.tenantName,
+            tenantName: args.tenantName,
             isSystemTenant: false,
             createdAt: now,
             updatedAt: now,
         };
     }
 
-    async findById(ctx: ServerContext, id: string): Promise<TenantEntity | null> {
-        const sub = iriFor("tenant", id);
+    /** @insecure @nochecks */
+    async findById(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<TenantEntity | null> {
+        const sub = iriFor("tenant", args.id);
         const quads = await this._store.find(ctx, { subject: sub, graph: RBAC_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(id, quads);
+        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
     }
 
-    async findByIri(ctx: ServerContext, iriStr: string): Promise<TenantEntity | null> {
-        const sub = new IRI(iriStr);
+    /** @insecure @nochecks */
+    async findByIri(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IriStrArgs,
+    ): Promise<TenantEntity | null> {
+        const sub = new IRI(args.iriStr);
         const quads = await this._store.find(ctx, { subject: sub, graph: RBAC_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(idFrom(iriStr), quads);
+        return quads.length === 0 ? null : this._fromQuads(idFrom(args.iriStr), quads);
     }
 
-    async listAll(ctx: ServerContext): Promise<TenantEntity[]> {
+    /** @insecure @nochecks */
+    async listAll(ctx: ServerContext, _sec: SecurityContext): Promise<TenantEntity[]> {
         const typeQuads = await this._store.find(ctx, {
             predicate: RDF_TYPE,
             object: TenantIRI,
@@ -97,44 +123,47 @@ export class TenantRepository {
         return results;
     }
 
+    /** @insecure @nochecks */
     async update(
         ctx: ServerContext,
-        id: string,
-        patch: { tenantName?: string },
+        sec: SecurityContext,
+        args: UpdateTenantArgs,
     ): Promise<TenantEntity | null> {
-        const existing = await this.findById(ctx, id);
-        if (!existing) {
-            return null;
-        }
-        const sub = iriFor("tenant", id);
-        const now = new Date();
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const existing = await this.findById(ctx, sec, { id: args.id });
+            if (!existing) {
+                return null;
+            }
+            const sub = iriFor("tenant", args.id);
+            const now = new Date();
 
-        if (patch.tenantName !== undefined) {
+            if (args.patch.tenantName !== undefined) {
+                await this._store.delete(ctx, {
+                    subject: sub,
+                    predicate: tenantNameIRI,
+                    graph: RBAC_GRAPH,
+                });
+                await this._store.insert(ctx, {
+                    subject: sub,
+                    predicate: tenantNameIRI,
+                    object: literal(args.patch.tenantName, XSD_STRING),
+                    graph: RBAC_GRAPH,
+                });
+            }
             await this._store.delete(ctx, {
                 subject: sub,
-                predicate: tenantNameIRI,
+                predicate: rbacUpdatedAtIRI,
                 graph: RBAC_GRAPH,
             });
             await this._store.insert(ctx, {
                 subject: sub,
-                predicate: tenantNameIRI,
-                object: literal(patch.tenantName, XSD_STRING),
+                predicate: rbacUpdatedAtIRI,
+                object: literal(now.toISOString(), XSD_DATETIME),
                 graph: RBAC_GRAPH,
             });
-        }
-        await this._store.delete(ctx, {
-            subject: sub,
-            predicate: rbacUpdatedAtIRI,
-            graph: RBAC_GRAPH,
-        });
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: rbacUpdatedAtIRI,
-            object: literal(now.toISOString(), XSD_DATETIME),
-            graph: RBAC_GRAPH,
-        });
 
-        return this.findById(ctx, id);
+            return this.findById(ctx, sec, { id: args.id });
+        });
     }
 
     private _fromQuads(id: string, quads: Awaited<ReturnType<TripleStore["find"]>>): TenantEntity {

@@ -1,6 +1,6 @@
 import { IRI, literal } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import {
     assignedToIRI,
     CONVOS_GRAPH,
@@ -19,6 +19,28 @@ import {
 import type { ConversationEntity, ConversationStatus } from "../types.js";
 import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
 
+export interface IdArgs {
+    id: string;
+}
+
+export interface SubjectIriArgs {
+    subjectIri: string;
+}
+
+export interface InboxIdArgs {
+    inboxId: string;
+}
+
+export interface UpdateStatusArgs {
+    id: string;
+    status: ConversationStatus;
+}
+
+export interface UpdateAssignmentArgs {
+    id: string;
+    assignedTo: string | null;
+}
+
 export class ConversationRepository {
     private readonly _store: TripleStore;
 
@@ -30,9 +52,11 @@ export class ConversationRepository {
         return this._store;
     }
 
+    /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        input: Pick<ConversationEntity, "subjectIri" | "title" | "createdBy"> & {
+        _sec: SecurityContext,
+        args: Pick<ConversationEntity, "subjectIri" | "title" | "createdBy"> & {
             inboxId?: string;
             assignedTo?: string;
         },
@@ -51,13 +75,13 @@ export class ConversationRepository {
             {
                 subject: sub,
                 predicate: subjectIriIRI,
-                object: literal(input.subjectIri, XSD_STRING),
+                object: literal(args.subjectIri, XSD_STRING),
                 graph: CONVOS_GRAPH,
             },
             {
                 subject: sub,
                 predicate: titleIRI,
-                object: literal(input.title, XSD_STRING),
+                object: literal(args.title, XSD_STRING),
                 graph: CONVOS_GRAPH,
             },
             {
@@ -69,7 +93,7 @@ export class ConversationRepository {
             {
                 subject: sub,
                 predicate: convoCreatedByIRI,
-                object: new IRI(input.createdBy),
+                object: new IRI(args.createdBy),
                 graph: CONVOS_GRAPH,
             },
             {
@@ -86,20 +110,20 @@ export class ConversationRepository {
             },
         ];
 
-        if (input.inboxId) {
+        if (args.inboxId) {
             quads.push({
                 subject: sub,
                 predicate: convoInboxIRI,
-                object: iriFor("inbox", input.inboxId),
+                object: iriFor("inbox", args.inboxId),
                 graph: CONVOS_GRAPH,
             });
         }
 
-        if (input.assignedTo) {
+        if (args.assignedTo) {
             quads.push({
                 subject: sub,
                 predicate: assignedToIRI,
-                object: new IRI(input.assignedTo),
+                object: new IRI(args.assignedTo),
                 graph: CONVOS_GRAPH,
             });
         }
@@ -109,27 +133,37 @@ export class ConversationRepository {
         return {
             id,
             iri: sub.value,
-            subjectIri: input.subjectIri,
-            inboxId: input.inboxId ?? null,
-            title: input.title,
+            subjectIri: args.subjectIri,
+            inboxId: args.inboxId ?? null,
+            title: args.title,
             status: "open",
-            assignedTo: input.assignedTo ?? null,
-            createdBy: input.createdBy,
+            assignedTo: args.assignedTo ?? null,
+            createdBy: args.createdBy,
             createdAt: now,
             updatedAt: now,
         };
     }
 
-    async findById(ctx: ServerContext, id: string): Promise<ConversationEntity | null> {
-        const sub = iriFor("conversation", id);
+    /** @insecure @nochecks */
+    async findById(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<ConversationEntity | null> {
+        const sub = iriFor("conversation", args.id);
         const quads = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(id, quads);
+        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
     }
 
-    async findBySubject(ctx: ServerContext, subjectIri: string): Promise<ConversationEntity[]> {
+    /** @insecure @nochecks */
+    async findBySubject(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: SubjectIriArgs,
+    ): Promise<ConversationEntity[]> {
         const quads = await this._store.find(ctx, {
             predicate: subjectIriIRI,
-            object: literal(subjectIri, XSD_STRING),
+            object: literal(args.subjectIri, XSD_STRING),
             graph: CONVOS_GRAPH,
         });
 
@@ -155,10 +189,15 @@ export class ConversationRepository {
         return conversations;
     }
 
-    async findByInbox(ctx: ServerContext, inboxId: string): Promise<ConversationEntity[]> {
+    /** @insecure @nochecks */
+    async findByInbox(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: InboxIdArgs,
+    ): Promise<ConversationEntity[]> {
         const quads = await this._store.find(ctx, {
             predicate: convoInboxIRI,
-            object: iriFor("inbox", inboxId),
+            object: iriFor("inbox", args.inboxId),
             graph: CONVOS_GRAPH,
         });
 
@@ -178,87 +217,102 @@ export class ConversationRepository {
         return conversations;
     }
 
+    /** @insecure @nochecks */
     async updateStatus(
         ctx: ServerContext,
-        id: string,
-        status: ConversationStatus,
+        sec: SecurityContext,
+        args: UpdateStatusArgs,
     ): Promise<ConversationEntity | null> {
-        const existing = await this.findById(ctx, id);
-        if (!existing) {
-            return null;
-        }
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const existing = await this.findById(ctx, sec, { id: args.id });
+            if (!existing) {
+                return null;
+            }
 
-        const sub = iriFor("conversation", id);
-        const now = new Date();
+            const sub = iriFor("conversation", args.id);
+            const now = new Date();
 
-        await this._store.delete(ctx, { subject: sub, predicate: statusIRI, graph: CONVOS_GRAPH });
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: statusIRI,
-            object: literal(status, XSD_STRING),
-            graph: CONVOS_GRAPH,
-        });
-        await this._store.delete(ctx, {
-            subject: sub,
-            predicate: convosUpdatedAtIRI,
-            graph: CONVOS_GRAPH,
-        });
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: convosUpdatedAtIRI,
-            object: literal(now.toISOString(), XSD_DATETIME),
-            graph: CONVOS_GRAPH,
-        });
-
-        return this.findById(ctx, id);
-    }
-
-    async updateAssignment(
-        ctx: ServerContext,
-        id: string,
-        assignedTo: string | null,
-    ): Promise<ConversationEntity | null> {
-        const existing = await this.findById(ctx, id);
-        if (!existing) {
-            return null;
-        }
-
-        const sub = iriFor("conversation", id);
-        const now = new Date();
-
-        await this._store.delete(ctx, {
-            subject: sub,
-            predicate: assignedToIRI,
-            graph: CONVOS_GRAPH,
-        });
-
-        if (assignedTo) {
-            await this._store.insert(ctx, {
+            await this._store.delete(ctx, {
                 subject: sub,
-                predicate: assignedToIRI,
-                object: new IRI(assignedTo),
+                predicate: statusIRI,
                 graph: CONVOS_GRAPH,
             });
-        }
+            await this._store.insert(ctx, {
+                subject: sub,
+                predicate: statusIRI,
+                object: literal(args.status, XSD_STRING),
+                graph: CONVOS_GRAPH,
+            });
+            await this._store.delete(ctx, {
+                subject: sub,
+                predicate: convosUpdatedAtIRI,
+                graph: CONVOS_GRAPH,
+            });
+            await this._store.insert(ctx, {
+                subject: sub,
+                predicate: convosUpdatedAtIRI,
+                object: literal(now.toISOString(), XSD_DATETIME),
+                graph: CONVOS_GRAPH,
+            });
 
-        await this._store.delete(ctx, {
-            subject: sub,
-            predicate: convosUpdatedAtIRI,
-            graph: CONVOS_GRAPH,
+            return this.findById(ctx, sec, { id: args.id });
         });
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: convosUpdatedAtIRI,
-            object: literal(now.toISOString(), XSD_DATETIME),
-            graph: CONVOS_GRAPH,
-        });
-
-        return this.findById(ctx, id);
     }
 
-    async delete(ctx: ServerContext, id: string): Promise<void> {
+    /** @insecure @nochecks */
+    async updateAssignment(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: UpdateAssignmentArgs,
+    ): Promise<ConversationEntity | null> {
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const existing = await this.findById(ctx, sec, { id: args.id });
+            if (!existing) {
+                return null;
+            }
+
+            const sub = iriFor("conversation", args.id);
+            const now = new Date();
+
+            await this._store.delete(ctx, {
+                subject: sub,
+                predicate: assignedToIRI,
+                graph: CONVOS_GRAPH,
+            });
+
+            if (args.assignedTo) {
+                await this._store.insert(ctx, {
+                    subject: sub,
+                    predicate: assignedToIRI,
+                    object: new IRI(args.assignedTo),
+                    graph: CONVOS_GRAPH,
+                });
+            }
+
+            await this._store.delete(ctx, {
+                subject: sub,
+                predicate: convosUpdatedAtIRI,
+                graph: CONVOS_GRAPH,
+            });
+            await this._store.insert(ctx, {
+                subject: sub,
+                predicate: convosUpdatedAtIRI,
+                object: literal(now.toISOString(), XSD_DATETIME),
+                graph: CONVOS_GRAPH,
+            });
+
+            return this.findById(ctx, sec, { id: args.id });
+        });
+    }
+
+    /** @insecure @nochecks */
+    async delete(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<void> {
         await this._store.delete(ctx, {
-            subject: iriFor("conversation", id),
+            subject: iriFor("conversation", args.id),
             graph: CONVOS_GRAPH,
         });
     }
@@ -302,7 +356,7 @@ export class ConversationRepository {
         }
 
         const inboxIri = getIri(convoInboxIRI);
-        const assignedToIri = getIri(assignedToIRI);
+        const assignedToIriVal = getIri(assignedToIRI);
 
         return {
             id,
@@ -311,7 +365,7 @@ export class ConversationRepository {
             inboxId: inboxIri ? idFrom(inboxIri) : null,
             title,
             status: status as ConversationStatus,
-            assignedTo: assignedToIri ?? null,
+            assignedTo: assignedToIriVal ?? null,
             createdBy: createdByIri,
             createdAt: new Date(createdAtStr),
             updatedAt: new Date(updatedAtStr),

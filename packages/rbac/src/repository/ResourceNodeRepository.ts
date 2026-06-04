@@ -9,7 +9,7 @@ import {
     resourceTypeIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import { RBAC_GRAPH, RDF_TYPE, XSD_DATETIME, XSD_STRING } from "../constants.js";
 import type { ResourceNodeEntity } from "../types.js";
 import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
@@ -20,6 +20,19 @@ export interface CreateResourceInput {
     parentIri?: string;
 }
 
+export interface IdArgs {
+    id: string;
+}
+
+export interface IriStrArgs {
+    iriStr: string;
+}
+
+export interface SetParentArgs {
+    resourceIri: string;
+    parentIri: string;
+}
+
 export class ResourceNodeRepository {
     private readonly _store: TripleStore;
 
@@ -27,7 +40,12 @@ export class ResourceNodeRepository {
         this._store = store;
     }
 
-    async create(ctx: ServerContext, input: CreateResourceInput): Promise<ResourceNodeEntity> {
+    /** @insecure @nochecks */
+    async create(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: CreateResourceInput,
+    ): Promise<ResourceNodeEntity> {
         const id = newId();
         const now = new Date();
         const sub = iriFor("resource", id);
@@ -37,7 +55,7 @@ export class ResourceNodeRepository {
             {
                 subject: sub,
                 predicate: resourceTypeIRI,
-                object: literal(input.resourceType, XSD_STRING),
+                object: literal(args.resourceType, XSD_STRING),
                 graph: RBAC_GRAPH,
             },
             {
@@ -53,19 +71,19 @@ export class ResourceNodeRepository {
                 graph: RBAC_GRAPH,
             },
         ];
-        if (input.tenantId) {
+        if (args.tenantId) {
             quads.push({
                 subject: sub,
                 predicate: inTenantIRI,
-                object: iriFor("tenant", input.tenantId),
+                object: iriFor("tenant", args.tenantId),
                 graph: RBAC_GRAPH,
             });
         }
-        if (input.parentIri) {
+        if (args.parentIri) {
             quads.push({
                 subject: sub,
                 predicate: parentResourceIRI,
-                object: new IRI(input.parentIri),
+                object: new IRI(args.parentIri),
                 graph: RBAC_GRAPH,
             });
         }
@@ -75,37 +93,56 @@ export class ResourceNodeRepository {
         return {
             id,
             iri: sub.value,
-            resourceType: input.resourceType,
-            parentIri: input.parentIri ?? null,
-            tenantId: input.tenantId ?? null,
+            resourceType: args.resourceType,
+            parentIri: args.parentIri ?? null,
+            tenantId: args.tenantId ?? null,
             createdAt: now,
             updatedAt: now,
         };
     }
 
-    async findById(ctx: ServerContext, id: string): Promise<ResourceNodeEntity | null> {
-        const sub = iriFor("resource", id);
+    /** @insecure @nochecks */
+    async findById(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<ResourceNodeEntity | null> {
+        const sub = iriFor("resource", args.id);
         const quads = await this._store.find(ctx, { subject: sub, graph: RBAC_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(id, quads);
+        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
     }
 
-    async findByIri(ctx: ServerContext, iriStr: string): Promise<ResourceNodeEntity | null> {
-        const quads = await this._store.find(ctx, { subject: new IRI(iriStr), graph: RBAC_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(idFrom(iriStr), quads);
-    }
-
-    /** Set the parent of a resource (adds a parentResource edge). */
-    async setParent(ctx: ServerContext, resourceIri: string, parentIri: string): Promise<void> {
-        await this._store.delete(ctx, {
-            subject: new IRI(resourceIri),
-            predicate: parentResourceIRI,
+    /** @insecure @nochecks */
+    async findByIri(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IriStrArgs,
+    ): Promise<ResourceNodeEntity | null> {
+        const quads = await this._store.find(ctx, {
+            subject: new IRI(args.iriStr),
             graph: RBAC_GRAPH,
         });
-        await this._store.insert(ctx, {
-            subject: new IRI(resourceIri),
-            predicate: parentResourceIRI,
-            object: new IRI(parentIri),
-            graph: RBAC_GRAPH,
+        return quads.length === 0 ? null : this._fromQuads(idFrom(args.iriStr), quads);
+    }
+
+    /** @insecure @nochecks Set the parent of a resource (replaces existing parentResource edge). */
+    async setParent(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: SetParentArgs,
+    ): Promise<void> {
+        return this._store.withTransaction(ctx, async (ctx) => {
+            await this._store.delete(ctx, {
+                subject: new IRI(args.resourceIri),
+                predicate: parentResourceIRI,
+                graph: RBAC_GRAPH,
+            });
+            await this._store.insert(ctx, {
+                subject: new IRI(args.resourceIri),
+                predicate: parentResourceIRI,
+                object: new IRI(args.parentIri),
+                graph: RBAC_GRAPH,
+            });
         });
     }
 

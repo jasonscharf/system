@@ -11,10 +11,25 @@ import {
     UserSessionIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import { AUTH_GRAPH, RDF_TYPE, XSD_BOOLEAN, XSD_DATETIME, XSD_STRING } from "../constants.js";
 import type { UserSessionEntity } from "../types.js";
 import { idFrom, iriFor, newId, newSessionToken } from "./util.js";
+
+export interface CreateSessionArgs {
+    userId: string;
+    deviceId: string;
+    expiresAt: Date;
+    ipAddress?: string;
+}
+
+export interface TokenArgs {
+    token: string;
+}
+
+export interface UserIdArgs {
+    userId: string;
+}
 
 export class UserSessionRepository {
     private readonly _store: TripleStore;
@@ -23,14 +38,11 @@ export class UserSessionRepository {
         this._store = store;
     }
 
+    /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        input: {
-            userId: string;
-            deviceId: string;
-            expiresAt: Date;
-            ipAddress?: string;
-        },
+        _sec: SecurityContext,
+        args: CreateSessionArgs,
     ): Promise<UserSessionEntity> {
         const id = newId();
         const token = newSessionToken();
@@ -48,19 +60,19 @@ export class UserSessionRepository {
             {
                 subject: sub,
                 predicate: sessionUserIRI,
-                object: iriFor("user", input.userId),
+                object: iriFor("user", args.userId),
                 graph: AUTH_GRAPH,
             },
             {
                 subject: sub,
                 predicate: sessionDeviceIRI,
-                object: iriFor("device", input.deviceId),
+                object: iriFor("device", args.deviceId),
                 graph: AUTH_GRAPH,
             },
             {
                 subject: sub,
                 predicate: expiresAtIRI,
-                object: literal(input.expiresAt.toISOString(), XSD_DATETIME),
+                object: literal(args.expiresAt.toISOString(), XSD_DATETIME),
                 graph: AUTH_GRAPH,
             },
             {
@@ -75,12 +87,12 @@ export class UserSessionRepository {
                 object: literal(now.toISOString(), XSD_DATETIME),
                 graph: AUTH_GRAPH,
             },
-            ...(input.ipAddress
+            ...(args.ipAddress
                 ? [
                       {
                           subject: sub,
                           predicate: ipAddressIRI,
-                          object: literal(input.ipAddress, XSD_STRING),
+                          object: literal(args.ipAddress, XSD_STRING),
                           graph: AUTH_GRAPH,
                       },
                   ]
@@ -91,19 +103,24 @@ export class UserSessionRepository {
             id,
             iri: sub.value,
             sessionToken: token,
-            userId: input.userId,
-            deviceId: input.deviceId,
-            expiresAt: input.expiresAt,
+            userId: args.userId,
+            deviceId: args.deviceId,
+            expiresAt: args.expiresAt,
             isActive: true,
-            ipAddress: input.ipAddress,
+            ipAddress: args.ipAddress,
             createdAt: now,
         };
     }
 
-    async findByToken(ctx: ServerContext, token: string): Promise<UserSessionEntity | null> {
+    /** @insecure @nochecks */
+    async findByToken(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: TokenArgs,
+    ): Promise<UserSessionEntity | null> {
         const quads = await this._store.find(ctx, {
             predicate: sessionTokenIRI,
-            object: literal(token, XSD_STRING),
+            object: literal(args.token, XSD_STRING),
             graph: AUTH_GRAPH,
         });
         if (quads.length === 0) {
@@ -115,8 +132,13 @@ export class UserSessionRepository {
         return this._fromQuads(idFrom(sub.value), allQuads);
     }
 
-    async findByUserId(ctx: ServerContext, userId: string): Promise<UserSessionEntity[]> {
-        const userIri = iriFor("user", userId);
+    /** @insecure @nochecks */
+    async findByUserId(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: UserIdArgs,
+    ): Promise<UserSessionEntity[]> {
+        const userIri = iriFor("user", args.userId);
         const byUser = await this._store.find(ctx, {
             predicate: sessionUserIRI,
             object: userIri,
@@ -132,36 +154,53 @@ export class UserSessionRepository {
         return results;
     }
 
-    async revoke(ctx: ServerContext, token: string): Promise<boolean> {
-        const session = await this.findByToken(ctx, token);
-        if (!session) {
-            return false;
-        }
+    /** @insecure @nochecks */
+    async revoke(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: TokenArgs,
+    ): Promise<boolean> {
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const session = await this.findByToken(ctx, sec, args);
+            if (!session) {
+                return false;
+            }
 
-        const sub = iriFor("session", session.id);
-        await this._store.delete(ctx, { subject: sub, predicate: isActiveIRI, graph: AUTH_GRAPH });
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: isActiveIRI,
-            object: literal("false", XSD_BOOLEAN),
-            graph: AUTH_GRAPH,
+            const sub = iriFor("session", session.id);
+            await this._store.delete(ctx, {
+                subject: sub,
+                predicate: isActiveIRI,
+                graph: AUTH_GRAPH,
+            });
+            await this._store.insert(ctx, {
+                subject: sub,
+                predicate: isActiveIRI,
+                object: literal("false", XSD_BOOLEAN),
+                graph: AUTH_GRAPH,
+            });
+            return true;
         });
-        return true;
     }
 
-    async revokeAllForUser(ctx: ServerContext, userId: string): Promise<number> {
-        const sessions = await this.findByUserId(ctx, userId);
+    /** @insecure @nochecks */
+    async revokeAllForUser(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: UserIdArgs,
+    ): Promise<number> {
+        const sessions = await this.findByUserId(ctx, sec, args);
         let count = 0;
         for (const s of sessions) {
             if (s.isActive) {
-                await this.revoke(ctx, s.sessionToken);
+                await this.revoke(ctx, sec, { token: s.sessionToken });
                 count++;
             }
         }
         return count;
     }
 
-    async deleteExpired(ctx: ServerContext): Promise<number> {
+    /** @insecure @nochecks */
+    async deleteExpired(ctx: ServerContext, _sec: SecurityContext): Promise<number> {
         const allByToken = await this._store.find(ctx, {
             predicate: sessionTokenIRI,
             graph: AUTH_GRAPH,

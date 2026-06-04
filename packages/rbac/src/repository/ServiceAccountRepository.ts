@@ -10,10 +10,18 @@ import {
     serviceAccountTokenIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import { RBAC_GRAPH, RDF_TYPE, XSD_BOOLEAN, XSD_DATETIME, XSD_STRING } from "../constants.js";
 import type { ServiceAccountEntity } from "../types.js";
 import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
+
+export interface IdArgs {
+    id: string;
+}
+
+export interface IriStrArgs {
+    iriStr: string;
+}
 
 export class ServiceAccountRepository {
     private readonly _store: TripleStore;
@@ -22,12 +30,11 @@ export class ServiceAccountRepository {
         this._store = store;
     }
 
+    /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        input: Pick<
-            ServiceAccountEntity,
-            "serviceAccountName" | "serviceAccountToken" | "tenantId"
-        >,
+        _sec: SecurityContext,
+        args: Pick<ServiceAccountEntity, "serviceAccountName" | "serviceAccountToken" | "tenantId">,
     ): Promise<ServiceAccountEntity> {
         const id = newId();
         const now = new Date();
@@ -38,13 +45,13 @@ export class ServiceAccountRepository {
             {
                 subject: sub,
                 predicate: serviceAccountNameIRI,
-                object: literal(input.serviceAccountName, XSD_STRING),
+                object: literal(args.serviceAccountName, XSD_STRING),
                 graph: RBAC_GRAPH,
             },
             {
                 subject: sub,
                 predicate: serviceAccountTokenIRI,
-                object: literal(input.serviceAccountToken, XSD_STRING),
+                object: literal(args.serviceAccountToken, XSD_STRING),
                 graph: RBAC_GRAPH,
             },
             {
@@ -66,11 +73,11 @@ export class ServiceAccountRepository {
                 graph: RBAC_GRAPH,
             },
         ];
-        if (input.tenantId) {
+        if (args.tenantId) {
             quads.push({
                 subject: sub,
                 predicate: inTenantIRI,
-                object: iriFor("tenant", input.tenantId),
+                object: iriFor("tenant", args.tenantId),
                 graph: RBAC_GRAPH,
             });
         }
@@ -79,50 +86,70 @@ export class ServiceAccountRepository {
         return {
             id,
             iri: sub.value,
-            serviceAccountName: input.serviceAccountName,
-            serviceAccountToken: input.serviceAccountToken,
+            serviceAccountName: args.serviceAccountName,
+            serviceAccountToken: args.serviceAccountToken,
             isActive: true,
-            tenantId: input.tenantId ?? null,
+            tenantId: args.tenantId ?? null,
             createdAt: now,
             updatedAt: now,
         };
     }
 
-    async findById(ctx: ServerContext, id: string): Promise<ServiceAccountEntity | null> {
-        const sub = iriFor("sa", id);
+    /** @insecure @nochecks */
+    async findById(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<ServiceAccountEntity | null> {
+        const sub = iriFor("sa", args.id);
         const quads = await this._store.find(ctx, { subject: sub, graph: RBAC_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(id, quads);
+        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
     }
 
-    async findByIri(ctx: ServerContext, iriStr: string): Promise<ServiceAccountEntity | null> {
-        const quads = await this._store.find(ctx, { subject: new IRI(iriStr), graph: RBAC_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(idFrom(iriStr), quads);
+    /** @insecure @nochecks */
+    async findByIri(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IriStrArgs,
+    ): Promise<ServiceAccountEntity | null> {
+        const quads = await this._store.find(ctx, {
+            subject: new IRI(args.iriStr),
+            graph: RBAC_GRAPH,
+        });
+        return quads.length === 0 ? null : this._fromQuads(idFrom(args.iriStr), quads);
     }
 
-    async deactivate(ctx: ServerContext, id: string): Promise<void> {
-        const sub = iriFor("sa", id);
-        await this._store.delete(ctx, {
-            subject: sub,
-            predicate: rbacIsActiveIRI,
-            graph: RBAC_GRAPH,
-        });
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: rbacIsActiveIRI,
-            object: literal("false", XSD_BOOLEAN),
-            graph: RBAC_GRAPH,
-        });
-        const now = new Date();
-        await this._store.delete(ctx, {
-            subject: sub,
-            predicate: rbacUpdatedAtIRI,
-            graph: RBAC_GRAPH,
-        });
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: rbacUpdatedAtIRI,
-            object: literal(now.toISOString(), XSD_DATETIME),
-            graph: RBAC_GRAPH,
+    /** @insecure @nochecks */
+    async deactivate(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<void> {
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const sub = iriFor("sa", args.id);
+            await this._store.delete(ctx, {
+                subject: sub,
+                predicate: rbacIsActiveIRI,
+                graph: RBAC_GRAPH,
+            });
+            await this._store.insert(ctx, {
+                subject: sub,
+                predicate: rbacIsActiveIRI,
+                object: literal("false", XSD_BOOLEAN),
+                graph: RBAC_GRAPH,
+            });
+            const now = new Date();
+            await this._store.delete(ctx, {
+                subject: sub,
+                predicate: rbacUpdatedAtIRI,
+                graph: RBAC_GRAPH,
+            });
+            await this._store.insert(ctx, {
+                subject: sub,
+                predicate: rbacUpdatedAtIRI,
+                object: literal(now.toISOString(), XSD_DATETIME),
+                graph: RBAC_GRAPH,
+            });
         });
     }
 

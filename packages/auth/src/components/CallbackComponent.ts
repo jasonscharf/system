@@ -1,5 +1,5 @@
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
-import { defaultServerContext } from "@jasonscharf/server";
+import { defaultServerContext, systemSec } from "@jasonscharf/server";
 import { SESSION_TTL_SECS } from "../constants.js";
 import type { IOAuthProvider } from "../oauth/types.js";
 import type { UserDeviceRepository } from "../repository/UserDeviceRepository.js";
@@ -91,30 +91,35 @@ export class CallbackComponent extends FlowComponent {
             // Exchange code → tokens + profile
             const { profile, tokens } = await provider.exchangeCode(req.code, req.redirectUri);
 
+            const ctx = defaultServerContext;
+            const sec = systemSec;
+
             // Upsert user
-            let user = await this._users.findByEmail(defaultServerContext, profile.email);
+            let user = await this._users.findByEmail(ctx, sec, { email: profile.email });
             if (!user) {
-                user = await this._users.create(defaultServerContext, {
+                user = await this._users.create(ctx, sec, {
                     email: profile.email,
                     displayName: profile.displayName,
                     avatarUrl: profile.avatarUrl,
                 });
             } else if (profile.displayName || profile.avatarUrl) {
                 user =
-                    (await this._users.update(defaultServerContext, user.id, {
-                        displayName: profile.displayName ?? user.displayName,
-                        avatarUrl: profile.avatarUrl ?? user.avatarUrl,
+                    (await this._users.update(ctx, sec, {
+                        id: user.id,
+                        patch: {
+                            displayName: profile.displayName ?? user.displayName,
+                            avatarUrl: profile.avatarUrl ?? user.avatarUrl,
+                        },
                     })) ?? user;
             }
 
             // Upsert identity
-            let identity = await this._identities.findByProvider(
-                defaultServerContext,
-                req.provider,
-                profile.providerUserId,
-            );
+            let identity = await this._identities.findByProvider(ctx, sec, {
+                provider: req.provider,
+                providerUserId: profile.providerUserId,
+            });
             if (!identity) {
-                identity = await this._identities.create(defaultServerContext, {
+                identity = await this._identities.create(ctx, sec, {
                     provider: req.provider,
                     providerUserId: profile.providerUserId,
                     providerEmail: profile.email,
@@ -124,23 +129,25 @@ export class CallbackComponent extends FlowComponent {
                     userId: user.id,
                 });
             } else {
-                await this._identities.updateTokens(defaultServerContext, identity.id, {
-                    accessToken: tokens.accessToken,
-                    refreshToken: tokens.refreshToken,
-                    tokenExpiresAt: tokens.expiresAt,
+                await this._identities.updateTokens(ctx, sec, {
+                    id: identity.id,
+                    tokens: {
+                        accessToken: tokens.accessToken,
+                        refreshToken: tokens.refreshToken,
+                        tokenExpiresAt: tokens.expiresAt,
+                    },
                 });
             }
 
             // Upsert device
-            const device = await this._devices.findOrCreate(
-                defaultServerContext,
-                user.id,
-                req.device,
-            );
+            const device = await this._devices.findOrCreate(ctx, sec, {
+                userId: user.id,
+                info: req.device,
+            });
 
             // Create session (store in both TripleStore and Redis/memory)
             const expiresAt = new Date(Date.now() + SESSION_TTL_SECS * 1000);
-            const session = await this._sessRepo.create(defaultServerContext, {
+            const session = await this._sessRepo.create(ctx, sec, {
                 userId: user.id,
                 deviceId: device.id,
                 expiresAt,

@@ -8,7 +8,7 @@ import {
     rbacGrantsIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import { type ServerContext, systemSec } from "@jasonscharf/server";
 import { RBAC_GRAPH, WILDCARD_PERMISSION } from "./constants.js";
 import type { PolicyGrantRepository } from "./repository/PolicyGrantRepository.js";
 import { iriValue, literalValue } from "./repository/util.js";
@@ -55,11 +55,10 @@ export class AccessChecker {
         const principals = await this._resolvePrincipalSet(ctx, effectivePrincipal);
         const scopeChain = opts.scope ? await this._resolveScopeChain(ctx, opts.scope) : [];
 
-        const grants = await this._grants.findForPrincipals(
-            ctx,
-            Array.from(principals),
-            scopeChain,
-        );
+        const grants = await this._grants.findForPrincipals(ctx, systemSec, {
+            principalIris: Array.from(principals),
+            scopeIris: scopeChain,
+        });
         const active = this._filterExpired(grants);
 
         const allows = active.filter((g) => !g.isDenial);
@@ -86,11 +85,10 @@ export class AccessChecker {
         const principals = await this._resolvePrincipalSet(ctx, principalIri);
         const scopeChain = scopeIri ? await this._resolveScopeChain(ctx, scopeIri) : [];
 
-        const grants = await this._grants.findForPrincipals(
-            ctx,
-            Array.from(principals),
-            scopeChain,
-        );
+        const grants = await this._grants.findForPrincipals(ctx, systemSec, {
+            principalIris: Array.from(principals),
+            scopeIris: scopeChain,
+        });
         const active = this._filterExpired(grants);
 
         const allows = active.filter((g) => !g.isDenial);

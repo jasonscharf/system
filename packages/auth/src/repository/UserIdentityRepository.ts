@@ -13,10 +13,24 @@ import {
     updatedAtIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import { AUTH_GRAPH, RDF_TYPE, XSD_DATETIME, XSD_STRING } from "../constants.js";
 import type { OAuthProvider, UserIdentityEntity } from "../types.js";
 import { idFrom, iriFor, newId } from "./util.js";
+
+export interface FindByProviderArgs {
+    provider: OAuthProvider;
+    providerUserId: string;
+}
+
+export interface UserIdArgs {
+    userId: string;
+}
+
+export interface UpdateTokensArgs {
+    id: string;
+    tokens: Pick<UserIdentityEntity, "accessToken" | "refreshToken" | "tokenExpiresAt">;
+}
 
 export class UserIdentityRepository {
     private readonly _store: TripleStore;
@@ -25,39 +39,41 @@ export class UserIdentityRepository {
         this._store = store;
     }
 
+    /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        input: Omit<UserIdentityEntity, "id" | "iri" | "createdAt" | "updatedAt">,
+        _sec: SecurityContext,
+        args: Omit<UserIdentityEntity, "id" | "iri" | "createdAt" | "updatedAt">,
     ): Promise<UserIdentityEntity> {
         const id = newId();
         const now = new Date();
         const sub = iriFor("identity", id);
-        const userIri = iriFor("user", input.userId);
+        const userIri = iriFor("user", args.userId);
 
         const quads = [
             { subject: sub, predicate: RDF_TYPE, object: UserIdentityIRI, graph: AUTH_GRAPH },
             {
                 subject: sub,
                 predicate: providerIRI,
-                object: literal(input.provider, XSD_STRING),
+                object: literal(args.provider, XSD_STRING),
                 graph: AUTH_GRAPH,
             },
             {
                 subject: sub,
                 predicate: providerUserIdIRI,
-                object: literal(input.providerUserId, XSD_STRING),
+                object: literal(args.providerUserId, XSD_STRING),
                 graph: AUTH_GRAPH,
             },
             {
                 subject: sub,
                 predicate: providerEmailIRI,
-                object: literal(input.providerEmail, XSD_STRING),
+                object: literal(args.providerEmail, XSD_STRING),
                 graph: AUTH_GRAPH,
             },
             {
                 subject: sub,
                 predicate: accessTokenIRI,
-                object: literal(input.accessToken, XSD_STRING),
+                object: literal(args.accessToken, XSD_STRING),
                 graph: AUTH_GRAPH,
             },
             { subject: sub, predicate: identityOfIRI, object: userIri, graph: AUTH_GRAPH },
@@ -73,22 +89,22 @@ export class UserIdentityRepository {
                 object: literal(now.toISOString(), XSD_DATETIME),
                 graph: AUTH_GRAPH,
             },
-            ...(input.refreshToken
+            ...(args.refreshToken
                 ? [
                       {
                           subject: sub,
                           predicate: refreshTokenIRI,
-                          object: literal(input.refreshToken, XSD_STRING),
+                          object: literal(args.refreshToken, XSD_STRING),
                           graph: AUTH_GRAPH,
                       },
                   ]
                 : []),
-            ...(input.tokenExpiresAt
+            ...(args.tokenExpiresAt
                 ? [
                       {
                           subject: sub,
                           predicate: tokenExpiresAtIRI,
-                          object: literal(input.tokenExpiresAt.toISOString(), XSD_DATETIME),
+                          object: literal(args.tokenExpiresAt.toISOString(), XSD_DATETIME),
                           graph: AUTH_GRAPH,
                       },
                   ]
@@ -96,17 +112,18 @@ export class UserIdentityRepository {
         ];
 
         await this._store.insertMany(ctx, quads);
-        return { id, iri: sub.value, ...input, createdAt: now, updatedAt: now };
+        return { id, iri: sub.value, ...args, createdAt: now, updatedAt: now };
     }
 
+    /** @insecure @nochecks */
     async findByProvider(
         ctx: ServerContext,
-        provider: OAuthProvider,
-        providerUserId: string,
+        _sec: SecurityContext,
+        args: FindByProviderArgs,
     ): Promise<UserIdentityEntity | null> {
         const byProvider = await this._store.find(ctx, {
             predicate: providerIRI,
-            object: literal(provider, XSD_STRING),
+            object: literal(args.provider, XSD_STRING),
             graph: AUTH_GRAPH,
         });
 
@@ -114,15 +131,20 @@ export class UserIdentityRepository {
             const sub = q.subject as IRI;
             const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
             const entity = this._fromQuads(idFrom(sub.value), quads);
-            if (entity.providerUserId === providerUserId) {
+            if (entity.providerUserId === args.providerUserId) {
                 return entity;
             }
         }
         return null;
     }
 
-    async findByUserId(ctx: ServerContext, userId: string): Promise<UserIdentityEntity[]> {
-        const userIri = iriFor("user", userId);
+    /** @insecure @nochecks */
+    async findByUserId(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: UserIdArgs,
+    ): Promise<UserIdentityEntity[]> {
+        const userIri = iriFor("user", args.userId);
         const byUser = await this._store.find(ctx, {
             predicate: identityOfIRI,
             object: userIri,
@@ -138,58 +160,65 @@ export class UserIdentityRepository {
         return results;
     }
 
+    /** @insecure @nochecks */
     async updateTokens(
         ctx: ServerContext,
-        id: string,
-        tokens: Pick<UserIdentityEntity, "accessToken" | "refreshToken" | "tokenExpiresAt">,
+        _sec: SecurityContext,
+        args: UpdateTokensArgs,
     ): Promise<void> {
-        const sub = iriFor("identity", id);
-        const now = new Date();
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const sub = iriFor("identity", args.id);
+            const now = new Date();
 
-        await this._store.delete(ctx, {
-            subject: sub,
-            predicate: accessTokenIRI,
-            graph: AUTH_GRAPH,
-        });
-        await this._store.delete(ctx, {
-            subject: sub,
-            predicate: refreshTokenIRI,
-            graph: AUTH_GRAPH,
-        });
-        await this._store.delete(ctx, {
-            subject: sub,
-            predicate: tokenExpiresAtIRI,
-            graph: AUTH_GRAPH,
-        });
-        await this._store.delete(ctx, { subject: sub, predicate: updatedAtIRI, graph: AUTH_GRAPH });
-
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: accessTokenIRI,
-            object: literal(tokens.accessToken, XSD_STRING),
-            graph: AUTH_GRAPH,
-        });
-        if (tokens.refreshToken) {
-            await this._store.insert(ctx, {
+            await this._store.delete(ctx, {
+                subject: sub,
+                predicate: accessTokenIRI,
+                graph: AUTH_GRAPH,
+            });
+            await this._store.delete(ctx, {
                 subject: sub,
                 predicate: refreshTokenIRI,
-                object: literal(tokens.refreshToken, XSD_STRING),
                 graph: AUTH_GRAPH,
             });
-        }
-        if (tokens.tokenExpiresAt) {
-            await this._store.insert(ctx, {
+            await this._store.delete(ctx, {
                 subject: sub,
                 predicate: tokenExpiresAtIRI,
-                object: literal(tokens.tokenExpiresAt.toISOString(), XSD_DATETIME),
                 graph: AUTH_GRAPH,
             });
-        }
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: updatedAtIRI,
-            object: literal(now.toISOString(), XSD_DATETIME),
-            graph: AUTH_GRAPH,
+            await this._store.delete(ctx, {
+                subject: sub,
+                predicate: updatedAtIRI,
+                graph: AUTH_GRAPH,
+            });
+
+            await this._store.insert(ctx, {
+                subject: sub,
+                predicate: accessTokenIRI,
+                object: literal(args.tokens.accessToken, XSD_STRING),
+                graph: AUTH_GRAPH,
+            });
+            if (args.tokens.refreshToken) {
+                await this._store.insert(ctx, {
+                    subject: sub,
+                    predicate: refreshTokenIRI,
+                    object: literal(args.tokens.refreshToken, XSD_STRING),
+                    graph: AUTH_GRAPH,
+                });
+            }
+            if (args.tokens.tokenExpiresAt) {
+                await this._store.insert(ctx, {
+                    subject: sub,
+                    predicate: tokenExpiresAtIRI,
+                    object: literal(args.tokens.tokenExpiresAt.toISOString(), XSD_DATETIME),
+                    graph: AUTH_GRAPH,
+                });
+            }
+            await this._store.insert(ctx, {
+                subject: sub,
+                predicate: updatedAtIRI,
+                object: literal(now.toISOString(), XSD_DATETIME),
+                graph: AUTH_GRAPH,
+            });
         });
     }
 

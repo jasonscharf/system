@@ -1,5 +1,5 @@
 import type { RbacService } from "@jasonscharf/rbac";
-import type { ServerContext } from "@jasonscharf/server";
+import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import {
     PERM_CONVO_ARCHIVE,
     PERM_CONVO_ASSIGN,
@@ -47,6 +47,118 @@ export interface ConvoServiceOptions {
     rbac?: RbacService;
 }
 
+export interface CreateConversationArgs {
+    subjectIri: string;
+    title: string;
+    initialMessage?: string;
+    contentType?: ContentType;
+    inboxId?: string;
+    assignedTo?: string;
+    participantIds?: string[];
+}
+
+export interface PostMessageArgs {
+    conversationId: string;
+    content: string;
+    contentType?: ContentType;
+    replyToId?: string;
+}
+
+export interface CreateDraftArgs {
+    conversationId: string;
+    authorId: string;
+    content: string;
+    contentType?: ContentType;
+    replyToId?: string;
+}
+
+export interface CreateInboxArgs {
+    subjectIri: string;
+    name: string;
+    memberIds?: string[];
+}
+
+export interface ConversationIdArgs {
+    conversationId: string;
+}
+
+export interface SubjectIriArgs {
+    subjectIri: string;
+}
+
+export interface AssignConversationArgs {
+    conversationId: string;
+    assignedTo: string | null;
+}
+
+export interface EditMessageArgs {
+    messageId: string;
+    newContent: string;
+}
+
+export interface MessageIdArgs {
+    messageId: string;
+}
+
+export interface AddParticipantArgs {
+    conversationId: string;
+    userId: string;
+    role: ParticipantRole;
+}
+
+export interface ConversationUserArgs {
+    conversationId: string;
+    userId: string;
+}
+
+export interface UpdateDraftArgs {
+    draftId: string;
+    content: string;
+}
+
+export interface DraftIdArgs {
+    draftId: string;
+}
+
+export interface GetDraftsForAuthorArgs {
+    authorId: string;
+    conversationId?: string;
+}
+
+export interface InboxIdArgs {
+    inboxId: string;
+}
+
+export interface GrantInboxAccessArgs {
+    inboxId: string;
+    userId: string;
+    role: InboxRole;
+}
+
+export interface RevokeInboxAccessArgs {
+    inboxId: string;
+    userId: string;
+}
+
+export interface MarkConversationReadArgs {
+    conversationId: string;
+    userId: string;
+    lastReadMessageId: string;
+}
+
+export interface GetNotificationsForUserArgs {
+    userId: string;
+    unreadOnly?: boolean;
+}
+
+export interface UserIdArgs {
+    userId: string;
+}
+
+export interface NotificationIdArgs {
+    notificationId: string;
+}
+
 export class ConvoService {
     private readonly _conversations: ConversationRepository;
     private readonly _messages: MessageRepository;
@@ -72,36 +184,29 @@ export class ConvoService {
 
     async createConversation(
         ctx: ServerContext,
-        callerIri: string,
-        input: {
-            subjectIri: string;
-            title: string;
-            initialMessage?: string;
-            contentType?: ContentType;
-            inboxId?: string;
-            assignedTo?: string;
-            participantIds?: string[];
-        },
+        sec: SecurityContext,
+        args: CreateConversationArgs,
     ): Promise<{ conversation: ConversationEntity; message?: MessageEntity }> {
-        await this._assert(ctx, callerIri, PERM_CONVO_CREATE);
+        await this._assert(ctx, sec, PERM_CONVO_CREATE);
+        const callerIri = sec.principalIri ?? "";
 
-        const conversation = await this._conversations.create(ctx, {
-            subjectIri: input.subjectIri,
-            title: input.title,
+        const conversation = await this._conversations.create(ctx, sec, {
+            subjectIri: args.subjectIri,
+            title: args.title,
             createdBy: callerIri,
-            inboxId: input.inboxId,
-            assignedTo: input.assignedTo,
+            inboxId: args.inboxId,
+            assignedTo: args.assignedTo,
         });
 
-        await this._participants.create(ctx, {
+        await this._participants.create(ctx, sec, {
             conversationId: conversation.id,
             userId: callerIri,
             role: "owner",
         });
 
-        for (const pid of input.participantIds ?? []) {
+        for (const pid of args.participantIds ?? []) {
             if (pid !== callerIri) {
-                await this._participants.create(ctx, {
+                await this._participants.create(ctx, sec, {
                     conversationId: conversation.id,
                     userId: pid,
                     role: "member",
@@ -111,14 +216,14 @@ export class ConvoService {
 
         let message: MessageEntity | undefined;
 
-        if (input.initialMessage) {
-            message = await this._messages.create(ctx, {
+        if (args.initialMessage) {
+            message = await this._messages.create(ctx, sec, {
                 conversationId: conversation.id,
                 authorId: callerIri,
-                content: input.initialMessage,
-                contentType: input.contentType ?? "text/markdown",
+                content: args.initialMessage,
+                contentType: args.contentType ?? "text/markdown",
             });
-            await this._fanOutMessageNotification(ctx, conversation.id, message, callerIri);
+            await this._fanOutMessageNotification(ctx, sec, conversation.id, message);
         }
 
         return { conversation, message };
@@ -126,201 +231,211 @@ export class ConvoService {
 
     async getConversation(
         ctx: ServerContext,
-        conversationId: string,
+        sec: SecurityContext,
+        args: ConversationIdArgs,
     ): Promise<ConversationEntity | null> {
-        return this._conversations.findById(ctx, conversationId);
+        return this._conversations.findById(ctx, sec, { id: args.conversationId });
     }
 
     async getConversationsForSubject(
         ctx: ServerContext,
-        subjectIri: string,
+        sec: SecurityContext,
+        args: SubjectIriArgs,
     ): Promise<ConversationEntity[]> {
-        return this._conversations.findBySubject(ctx, subjectIri);
+        return this._conversations.findBySubject(ctx, sec, args);
     }
 
     async closeConversation(
         ctx: ServerContext,
-        callerIri: string,
-        conversationId: string,
+        sec: SecurityContext,
+        args: ConversationIdArgs,
     ): Promise<ConversationEntity | null> {
-        await this._assert(ctx, callerIri, PERM_CONVO_CLOSE, conversationId);
-        return this._conversations.updateStatus(ctx, conversationId, "closed");
+        await this._assert(ctx, sec, PERM_CONVO_CLOSE, args.conversationId);
+        return this._conversations.updateStatus(ctx, sec, {
+            id: args.conversationId,
+            status: "closed",
+        });
     }
 
     async archiveConversation(
         ctx: ServerContext,
-        callerIri: string,
-        conversationId: string,
+        sec: SecurityContext,
+        args: ConversationIdArgs,
     ): Promise<ConversationEntity | null> {
-        await this._assert(ctx, callerIri, PERM_CONVO_ARCHIVE, conversationId);
-        return this._conversations.updateStatus(ctx, conversationId, "archived");
+        await this._assert(ctx, sec, PERM_CONVO_ARCHIVE, args.conversationId);
+        return this._conversations.updateStatus(ctx, sec, {
+            id: args.conversationId,
+            status: "archived",
+        });
     }
 
     async reopenConversation(
         ctx: ServerContext,
-        conversationId: string,
+        sec: SecurityContext,
+        args: ConversationIdArgs,
     ): Promise<ConversationEntity | null> {
-        return this._conversations.updateStatus(ctx, conversationId, "open");
+        return this._conversations.updateStatus(ctx, sec, {
+            id: args.conversationId,
+            status: "open",
+        });
     }
 
     async assignConversation(
         ctx: ServerContext,
-        callerIri: string,
-        conversationId: string,
-        assignedTo: string | null,
+        sec: SecurityContext,
+        args: AssignConversationArgs,
     ): Promise<ConversationEntity | null> {
-        await this._assert(ctx, callerIri, PERM_CONVO_ASSIGN, conversationId);
-        return this._conversations.updateAssignment(ctx, conversationId, assignedTo);
+        await this._assert(ctx, sec, PERM_CONVO_ASSIGN, args.conversationId);
+        return this._conversations.updateAssignment(ctx, sec, {
+            id: args.conversationId,
+            assignedTo: args.assignedTo,
+        });
     }
 
     // ── Messages ──────────────────────────────────────────────────────────────
 
     async postMessage(
         ctx: ServerContext,
-        callerIri: string,
-        input: {
-            conversationId: string;
-            content: string;
-            contentType?: ContentType;
-            replyToId?: string;
-        },
+        sec: SecurityContext,
+        args: PostMessageArgs,
     ): Promise<MessageEntity> {
-        await this._assert(ctx, callerIri, PERM_MESSAGE_POST, input.conversationId);
+        await this._assert(ctx, sec, PERM_MESSAGE_POST, args.conversationId);
+        const callerIri = sec.principalIri ?? "";
 
-        const message = await this._messages.create(ctx, {
-            conversationId: input.conversationId,
+        const message = await this._messages.create(ctx, sec, {
+            conversationId: args.conversationId,
             authorId: callerIri,
-            content: input.content,
-            contentType: input.contentType ?? "text/markdown",
-            replyToId: input.replyToId,
+            content: args.content,
+            contentType: args.contentType ?? "text/markdown",
+            replyToId: args.replyToId,
         });
 
-        await this._fanOutMessageNotification(ctx, input.conversationId, message, callerIri);
+        await this._fanOutMessageNotification(ctx, sec, args.conversationId, message);
         return message;
     }
 
     async editMessage(
         ctx: ServerContext,
-        callerIri: string,
-        messageId: string,
-        newContent: string,
+        sec: SecurityContext,
+        args: EditMessageArgs,
     ): Promise<{ message: MessageEntity; revision: MessageRevisionEntity } | null> {
-        const existing = await this._messages.findById(ctx, messageId);
+        const existing = await this._messages.findById(ctx, sec, { id: args.messageId });
         if (!existing) {
             return null;
         }
 
+        const callerIri = sec.principalIri ?? "";
         const isOwnMessage = existing.authorId === callerIri;
-        await this._assertEditPermission(ctx, callerIri, isOwnMessage, existing.conversationId);
+        await this._assertEditPermission(ctx, sec, isOwnMessage, existing.conversationId);
 
-        return this._messages.edit(ctx, messageId, newContent, callerIri);
+        return this._messages.edit(ctx, sec, {
+            id: args.messageId,
+            newContent: args.newContent,
+            editorId: callerIri,
+        });
     }
 
     async deleteMessage(
         ctx: ServerContext,
-        callerIri: string,
-        messageId: string,
+        sec: SecurityContext,
+        args: MessageIdArgs,
     ): Promise<MessageEntity | null> {
-        const existing = await this._messages.findById(ctx, messageId);
+        const existing = await this._messages.findById(ctx, sec, { id: args.messageId });
         if (!existing) {
             return null;
         }
 
+        const callerIri = sec.principalIri ?? "";
         const isOwnMessage = existing.authorId === callerIri;
-        await this._assertDeletePermission(ctx, callerIri, isOwnMessage, existing.conversationId);
+        await this._assertDeletePermission(ctx, sec, isOwnMessage, existing.conversationId);
 
-        return this._messages.softDelete(ctx, messageId);
+        return this._messages.softDelete(ctx, sec, { id: args.messageId });
     }
 
     async getMessagesForConversation(
         ctx: ServerContext,
-        conversationId: string,
+        sec: SecurityContext,
+        args: ConversationIdArgs,
     ): Promise<MessageEntity[]> {
-        return this._messages.findByConversation(ctx, conversationId);
+        return this._messages.findByConversation(ctx, sec, args);
     }
 
     async getMessageRevisions(
         ctx: ServerContext,
-        messageId: string,
+        sec: SecurityContext,
+        args: MessageIdArgs,
     ): Promise<MessageRevisionEntity[]> {
-        return this._messages.findRevisionsForMessage(ctx, messageId);
+        return this._messages.findRevisionsForMessage(ctx, sec, args);
     }
 
     // ── Participants ──────────────────────────────────────────────────────────
 
     async addParticipant(
         ctx: ServerContext,
-        callerIri: string,
-        conversationId: string,
-        userId: string,
-        role: ParticipantRole,
+        sec: SecurityContext,
+        args: AddParticipantArgs,
     ): Promise<ParticipantEntity> {
-        await this._assert(ctx, callerIri, PERM_PARTICIPANT_MANAGE, conversationId);
-        return this._participants.create(ctx, { conversationId, userId, role });
+        await this._assert(ctx, sec, PERM_PARTICIPANT_MANAGE, args.conversationId);
+        return this._participants.create(ctx, sec, args);
     }
 
     async removeParticipant(
         ctx: ServerContext,
-        callerIri: string,
-        conversationId: string,
-        userId: string,
+        sec: SecurityContext,
+        args: ConversationUserArgs,
     ): Promise<void> {
-        await this._assert(ctx, callerIri, PERM_PARTICIPANT_MANAGE, conversationId);
-        const p = await this._participants.findByConversationAndUser(ctx, conversationId, userId);
+        await this._assert(ctx, sec, PERM_PARTICIPANT_MANAGE, args.conversationId);
+        const p = await this._participants.findByConversationAndUser(ctx, sec, args);
         if (p) {
-            await this._participants.remove(ctx, p.id);
+            await this._participants.remove(ctx, sec, { id: p.id });
         }
     }
 
     async getParticipants(
         ctx: ServerContext,
-        conversationId: string,
+        sec: SecurityContext,
+        args: ConversationIdArgs,
     ): Promise<ParticipantEntity[]> {
-        return this._participants.findByConversation(ctx, conversationId);
+        return this._participants.findByConversation(ctx, sec, args);
     }
 
     // ── Drafts ────────────────────────────────────────────────────────────────
 
     async createDraft(
         ctx: ServerContext,
-        input: {
-            conversationId: string;
-            authorId: string;
-            content: string;
-            contentType?: ContentType;
-            replyToId?: string;
-        },
+        sec: SecurityContext,
+        args: CreateDraftArgs,
     ): Promise<DraftEntity> {
-        return this._drafts.create(ctx, {
-            conversationId: input.conversationId,
-            authorId: input.authorId,
-            content: input.content,
-            contentType: input.contentType ?? "text/markdown",
-            replyToId: input.replyToId,
+        return this._drafts.create(ctx, sec, {
+            conversationId: args.conversationId,
+            authorId: args.authorId,
+            content: args.content,
+            contentType: args.contentType ?? "text/markdown",
+            replyToId: args.replyToId,
         });
     }
 
     async updateDraft(
         ctx: ServerContext,
-        draftId: string,
-        content: string,
+        sec: SecurityContext,
+        args: UpdateDraftArgs,
     ): Promise<DraftEntity | null> {
-        return this._drafts.update(ctx, draftId, content);
+        return this._drafts.update(ctx, sec, { id: args.draftId, content: args.content });
     }
 
     async sendDraft(
         ctx: ServerContext,
-        callerIri: string,
-        draftId: string,
+        sec: SecurityContext,
+        args: DraftIdArgs,
     ): Promise<MessageEntity | null> {
-        const draft = await this._drafts.findById(ctx, draftId);
+        const draft = await this._drafts.findById(ctx, sec, { id: args.draftId });
         if (!draft) {
             return null;
         }
 
-        await this._assert(ctx, callerIri, PERM_MESSAGE_POST, draft.conversationId);
+        await this._assert(ctx, sec, PERM_MESSAGE_POST, draft.conversationId);
 
-        const message = await this._messages.create(ctx, {
+        const message = await this._messages.create(ctx, sec, {
             conversationId: draft.conversationId,
             authorId: draft.authorId,
             content: draft.content,
@@ -328,91 +443,117 @@ export class ConvoService {
             replyToId: draft.replyToId ?? undefined,
         });
 
-        await this._drafts.delete(ctx, draftId);
-        await this._fanOutMessageNotification(ctx, draft.conversationId, message, callerIri);
+        await this._drafts.delete(ctx, sec, { id: args.draftId });
+        await this._fanOutMessageNotification(ctx, sec, draft.conversationId, message);
 
         return message;
     }
 
-    async discardDraft(ctx: ServerContext, draftId: string): Promise<void> {
-        await this._drafts.delete(ctx, draftId);
+    async discardDraft(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: DraftIdArgs,
+    ): Promise<void> {
+        await this._drafts.delete(ctx, sec, { id: args.draftId });
     }
 
     async getDraftsForAuthor(
         ctx: ServerContext,
-        authorId: string,
-        conversationId?: string,
+        sec: SecurityContext,
+        args: GetDraftsForAuthorArgs,
     ): Promise<DraftEntity[]> {
-        if (conversationId) {
-            return this._drafts.findByAuthorAndConversation(ctx, authorId, conversationId);
+        if (args.conversationId) {
+            return this._drafts.findByAuthorAndConversation(ctx, sec, {
+                authorId: args.authorId,
+                conversationId: args.conversationId,
+            });
         }
-        return this._drafts.findByAuthor(ctx, authorId);
+        return this._drafts.findByAuthor(ctx, sec, { authorId: args.authorId });
     }
 
     // ── Inboxes ───────────────────────────────────────────────────────────────
 
     async createInbox(
         ctx: ServerContext,
-        callerIri: string,
-        input: { subjectIri: string; name: string; memberIds?: string[] },
+        sec: SecurityContext,
+        args: CreateInboxArgs,
     ): Promise<InboxEntity> {
-        await this._assert(ctx, callerIri, PERM_INBOX_CREATE);
+        await this._assert(ctx, sec, PERM_INBOX_CREATE);
+        const callerIri = sec.principalIri ?? "";
 
-        const inbox = await this._inboxes.create(ctx, {
-            subjectIri: input.subjectIri,
-            name: input.name,
+        const inbox = await this._inboxes.create(ctx, sec, {
+            subjectIri: args.subjectIri,
+            name: args.name,
             createdBy: callerIri,
         });
 
-        await this._inboxes.addMember(ctx, inbox.id, callerIri, "owner");
+        await this._inboxes.addMember(ctx, sec, {
+            inboxId: inbox.id,
+            userId: callerIri,
+            role: "owner",
+        });
 
-        for (const memberId of input.memberIds ?? []) {
+        for (const memberId of args.memberIds ?? []) {
             if (memberId !== callerIri) {
-                await this._inboxes.addMember(ctx, inbox.id, memberId, "member");
+                await this._inboxes.addMember(ctx, sec, {
+                    inboxId: inbox.id,
+                    userId: memberId,
+                    role: "member",
+                });
             }
         }
 
         return inbox;
     }
 
-    async getInbox(ctx: ServerContext, inboxId: string): Promise<InboxEntity | null> {
-        return this._inboxes.findById(ctx, inboxId);
+    async getInbox(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: InboxIdArgs,
+    ): Promise<InboxEntity | null> {
+        return this._inboxes.findById(ctx, sec, { id: args.inboxId });
     }
 
-    async getInboxesForSubject(ctx: ServerContext, subjectIri: string): Promise<InboxEntity[]> {
-        return this._inboxes.findBySubject(ctx, subjectIri);
+    async getInboxesForSubject(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: SubjectIriArgs,
+    ): Promise<InboxEntity[]> {
+        return this._inboxes.findBySubject(ctx, sec, args);
     }
 
     async grantInboxAccess(
         ctx: ServerContext,
-        callerIri: string,
-        inboxId: string,
-        userId: string,
-        role: InboxRole,
+        sec: SecurityContext,
+        args: GrantInboxAccessArgs,
     ): Promise<InboxMembershipEntity> {
-        await this._assert(ctx, callerIri, PERM_INBOX_MANAGE, inboxId);
-        return this._inboxes.addMember(ctx, inboxId, userId, role);
+        await this._assert(ctx, sec, PERM_INBOX_MANAGE, args.inboxId);
+        return this._inboxes.addMember(ctx, sec, args);
     }
 
     async revokeInboxAccess(
         ctx: ServerContext,
-        callerIri: string,
-        inboxId: string,
-        userId: string,
+        sec: SecurityContext,
+        args: RevokeInboxAccessArgs,
     ): Promise<void> {
-        await this._assert(ctx, callerIri, PERM_INBOX_MANAGE, inboxId);
-        await this._inboxes.removeMember(ctx, inboxId, userId);
+        await this._assert(ctx, sec, PERM_INBOX_MANAGE, args.inboxId);
+        await this._inboxes.removeMember(ctx, sec, args);
     }
 
-    async getInboxMembers(ctx: ServerContext, inboxId: string): Promise<InboxMembershipEntity[]> {
-        return this._inboxes.listMembers(ctx, inboxId);
+    async getInboxMembers(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: InboxIdArgs,
+    ): Promise<InboxMembershipEntity[]> {
+        return this._inboxes.listMembers(ctx, sec, args);
     }
 
     async getConversationsInInbox(
         ctx: ServerContext,
-        inboxId: string,
+        sec: SecurityContext,
+        args: InboxIdArgs,
     ): Promise<ConversationEntity[]> {
-        return this._conversations.findByInbox(ctx, inboxId);
+        return this._conversations.findByInbox(ctx, sec, args);
     }
 
     // ── Read receipts ─────────────────────────────────────────────────────────
@@ -420,29 +561,28 @@ export class ConvoService {
     /**
      * Mark that userId has read up to lastReadMessageId in this conversation.
      * Advances the read receipt watermark and dismisses superseded notifications.
-     *
-     * This is the "one-time" path: future messages will produce new notifications,
-     * but messages already covered by this receipt will not.
      */
     async markConversationRead(
         ctx: ServerContext,
-        userId: string,
-        conversationId: string,
-        lastReadMessageId: string,
+        sec: SecurityContext,
+        args: MarkConversationReadArgs,
     ): Promise<ReadReceiptEntity> {
-        const receipt = await this._receipts.upsert(ctx, conversationId, userId, lastReadMessageId);
+        const receipt = await this._receipts.upsert(ctx, sec, args);
 
-        // Dismiss any outstanding notifications sourced from this conversation
-        // that pre-date the new watermark.
-        const lastReadMsg = await this._messages.findById(ctx, lastReadMessageId);
+        const lastReadMsg = await this._messages.findById(ctx, sec, {
+            id: args.lastReadMessageId,
+        });
         if (lastReadMsg) {
-            const notifs = await this._notifications.findByUser(ctx, userId, { unreadOnly: true });
+            const notifs = await this._notifications.findByUser(ctx, sec, {
+                userId: args.userId,
+                unreadOnly: true,
+            });
             for (const n of notifs) {
                 if (
                     n.sourceIri &&
                     (n.sourceIri === lastReadMsg.iri || n.sourceIri.includes("/message/"))
                 ) {
-                    await this._notifications.dismiss(ctx, n.id);
+                    await this._notifications.dismiss(ctx, sec, { id: n.id });
                 }
             }
         }
@@ -452,31 +592,32 @@ export class ConvoService {
 
     async getReadReceipt(
         ctx: ServerContext,
-        conversationId: string,
-        userId: string,
+        sec: SecurityContext,
+        args: ConversationUserArgs,
     ): Promise<ReadReceiptEntity | null> {
-        return this._receipts.findByConversationAndUser(ctx, conversationId, userId);
+        return this._receipts.findByConversationAndUser(ctx, sec, args);
     }
 
     async getReadReceiptsForConversation(
         ctx: ServerContext,
-        conversationId: string,
+        sec: SecurityContext,
+        args: ConversationIdArgs,
     ): Promise<ReadReceiptEntity[]> {
-        return this._receipts.findByConversation(ctx, conversationId);
+        return this._receipts.findByConversation(ctx, sec, args);
     }
 
     /**
-     * Count messages in this conversation that the user has not yet read
-     * (i.e., were posted after their read receipt watermark).
+     * Count messages in this conversation that the user has not yet read.
      */
     async getUnreadMessageCount(
         ctx: ServerContext,
-        conversationId: string,
-        userId: string,
+        sec: SecurityContext,
+        args: ConversationUserArgs,
     ): Promise<number> {
-        const receipt = await this._receipts.findByConversationAndUser(ctx, conversationId, userId);
-
-        const messages = await this._messages.findByConversation(ctx, conversationId);
+        const receipt = await this._receipts.findByConversationAndUser(ctx, sec, args);
+        const messages = await this._messages.findByConversation(ctx, sec, {
+            conversationId: args.conversationId,
+        });
         const visible = messages.filter((m) => !m.isDeleted);
 
         if (!receipt) {
@@ -496,39 +637,49 @@ export class ConvoService {
 
     async getNotificationsForUser(
         ctx: ServerContext,
-        userId: string,
-        opts: { unreadOnly?: boolean } = {},
+        sec: SecurityContext,
+        args: GetNotificationsForUserArgs,
     ): Promise<NotificationEntity[]> {
-        return this._notifications.findByUser(ctx, userId, opts);
+        return this._notifications.findByUser(ctx, sec, args);
     }
 
-    async getUnreadCount(ctx: ServerContext, userId: string): Promise<number> {
-        return this._notifications.countUnread(ctx, userId);
+    async getUnreadCount(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: UserIdArgs,
+    ): Promise<number> {
+        return this._notifications.countUnread(ctx, sec, args);
     }
 
     async markNotificationRead(
         ctx: ServerContext,
-        notificationId: string,
+        sec: SecurityContext,
+        args: NotificationIdArgs,
     ): Promise<NotificationEntity | null> {
-        return this._notifications.markRead(ctx, notificationId);
+        return this._notifications.markRead(ctx, sec, { id: args.notificationId });
     }
 
-    async markAllNotificationsRead(ctx: ServerContext, userId: string): Promise<number> {
-        return this._notifications.markAllReadForUser(ctx, userId);
+    async markAllNotificationsRead(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: UserIdArgs,
+    ): Promise<number> {
+        return this._notifications.markAllReadForUser(ctx, sec, args);
     }
 
     async dismissNotification(
         ctx: ServerContext,
-        notificationId: string,
+        sec: SecurityContext,
+        args: NotificationIdArgs,
     ): Promise<NotificationEntity | null> {
-        return this._notifications.dismiss(ctx, notificationId);
+        return this._notifications.dismiss(ctx, sec, { id: args.notificationId });
     }
 
     // ── Internal ──────────────────────────────────────────────────────────────
 
     private async _assert(
         ctx: ServerContext,
-        principalIri: string,
+        sec: SecurityContext,
         permission: string,
         scopeConversationId?: string,
     ): Promise<void> {
@@ -536,22 +687,20 @@ export class ConvoService {
             return;
         }
 
-        let scopeIri: string | undefined;
+        let scope: string | undefined;
         if (scopeConversationId) {
-            const conv = await this._conversations.findById(ctx, scopeConversationId);
-            scopeIri = conv?.iri;
+            const conv = await this._conversations.findById(ctx, sec, {
+                id: scopeConversationId,
+            });
+            scope = conv?.iri;
         }
 
-        await this._rbac.assert(ctx, {
-            principal: principalIri,
-            permission,
-            scope: scopeIri,
-        });
+        await this._rbac.assert(ctx, sec, { permission, scope });
     }
 
     private async _assertEditPermission(
         ctx: ServerContext,
-        callerIri: string,
+        sec: SecurityContext,
         isOwn: boolean,
         conversationId: string,
     ): Promise<void> {
@@ -559,35 +708,31 @@ export class ConvoService {
             return;
         }
 
-        const conv = await this._conversations.findById(ctx, conversationId);
-        const scopeIri = conv?.iri;
+        const conv = await this._conversations.findById(ctx, sec, { id: conversationId });
+        const scope = conv?.iri;
 
         if (isOwn) {
-            const canEditOwn = await this._rbac.can(ctx, {
-                principal: callerIri,
+            const canEditOwn = await this._rbac.can(ctx, sec, {
                 permission: PERM_MESSAGE_EDIT_OWN,
-                scope: scopeIri,
+                scope,
             });
-            const canEditAny = await this._rbac.can(ctx, {
-                principal: callerIri,
+            const canEditAny = await this._rbac.can(ctx, sec, {
                 permission: PERM_MESSAGE_EDIT_ANY,
-                scope: scopeIri,
+                scope,
             });
             if (!canEditOwn && !canEditAny) {
-                throw new Error(`Access denied: "${callerIri}" lacks permission to edit messages.`);
+                throw new Error(
+                    `Access denied: "${sec.principalIri}" lacks permission to edit messages.`,
+                );
             }
         } else {
-            await this._rbac.assert(ctx, {
-                principal: callerIri,
-                permission: PERM_MESSAGE_EDIT_ANY,
-                scope: scopeIri,
-            });
+            await this._rbac.assert(ctx, sec, { permission: PERM_MESSAGE_EDIT_ANY, scope });
         }
     }
 
     private async _assertDeletePermission(
         ctx: ServerContext,
-        callerIri: string,
+        sec: SecurityContext,
         isOwn: boolean,
         conversationId: string,
     ): Promise<void> {
@@ -595,63 +740,59 @@ export class ConvoService {
             return;
         }
 
-        const conv = await this._conversations.findById(ctx, conversationId);
-        const scopeIri = conv?.iri;
+        const conv = await this._conversations.findById(ctx, sec, { id: conversationId });
+        const scope = conv?.iri;
 
         if (isOwn) {
-            const canDeleteOwn = await this._rbac.can(ctx, {
-                principal: callerIri,
+            const canDeleteOwn = await this._rbac.can(ctx, sec, {
                 permission: PERM_MESSAGE_DELETE_OWN,
-                scope: scopeIri,
+                scope,
             });
-            const canDeleteAny = await this._rbac.can(ctx, {
-                principal: callerIri,
+            const canDeleteAny = await this._rbac.can(ctx, sec, {
                 permission: PERM_MESSAGE_DELETE_ANY,
-                scope: scopeIri,
+                scope,
             });
             if (!canDeleteOwn && !canDeleteAny) {
                 throw new Error(
-                    `Access denied: "${callerIri}" lacks permission to delete messages.`,
+                    `Access denied: "${sec.principalIri}" lacks permission to delete messages.`,
                 );
             }
         } else {
-            await this._rbac.assert(ctx, {
-                principal: callerIri,
-                permission: PERM_MESSAGE_DELETE_ANY,
-                scope: scopeIri,
-            });
+            await this._rbac.assert(ctx, sec, { permission: PERM_MESSAGE_DELETE_ANY, scope });
         }
     }
 
     private async _fanOutMessageNotification(
         ctx: ServerContext,
+        sec: SecurityContext,
         conversationId: string,
         message: MessageEntity,
-        authorIri: string,
     ): Promise<void> {
-        const participants = await this._participants.findByConversation(ctx, conversationId);
+        const callerIri = sec.principalIri ?? "";
+        const participants = await this._participants.findByConversation(ctx, sec, {
+            conversationId,
+        });
 
         for (const p of participants) {
-            if (p.userId === authorIri) {
+            if (p.userId === callerIri) {
                 continue;
             }
 
-            // Skip if the user already has a read receipt past this message —
-            // they're actively watching the conversation and don't need a ping.
-            const receipt = await this._receipts.findByConversationAndUser(
-                ctx,
+            const receipt = await this._receipts.findByConversationAndUser(ctx, sec, {
                 conversationId,
-                p.userId,
-            );
+                userId: p.userId,
+            });
             if (receipt) {
-                const watermark = await this._messages.findById(ctx, receipt.lastReadMessageId);
+                const watermark = await this._messages.findById(ctx, sec, {
+                    id: receipt.lastReadMessageId,
+                });
                 if (watermark && watermark.createdAt.getTime() >= message.createdAt.getTime()) {
                     continue;
                 }
             }
 
             const notifType = message.replyToId ? "reply" : "reply";
-            await this._notifications.create(ctx, {
+            await this._notifications.create(ctx, sec, {
                 userId: p.userId,
                 notifType,
                 sourceIri: message.iri,

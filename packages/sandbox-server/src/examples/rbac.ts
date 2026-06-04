@@ -22,7 +22,7 @@ import {
     TenantRepository,
     UserGroupRepository,
 } from "@jasonscharf/rbac";
-import { defaultServerContext } from "@jasonscharf/server";
+import { defaultServerContext, type SecurityContext, systemSec } from "@jasonscharf/server";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -36,6 +36,25 @@ function ok(label: string, value: boolean) {
     const icon = value ? "✓" : "✗";
     const color = value ? "\x1b[32m" : "\x1b[31m";
     console.log(`  ${color}${icon}\x1b[0m  ${label}: ${value}`);
+}
+
+function secFor(principalIri: string): SecurityContext {
+    return {
+        principalIri,
+        sessionId: null,
+        sessionToken: null,
+        isImpersonating: false,
+    };
+}
+
+function secActingAs(principalIri: string, actingAsIri: string): SecurityContext {
+    return {
+        principalIri,
+        sessionId: null,
+        sessionToken: null,
+        isImpersonating: true,
+        actingAsIri,
+    };
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
@@ -60,8 +79,8 @@ const rbac = new RbacService({
 
 section("1. Tenants");
 
-const acme = await rbac.createTenant(ctx, "Acme Corp");
-await rbac.createTenant(ctx, "Globex Corp"); // dave's tenant — kept separate for isolation demo
+const acme = await rbac.createTenant(ctx, systemSec, { name: "Acme Corp" });
+await rbac.createTenant(ctx, systemSec, { name: "Globex Corp" });
 
 console.log(`  Created tenant: ${acme.tenantName} (${acme.id})`);
 console.log("  Created tenant: Globex Corp (dave's tenant — no Acme grants)");
@@ -70,12 +89,12 @@ console.log("  Created tenant: Globex Corp (dave's tenant — no Acme grants)");
 
 section("2. Permissions");
 
-const projRead = await rbac.createPermission(ctx, "project.read");
-const projWrite = await rbac.createPermission(ctx, "project.write");
-const projDelete = await rbac.createPermission(ctx, "project.delete");
-const userManage = await rbac.createPermission(ctx, "user.manage");
-const billingRead = await rbac.createPermission(ctx, "billing.read");
-const billingWrite = await rbac.createPermission(ctx, "billing.write");
+const projRead = await rbac.createPermission(ctx, systemSec, { key: "project.read" });
+const projWrite = await rbac.createPermission(ctx, systemSec, { key: "project.write" });
+const projDelete = await rbac.createPermission(ctx, systemSec, { key: "project.delete" });
+const userManage = await rbac.createPermission(ctx, systemSec, { key: "user.manage" });
+const billingRead = await rbac.createPermission(ctx, systemSec, { key: "billing.read" });
+const billingWrite = await rbac.createPermission(ctx, systemSec, { key: "billing.write" });
 
 console.log(
     "  Permissions registered:",
@@ -91,19 +110,40 @@ section("3. Roles with inheritance");
 //  Viewer  ←──── Editor  ←──── Owner
 //  (read)       (+write)       (+delete, user.manage)
 
-const viewerRole = await rbac.createRole(ctx, { roleName: "Viewer", tenantId: acme.id });
-await rbac.addPermissionToRole(ctx, viewerRole.iri, projRead.iri);
-await rbac.addPermissionToRole(ctx, viewerRole.iri, billingRead.iri);
+const viewerRole = await rbac.createRole(ctx, systemSec, { roleName: "Viewer", tenantId: acme.id });
+await rbac.addPermissionToRole(ctx, systemSec, { roleIri: viewerRole.iri, permissionIri: projRead.iri });
+await rbac.addPermissionToRole(ctx, systemSec, {
+    roleIri: viewerRole.iri,
+    permissionIri: billingRead.iri,
+});
 
-const editorRole = await rbac.createRole(ctx, { roleName: "Editor", tenantId: acme.id });
-await rbac.addPermissionToRole(ctx, editorRole.iri, projWrite.iri);
-await rbac.addRoleInheritance(ctx, editorRole.iri, viewerRole.iri); // Editor inherits Viewer
+const editorRole = await rbac.createRole(ctx, systemSec, { roleName: "Editor", tenantId: acme.id });
+await rbac.addPermissionToRole(ctx, systemSec, {
+    roleIri: editorRole.iri,
+    permissionIri: projWrite.iri,
+});
+await rbac.addRoleInheritance(ctx, systemSec, {
+    childRoleIri: editorRole.iri,
+    parentRoleIri: viewerRole.iri,
+});
 
-const ownerRole = await rbac.createRole(ctx, { roleName: "Owner", tenantId: acme.id });
-await rbac.addPermissionToRole(ctx, ownerRole.iri, projDelete.iri);
-await rbac.addPermissionToRole(ctx, ownerRole.iri, userManage.iri);
-await rbac.addPermissionToRole(ctx, ownerRole.iri, billingWrite.iri);
-await rbac.addRoleInheritance(ctx, ownerRole.iri, editorRole.iri); // Owner inherits Editor
+const ownerRole = await rbac.createRole(ctx, systemSec, { roleName: "Owner", tenantId: acme.id });
+await rbac.addPermissionToRole(ctx, systemSec, {
+    roleIri: ownerRole.iri,
+    permissionIri: projDelete.iri,
+});
+await rbac.addPermissionToRole(ctx, systemSec, {
+    roleIri: ownerRole.iri,
+    permissionIri: userManage.iri,
+});
+await rbac.addPermissionToRole(ctx, systemSec, {
+    roleIri: ownerRole.iri,
+    permissionIri: billingWrite.iri,
+});
+await rbac.addRoleInheritance(ctx, systemSec, {
+    childRoleIri: ownerRole.iri,
+    parentRoleIri: editorRole.iri,
+});
 
 console.log("  Viewer  → project.read, billing.read");
 console.log("  Editor  → project.write  (+ inherits Viewer)");
@@ -113,24 +153,32 @@ console.log("  Owner   → project.delete, user.manage, billing.write  (+ inheri
 
 section("4. Groups and membership");
 
-const ownersGroup = await rbac.createUserGroup(ctx, { groupName: "Owners", tenantId: acme.id });
-const editorsGroup = await rbac.createUserGroup(ctx, { groupName: "Editors", tenantId: acme.id });
-const viewersGroup = await rbac.createUserGroup(ctx, { groupName: "Viewers", tenantId: acme.id });
+const ownersGroup = await rbac.createUserGroup(ctx, systemSec, {
+    groupName: "Owners",
+    tenantId: acme.id,
+});
+const editorsGroup = await rbac.createUserGroup(ctx, systemSec, {
+    groupName: "Editors",
+    tenantId: acme.id,
+});
+const viewersGroup = await rbac.createUserGroup(ctx, systemSec, {
+    groupName: "Viewers",
+    tenantId: acme.id,
+});
 
-// Grant a role to each group (system-wide within Acme — no scope restriction)
-await rbac.grant(ctx, { principalIri: ownersGroup.iri, roleIri: ownerRole.iri });
-await rbac.grant(ctx, { principalIri: editorsGroup.iri, roleIri: editorRole.iri });
-await rbac.grant(ctx, { principalIri: viewersGroup.iri, roleIri: viewerRole.iri });
+await rbac.grant(ctx, systemSec, { principalIri: ownersGroup.iri, roleIri: ownerRole.iri });
+await rbac.grant(ctx, systemSec, { principalIri: editorsGroup.iri, roleIri: editorRole.iri });
+await rbac.grant(ctx, systemSec, { principalIri: viewersGroup.iri, roleIri: viewerRole.iri });
 
-// Synthetic user IRIs (would normally come from auth:User nodes)
+// Synthetic user IRIs
 const alice = "http://tern.dev/ns/auth/user/alice";
 const bob = "http://tern.dev/ns/auth/user/bob";
 const charlie = "http://tern.dev/ns/auth/user/charlie";
-const dave = "http://tern.dev/ns/auth/user/dave"; // in Globex — no Acme access
+const dave = "http://tern.dev/ns/auth/user/dave";
 
-await rbac.addMember(ctx, ownersGroup.iri, alice);
-await rbac.addMember(ctx, editorsGroup.iri, bob);
-await rbac.addMember(ctx, viewersGroup.iri, charlie);
+await rbac.addMember(ctx, systemSec, { groupIri: ownersGroup.iri, memberIri: alice });
+await rbac.addMember(ctx, systemSec, { groupIri: editorsGroup.iri, memberIri: bob });
+await rbac.addMember(ctx, systemSec, { groupIri: viewersGroup.iri, memberIri: charlie });
 
 console.log("  alice  → Owners group");
 console.log("  bob    → Editors group");
@@ -143,46 +191,51 @@ section("5. Basic permission checks");
 
 ok(
     "alice  can project.delete (owner)",
-    await rbac.can(ctx, { principal: alice, permission: "project.delete" }),
+    await rbac.can(ctx, secFor(alice), { permission: "project.delete" }),
 );
 ok(
     "alice  can project.read   (inherited)",
-    await rbac.can(ctx, { principal: alice, permission: "project.read" }),
+    await rbac.can(ctx, secFor(alice), { permission: "project.read" }),
 );
 ok(
     "bob    can project.write  (editor)",
-    await rbac.can(ctx, { principal: bob, permission: "project.write" }),
+    await rbac.can(ctx, secFor(bob), { permission: "project.write" }),
 );
 ok(
     "bob    can project.read   (inherited from viewer)",
-    await rbac.can(ctx, { principal: bob, permission: "project.read" }),
+    await rbac.can(ctx, secFor(bob), { permission: "project.read" }),
 );
 ok(
     "bob    cannot project.delete",
-    !(await rbac.can(ctx, { principal: bob, permission: "project.delete" })),
+    !(await rbac.can(ctx, secFor(bob), { permission: "project.delete" })),
 );
 ok(
     "charlie can project.read (viewer)",
-    await rbac.can(ctx, { principal: charlie, permission: "project.read" }),
+    await rbac.can(ctx, secFor(charlie), { permission: "project.read" }),
 );
 ok(
     "charlie cannot project.write",
-    !(await rbac.can(ctx, { principal: charlie, permission: "project.write" })),
+    !(await rbac.can(ctx, secFor(charlie), { permission: "project.write" })),
 );
 ok(
     "dave   cannot anything    (wrong tenant)",
-    !(await rbac.can(ctx, { principal: dave, permission: "project.read" })),
+    !(await rbac.can(ctx, secFor(dave), { permission: "project.read" })),
 );
 
 // ── 6. Resource-level scoping ─────────────────────────────────────────────────
 
 section("6. Resource-level scoping");
 
-const projectAlpha = await rbac.createResource(ctx, { resourceType: "project", tenantId: acme.id });
-const projectBeta = await rbac.createResource(ctx, { resourceType: "project", tenantId: acme.id });
+const projectAlpha = await rbac.createResource(ctx, systemSec, {
+    resourceType: "project",
+    tenantId: acme.id,
+});
+const projectBeta = await rbac.createResource(ctx, systemSec, {
+    resourceType: "project",
+    tenantId: acme.id,
+});
 
-// Grant Charlie write access to alpha only
-await rbac.grant(ctx, {
+await rbac.grant(ctx, systemSec, {
     principalIri: charlie,
     roleIri: editorRole.iri,
     scopeIri: projectAlpha.iri,
@@ -190,99 +243,101 @@ await rbac.grant(ctx, {
 
 ok(
     "charlie can  project.write on alpha (scoped grant)",
-    await rbac.can(ctx, {
-        principal: charlie,
+    await rbac.can(ctx, secFor(charlie), {
         permission: "project.write",
         scope: projectAlpha.iri,
     }),
 );
 ok(
     "charlie cannot project.write on beta (different resource)",
-    !(await rbac.can(ctx, {
-        principal: charlie,
+    !(await rbac.can(ctx, secFor(charlie), {
         permission: "project.write",
         scope: projectBeta.iri,
     })),
 );
 ok(
     "charlie cannot project.write globally",
-    !(await rbac.can(ctx, { principal: charlie, permission: "project.write" })),
+    !(await rbac.can(ctx, secFor(charlie), { permission: "project.write" })),
 );
 
-// ── 7. Resource hierarchy (parent scope propagates to children) ───────────────
+// ── 7. Resource hierarchy ─────────────────────────────────────────────────────
 
 section("7. Resource hierarchy");
 
-const folder = await rbac.createResource(ctx, {
+const folder = await rbac.createResource(ctx, systemSec, {
     resourceType: "folder",
     parentIri: projectAlpha.iri,
 });
-const file = await rbac.createResource(ctx, { resourceType: "file", parentIri: folder.iri });
+const file = await rbac.createResource(ctx, systemSec, {
+    resourceType: "file",
+    parentIri: folder.iri,
+});
 
-// Grant on projectAlpha propagates to folder and file
 ok(
     "charlie can  project.write on folder (child of alpha)",
-    await rbac.can(ctx, { principal: charlie, permission: "project.write", scope: folder.iri }),
+    await rbac.can(ctx, secFor(charlie), { permission: "project.write", scope: folder.iri }),
 );
 ok(
     "charlie can  project.write on file   (grandchild of alpha)",
-    await rbac.can(ctx, { principal: charlie, permission: "project.write", scope: file.iri }),
+    await rbac.can(ctx, secFor(charlie), { permission: "project.write", scope: file.iri }),
 );
 
 // ── 8. Temporary grants ───────────────────────────────────────────────────────
 
 section("8. Temporary grants");
 
-const tempPerm = await rbac.createPermission(ctx, "deploy.trigger");
-const deployRole = await rbac.createRole(ctx, { roleName: "Deployer", tenantId: null });
-await rbac.addPermissionToRole(ctx, deployRole.iri, tempPerm.iri);
+const tempPerm = await rbac.createPermission(ctx, systemSec, { key: "deploy.trigger" });
+const deployRole = await rbac.createRole(ctx, systemSec, { roleName: "Deployer", tenantId: null });
+await rbac.addPermissionToRole(ctx, systemSec, {
+    roleIri: deployRole.iri,
+    permissionIri: tempPerm.iri,
+});
 
-// Grant expires in the future — valid now
-const futureExpiry = new Date(Date.now() + 30 * 60_000); // 30 minutes
-await rbac.grant(ctx, { principalIri: bob, roleIri: deployRole.iri, grantExpiresAt: futureExpiry });
+const futureExpiry = new Date(Date.now() + 30 * 60_000);
+await rbac.grant(ctx, systemSec, {
+    principalIri: bob,
+    roleIri: deployRole.iri,
+    grantExpiresAt: futureExpiry,
+});
 ok(
     "bob    can  deploy.trigger (30-min grant)",
-    await rbac.can(ctx, { principal: bob, permission: "deploy.trigger" }),
+    await rbac.can(ctx, secFor(bob), { permission: "deploy.trigger" }),
 );
 
-// Grant already expired — denied
 const pastExpiry = new Date(Date.now() - 1);
-const expiredGrant = await rbac.grant(ctx, {
+const expiredGrant = await rbac.grant(ctx, systemSec, {
     principalIri: charlie,
     roleIri: deployRole.iri,
     grantExpiresAt: pastExpiry,
 });
 ok(
     "charlie cannot deploy.trigger (expired grant)",
-    !(await rbac.can(ctx, { principal: charlie, permission: "deploy.trigger" })),
+    !(await rbac.can(ctx, secFor(charlie), { permission: "deploy.trigger" })),
 );
 
-// Revoking a grant
-const aliveGrant = await rbac.grant(ctx, { principalIri: dave, roleIri: deployRole.iri });
+const aliveGrant = await rbac.grant(ctx, systemSec, { principalIri: dave, roleIri: deployRole.iri });
 ok(
     "dave   can  deploy.trigger (active grant)",
-    await rbac.can(ctx, { principal: dave, permission: "deploy.trigger" }),
+    await rbac.can(ctx, secFor(dave), { permission: "deploy.trigger" }),
 );
-await rbac.revoke(ctx, aliveGrant.iri);
+await rbac.revoke(ctx, systemSec, { grantIri: aliveGrant.iri });
 ok(
     "dave   cannot deploy.trigger (grant revoked)",
-    !(await rbac.can(ctx, { principal: dave, permission: "deploy.trigger" })),
+    !(await rbac.can(ctx, secFor(dave), { permission: "deploy.trigger" })),
 );
 
-// Silence unused-variable warning for expiredGrant
 void expiredGrant;
 
 // ── 9. Explicit denials ───────────────────────────────────────────────────────
 
 section("9. Explicit denials");
 
-// Charlie inherits billing.read from Viewers, but we want to block it explicitly
 ok(
     "charlie can  billing.read before denial",
-    await rbac.can(ctx, { principal: charlie, permission: "billing.read" }),
+    await rbac.can(ctx, secFor(charlie), { permission: "billing.read" }),
 );
 
-await rbac.grant(ctx, {
+await rbac.grant(ctx, systemSec, {
     principalIri: charlie,
     roleIri: viewerRole.iri,
     isDenial: true,
@@ -290,18 +345,18 @@ await rbac.grant(ctx, {
 
 ok(
     "charlie cannot billing.read after denial (overrides group allow)",
-    !(await rbac.can(ctx, { principal: charlie, permission: "billing.read" })),
+    !(await rbac.can(ctx, secFor(charlie), { permission: "billing.read" })),
 );
 ok(
     "bob    can  billing.read  (denial only targets charlie)",
-    await rbac.can(ctx, { principal: bob, permission: "billing.read" }),
+    await rbac.can(ctx, secFor(bob), { permission: "billing.read" }),
 );
 
 // ── 10. Impersonation ─────────────────────────────────────────────────────────
 
 section("10. Impersonation");
 
-const agent = await rbac.createServiceAccount(ctx, {
+const agent = await rbac.createServiceAccount(ctx, systemSec, {
     serviceAccountName: "deploy-agent",
     serviceAccountToken: "super-secret-token",
     tenantId: acme.id,
@@ -309,51 +364,52 @@ const agent = await rbac.createServiceAccount(ctx, {
 
 ok(
     "agent  cannot user.manage (no direct permissions)",
-    !(await rbac.can(ctx, { principal: agent.iri, permission: "user.manage" })),
+    !(await rbac.can(ctx, secFor(agent.iri), { permission: "user.manage" })),
 );
 
-// Allow the agent to impersonate alice (an owner)
-await rbac.allowImpersonation(ctx, agent.iri, alice);
+await rbac.allowImpersonation(ctx, systemSec, { fromIri: agent.iri, toIri: alice });
 
 ok(
     "agent  can  user.manage  acting as alice",
-    await rbac.can(ctx, { principal: agent.iri, permission: "user.manage", actingAs: alice }),
+    await rbac.can(ctx, secActingAs(agent.iri, alice), { permission: "user.manage" }),
 );
 ok(
     "agent  cannot user.manage acting as bob (not granted)",
-    !(await rbac.can(ctx, { principal: agent.iri, permission: "user.manage", actingAs: bob })),
+    !(await rbac.can(ctx, secActingAs(agent.iri, bob), { permission: "user.manage" })),
 );
 
-await rbac.revokeImpersonation(ctx, agent.iri, alice);
+await rbac.revokeImpersonation(ctx, systemSec, { fromIri: agent.iri, toIri: alice });
 ok(
     "agent  cannot user.manage after revoking impersonation",
-    !(await rbac.can(ctx, { principal: agent.iri, permission: "user.manage", actingAs: alice })),
+    !(await rbac.can(ctx, secActingAs(agent.iri, alice), { permission: "user.manage" })),
 );
 
 // ── 11. Service accounts ──────────────────────────────────────────────────────
 
 section("11. Service accounts");
 
-const syncBot = await rbac.createServiceAccount(ctx, {
+const syncBot = await rbac.createServiceAccount(ctx, systemSec, {
     serviceAccountName: "sync-bot",
     serviceAccountToken: "sync-secret",
     tenantId: acme.id,
 });
-const apiReadPerm = await rbac.createPermission(ctx, "api.read");
-const apiRole = await rbac.createRole(ctx, { roleName: "APIReader", tenantId: null });
-await rbac.addPermissionToRole(ctx, apiRole.iri, apiReadPerm.iri);
-await rbac.grant(ctx, { principalIri: syncBot.iri, roleIri: apiRole.iri });
+const apiReadPerm = await rbac.createPermission(ctx, systemSec, { key: "api.read" });
+const apiRole = await rbac.createRole(ctx, systemSec, { roleName: "APIReader", tenantId: null });
+await rbac.addPermissionToRole(ctx, systemSec, {
+    roleIri: apiRole.iri,
+    permissionIri: apiReadPerm.iri,
+});
+await rbac.grant(ctx, systemSec, { principalIri: syncBot.iri, roleIri: apiRole.iri });
 
 ok(
     "sync-bot can  api.read",
-    await rbac.can(ctx, { principal: syncBot.iri, permission: "api.read" }),
+    await rbac.can(ctx, secFor(syncBot.iri), { permission: "api.read" }),
 );
 
-// Service accounts participate in groups too
-await rbac.addMember(ctx, editorsGroup.iri, syncBot.iri);
+await rbac.addMember(ctx, systemSec, { groupIri: editorsGroup.iri, memberIri: syncBot.iri });
 ok(
     "sync-bot can  project.write (via Editors group)",
-    await rbac.can(ctx, { principal: syncBot.iri, permission: "project.write" }),
+    await rbac.can(ctx, secFor(syncBot.iri), { permission: "project.write" }),
 );
 
 // ── 12. Superusers ────────────────────────────────────────────────────────────
@@ -363,42 +419,39 @@ section("12. Superusers (system wildcard)");
 const superAdmin = "http://tern.dev/ns/auth/user/super-admin";
 ok(
     "superAdmin cannot anything before being added to superusers",
-    !(await rbac.can(ctx, { principal: superAdmin, permission: "billing.delete" })),
+    !(await rbac.can(ctx, secFor(superAdmin), { permission: "billing.delete" })),
 );
 
-await rbac.addMember(ctx, SYS_SUPERUSERS_IRI, superAdmin);
+await rbac.addMember(ctx, systemSec, { groupIri: SYS_SUPERUSERS_IRI, memberIri: superAdmin });
 ok(
     "superAdmin can  billing.delete (wildcard via superusers)",
-    await rbac.can(ctx, { principal: superAdmin, permission: "billing.delete" }),
+    await rbac.can(ctx, secFor(superAdmin), { permission: "billing.delete" }),
 );
 ok(
     "superAdmin can  any.invented.permission",
-    await rbac.can(ctx, { principal: superAdmin, permission: "any.invented.permission" }),
+    await rbac.can(ctx, secFor(superAdmin), { permission: "any.invented.permission" }),
 );
 
-const allPerms = await rbac.resolvePermissions(ctx, superAdmin);
+const allPerms = await rbac.resolvePermissions(ctx, secFor(superAdmin), {});
 ok("resolvePermissions includes '*' for superuser", allPerms.has("*"));
 
 // ── 13. assert() and resolvePermissions() ─────────────────────────────────────
 
 section("13. assert() and resolvePermissions()");
 
-// assert() resolves silently when allowed
-await rbac.assert(ctx, { principal: alice, permission: "project.delete" });
+await rbac.assert(ctx, secFor(alice), { permission: "project.delete" });
 console.log("  alice assert(project.delete) → resolved silently ✓");
 
-// assert() throws a descriptive error when denied
 try {
-    await rbac.assert(ctx, { principal: dave, permission: "project.delete" });
+    await rbac.assert(ctx, secFor(dave), { permission: "project.delete" });
 } catch (err) {
     console.log(`  dave  assert(project.delete) → threw: ${(err as Error).message}`);
 }
 
-// resolvePermissions() gives the full effective set
-const alicePerms = await rbac.resolvePermissions(ctx, alice);
+const alicePerms = await rbac.resolvePermissions(ctx, secFor(alice), {});
 console.log(`  alice's effective permissions: [${[...alicePerms].sort().join(", ")}]`);
 
-const charliePerms = await rbac.resolvePermissions(ctx, charlie);
+const charliePerms = await rbac.resolvePermissions(ctx, secFor(charlie), {});
 console.log(
     `  charlie's effective permissions (with scoped grant excluded): [${[...charliePerms].sort().join(", ")}]`,
 );
@@ -407,25 +460,24 @@ console.log(
 
 section("14. UserGroup CRUD");
 
-// findByName
-const foundEng = await rbac.findUserGroupByName(ctx, "Editors", acme.id);
+const foundEng = await rbac.findUserGroupByName(ctx, systemSec, { name: "Editors", tenantId: acme.id });
 console.log(`  findUserGroupByName("Editors") → ${foundEng?.groupName ?? "null"}`);
 
-// listUserGroups
-const allGroups = await rbac.listUserGroups(ctx, acme.id);
+const allGroups = await rbac.listUserGroups(ctx, systemSec, { tenantId: acme.id });
 console.log(`  listUserGroups(acme) → [${allGroups.map((g) => g.groupName).join(", ")}]`);
 
-// updateUserGroup
-const tempGroup = await rbac.createUserGroup(ctx, { groupName: "OldName", tenantId: acme.id });
-await rbac.updateUserGroup(ctx, tempGroup.id, { groupName: "NewName" });
-const renamed = await rbac.getUserGroup(ctx, tempGroup.id);
+const tempGroup = await rbac.createUserGroup(ctx, systemSec, {
+    groupName: "OldName",
+    tenantId: acme.id,
+});
+await rbac.updateUserGroup(ctx, systemSec, { id: tempGroup.id, patch: { groupName: "NewName" } });
+const renamed = await rbac.getUserGroup(ctx, systemSec, { id: tempGroup.id });
 console.log(`  updateUserGroup: "OldName" → "${renamed?.groupName}"`);
 
-// deleteUserGroup
-await rbac.addMember(ctx, tempGroup.iri, dave);
-await rbac.deleteUserGroup(ctx, tempGroup.id);
-const afterDelete = await rbac.getUserGroup(ctx, tempGroup.id);
-const membersAfterDelete = await rbac.listMembers(ctx, tempGroup.iri);
+await rbac.addMember(ctx, systemSec, { groupIri: tempGroup.iri, memberIri: dave });
+await rbac.deleteUserGroup(ctx, systemSec, { id: tempGroup.id });
+const afterDelete = await rbac.getUserGroup(ctx, systemSec, { id: tempGroup.id });
+const membersAfterDelete = await rbac.listMembers(ctx, systemSec, { groupIri: tempGroup.iri });
 console.log(
     `  deleteUserGroup: group exists? ${afterDelete !== null}, members left: ${membersAfterDelete.length}`,
 );
@@ -436,12 +488,15 @@ section("15. Inspector cheatsheet");
 
 const inspect = rbac.inspector();
 
-// ── List effective permissions
-const effectiveAlice = await inspect.listEffectivePermissions(ctx, alice);
+const effectiveAlice = await inspect.listEffectivePermissions(ctx, systemSec, {
+    principalIri: alice,
+});
 console.log(`  listEffectivePermissions(alice): [${[...effectiveAlice].sort().join(", ")}]`);
 
-// ── Explain a permission: why does alice have project.delete?
-const explanation = await inspect.explain(ctx, { principal: alice, permission: "project.delete" });
+const explanation = await inspect.explain(ctx, systemSec, {
+    principal: alice,
+    permission: "project.delete",
+});
 console.log(`\n  explain(alice, "project.delete"):`);
 console.log(`    allowed:     ${explanation.allowed}`);
 for (const path of explanation.allowedBy) {
@@ -456,8 +511,7 @@ for (const path of explanation.allowedBy) {
     console.log(`    allowedBy:   role "${path.roleName}"${via}${inherited}`);
 }
 
-// ── Explain a denied permission
-const denialExplain = await inspect.explain(ctx, {
+const denialExplain = await inspect.explain(ctx, systemSec, {
     principal: charlie,
     permission: "billing.read",
 });
@@ -467,36 +521,46 @@ console.log(
     `    deniedBy:    ${denialExplain.deniedBy.length} path(s), allowedBy: ${denialExplain.allowedBy.length} path(s)`,
 );
 
-// ── Explain an unpermitted principal
-const noAccess = await inspect.explain(ctx, { principal: dave, permission: "project.delete" });
+const noAccess = await inspect.explain(ctx, systemSec, {
+    principal: dave,
+    permission: "project.delete",
+});
 console.log(`\n  explain(dave, "project.delete"):`);
 console.log(`    allowed: ${noAccess.allowed}, paths: ${noAccess.allowedBy.length}`);
 
-// ── List group memberships (direct)
-const aliceDirect = await inspect.listGroupMemberships(ctx, alice);
+const aliceDirect = await inspect.listGroupMemberships(ctx, systemSec, { principalIri: alice });
 console.log(
     `\n  listGroupMemberships(alice, direct): [${aliceDirect.map((g) => g.groupName).join(", ")}]`,
 );
 
-// ── List group memberships (transitive) — using nested-group scenario
-const outerGroup = await rbac.createUserGroup(ctx, { groupName: "OuterTeam", tenantId: acme.id });
-const innerGroup = await rbac.createUserGroup(ctx, { groupName: "InnerTeam", tenantId: acme.id });
-await rbac.addMember(ctx, outerGroup.iri, innerGroup.iri); // InnerTeam ⊂ OuterTeam
-await rbac.addMember(ctx, innerGroup.iri, bob);
+const outerGroup = await rbac.createUserGroup(ctx, systemSec, {
+    groupName: "OuterTeam",
+    tenantId: acme.id,
+});
+const innerGroup = await rbac.createUserGroup(ctx, systemSec, {
+    groupName: "InnerTeam",
+    tenantId: acme.id,
+});
+await rbac.addMember(ctx, systemSec, { groupIri: outerGroup.iri, memberIri: innerGroup.iri });
+await rbac.addMember(ctx, systemSec, { groupIri: innerGroup.iri, memberIri: bob });
 
-const bobTransitive = await inspect.listGroupMemberships(ctx, bob, { transitive: true });
+const bobTransitive = await inspect.listGroupMemberships(ctx, systemSec, {
+    principalIri: bob,
+    transitive: true,
+});
 console.log(
     `  listGroupMemberships(bob, transitive): [${bobTransitive.map((g) => g.groupName).join(", ")}]`,
 );
 
-// ── List members of a group (transitive)
-const outerMembers = await inspect.listGroupMembers(ctx, outerGroup.iri, { transitive: true });
+const outerMembers = await inspect.listGroupMembers(ctx, systemSec, {
+    groupIri: outerGroup.iri,
+    transitive: true,
+});
 console.log(
     `  listGroupMembers(OuterTeam, transitive): bob in list? ${outerMembers.includes(bob)}`,
 );
 
-// ── List groups with their members summary
-const withMembers = await inspect.listGroupsWithMembers(ctx, acme.id);
+const withMembers = await inspect.listGroupsWithMembers(ctx, systemSec, { tenantId: acme.id });
 console.log(`\n  listGroupsWithMembers(acme):`);
 for (const g of withMembers.filter((g) => g.members.length > 0)) {
     console.log(`    ${g.groupName}: ${g.members.length} member(s)`);

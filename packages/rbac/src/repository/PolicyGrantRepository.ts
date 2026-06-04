@@ -14,7 +14,7 @@ import {
     rbacUpdatedAtIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import { RBAC_GRAPH, RDF_TYPE, XSD_BOOLEAN, XSD_DATETIME } from "../constants.js";
 import type { PolicyGrantEntity } from "../types.js";
 import { iriFor, iriValue, literalValue, newId } from "./util.js";
@@ -30,6 +30,15 @@ export interface CreateGrantInput {
     isDenial?: boolean;
 }
 
+export interface GrantIriArgs {
+    grantIri: string;
+}
+
+export interface FindGrantsArgs {
+    principalIris: string[];
+    scopeIris?: string[];
+}
+
 export class PolicyGrantRepository {
     private readonly _store: TripleStore;
 
@@ -37,18 +46,23 @@ export class PolicyGrantRepository {
         this._store = store;
     }
 
-    async create(ctx: ServerContext, input: CreateGrantInput): Promise<PolicyGrantEntity> {
+    /** @insecure @nochecks */
+    async create(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: CreateGrantInput,
+    ): Promise<PolicyGrantEntity> {
         const id = newId();
         const now = new Date();
         const sub = iriFor("grant", id);
-        const denial = input.isDenial ?? false;
+        const denial = args.isDenial ?? false;
 
         const quads = [
             { subject: sub, predicate: RDF_TYPE, object: PolicyGrantIRI, graph: RBAC_GRAPH },
             {
                 subject: sub,
                 predicate: grantPrincipalIRI,
-                object: new IRI(input.principalIri),
+                object: new IRI(args.principalIri),
                 graph: RBAC_GRAPH,
             },
             {
@@ -71,51 +85,51 @@ export class PolicyGrantRepository {
             },
         ];
 
-        if (input.roleIri) {
+        if (args.roleIri) {
             quads.push({
                 subject: sub,
                 predicate: grantRoleIRI,
-                object: new IRI(input.roleIri),
+                object: new IRI(args.roleIri),
                 graph: RBAC_GRAPH,
             });
         }
-        if (input.permissionIri) {
+        if (args.permissionIri) {
             quads.push({
                 subject: sub,
                 predicate: grantPermissionIRI,
-                object: new IRI(input.permissionIri),
+                object: new IRI(args.permissionIri),
                 graph: RBAC_GRAPH,
             });
         }
-        if (input.scopeIri) {
+        if (args.scopeIri) {
             quads.push({
                 subject: sub,
                 predicate: grantScopeIRI,
-                object: new IRI(input.scopeIri),
+                object: new IRI(args.scopeIri),
                 graph: RBAC_GRAPH,
             });
         }
-        if (input.grantedByIri) {
+        if (args.grantedByIri) {
             quads.push({
                 subject: sub,
                 predicate: grantedByIRI,
-                object: new IRI(input.grantedByIri),
+                object: new IRI(args.grantedByIri),
                 graph: RBAC_GRAPH,
             });
         }
-        if (input.delegatedFromIri) {
+        if (args.delegatedFromIri) {
             quads.push({
                 subject: sub,
                 predicate: delegatedFromIRI,
-                object: new IRI(input.delegatedFromIri),
+                object: new IRI(args.delegatedFromIri),
                 graph: RBAC_GRAPH,
             });
         }
-        if (input.grantExpiresAt) {
+        if (args.grantExpiresAt) {
             quads.push({
                 subject: sub,
                 predicate: grantExpiresAtIRI,
-                object: literal(input.grantExpiresAt.toISOString(), XSD_DATETIME),
+                object: literal(args.grantExpiresAt.toISOString(), XSD_DATETIME),
                 graph: RBAC_GRAPH,
             });
         }
@@ -125,37 +139,42 @@ export class PolicyGrantRepository {
         return {
             id,
             iri: sub.value,
-            principalIri: input.principalIri,
-            roleIri: input.roleIri ?? null,
-            permissionIri: input.permissionIri ?? null,
-            scopeIri: input.scopeIri ?? null,
-            grantedByIri: input.grantedByIri ?? null,
-            delegatedFromIri: input.delegatedFromIri ?? null,
-            grantExpiresAt: input.grantExpiresAt ?? null,
+            principalIri: args.principalIri,
+            roleIri: args.roleIri ?? null,
+            permissionIri: args.permissionIri ?? null,
+            scopeIri: args.scopeIri ?? null,
+            grantedByIri: args.grantedByIri ?? null,
+            delegatedFromIri: args.delegatedFromIri ?? null,
+            grantExpiresAt: args.grantExpiresAt ?? null,
             isDenial: denial,
             createdAt: now,
             updatedAt: now,
         };
     }
 
-    /** Soft-delete a grant by IRI (revokes the assignment). */
-    async revoke(ctx: ServerContext, grantIri: string): Promise<void> {
-        await this._store.delete(ctx, { subject: new IRI(grantIri), graph: RBAC_GRAPH });
+    /** @insecure @nochecks Soft-delete a grant by IRI (revokes the assignment). */
+    async revoke(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: GrantIriArgs,
+    ): Promise<void> {
+        await this._store.delete(ctx, { subject: new IRI(args.grantIri), graph: RBAC_GRAPH });
     }
 
     /**
+     * @insecure @nochecks
      * Find all active grants where grantPrincipal is in the given set of principal IRIs.
      * Optionally filter to grants whose grantScope is one of the provided scope IRIs
      * (or has no scope at all, i.e. system-wide).
      */
     async findForPrincipals(
         ctx: ServerContext,
-        principalIris: string[],
-        scopeIris?: string[],
+        _sec: SecurityContext,
+        args: FindGrantsArgs,
     ): Promise<PolicyGrantEntity[]> {
         const results: PolicyGrantEntity[] = [];
 
-        for (const principalIri of principalIris) {
+        for (const principalIri of args.principalIris) {
             const principalEdges = await this._store.find(ctx, {
                 predicate: grantPrincipalIRI,
                 object: new IRI(principalIri),
@@ -167,9 +186,8 @@ export class PolicyGrantRepository {
                 const quads = await this._store.find(ctx, { subject: grantSub, graph: RBAC_GRAPH });
                 const grant = this._fromQuads(grantSub.value, quads);
 
-                // If scopeIris provided, include only grants matching those scopes or no scope
-                if (scopeIris !== undefined) {
-                    if (grant.scopeIri !== null && !scopeIris.includes(grant.scopeIri)) {
+                if (args.scopeIris !== undefined) {
+                    if (grant.scopeIri !== null && !args.scopeIris.includes(grant.scopeIri)) {
                         continue;
                     }
                 }

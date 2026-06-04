@@ -1,6 +1,6 @@
 import { IRI, literal } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import {
     CONVOS_GRAPH,
     convosCreatedAtIRI,
@@ -20,6 +20,33 @@ import {
 import type { InboxEntity, InboxMembershipEntity, InboxRole } from "../types.js";
 import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
 
+export interface IdArgs {
+    id: string;
+}
+
+export interface SubjectIriArgs {
+    subjectIri: string;
+}
+
+export interface AddMemberArgs {
+    inboxId: string;
+    userId: string;
+    role: InboxRole;
+}
+
+export interface InboxUserArgs {
+    inboxId: string;
+    userId: string;
+}
+
+export interface InboxIdArgs {
+    inboxId: string;
+}
+
+export interface UserIdArgs {
+    userId: string;
+}
+
 export class InboxRepository {
     private readonly _store: TripleStore;
 
@@ -27,9 +54,11 @@ export class InboxRepository {
         this._store = store;
     }
 
+    /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        input: Pick<InboxEntity, "subjectIri" | "name" | "createdBy">,
+        _sec: SecurityContext,
+        args: Pick<InboxEntity, "subjectIri" | "name" | "createdBy">,
     ): Promise<InboxEntity> {
         const id = newId();
         const now = new Date();
@@ -40,19 +69,19 @@ export class InboxRepository {
             {
                 subject: sub,
                 predicate: subjectIriIRI,
-                object: literal(input.subjectIri, XSD_STRING),
+                object: literal(args.subjectIri, XSD_STRING),
                 graph: CONVOS_GRAPH,
             },
             {
                 subject: sub,
                 predicate: inboxNameIRI,
-                object: literal(input.name, XSD_STRING),
+                object: literal(args.name, XSD_STRING),
                 graph: CONVOS_GRAPH,
             },
             {
                 subject: sub,
                 predicate: inboxCreatedByIRI,
-                object: new IRI(input.createdBy),
+                object: new IRI(args.createdBy),
                 graph: CONVOS_GRAPH,
             },
             {
@@ -66,23 +95,33 @@ export class InboxRepository {
         return {
             id,
             iri: sub.value,
-            subjectIri: input.subjectIri,
-            name: input.name,
-            createdBy: input.createdBy,
+            subjectIri: args.subjectIri,
+            name: args.name,
+            createdBy: args.createdBy,
             createdAt: now,
         };
     }
 
-    async findById(ctx: ServerContext, id: string): Promise<InboxEntity | null> {
-        const sub = iriFor("inbox", id);
+    /** @insecure @nochecks */
+    async findById(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<InboxEntity | null> {
+        const sub = iriFor("inbox", args.id);
         const quads = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(id, quads);
+        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
     }
 
-    async findBySubject(ctx: ServerContext, subjectIri: string): Promise<InboxEntity[]> {
+    /** @insecure @nochecks */
+    async findBySubject(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: SubjectIriArgs,
+    ): Promise<InboxEntity[]> {
         const quads = await this._store.find(ctx, {
             predicate: subjectIriIRI,
-            object: literal(subjectIri, XSD_STRING),
+            object: literal(args.subjectIri, XSD_STRING),
             graph: CONVOS_GRAPH,
         });
 
@@ -113,13 +152,16 @@ export class InboxRepository {
         return inboxes;
     }
 
+    /** @insecure @nochecks */
     async addMember(
         ctx: ServerContext,
-        inboxId: string,
-        userId: string,
-        role: InboxRole,
+        sec: SecurityContext,
+        args: AddMemberArgs,
     ): Promise<InboxMembershipEntity> {
-        const existing = await this.findMembership(ctx, inboxId, userId);
+        const existing = await this.findMembership(ctx, sec, {
+            inboxId: args.inboxId,
+            userId: args.userId,
+        });
         if (existing) {
             return existing;
         }
@@ -138,19 +180,19 @@ export class InboxRepository {
             {
                 subject: sub,
                 predicate: memberInboxIRI,
-                object: iriFor("inbox", inboxId),
+                object: iriFor("inbox", args.inboxId),
                 graph: CONVOS_GRAPH,
             },
             {
                 subject: sub,
                 predicate: memberUserIRI,
-                object: new IRI(userId),
+                object: new IRI(args.userId),
                 graph: CONVOS_GRAPH,
             },
             {
                 subject: sub,
                 predicate: roleIRI,
-                object: literal(role, XSD_STRING),
+                object: literal(args.role, XSD_STRING),
                 graph: CONVOS_GRAPH,
             },
             {
@@ -164,15 +206,20 @@ export class InboxRepository {
         return {
             id,
             iri: sub.value,
-            inboxId,
-            userId,
-            role,
+            inboxId: args.inboxId,
+            userId: args.userId,
+            role: args.role,
             grantedAt: now,
         };
     }
 
-    async removeMember(ctx: ServerContext, inboxId: string, userId: string): Promise<void> {
-        const membership = await this.findMembership(ctx, inboxId, userId);
+    /** @insecure @nochecks */
+    async removeMember(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: InboxUserArgs,
+    ): Promise<void> {
+        const membership = await this.findMembership(ctx, sec, args);
         if (!membership) {
             return;
         }
@@ -182,19 +229,25 @@ export class InboxRepository {
         });
     }
 
+    /** @insecure @nochecks */
     async findMembership(
         ctx: ServerContext,
-        inboxId: string,
-        userId: string,
+        sec: SecurityContext,
+        args: InboxUserArgs,
     ): Promise<InboxMembershipEntity | null> {
-        const members = await this.listMembers(ctx, inboxId);
-        return members.find((m) => m.userId === userId) ?? null;
+        const members = await this.listMembers(ctx, sec, { inboxId: args.inboxId });
+        return members.find((m) => m.userId === args.userId) ?? null;
     }
 
-    async listMembers(ctx: ServerContext, inboxId: string): Promise<InboxMembershipEntity[]> {
+    /** @insecure @nochecks */
+    async listMembers(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: InboxIdArgs,
+    ): Promise<InboxMembershipEntity[]> {
         const quads = await this._store.find(ctx, {
             predicate: memberInboxIRI,
-            object: iriFor("inbox", inboxId),
+            object: iriFor("inbox", args.inboxId),
             graph: CONVOS_GRAPH,
         });
 
@@ -215,10 +268,15 @@ export class InboxRepository {
         return members;
     }
 
-    async listInboxesForUser(ctx: ServerContext, userId: string): Promise<InboxMembershipEntity[]> {
+    /** @insecure @nochecks */
+    async listInboxesForUser(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: UserIdArgs,
+    ): Promise<InboxMembershipEntity[]> {
         const quads = await this._store.find(ctx, {
             predicate: memberUserIRI,
-            object: new IRI(userId),
+            object: new IRI(args.userId),
             graph: CONVOS_GRAPH,
         });
 

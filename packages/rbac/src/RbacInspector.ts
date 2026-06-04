@@ -8,7 +8,7 @@ import {
     roleNameIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import { type SecurityContext, type ServerContext, systemSec } from "@jasonscharf/server";
 import type { AccessChecker } from "./AccessChecker.js";
 import { RBAC_GRAPH } from "./constants.js";
 import type { PolicyGrantRepository } from "./repository/PolicyGrantRepository.js";
@@ -34,18 +34,13 @@ export interface GrantPath {
     /**
      * Chain of group IRIs between the queried principal and the grant target.
      * Empty when the grant is directly on the principal.
-     * e.g. [alice → staff, staff → admins] yields ["staff-iri", "admins-iri"].
      */
     membershipChain: string[];
     /** IRI of the role granted (null for direct-permission grants). */
     roleIri: string | null;
     /** Human-readable role name (null for direct-permission grants). */
     roleName: string | null;
-    /**
-     * Role inheritance path through which the target permission was reached.
-     * Empty when the role grants the permission directly.
-     * e.g. [owner → editor → viewer] yields ["editor-iri", "viewer-iri"].
-     */
+    /** Role inheritance path through which the target permission was reached. */
     roleInheritanceChain: string[];
     /** IRI of the Permission node (for direct-permission grants). */
     permissionIri: string | null;
@@ -71,6 +66,25 @@ export interface PermissionExplanation {
 /** UserGroup with its direct members. */
 export interface UserGroupWithMembers extends UserGroupEntity {
     members: string[];
+}
+
+export interface PrincipalScopeArgs {
+    principalIri: string;
+    scopeIri?: string;
+}
+
+export interface PrincipalTransitiveArgs {
+    principalIri: string;
+    transitive?: boolean;
+}
+
+export interface GroupTransitiveArgs {
+    groupIri: string;
+    transitive?: boolean;
+}
+
+export interface TenantFilterArgs {
+    tenantId?: string;
 }
 
 // ── Inspector ─────────────────────────────────────────────────────────────────
@@ -101,37 +115,28 @@ export class RbacInspector {
 
     // ── Permission inspection ─────────────────────────────────────────────────
 
-    /**
-     * Returns the effective set of permission keys for the principal.
-     * Alias for `AccessChecker.resolvePermissions` — convenience shorthand.
-     */
+    /** @insecure @nochecks Alias for AccessChecker.resolvePermissions. */
     async listEffectivePermissions(
         ctx: ServerContext,
-        principalIri: string,
-        scopeIri?: string,
+        _sec: SecurityContext,
+        args: PrincipalScopeArgs,
     ): Promise<Set<string>> {
-        return this._checker.resolvePermissions(ctx, principalIri, scopeIri);
+        return this._checker.resolvePermissions(ctx, args.principalIri, args.scopeIri);
     }
 
-    /**
-     * Explains why a principal does or does not have a permission.
-     *
-     * Returns the final `allowed` decision and all grant paths that contributed
-     * to it (both allows and denials) so you can see exactly where each
-     * permission comes from.
-     */
+    /** @insecure @nochecks Explains why a principal does or does not have a permission. */
     async explain(
         ctx: ServerContext,
+        _sec: SecurityContext,
         opts: { principal: string; permission: string; scope?: string },
     ): Promise<PermissionExplanation> {
         const principals = await this._resolvePrincipalSet(ctx, opts.principal);
         const scopeChain = opts.scope ? await this._resolveScopeChain(ctx, opts.scope) : [];
 
-        const rawGrants = await this._grants.findForPrincipals(
-            ctx,
-            Array.from(principals),
-            scopeChain,
-        );
+        const rawGrants = await this._grants.findForPrincipals(ctx, systemSec, {
+            principalIris: Array.from(principals),
+            scopeIris: scopeChain,
+        });
         const active = rawGrants.filter(
             (g) => g.grantExpiresAt == null || g.grantExpiresAt.getTime() > Date.now(),
         );
@@ -180,42 +185,47 @@ export class RbacInspector {
     // ── Group / membership inspection ─────────────────────────────────────────
 
     /**
-     * Returns all UserGroups the principal directly belongs to.
+     * @insecure @nochecks Returns all UserGroups the principal directly belongs to.
      * Pass `transitive: true` to also include groups-of-groups.
      */
     async listGroupMemberships(
         ctx: ServerContext,
-        principalIri: string,
-        opts?: { transitive?: boolean },
+        _sec: SecurityContext,
+        args: PrincipalTransitiveArgs,
     ): Promise<UserGroupEntity[]> {
-        if (opts?.transitive) {
-            const allIris = await this._resolvePrincipalSet(ctx, principalIri);
-            allIris.delete(principalIri);
-            const results = await Promise.all([...allIris].map((iri) => this._groups.findByIri(ctx, iri)));
+        if (args.transitive) {
+            const allIris = await this._resolvePrincipalSet(ctx, args.principalIri);
+            allIris.delete(args.principalIri);
+            const results = await Promise.all(
+                [...allIris].map((iri) => this._groups.findByIri(ctx, systemSec, { iriStr: iri })),
+            );
             return results.filter((g): g is UserGroupEntity => g != null);
         }
 
-        const directIris = await this._groups.listGroupsForPrincipal(ctx, principalIri);
-        const results = await Promise.all(directIris.map((iri) => this._groups.findByIri(ctx, iri)));
+        const directIris = await this._groups.listGroupsForPrincipal(ctx, systemSec, {
+            principalIri: args.principalIri,
+        });
+        const results = await Promise.all(
+            directIris.map((iri) => this._groups.findByIri(ctx, systemSec, { iriStr: iri })),
+        );
         return results.filter((g): g is UserGroupEntity => g != null);
     }
 
     /**
-     * Returns all member IRIs of the given group.
+     * @insecure @nochecks Returns all member IRIs of the given group.
      * Pass `transitive: true` to recursively expand nested groups.
      */
     async listGroupMembers(
         ctx: ServerContext,
-        groupIri: string,
-        opts?: { transitive?: boolean },
+        _sec: SecurityContext,
+        args: GroupTransitiveArgs,
     ): Promise<string[]> {
-        if (!opts?.transitive) {
-            return this._groups.listMembers(ctx, groupIri);
+        if (!args.transitive) {
+            return this._groups.listMembers(ctx, systemSec, { groupIri: args.groupIri });
         }
 
-        // BFS — collect all principals reachable through MEMBER_OF edges pointing to this group
         const visited = new Set<string>();
-        const queue = [groupIri];
+        const queue = [args.groupIri];
         const members = new Set<string>();
 
         while (queue.length > 0) {
@@ -223,13 +233,12 @@ export class RbacInspector {
             if (!current) {
                 break;
             }
-            const direct = await this._groups.listMembers(ctx, current);
+            const direct = await this._groups.listMembers(ctx, systemSec, { groupIri: current });
             for (const m of direct) {
                 if (members.has(m)) {
                     continue;
                 }
                 members.add(m);
-                // If the member is itself a group, expand it too
                 const isGroup = await this._isGroup(ctx, m);
                 if (isGroup && !visited.has(m)) {
                     visited.add(m);
@@ -241,15 +250,17 @@ export class RbacInspector {
     }
 
     /**
-     * Returns each UserGroup in the tenant along with its direct member IRIs.
-     * Useful for rendering a group management UI.
+     * @insecure @nochecks Returns each UserGroup in the tenant along with its direct member IRIs.
      */
     async listGroupsWithMembers(
         ctx: ServerContext,
-        tenantId?: string,
+        _sec: SecurityContext,
+        args: TenantFilterArgs = {},
     ): Promise<UserGroupWithMembers[]> {
-        const groups = await this._groups.listAll(ctx, tenantId);
-        const memberLists = await Promise.all(groups.map((g) => this._groups.listMembers(ctx, g.iri)));
+        const groups = await this._groups.listAll(ctx, systemSec, { tenantId: args.tenantId });
+        const memberLists = await Promise.all(
+            groups.map((g) => this._groups.listMembers(ctx, systemSec, { groupIri: g.iri })),
+        );
         return groups.map((g, i) => ({ ...g, members: memberLists[i] ?? [] }));
     }
 
@@ -299,10 +310,6 @@ export class RbacInspector {
         return chain;
     }
 
-    /**
-     * Returns the IRI chain between `from` and `target` through MEMBER_OF edges,
-     * or an empty array if the grant is directly on `from`.
-     */
     private async _membershipChain(
         ctx: ServerContext,
         from: string,
@@ -311,7 +318,6 @@ export class RbacInspector {
         if (from === target) {
             return [];
         }
-        // BFS tracking parent pointers
         const parent = new Map<string, string>();
         const queue = [from];
         const visited = new Set<string>([from]);
@@ -333,7 +339,6 @@ export class RbacInspector {
                 }
                 parent.set(g, current);
                 if (g === target) {
-                    // Reconstruct path
                     const path: string[] = [];
                     let node: string | undefined = g;
                     while (node && node !== from) {
@@ -349,11 +354,6 @@ export class RbacInspector {
         return [];
     }
 
-    /**
-     * Builds a GrantPath for a single PolicyGrant, following role inheritance
-     * to find the path through which the queried permission is reached.
-     * Returns null if the grant does not contribute the queried permission.
-     */
     private async _buildGrantPath(
         ctx: ServerContext,
         grant: PolicyGrantEntity,
@@ -395,10 +395,6 @@ export class RbacInspector {
         return null;
     }
 
-    /**
-     * DFS through role inheritance to find whether `permission` (or `*`) is
-     * granted.  Returns the inheritance chain (list of role IRIs traversed).
-     */
     private async _findPermissionInRole(
         ctx: ServerContext,
         roleIri: string,

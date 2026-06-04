@@ -11,7 +11,7 @@
  */
 
 import type { RbacService } from "@jasonscharf/rbac";
-import type { ServerContext } from "@jasonscharf/server";
+import { type SecurityContext, type ServerContext, systemSec } from "@jasonscharf/server";
 import {
     ALL_CONVOS_PERMISSIONS,
     CONVO_MODERATOR_PERMISSIONS,
@@ -40,33 +40,38 @@ export async function installConvos(
     rbac: RbacService,
     tenantId: string | null = null,
 ): Promise<ConvosInstallResult> {
+    const sec: SecurityContext = systemSec;
+
     // ── Permissions ───────────────────────────────────────────────────────────
     const permissionIris: Record<string, string> = {};
 
     for (const key of ALL_CONVOS_PERMISSIONS) {
-        const existing = await rbac.findPermissionByKey(ctx, key);
-        const perm = existing ?? (await rbac.createPermission(ctx, key));
+        const existing = await rbac.findPermissionByKey(ctx, sec, { key });
+        const perm = existing ?? (await rbac.createPermission(ctx, sec, { key }));
         permissionIris[key] = perm.iri;
     }
 
     // ── ConvoUser role ────────────────────────────────────────────────────────
-    const userRole = await rbac.createRole(ctx, { roleName: CONVO_USER_ROLE_NAME, tenantId });
+    const userRole = await rbac.createRole(ctx, sec, {
+        roleName: CONVO_USER_ROLE_NAME,
+        tenantId,
+    });
     for (const key of CONVO_USER_PERMISSIONS) {
         const pIri = permissionIris[key];
         if (pIri) {
-            await rbac.addPermissionToRole(ctx, userRole.iri, pIri);
+            await rbac.addPermissionToRole(ctx, sec, { roleIri: userRole.iri, permissionIri: pIri });
         }
     }
 
     // ── ConvoModerator role ───────────────────────────────────────────────────
-    const modRole = await rbac.createRole(ctx, {
+    const modRole = await rbac.createRole(ctx, sec, {
         roleName: CONVO_MODERATOR_ROLE_NAME,
         tenantId,
     });
     for (const key of CONVO_MODERATOR_PERMISSIONS) {
         const pIri = permissionIris[key];
         if (pIri) {
-            await rbac.addPermissionToRole(ctx, modRole.iri, pIri);
+            await rbac.addPermissionToRole(ctx, sec, { roleIri: modRole.iri, permissionIri: pIri });
         }
     }
 
@@ -79,12 +84,7 @@ export async function installConvos(
 
 /**
  * Revoke all grants the caller issued against the roles returned by a prior
- * installConvos() call.  Pass the array of grant IRIs you created so they can
- * be explicitly revoked.
- *
- * Full role/permission node deletion requires a deleteRole() API on
- * RbacService which does not exist yet.  Use a DB migration to hard-delete
- * the role nodes from the RBAC graph when removing the extension entirely.
+ * installConvos() call.
  */
 export async function uninstallConvos(
     ctx: ServerContext,
@@ -92,6 +92,6 @@ export async function uninstallConvos(
     grantIris: string[],
 ): Promise<void> {
     for (const grantIri of grantIris) {
-        await rbac.revoke(ctx, grantIri);
+        await rbac.revoke(ctx, systemSec, { grantIri });
     }
 }

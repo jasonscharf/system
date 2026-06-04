@@ -9,10 +9,23 @@ import {
     updatedAtIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import { AUTH_GRAPH, RDF_TYPE, XSD_DATETIME, XSD_STRING } from "../constants.js";
 import type { UserEntity } from "../types.js";
 import { idFrom, iriFor, newId } from "./util.js";
+
+export interface IdArgs {
+    id: string;
+}
+
+export interface EmailArgs {
+    email: string;
+}
+
+export interface UpdateUserArgs {
+    id: string;
+    patch: Partial<Pick<UserEntity, "displayName" | "avatarUrl" | "email">>;
+}
 
 export class UserRepository {
     private readonly _store: TripleStore;
@@ -25,9 +38,11 @@ export class UserRepository {
         return this._store;
     }
 
+    /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        input: Pick<UserEntity, "email" | "displayName" | "avatarUrl">,
+        _sec: SecurityContext,
+        args: Pick<UserEntity, "email" | "displayName" | "avatarUrl">,
     ): Promise<UserEntity> {
         const id = newId();
         const now = new Date();
@@ -38,7 +53,7 @@ export class UserRepository {
             {
                 subject: sub,
                 predicate: emailIRI,
-                object: literal(input.email, XSD_STRING),
+                object: literal(args.email, XSD_STRING),
                 graph: AUTH_GRAPH,
             },
             {
@@ -53,41 +68,51 @@ export class UserRepository {
                 object: literal(now.toISOString(), XSD_DATETIME),
                 graph: AUTH_GRAPH,
             },
-            ...(input.displayName
+            ...(args.displayName
                 ? [
                       {
                           subject: sub,
                           predicate: displayNameIRI,
-                          object: literal(input.displayName, XSD_STRING),
+                          object: literal(args.displayName, XSD_STRING),
                           graph: AUTH_GRAPH,
                       },
                   ]
                 : []),
-            ...(input.avatarUrl
+            ...(args.avatarUrl
                 ? [
                       {
                           subject: sub,
                           predicate: avatarUrlIRI,
-                          object: literal(input.avatarUrl, XSD_STRING),
+                          object: literal(args.avatarUrl, XSD_STRING),
                           graph: AUTH_GRAPH,
                       },
                   ]
                 : []),
         ]);
 
-        return { id, iri: sub.value, ...input, createdAt: now, updatedAt: now };
+        return { id, iri: sub.value, ...args, createdAt: now, updatedAt: now };
     }
 
-    async findById(ctx: ServerContext, id: string): Promise<UserEntity | null> {
-        const sub = iriFor("user", id);
+    /** @insecure @nochecks */
+    async findById(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<UserEntity | null> {
+        const sub = iriFor("user", args.id);
         const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(id, quads);
+        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
     }
 
-    async findByEmail(ctx: ServerContext, email: string): Promise<UserEntity | null> {
+    /** @insecure @nochecks */
+    async findByEmail(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: EmailArgs,
+    ): Promise<UserEntity | null> {
         const quads = await this._store.find(ctx, {
             predicate: emailIRI,
-            object: literal(email, XSD_STRING),
+            object: literal(args.email, XSD_STRING),
             graph: AUTH_GRAPH,
         });
         if (quads.length === 0) {
@@ -101,67 +126,83 @@ export class UserRepository {
         );
     }
 
+    /** @insecure @nochecks */
     async update(
         ctx: ServerContext,
-        id: string,
-        patch: Partial<Pick<UserEntity, "displayName" | "avatarUrl" | "email">>,
+        sec: SecurityContext,
+        args: UpdateUserArgs,
     ): Promise<UserEntity | null> {
-        const existing = await this.findById(ctx, id);
-        if (!existing) {
-            return null;
-        }
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const existing = await this.findById(ctx, sec, { id: args.id });
+            if (!existing) {
+                return null;
+            }
 
-        const sub = iriFor("user", id);
-        const now = new Date();
+            const sub = iriFor("user", args.id);
+            const now = new Date();
 
-        if (patch.email !== undefined) {
-            await this._store.delete(ctx, { subject: sub, predicate: emailIRI, graph: AUTH_GRAPH });
-            await this._store.insert(ctx, {
-                subject: sub,
-                predicate: emailIRI,
-                object: literal(patch.email, XSD_STRING),
-                graph: AUTH_GRAPH,
-            });
-        }
-        if (patch.displayName !== undefined) {
+            if (args.patch.email !== undefined) {
+                await this._store.delete(ctx, {
+                    subject: sub,
+                    predicate: emailIRI,
+                    graph: AUTH_GRAPH,
+                });
+                await this._store.insert(ctx, {
+                    subject: sub,
+                    predicate: emailIRI,
+                    object: literal(args.patch.email, XSD_STRING),
+                    graph: AUTH_GRAPH,
+                });
+            }
+            if (args.patch.displayName !== undefined) {
+                await this._store.delete(ctx, {
+                    subject: sub,
+                    predicate: displayNameIRI,
+                    graph: AUTH_GRAPH,
+                });
+                await this._store.insert(ctx, {
+                    subject: sub,
+                    predicate: displayNameIRI,
+                    object: literal(args.patch.displayName, XSD_STRING),
+                    graph: AUTH_GRAPH,
+                });
+            }
+            if (args.patch.avatarUrl !== undefined) {
+                await this._store.delete(ctx, {
+                    subject: sub,
+                    predicate: avatarUrlIRI,
+                    graph: AUTH_GRAPH,
+                });
+                await this._store.insert(ctx, {
+                    subject: sub,
+                    predicate: avatarUrlIRI,
+                    object: literal(args.patch.avatarUrl, XSD_STRING),
+                    graph: AUTH_GRAPH,
+                });
+            }
             await this._store.delete(ctx, {
                 subject: sub,
-                predicate: displayNameIRI,
+                predicate: updatedAtIRI,
                 graph: AUTH_GRAPH,
             });
             await this._store.insert(ctx, {
                 subject: sub,
-                predicate: displayNameIRI,
-                object: literal(patch.displayName, XSD_STRING),
+                predicate: updatedAtIRI,
+                object: literal(now.toISOString(), XSD_DATETIME),
                 graph: AUTH_GRAPH,
             });
-        }
-        if (patch.avatarUrl !== undefined) {
-            await this._store.delete(ctx, {
-                subject: sub,
-                predicate: avatarUrlIRI,
-                graph: AUTH_GRAPH,
-            });
-            await this._store.insert(ctx, {
-                subject: sub,
-                predicate: avatarUrlIRI,
-                object: literal(patch.avatarUrl, XSD_STRING),
-                graph: AUTH_GRAPH,
-            });
-        }
-        await this._store.delete(ctx, { subject: sub, predicate: updatedAtIRI, graph: AUTH_GRAPH });
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: updatedAtIRI,
-            object: literal(now.toISOString(), XSD_DATETIME),
-            graph: AUTH_GRAPH,
+
+            return this.findById(ctx, sec, { id: args.id });
         });
-
-        return this.findById(ctx, id);
     }
 
-    async delete(ctx: ServerContext, id: string): Promise<void> {
-        await this._store.delete(ctx, { subject: iriFor("user", id), graph: AUTH_GRAPH });
+    /** @insecure @nochecks */
+    async delete(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<void> {
+        await this._store.delete(ctx, { subject: iriFor("user", args.id), graph: AUTH_GRAPH });
     }
 
     private _fromQuads(id: string, quads: Awaited<ReturnType<TripleStore["find"]>>): UserEntity {

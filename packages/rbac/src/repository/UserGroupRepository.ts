@@ -10,10 +10,49 @@ import {
     UserGroupIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import { RBAC_GRAPH, RDF_TYPE, XSD_BOOLEAN, XSD_DATETIME, XSD_STRING } from "../constants.js";
 import type { UserGroupEntity } from "../types.js";
 import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
+
+export interface IdArgs {
+    id: string;
+}
+
+export interface IriStrArgs {
+    iriStr: string;
+}
+
+export interface FindByNameArgs {
+    name: string;
+    tenantId?: string;
+}
+
+export interface TenantFilterArgs {
+    tenantId?: string;
+}
+
+export interface TenantIdArgs {
+    tenantId: string;
+}
+
+export interface UpdateGroupArgs {
+    id: string;
+    patch: { groupName?: string };
+}
+
+export interface GroupMemberArgs {
+    groupIri: string;
+    memberIri: string;
+}
+
+export interface GroupIriArgs {
+    groupIri: string;
+}
+
+export interface PrincipalIriArgs {
+    principalIri: string;
+}
 
 export class UserGroupRepository {
     private readonly _store: TripleStore;
@@ -24,9 +63,11 @@ export class UserGroupRepository {
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
 
+    /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        input: Pick<UserGroupEntity, "groupName" | "tenantId">,
+        _sec: SecurityContext,
+        args: Pick<UserGroupEntity, "groupName" | "tenantId">,
     ): Promise<UserGroupEntity> {
         const id = newId();
         const now = new Date();
@@ -37,7 +78,7 @@ export class UserGroupRepository {
             {
                 subject: sub,
                 predicate: groupNameIRI,
-                object: literal(input.groupName, XSD_STRING),
+                object: literal(args.groupName, XSD_STRING),
                 graph: RBAC_GRAPH,
             },
             {
@@ -59,11 +100,11 @@ export class UserGroupRepository {
                 graph: RBAC_GRAPH,
             },
         ];
-        if (input.tenantId) {
+        if (args.tenantId) {
             quads.push({
                 subject: sub,
                 predicate: inTenantIRI,
-                object: iriFor("tenant", input.tenantId),
+                object: iriFor("tenant", args.tenantId),
                 graph: RBAC_GRAPH,
             });
         }
@@ -72,34 +113,47 @@ export class UserGroupRepository {
         return {
             id,
             iri: sub.value,
-            groupName: input.groupName,
+            groupName: args.groupName,
             isSystemGroup: false,
-            tenantId: input.tenantId ?? null,
+            tenantId: args.tenantId ?? null,
             createdAt: now,
             updatedAt: now,
         };
     }
 
-    async findById(ctx: ServerContext, id: string): Promise<UserGroupEntity | null> {
-        const sub = iriFor("group", id);
+    /** @insecure @nochecks */
+    async findById(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<UserGroupEntity | null> {
+        const sub = iriFor("group", args.id);
         const quads = await this._store.find(ctx, { subject: sub, graph: RBAC_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(id, quads);
+        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
     }
 
-    async findByIri(ctx: ServerContext, iriStr: string): Promise<UserGroupEntity | null> {
-        const quads = await this._store.find(ctx, { subject: new IRI(iriStr), graph: RBAC_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(idFrom(iriStr), quads);
+    /** @insecure @nochecks */
+    async findByIri(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IriStrArgs,
+    ): Promise<UserGroupEntity | null> {
+        const quads = await this._store.find(ctx, {
+            subject: new IRI(args.iriStr),
+            graph: RBAC_GRAPH,
+        });
+        return quads.length === 0 ? null : this._fromQuads(idFrom(args.iriStr), quads);
     }
 
-    /** Find a group by its human-readable name, optionally scoped to a tenant. */
+    /** @insecure @nochecks Find a group by its human-readable name, optionally scoped to a tenant. */
     async findByName(
         ctx: ServerContext,
-        name: string,
-        tenantId?: string,
+        _sec: SecurityContext,
+        args: FindByNameArgs,
     ): Promise<UserGroupEntity | null> {
         const nameQuads = await this._store.find(ctx, {
             predicate: groupNameIRI,
-            object: literal(name, XSD_STRING),
+            object: literal(args.name, XSD_STRING),
             graph: RBAC_GRAPH,
         });
         for (const nq of nameQuads) {
@@ -115,17 +169,21 @@ export class UserGroupRepository {
             }
             const quads = await this._store.find(ctx, { subject: sub, graph: RBAC_GRAPH });
             const entity = this._fromQuads(idFrom(sub.value), quads);
-            if (tenantId === undefined || entity.tenantId === tenantId) {
+            if (args.tenantId === undefined || entity.tenantId === args.tenantId) {
                 return entity;
             }
         }
         return null;
     }
 
-    /** List all user groups, optionally filtered to a tenant. */
-    async listAll(ctx: ServerContext, tenantId?: string): Promise<UserGroupEntity[]> {
-        if (tenantId !== undefined) {
-            return this.listForTenant(ctx, tenantId);
+    /** @insecure @nochecks List all user groups, optionally filtered to a tenant. */
+    async listAll(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        args: TenantFilterArgs = {},
+    ): Promise<UserGroupEntity[]> {
+        if (args.tenantId !== undefined) {
+            return this.listForTenant(ctx, sec, { tenantId: args.tenantId });
         }
         const typeQuads = await this._store.find(ctx, {
             predicate: RDF_TYPE,
@@ -146,8 +204,13 @@ export class UserGroupRepository {
         return results;
     }
 
-    async listForTenant(ctx: ServerContext, tenantId: string): Promise<UserGroupEntity[]> {
-        const tenantNode = iriFor("tenant", tenantId);
+    /** @insecure @nochecks */
+    async listForTenant(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: TenantIdArgs,
+    ): Promise<UserGroupEntity[]> {
+        const tenantNode = iriFor("tenant", args.tenantId);
         const tenantEdges = await this._store.find(ctx, {
             predicate: inTenantIRI,
             object: tenantNode,
@@ -172,94 +235,118 @@ export class UserGroupRepository {
         return results;
     }
 
+    /** @insecure @nochecks */
     async update(
         ctx: ServerContext,
-        id: string,
-        patch: { groupName?: string },
+        sec: SecurityContext,
+        args: UpdateGroupArgs,
     ): Promise<UserGroupEntity | null> {
-        const existing = await this.findById(ctx, id);
-        if (!existing) {
-            return null;
-        }
-        const sub = iriFor("group", id);
-        const now = new Date();
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const existing = await this.findById(ctx, sec, { id: args.id });
+            if (!existing) {
+                return null;
+            }
+            const sub = iriFor("group", args.id);
+            const now = new Date();
 
-        if (patch.groupName !== undefined) {
+            if (args.patch.groupName !== undefined) {
+                await this._store.delete(ctx, {
+                    subject: sub,
+                    predicate: groupNameIRI,
+                    graph: RBAC_GRAPH,
+                });
+                await this._store.insert(ctx, {
+                    subject: sub,
+                    predicate: groupNameIRI,
+                    object: literal(args.patch.groupName, XSD_STRING),
+                    graph: RBAC_GRAPH,
+                });
+            }
             await this._store.delete(ctx, {
                 subject: sub,
-                predicate: groupNameIRI,
+                predicate: rbacUpdatedAtIRI,
                 graph: RBAC_GRAPH,
             });
             await this._store.insert(ctx, {
                 subject: sub,
-                predicate: groupNameIRI,
-                object: literal(patch.groupName, XSD_STRING),
+                predicate: rbacUpdatedAtIRI,
+                object: literal(now.toISOString(), XSD_DATETIME),
                 graph: RBAC_GRAPH,
             });
-        }
-        await this._store.delete(ctx, {
-            subject: sub,
-            predicate: rbacUpdatedAtIRI,
-            graph: RBAC_GRAPH,
-        });
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: rbacUpdatedAtIRI,
-            object: literal(now.toISOString(), XSD_DATETIME),
-            graph: RBAC_GRAPH,
-        });
 
-        return this.findById(ctx, id);
+            return this.findById(ctx, sec, { id: args.id });
+        });
     }
 
-    /** Soft-deletes all edges whose subject is this group (removes the group and all its memberships/grants). */
-    async delete(ctx: ServerContext, id: string): Promise<void> {
-        const sub = iriFor("group", id);
-        await this._store.delete(ctx, { subject: sub, graph: RBAC_GRAPH });
-        // Also remove any memberOf edges pointing TO this group from other principals
-        await this._store.delete(ctx, {
-            predicate: memberOfIRI,
-            object: sub,
-            graph: RBAC_GRAPH,
+    /** @insecure @nochecks Removes the group and all its membership/grant edges. */
+    async delete(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: IdArgs,
+    ): Promise<void> {
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const sub = iriFor("group", args.id);
+            await this._store.delete(ctx, { subject: sub, graph: RBAC_GRAPH });
+            await this._store.delete(ctx, {
+                predicate: memberOfIRI,
+                object: sub,
+                graph: RBAC_GRAPH,
+            });
         });
     }
 
     // ── Membership ────────────────────────────────────────────────────────────
 
-    /** Add a member to a group. The member may be any principal IRI (User, ServiceAccount, or UserGroup). */
-    async addMember(ctx: ServerContext, groupIri: string, memberIri: string): Promise<void> {
+    /** @insecure @nochecks Add a member to a group. The member may be any principal IRI. */
+    async addMember(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: GroupMemberArgs,
+    ): Promise<void> {
         await this._store.insert(ctx, {
-            subject: new IRI(memberIri),
+            subject: new IRI(args.memberIri),
             predicate: memberOfIRI,
-            object: new IRI(groupIri),
+            object: new IRI(args.groupIri),
             graph: RBAC_GRAPH,
         });
     }
 
-    /** Remove a member from a group. */
-    async removeMember(ctx: ServerContext, groupIri: string, memberIri: string): Promise<void> {
+    /** @insecure @nochecks Remove a member from a group. */
+    async removeMember(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: GroupMemberArgs,
+    ): Promise<void> {
         await this._store.delete(ctx, {
-            subject: new IRI(memberIri),
+            subject: new IRI(args.memberIri),
             predicate: memberOfIRI,
-            object: new IRI(groupIri),
+            object: new IRI(args.groupIri),
             graph: RBAC_GRAPH,
         });
     }
 
-    /** List IRIs of all direct members of a group. */
-    async listMembers(ctx: ServerContext, groupIri: string): Promise<string[]> {
+    /** @insecure @nochecks List IRIs of all direct members of a group. */
+    async listMembers(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: GroupIriArgs,
+    ): Promise<string[]> {
         const quads = await this._store.find(ctx, {
             predicate: memberOfIRI,
-            object: new IRI(groupIri),
+            object: new IRI(args.groupIri),
             graph: RBAC_GRAPH,
         });
         return quads.map((q) => (q.subject as IRI).value);
     }
 
-    /** List the group IRIs that a principal directly belongs to. */
-    async listGroupsForPrincipal(ctx: ServerContext, principalIri: string): Promise<string[]> {
+    /** @insecure @nochecks List the group IRIs that a principal directly belongs to. */
+    async listGroupsForPrincipal(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: PrincipalIriArgs,
+    ): Promise<string[]> {
         const quads = await this._store.find(ctx, {
-            subject: new IRI(principalIri),
+            subject: new IRI(args.principalIri),
             predicate: memberOfIRI,
             graph: RBAC_GRAPH,
         });

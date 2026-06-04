@@ -79,6 +79,7 @@ export interface ResourceNodeEntity {
     updatedAt: Date;
 }
 
+/** Internal full check options used by AccessChecker. */
 export interface CheckOptions {
     /** IRI of the real caller (User or ServiceAccount). */
     principal: string;
@@ -91,4 +92,12 @@ export interface CheckOptions {
      * The check verifies principal --actsFor--> actingAs and then evaluates as actingAs.
      */
     actingAs?: string;
+}
+
+/** Args for RbacService.can() / assert() — principal and actingAs come from SecurityContext. */
+export interface RbacCheckArgs {
+    /** Dot-separated permission key, e.g. 'invoice.read'. */
+    permission: string;
+    /** IRI of the resource or tenant to scope the check to. Absent = system-wide. */
+    scope?: string;
 }

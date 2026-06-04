@@ -20,6 +20,7 @@
         "test:watch": "yarn workspace @jasonscharf/test start:debug",
         "format": "yarn biome format --write .",
         "lint": "yarn biome lint --write .",
+        "pc": "yarn && biome format --write . && yarn build && yarn test",
         "check": "yarn biome check --write .",
         "typecheck": "yarn workspaces foreach -pt run typecheck",
         "watch": "tsc -b -w --preserveWatchOutput",

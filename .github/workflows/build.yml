@@ -242,6 +242,9 @@ jobs:
           publish_pkg server
           publish_pkg auth
 
+          # Layer 4 — depends on app + core + data + server
+          publish_pkg rbac
+
           exit $fail
         env:
           YARN_NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

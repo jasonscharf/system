@@ -1,0 +1,118 @@
+# Tern Tenancy Ontology — Turtle format
+# Namespace: http://tern.dev/ns/tenancy/
+#
+# Defines the multi-tenancy primitives used by all Tern deployments:
+#   Tenant       — the billing/platform entity backing an Org
+#   Organization — user-facing named group wrapping a Tenant
+#   Domain       — a registered domain belonging to a Tenant
+#
+# Relationships:
+#   Organization → Tenant  via orgTenant
+#   Domain       → Tenant  via domainTenant
+
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix tenancy: <http://tern.dev/ns/tenancy/> .
+
+# ── Classes ───────────────────────────────────────────────────────────────────
+
+tenancy:Tenant a owl:Class ;
+    rdfs:comment "A customer organisation — the licensee of the platform." .
+
+tenancy:Organization a owl:Class ;
+    rdfs:comment "A user-facing named group that wraps a backing Tenant." .
+
+tenancy:Domain a owl:Class ;
+    rdfs:comment "A registered domain (e.g. example.com) belonging to a Tenant." .
+
+# ── Tenant properties ─────────────────────────────────────────────────────────
+
+tenancy:tenantName a owl:DatatypeProperty ;
+    rdfs:domain tenancy:Tenant ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Display name of the tenant organisation." .
+
+tenancy:tenantCreatedAt a owl:DatatypeProperty ;
+    rdfs:domain tenancy:Tenant ;
+    rdfs:range xsd:dateTime ;
+    rdfs:comment "Timestamp when this tenant was created." .
+
+tenancy:tenantUpdatedAt a owl:DatatypeProperty ;
+    rdfs:domain tenancy:Tenant ;
+    rdfs:range xsd:dateTime ;
+    rdfs:comment "Timestamp when this tenant was last updated." .
+
+# tenantUser stores an auth:User IRI as an anyURI literal (one triple per member).
+tenancy:tenantUser a owl:DatatypeProperty ;
+    rdfs:domain tenancy:Tenant ;
+    rdfs:range xsd:anyURI ;
+    rdfs:comment "IRI of a member auth:User; one triple per member." .
+
+# ── Organization properties ───────────────────────────────────────────────────
+
+tenancy:orgName a owl:DatatypeProperty ;
+    rdfs:domain tenancy:Organization ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Display name of the organization (user-renameable)." .
+
+tenancy:orgCreatedAt a owl:DatatypeProperty ;
+    rdfs:domain tenancy:Organization ;
+    rdfs:range xsd:dateTime ;
+    rdfs:comment "Timestamp when the organization was created." .
+
+tenancy:orgUpdatedAt a owl:DatatypeProperty ;
+    rdfs:domain tenancy:Organization ;
+    rdfs:range xsd:dateTime ;
+    rdfs:comment "Timestamp when the organization was last updated." .
+
+# orgTenant stores the IRI of the backing Tenant as an anyURI literal.
+tenancy:orgTenant a owl:DatatypeProperty ;
+    rdfs:domain tenancy:Organization ;
+    rdfs:range xsd:anyURI ;
+    rdfs:comment "IRI of the Tenant that backs this Organization." .
+
+# orgUser stores an auth:User IRI as an anyURI literal (one triple per member).
+tenancy:orgUser a owl:DatatypeProperty ;
+    rdfs:domain tenancy:Organization ;
+    rdfs:range xsd:anyURI ;
+    rdfs:comment "IRI of a member auth:User; one triple per member." .
+
+# orgOwner stores the founding user's auth:User IRI.
+tenancy:orgOwner a owl:DatatypeProperty ;
+    rdfs:domain tenancy:Organization ;
+    rdfs:range xsd:anyURI ;
+    rdfs:comment "IRI of the founding auth:User who created the organization." .
+
+# ── Domain properties ─────────────────────────────────────────────────────────
+
+tenancy:domainName a owl:DatatypeProperty ;
+    rdfs:domain tenancy:Domain ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The domain name, e.g. 'example.com'." .
+
+tenancy:domainDescription a owl:DatatypeProperty ;
+    rdfs:domain tenancy:Domain ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Human-readable description of the domain." .
+
+tenancy:domainUrl a owl:DatatypeProperty ;
+    rdfs:domain tenancy:Domain ;
+    rdfs:range xsd:anyURI ;
+    rdfs:comment "The canonical URL of the domain." .
+
+tenancy:domainCreatedAt a owl:DatatypeProperty ;
+    rdfs:domain tenancy:Domain ;
+    rdfs:range xsd:dateTime ;
+    rdfs:comment "Timestamp when this domain was registered." .
+
+tenancy:domainUpdatedAt a owl:DatatypeProperty ;
+    rdfs:domain tenancy:Domain ;
+    rdfs:range xsd:dateTime ;
+    rdfs:comment "Timestamp when this domain was last updated." .
+
+tenancy:domainTenant a owl:ObjectProperty ;
+    rdfs:domain tenancy:Domain ;
+    rdfs:range tenancy:Tenant ;
+    rdfs:comment "The Tenant this domain belongs to." .

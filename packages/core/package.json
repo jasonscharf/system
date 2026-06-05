@@ -9,6 +9,12 @@
             "default": "./dist/index.js",
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
+        },
+        "./tenancy": {
+            "source": "./src/tenancy/index.ts",
+            "default": "./dist/tenancy/index.js",
+            "types": "./dist/tenancy/index.d.ts",
+            "import": "./dist/tenancy/index.js"
         }
     },
     "main": "./dist/index.js",

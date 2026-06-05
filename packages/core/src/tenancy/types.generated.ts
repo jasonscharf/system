@@ -1,0 +1,53 @@
+// auto-generated — do not edit by hand
+import { IRI } from "../semantics/IRI.js";
+
+export const TENANCY_NS = "http://tern.dev/ns/tenancy/";
+export const TENANCY_GRAPH = new IRI(`${TENANCY_NS}graph`);
+
+/** A customer organisation — the licensee of the platform. */
+export interface Tenant {
+    tenantName?: string;
+    tenantCreatedAt?: Date;
+    tenantUpdatedAt?: Date;
+}
+
+export const TenantIRI = new IRI(`${TENANCY_NS}Tenant`);
+
+/** A user-facing named group that wraps a backing Tenant. */
+export interface Organization {
+    orgName?: string;
+    orgCreatedAt?: Date;
+    orgUpdatedAt?: Date;
+}
+
+export const OrganizationIRI = new IRI(`${TENANCY_NS}Organization`);
+
+/** A registered domain (e.g. example.com) belonging to a Tenant. */
+export interface Domain {
+    domainName?: string;
+    domainDescription?: string;
+    domainUrl?: string;
+    domainCreatedAt?: Date;
+    domainUpdatedAt?: Date;
+}
+
+export const DomainIRI = new IRI(`${TENANCY_NS}Domain`);
+
+export const tenantNameIRI = new IRI(`${TENANCY_NS}tenantName`);
+export const tenantCreatedAtIRI = new IRI(`${TENANCY_NS}tenantCreatedAt`);
+export const tenantUpdatedAtIRI = new IRI(`${TENANCY_NS}tenantUpdatedAt`);
+export const tenantUserIRI = new IRI(`${TENANCY_NS}tenantUser`);
+
+export const orgNameIRI = new IRI(`${TENANCY_NS}orgName`);
+export const orgCreatedAtIRI = new IRI(`${TENANCY_NS}orgCreatedAt`);
+export const orgUpdatedAtIRI = new IRI(`${TENANCY_NS}orgUpdatedAt`);
+export const orgTenantIRI = new IRI(`${TENANCY_NS}orgTenant`);
+export const orgUserIRI = new IRI(`${TENANCY_NS}orgUser`);
+export const orgOwnerIRI = new IRI(`${TENANCY_NS}orgOwner`);
+
+export const domainNameIRI = new IRI(`${TENANCY_NS}domainName`);
+export const domainDescriptionIRI = new IRI(`${TENANCY_NS}domainDescription`);
+export const domainUrlIRI = new IRI(`${TENANCY_NS}domainUrl`);
+export const domainCreatedAtIRI = new IRI(`${TENANCY_NS}domainCreatedAt`);
+export const domainUpdatedAtIRI = new IRI(`${TENANCY_NS}domainUpdatedAt`);
+export const domainTenantIRI = new IRI(`${TENANCY_NS}domainTenant`);

@@ -31,7 +31,7 @@ import {
     UserSessionSchema,
 } from "@jasonscharf/auth";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { defaultServerContext, EntityStore } from "@jasonscharf/server";
+import { buildServerContext, EntityStore } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -71,7 +71,7 @@ async function setup(db: DbProvider) {
     // rather than new connection-level transactions (avoids SQLite deadlock).
     const store = new TripleStore(trx as unknown as import("knex").Knex);
     const es = new EntityStore(store);
-    return { ...defaultServerContext, knex, trx, es };
+    return { ...buildServerContext(store, { trx }), knex, trx, es };
 }
 
 async function teardown(ctx: Awaited<ReturnType<typeof setup>>) {

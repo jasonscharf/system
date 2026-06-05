@@ -15,7 +15,7 @@ import {
 import { validate } from "@jasonscharf/gen";
 import type { CollectionViewOpts } from "./CollectionView.js";
 import { CollectionViewStore } from "./CollectionView.js";
-import { defaultServerContext, type ServerContext } from "./ServerContext.js";
+import { buildServerContext, type ServerContext } from "./ServerContext.js";
 import { tenantGraph, tenantGraphForInsert } from "./tenancy.js";
 
 // ── EntityStore ───────────────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ export class EntityStore {
     ): Promise<T> {
         if (typeof ctxOrFn === "function") {
             return this._store.knex.transaction(async (trx) =>
-                ctxOrFn({ ...defaultServerContext, trx }),
+                ctxOrFn(buildServerContext(this._store, { trx })),
             );
         }
         if (!maybeFn) {
@@ -62,7 +62,7 @@ export class EntityStore {
         ctx: ServerContext,
         schema: EntitySchema<Props>,
         data: Partial<Props>,
-    ): Promise<EntityRecord> {
+    ): Promise<EntityRecord<Props>> {
         const withDefs = this._applyDefaults(schema, data);
         this._validate(schema, withDefs);
 
@@ -70,25 +70,25 @@ export class EntityStore {
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
 
         return this._withTrx(ctx, async (txCtx) => {
-            const graph = tenantGraphForInsert(txCtx);
+            const graph = tenantGraphForInsert(txCtx, schema.graph);
             await this._store.insertMany(txCtx, [
                 { subject: ent, predicate: RDF_TYPE, object: schema.typeIRI, graph },
                 ...this._propQuads(ent, schema, withDefs, graph),
             ]);
-            return { id, iri: ent.value, props: withDefs };
+            return { id, iri: ent.value, props: withDefs as Props };
         });
     }
 
     // ── Read ──────────────────────────────────────────────────────────────────
 
-    async findById(
+    async findById<Props extends Record<string, unknown>>(
         ctx: ServerContext,
-        schema: EntitySchema,
+        schema: EntitySchema<Props>,
         id: string,
-    ): Promise<EntityRecord | null> {
+    ): Promise<EntityRecord<Props> | null> {
         return this._withTrx(ctx, async (txCtx) => {
             const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-            const graph = tenantGraph(txCtx);
+            const graph = tenantGraph(txCtx, schema.graph);
             const typeQ = await this._store.find(txCtx, { subject: ent, predicate: RDF_TYPE, graph });
             if (typeQ.length === 0) {
                 return null;
@@ -120,8 +120,8 @@ export class EntityStore {
         });
 
         return this._withTrx(ctx, async (txCtx) => {
-            const filterGraph = tenantGraph(txCtx);
-            const insertGraph = tenantGraphForInsert(txCtx);
+            const filterGraph = tenantGraph(txCtx, schema.graph);
+            const insertGraph = tenantGraphForInsert(txCtx, schema.graph);
             if (predIris.length > 0) {
                 await this._store.deleteBySubjectPredicates(txCtx, ent, predIris, filterGraph);
             }
@@ -145,7 +145,7 @@ export class EntityStore {
     async delete(ctx: ServerContext, schema: EntitySchema, id: string): Promise<void> {
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
         return this._withTrx(ctx, async (txCtx) => {
-            await this._store.delete(txCtx, { subject: ent, graph: tenantGraph(txCtx) });
+            await this._store.delete(txCtx, { subject: ent, graph: tenantGraph(txCtx, schema.graph) });
         });
     }
 
@@ -163,7 +163,7 @@ export class EntityStore {
                 return [];
             }
             const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-            const quads = await this._store.findOrdered(txCtx, { subject: ent, predicate: propIri, graph: tenantGraph(txCtx) });
+            const quads = await this._store.findOrdered(txCtx, { subject: ent, predicate: propIri, graph: tenantGraph(txCtx, schema.graph) });
             return quads.map((q) => fromLiteral(q.object)).filter((v) => v !== undefined);
         });
     }
@@ -183,7 +183,7 @@ export class EntityStore {
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
 
         return this._withTrx(ctx, async (txCtx) => {
-            const graph = tenantGraphForInsert(txCtx);
+            const graph = tenantGraphForInsert(txCtx, schema.graph);
             const viewIris = await this._cvs().findViewsForSource(txCtx, ent.value, propIri.value);
 
             await this._store.insertMany(
@@ -218,7 +218,7 @@ export class EntityStore {
                 subject: ent,
                 predicate: propIri,
                 object: toLiteral(value),
-                graph: tenantGraph(txCtx),
+                graph: tenantGraph(txCtx, schema.graph),
             });
             deleted = count > 0;
             if (deleted) {
@@ -265,8 +265,8 @@ export class EntityStore {
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
 
         return this._withTrx(ctx, async (txCtx) => {
-            const filterGraph = tenantGraph(txCtx);
-            const insertGraph = tenantGraphForInsert(txCtx);
+            const filterGraph = tenantGraph(txCtx, schema.graph);
+            const insertGraph = tenantGraphForInsert(txCtx, schema.graph);
             await this._store.delete(txCtx, { subject: ent, predicate: propIri, graph: filterGraph });
             if (values.length > 0) {
                 await this._store.insertMany(
@@ -323,13 +323,13 @@ export class EntityStore {
 
     // ── Batch helpers used by EntityQuery ─────────────────────────────────────
 
-    async hydrateMany(
+    async hydrateMany<Props extends Record<string, unknown>>(
         ctx: ServerContext,
-        schema: EntitySchema,
+        schema: EntitySchema<Props>,
         iris: string[],
-    ): Promise<EntityRecord[]> {
+    ): Promise<EntityRecord<Props>[]> {
         return this._withTrx(ctx, async (txCtx) => {
-            const graph = tenantGraph(txCtx);
+            const graph = tenantGraph(txCtx, schema.graph);
             return Promise.all(
                 iris.map((iri) => {
                     const id = idFromIri(iri);
@@ -348,13 +348,13 @@ export class EntityStore {
         return this._cvsInstance;
     }
 
-    private async _hydrate(
+    private async _hydrate<Props extends Record<string, unknown>>(
         ctx: ServerContext,
-        schema: EntitySchema,
+        schema: EntitySchema<Props>,
         id: string,
         entIri: string,
         graph?: IRI | null,
-    ): Promise<EntityRecord> {
+    ): Promise<EntityRecord<Props>> {
         const iriToName = invertPropertyMap(schema.properties as Record<string, IRI>);
         const entNode = { value: entIri } as IRI;
         const quads = await this._store.find(ctx, { subject: entNode, graph });
@@ -380,7 +380,7 @@ export class EntityStore {
         for (const [k, vals] of Object.entries(raw)) {
             props[k] = vals.length === 1 ? vals[0] : vals;
         }
-        return { id, iri: entIri, props };
+        return { id, iri: entIri, props: props as Props };
     }
 
     private _propQuads(

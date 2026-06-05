@@ -1,5 +1,5 @@
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
-import { defaultServerContext, systemSec } from "@jasonscharf/server";
+import { buildServerContext, systemSec } from "@jasonscharf/server";
 import { SESSION_TTL_SECS } from "../constants.js";
 import type { IOAuthProvider } from "../oauth/types.js";
 import type { UserDeviceRepository } from "../repository/UserDeviceRepository.js";
@@ -91,7 +91,7 @@ export class CallbackComponent extends FlowComponent {
             // Exchange code → tokens + profile
             const { profile, tokens } = await provider.exchangeCode(req.code, req.redirectUri);
 
-            const ctx = defaultServerContext;
+            const ctx = buildServerContext(this._users.store);
             const sec = systemSec;
 
             // Upsert user

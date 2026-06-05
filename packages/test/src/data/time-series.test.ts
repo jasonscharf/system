@@ -23,7 +23,7 @@
 import { type BlankNode, DEFAULT_GRAPH, type IRI, type Literal } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import type { ServerContext } from "@jasonscharf/server";
-import { defaultServerContext } from "@jasonscharf/server";
+import { buildServerContext } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -145,7 +145,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
         });
         afterEach(async () => {
             await trx.rollback();
@@ -197,7 +197,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
         });
         afterEach(async () => {
             await trx.rollback();
@@ -314,7 +314,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
         });
         afterEach(async () => {
             await trx.rollback();
@@ -370,7 +370,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
         });
         afterEach(async () => {
             await trx.rollback();
@@ -480,7 +480,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
         });
         afterEach(async () => {
             await trx.rollback();
@@ -603,7 +603,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
         });
         afterEach(async () => {
             await trx.rollback();
@@ -688,7 +688,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
         });
         afterEach(async () => {
             await trx.rollback();
@@ -895,7 +895,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
         });
         afterEach(async () => {
             await trx.rollback();
@@ -1013,7 +1013,7 @@ for (const db of providers) {
             store = new TripleStore(knex);
             const { EntityStore } = await import("@jasonscharf/server");
             es = new EntityStore(store);
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
         });
         afterEach(async () => {
             await trx.rollback();
@@ -1076,7 +1076,7 @@ for (const db of providers) {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
         });
         afterEach(async () => {
             await trx.rollback();

@@ -41,7 +41,7 @@
             "path": "packages/entities"
         },
         {
-            "path": "packages/sandbox-analytics"
+            "path": "packages/sandbox-labs"
         }
     ]
 }

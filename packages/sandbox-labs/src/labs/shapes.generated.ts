@@ -3,7 +3,7 @@ import type { ShaclNodeShape, ShaclShapes } from "@jasonscharf/gen";
 
 const list: ShaclNodeShape[] = [
     {
-        iri: "http://tern.dev/ns/analytics/shapes/UserAnalyticsShape",
+        iri: "http://tern.dev/ns/labs/shapes/UserAnalyticsShape",
         targetClass: "http://tern.dev/ns/auth/User",
         closed: false,
         properties: [
@@ -15,7 +15,7 @@ const list: ShaclNodeShape[] = [
                 message: "A valid email address is required.",
             },
             {
-                path: "http://tern.dev/ns/analytics/analyticsRole",
+                path: "http://tern.dev/ns/labs/analyticsRole",
                 minCount: 1,
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#string",
@@ -23,31 +23,31 @@ const list: ShaclNodeShape[] = [
                 message: "analyticsRole must be 'owner', 'member', or 'viewer'.",
             },
             {
-                path: "http://tern.dev/ns/analytics/consentedToTracking",
+                path: "http://tern.dev/ns/labs/consentedToTracking",
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#boolean",
             },
             {
-                path: "http://tern.dev/ns/analytics/lastActiveAt",
+                path: "http://tern.dev/ns/labs/lastActiveAt",
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#dateTime",
             },
         ],
     },
     {
-        iri: "http://tern.dev/ns/analytics/shapes/ProjectShape",
-        targetClass: "http://tern.dev/ns/analytics/Project",
+        iri: "http://tern.dev/ns/labs/shapes/ProjectShape",
+        targetClass: "http://tern.dev/ns/labs/Project",
         closed: true,
         properties: [
             {
-                path: "http://tern.dev/ns/analytics/projectName",
+                path: "http://tern.dev/ns/labs/projectName",
                 minCount: 1,
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#string",
                 message: "projectName is required.",
             },
             {
-                path: "http://tern.dev/ns/analytics/projectSlug",
+                path: "http://tern.dev/ns/labs/projectSlug",
                 minCount: 1,
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#string",
@@ -55,23 +55,23 @@ const list: ShaclNodeShape[] = [
                 message: "projectSlug must be lowercase-kebab-case (e.g. 'my-project').",
             },
             {
-                path: "http://tern.dev/ns/analytics/projectOwner",
+                path: "http://tern.dev/ns/labs/projectOwner",
                 minCount: 1,
                 maxCount: 1,
                 classConstraint: "http://tern.dev/ns/auth/User",
                 message: "Every project must have exactly one owner.",
             },
             {
-                path: "http://tern.dev/ns/analytics/projectMember",
+                path: "http://tern.dev/ns/labs/projectMember",
                 classConstraint: "http://tern.dev/ns/auth/User",
             },
             {
-                path: "http://tern.dev/ns/analytics/isActive",
+                path: "http://tern.dev/ns/labs/isActive",
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#boolean",
             },
             {
-                path: "http://tern.dev/ns/analytics/projectCreatedAt",
+                path: "http://tern.dev/ns/labs/projectCreatedAt",
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#dateTime",
             },

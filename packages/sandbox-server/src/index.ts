@@ -36,7 +36,7 @@ import {
     WebSocketServer,
 } from "@jasonscharf/flow";
 import { getRbacService, rbacExtension } from "@jasonscharf/rbac";
-import { defaultServerContext } from "@jasonscharf/server";
+import { buildServerContext } from "@jasonscharf/server";
 import { SecretsManager } from "@jasonscharf/vaults";
 import { MessageDecoder } from "./components/MessageDecoder.js";
 import { MessageEncoder } from "./components/MessageEncoder.js";
@@ -98,18 +98,18 @@ async function main(): Promise<void> {
     }
 
     const store = new TripleStore(knex);
-    await store.ensureNamespace(defaultServerContext, "tern", "http://tern.dev/ns/");
+    await store.ensureNamespace(buildServerContext(store), "tern", "http://tern.dev/ns/");
     await store.ensureNamespace(
-        defaultServerContext,
+        buildServerContext(store),
         "rdf",
         "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
     );
     await store.ensureNamespace(
-        defaultServerContext,
+        buildServerContext(store),
         "rdfs",
         "http://www.w3.org/2000/01/rdf-schema#",
     );
-    await store.ensureNamespace(defaultServerContext, "auth", "http://tern.dev/ns/auth/");
+    await store.ensureNamespace(buildServerContext(store), "auth", "http://tern.dev/ns/auth/");
 
     // ── Session store ─────────────────────────────────────────────────────────
     const redisUrl = await secrets.getWithDefault("REDIS_URL", process.env.REDIS_URL ?? "");

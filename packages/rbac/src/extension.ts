@@ -19,7 +19,7 @@
 
 import type { ExtensionInstallContext, InstalledExtension, TernExtension } from "@jasonscharf/app";
 import type { TripleStore } from "@jasonscharf/data";
-import { defaultServerContext } from "@jasonscharf/server";
+import { buildServerContext } from "@jasonscharf/server";
 import { RbacService } from "./RbacService.js";
 import { PermissionRepository } from "./repository/PermissionRepository.js";
 import { PolicyGrantRepository } from "./repository/PolicyGrantRepository.js";
@@ -39,7 +39,7 @@ export const rbacExtension: TernExtension = {
 
     async install({ store }: ExtensionInstallContext) {
         const typedStore = store as TripleStore;
-        await seedSystemData(defaultServerContext, typedStore);
+        await seedSystemData(buildServerContext(typedStore), typedStore);
 
         const rbac = new RbacService({
             store: typedStore,

@@ -202,14 +202,14 @@ export class TripleStore {
 
     // ── Transaction ───────────────────────────────────────────────────────────
 
-    async withTransaction<T>(
-        ctx: ServerContext,
-        fn: (ctx: ServerContext) => Promise<T>,
+    async withTransaction<T, C extends ServerContext>(
+        ctx: C,
+        fn: (ctx: C) => Promise<T>,
     ): Promise<T> {
         if (ctx.trx) {
             return fn(ctx);
         }
-        return this._knex.transaction(async (trx) => fn({ ...ctx, trx }));
+        return this._knex.transaction(async (trx) => fn({ ...ctx, trx } as C));
     }
 
     // ── Namespace registry ────────────────────────────────────────────────────

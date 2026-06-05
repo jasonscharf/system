@@ -44,7 +44,7 @@ import {
     PushScheduler,
 } from "@jasonscharf/flow";
 import {
-    defaultServerContext,
+    buildServerContext,
     EntityStore,
     type ServerContext,
     systemSec,
@@ -252,7 +252,7 @@ for (const db of dbProviders) {
         beforeEach(async () => {
             knex = await db.create();
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             repo = new UserRepository(store);
         });
@@ -322,7 +322,7 @@ for (const db of dbProviders) {
         beforeEach(async () => {
             knex = await db.create();
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             userRepo = new UserRepository(store);
             idRepo = new UserIdentityRepository(store);
@@ -438,7 +438,7 @@ for (const db of dbProviders) {
         beforeEach(async () => {
             knex = await db.create();
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             userRepo = new UserRepository(store);
             devRepo = new UserDeviceRepository(store);
@@ -490,7 +490,7 @@ for (const db of dbProviders) {
         beforeEach(async () => {
             knex = await db.create();
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             userRepo = new UserRepository(store);
             devRepo = new UserDeviceRepository(store);
@@ -673,12 +673,12 @@ describe("AuthService", () => {
             device: {},
         });
 
-        const user = await service.validateToken(defaultServerContext, systemSec, { token: session.sessionToken });
+        const user = await service.validateToken(buildServerContext(store), systemSec, { token: session.sessionToken });
         expect(user?.email).toBe("svc@test.com");
     });
 
     it("validateToken() returns null for unknown token", async () => {
-        expect(await service.validateToken(defaultServerContext, systemSec, { token: "fake-token" })).toBeNull();
+        expect(await service.validateToken(buildServerContext(store), systemSec, { token: "fake-token" })).toBeNull();
     });
 
     it("revokeToken() invalidates the session", async () => {
@@ -690,8 +690,8 @@ describe("AuthService", () => {
             device: {},
         });
 
-        await service.revokeToken(defaultServerContext, systemSec, { token: session.sessionToken });
-        expect(await service.validateToken(defaultServerContext, systemSec, { token: session.sessionToken })).toBeNull();
+        await service.revokeToken(buildServerContext(store), systemSec, { token: session.sessionToken });
+        expect(await service.validateToken(buildServerContext(store), systemSec, { token: session.sessionToken })).toBeNull();
     });
 
     it("buildAuthUrl() returns a URL with correct state", () => {
@@ -825,7 +825,7 @@ describe("SessionComponent", () => {
     it("validateIn → valid:true via slow path when session is in TripleStore (lines 111-114)", async () => {
         const userRepo = new UserRepository(store);
         const sessRepo = new UserSessionRepository(store);
-        const ctx = defaultServerContext;
+        const ctx = buildServerContext(store);
         const user = await userRepo.create(ctx, systemSec, { email: "slow@test.com", displayName: "Slow" });
         const session = await sessRepo.create(ctx, systemSec, {
             userId: user.id,
@@ -843,7 +843,7 @@ describe("SessionComponent", () => {
     it("validateIn → valid:true via fast path when cache hit with valid session (lines 90-102)", async () => {
         const userRepo = new UserRepository(store);
         const sessRepo = new UserSessionRepository(store);
-        const ctx = defaultServerContext;
+        const ctx = buildServerContext(store);
         const user = await userRepo.create(ctx, systemSec, { email: "fast@test.com", displayName: "Fast" });
         const session = await sessRepo.create(ctx, systemSec, {
             userId: user.id,
@@ -1035,7 +1035,7 @@ describe("AuthService.validateToken — fallback path", () => {
         // Simulate session store miss (e.g. Redis restart)
         memStore.clear();
 
-        const user = await svc.validateToken(defaultServerContext, systemSec, { token: session.sessionToken });
+        const user = await svc.validateToken(buildServerContext(store), systemSec, { token: session.sessionToken });
         expect(user?.email).toBe("fb@test.com");
 
         vi.unstubAllGlobals();
@@ -1478,7 +1478,7 @@ describe("AuthService.validateToken — cache hit", () => {
         });
 
         // Token is already cached from handleCallback — validateToken should use the cache
-        const validated = await svc.validateToken(defaultServerContext, systemSec, { token: session.sessionToken });
+        const validated = await svc.validateToken(buildServerContext(store), systemSec, { token: session.sessionToken });
         expect(validated?.email).toBe("cache@test.com");
         expect(validated?.id).toBe(user.id);
 
@@ -1509,7 +1509,7 @@ describe("AuthService.validateToken — cache hit", () => {
         );
 
         // validateToken should detect the expiry, delete it from cache, and return null
-        const result = await svc.validateToken(defaultServerContext, systemSec, { token: fakeToken });
+        const result = await svc.validateToken(buildServerContext(store), systemSec, { token: fakeToken });
         expect(result).toBeNull();
 
         await knex.destroy();
@@ -1532,7 +1532,7 @@ for (const db of dbProviders) {
         beforeEach(async () => {
             knex = await db.create();
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             userRepo = new UserRepository(store);
             devRepo = new UserDeviceRepository(store);

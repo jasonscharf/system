@@ -6,7 +6,7 @@ export type {
 } from "./CollectionView.js";
 export { CollectionViewStore } from "./CollectionView.js";
 export type { FilterOp } from "./EntityQuery.js";
-export { EntityQuery, entities } from "./EntityQuery.js";
+export { EntityQuery } from "./EntityQuery.js";
 export { EntityStore } from "./EntityStore.js";
 export { EntityValidationError } from "./EntityValidationError.js";
 export { ExtensionManager } from "./ExtensionManager.js";
@@ -15,6 +15,6 @@ export { ExtensionRegistry } from "./ExtensionRegistry.js";
 export * from "./env.js";
 export type { SecurityContext } from "./SecurityContext.js";
 export { anonymousSec, systemSec } from "./SecurityContext.js";
-export type { ServerContext } from "./ServerContext.js";
-export { defaultServerContext } from "./ServerContext.js";
+export type { EntityLookup, ServerContext } from "./ServerContext.js";
+export { buildServerContext } from "./ServerContext.js";
 export { tenantGraph, tenantGraphForInsert } from "./tenancy.js";

@@ -8,7 +8,7 @@
  */
 import type { EntityRecord } from "@jasonscharf/entities";
 import type { EntityStore, ServerContext } from "@jasonscharf/server";
-import { entities } from "@jasonscharf/server";
+import { EntityQuery } from "@jasonscharf/server";
 import { UserDeviceSchema } from "./entities/UserDeviceSchema.js";
 import { UserSchema } from "./entities/UserSchema.js";
 import { UserSessionSchema } from "./entities/UserSessionSchema.js";
@@ -40,26 +40,24 @@ function strProp(record: EntityRecord, prop: string): string | undefined {
 
 /** Returns all User entities in insertion order. */
 export function listUsers(ctx: ServerContext, es: EntityStore): Promise<EntityRecord[]> {
-    return entities(es.store).find(UserSchema).all(ctx);
+    return EntityQuery.from(es.store, UserSchema).all(ctx);
 }
 
 /** Returns all UserDevice entities in insertion order. */
 export function listUserDevices(ctx: ServerContext, es: EntityStore): Promise<EntityRecord[]> {
-    return entities(es.store).find(UserDeviceSchema).all(ctx);
+    return EntityQuery.from(es.store, UserDeviceSchema).all(ctx);
 }
 
 /** Returns all UserSession entities where isActive = true. */
 export function listActiveSessions(ctx: ServerContext, es: EntityStore): Promise<EntityRecord[]> {
-    return entities(es.store)
-        .find(UserSessionSchema)
+    return EntityQuery.from(es.store, UserSessionSchema)
         .where("isActive", "=", true)
         .all(ctx);
 }
 
 /** Returns all UserSession entities where isActive = false. */
 export function listInactiveSessions(ctx: ServerContext, es: EntityStore): Promise<EntityRecord[]> {
-    return entities(es.store)
-        .find(UserSessionSchema)
+    return EntityQuery.from(es.store, UserSessionSchema)
         .where("isActive", "=", false)
         .all(ctx);
 }
@@ -80,8 +78,7 @@ export async function findUserWithRecentActivity(
         return null;
     }
 
-    const sessions = await entities(es.store)
-        .find(UserSessionSchema)
+    const sessions = await EntityQuery.from(es.store, UserSessionSchema)
         .where("sessionUser", "=", user.iri)
         .orderBy("createdAt", "desc")
         .all(ctx);
@@ -110,8 +107,7 @@ export async function findSessionsByTokens(
 ): Promise<EntityRecord[]> {
     const results: EntityRecord[] = [];
     for (const token of tokens) {
-        const found = await entities(es.store)
-            .find(UserSessionSchema)
+        const found = await EntityQuery.from(es.store, UserSessionSchema)
             .where("sessionToken", "=", token)
             .first(ctx);
         if (found) {
@@ -129,8 +125,7 @@ export async function findUserBySession(
     es: EntityStore,
     sessionToken: string,
 ): Promise<EntityRecord | null> {
-    const session = await entities(es.store)
-        .find(UserSessionSchema)
+    const session = await EntityQuery.from(es.store, UserSessionSchema)
         .where("sessionToken", "=", sessionToken)
         .first(ctx);
 

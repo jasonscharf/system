@@ -29,7 +29,7 @@ import type { ExtensionInstallContext, InstalledExtension, TernExtension } from 
 import type { TripleStore } from "@jasonscharf/data";
 import type { RbacService } from "@jasonscharf/rbac";
 import { getRbacService } from "@jasonscharf/rbac";
-import { defaultServerContext } from "@jasonscharf/server";
+import { buildServerContext } from "@jasonscharf/server";
 import { ConvoService } from "./ConvoService.js";
 import type { ConvosInstallResult } from "./install.js";
 import { installConvos } from "./install.js";
@@ -59,7 +59,7 @@ export const convosExtension: TernExtension = {
         }
         const rbac = getRbacService(rbacInstalled) as RbacService;
 
-        const convosInstall = await installConvos(defaultServerContext, rbac);
+        const convosInstall = await installConvos(buildServerContext(typedStore), rbac);
 
         const notificationRepo = new NotificationRepository(typedStore);
 

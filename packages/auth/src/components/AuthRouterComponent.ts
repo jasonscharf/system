@@ -9,7 +9,7 @@ import {
 } from "@jasonscharf/flow";
 import {
     anonymousSec,
-    defaultServerContext,
+    buildServerContext,
     type SecurityContext,
     systemSec,
 } from "@jasonscharf/server";
@@ -189,7 +189,7 @@ export class AuthRouterComponent extends FlowComponent {
      * Bearer token).  Returns the user entity or null.
      */
     validateToken(token: string): Promise<UserEntity | null> {
-        return this._service.validateToken(defaultServerContext, systemSec, { token });
+        return this._service.validateToken(buildServerContext(this._service.store), systemSec, { token });
     }
 
     /**
@@ -204,12 +204,12 @@ export class AuthRouterComponent extends FlowComponent {
                 getBearer(ctx.req.headers as Record<string, string | undefined>);
 
             if (token) {
-                const user = await this._service.validateToken(defaultServerContext, systemSec, {
+                const user = await this._service.validateToken(buildServerContext(this._service.store), systemSec, {
                     token,
                 });
                 if (user) {
                     const sessions = await this._service.listSessions(
-                        defaultServerContext,
+                        buildServerContext(this._service.store),
                         systemSec,
                         { userId: user.id },
                     );
@@ -243,7 +243,7 @@ export class AuthRouterComponent extends FlowComponent {
                 return;
             }
 
-            const user = await this._service.validateToken(defaultServerContext, systemSec, {
+            const user = await this._service.validateToken(buildServerContext(this._service.store), systemSec, {
                 token,
             });
             if (!user) {
@@ -270,7 +270,7 @@ export class AuthRouterComponent extends FlowComponent {
                 return;
             }
 
-            const user = await this._service.validateToken(defaultServerContext, systemSec, {
+            const user = await this._service.validateToken(buildServerContext(this._service.store), systemSec, {
                 token,
             });
             if (!user) {
@@ -278,7 +278,7 @@ export class AuthRouterComponent extends FlowComponent {
                 return;
             }
 
-            const sessions = await this._service.listSessions(defaultServerContext, systemSec, {
+            const sessions = await this._service.listSessions(buildServerContext(this._service.store), systemSec, {
                 userId: user.id,
             });
             ctx.body = sessions.map((s) => ({
@@ -297,7 +297,7 @@ export class AuthRouterComponent extends FlowComponent {
                 getBearer(ctx.req.headers as Record<string, string | undefined>);
 
             if (token) {
-                await this._service.revokeToken(defaultServerContext, systemSec, { token });
+                await this._service.revokeToken(buildServerContext(this._service.store), systemSec, { token });
             }
 
             ctx.status = 200;
@@ -316,7 +316,7 @@ export class AuthRouterComponent extends FlowComponent {
                 return;
             }
 
-            const user = await this._service.validateToken(defaultServerContext, systemSec, {
+            const user = await this._service.validateToken(buildServerContext(this._service.store), systemSec, {
                 token,
             });
             if (!user) {
@@ -324,7 +324,7 @@ export class AuthRouterComponent extends FlowComponent {
                 return;
             }
 
-            const revoked = await this._service.revokeAllSessions(defaultServerContext, systemSec, {
+            const revoked = await this._service.revokeAllSessions(buildServerContext(this._service.store), systemSec, {
                 userId: user.id,
             });
 

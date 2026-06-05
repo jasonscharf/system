@@ -10,7 +10,7 @@ import {
     type TernResult,
 } from "@jasonscharf/core";
 import { type QuadPattern, TripleStore } from "@jasonscharf/data";
-import { defaultServerContext } from "@jasonscharf/server";
+import { buildServerContext } from "@jasonscharf/server";
 
 type RdfTerm = IRI | BlankNode | Literal;
 
@@ -68,7 +68,7 @@ function getStore(ctx: HandlerContext): TripleStore {
 export async function handleFind(request: TernRequest, ctx: HandlerContext): Promise<TernResult> {
     const store = getStore(ctx);
     const pattern = patternFromWire(request.payload);
-    const quads = await store.find(defaultServerContext, pattern);
+    const quads = await store.find(buildServerContext(store), pattern);
     return okResult(request.id, TERN_TYPES.tripleFind, { quads });
 }
 
@@ -90,7 +90,7 @@ export async function handleInsert(request: TernRequest, ctx: HandlerContext): P
     if (object == null) {
         return errResult(request.id, TERN_TYPES.tripleInsert, "Missing or invalid object");
     }
-    await store.insert(defaultServerContext, {
+    await store.insert(buildServerContext(store), {
         subject: subject as IRI | BlankNode,
         predicate: predicate as IRI,
         object: object as RdfTerm,
@@ -101,6 +101,6 @@ export async function handleInsert(request: TernRequest, ctx: HandlerContext): P
 
 export async function handleStats(request: TernRequest, ctx: HandlerContext): Promise<TernResult> {
     const store = getStore(ctx);
-    const stats = await store.stats(defaultServerContext);
+    const stats = await store.stats(buildServerContext(store));
     return okResult(request.id, TERN_TYPES.tripleStats, stats);
 }

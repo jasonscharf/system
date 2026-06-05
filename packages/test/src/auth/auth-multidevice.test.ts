@@ -30,7 +30,7 @@ import {
     UserSessionRepository,
 } from "@jasonscharf/auth";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { defaultServerContext, systemSec } from "@jasonscharf/server";
+import { buildServerContext, systemSec } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -155,7 +155,7 @@ for (const db of providers) {
                 redirectUri: "http://localhost/cb",
                 device: { userAgent: PC_UA, platform: "web" },
             });
-            const userDevices = await ctx.devices.findByUserId(defaultServerContext, systemSec, { userId: user.id });
+            const userDevices = await ctx.devices.findByUserId(buildServerContext(ctx.store), systemSec, { userId: user.id });
             expect(userDevices).toHaveLength(1);
             expect(userDevices[0]?.deviceUserAgent).toBe(PC_UA);
         });
@@ -168,7 +168,7 @@ for (const db of providers) {
                 redirectUri: "http://localhost/cb",
                 device: { userAgent: PC_UA, platform: "web" },
             });
-            const devices = await ctx.devices.findByUserId(defaultServerContext, systemSec, { userId: user.id });
+            const devices = await ctx.devices.findByUserId(buildServerContext(ctx.store), systemSec, { userId: user.id });
             expect(session.isActive).toBe(true);
             expect(session.userId).toBe(user.id);
             expect(session.deviceId).toBe(devices[0]?.id);
@@ -182,7 +182,7 @@ for (const db of providers) {
                 redirectUri: "http://localhost/cb",
                 device: { userAgent: PC_UA, platform: "web" },
             });
-            const found = await ctx.service.validateToken(defaultServerContext, systemSec, { token: session.sessionToken });
+            const found = await ctx.service.validateToken(buildServerContext(ctx.store), systemSec, { token: session.sessionToken });
             expect(found?.email).toBe(ALICE.email);
         });
 
@@ -204,8 +204,8 @@ for (const db of providers) {
                 device: { userAgent: PC_UA, platform: "web" },
             });
 
-            const devices = await ctx.devices.findByUserId(defaultServerContext, systemSec, { userId: u2.id });
-            const sessions = await ctx.sessions.findByUserId(defaultServerContext, systemSec, { userId: u2.id });
+            const devices = await ctx.devices.findByUserId(buildServerContext(ctx.store), systemSec, { userId: u2.id });
+            const sessions = await ctx.sessions.findByUserId(buildServerContext(ctx.store), systemSec, { userId: u2.id });
 
             expect(devices).toHaveLength(1); // reused — same UA
             expect(sessions).toHaveLength(2); // two sessions on same device
@@ -254,15 +254,15 @@ for (const db of providers) {
         });
 
         it("both tokens resolve to the same user", async () => {
-            const fromPc = await ctx.service.validateToken(defaultServerContext, systemSec, { token: pcToken });
-            const fromPhone = await ctx.service.validateToken(defaultServerContext, systemSec, { token: phoneToken });
+            const fromPc = await ctx.service.validateToken(buildServerContext(ctx.store), systemSec, { token: pcToken });
+            const fromPhone = await ctx.service.validateToken(buildServerContext(ctx.store), systemSec, { token: phoneToken });
             expect(fromPc?.id).toBe(userId);
             expect(fromPhone?.id).toBe(userId);
             expect(fromPc?.email).toBe(fromPhone?.email);
         });
 
         it("creates two distinct device records", async () => {
-            const devices = await ctx.devices.findByUserId(defaultServerContext, systemSec, { userId });
+            const devices = await ctx.devices.findByUserId(buildServerContext(ctx.store), systemSec, { userId });
             expect(devices).toHaveLength(2);
             const agents = devices.map((d) => d.deviceUserAgent);
             expect(agents).toContain(PC_UA);
@@ -270,14 +270,14 @@ for (const db of providers) {
         });
 
         it("creates two distinct sessions, both active", async () => {
-            const sessions = await ctx.sessions.findByUserId(defaultServerContext, systemSec, { userId });
+            const sessions = await ctx.sessions.findByUserId(buildServerContext(ctx.store), systemSec, { userId });
             expect(sessions).toHaveLength(2);
             expect(sessions.every((s) => s.isActive)).toBe(true);
         });
 
         it("sessions are linked to different devices", async () => {
-            const devices = await ctx.devices.findByUserId(defaultServerContext, systemSec, { userId });
-            const sessions = await ctx.sessions.findByUserId(defaultServerContext, systemSec, { userId });
+            const devices = await ctx.devices.findByUserId(buildServerContext(ctx.store), systemSec, { userId });
+            const sessions = await ctx.sessions.findByUserId(buildServerContext(ctx.store), systemSec, { userId });
             const deviceIds = new Set(sessions.map((s) => s.deviceId));
             expect(deviceIds.size).toBe(2);
             const existingDeviceIds = new Set(devices.map((d) => d.id));
@@ -287,28 +287,28 @@ for (const db of providers) {
         });
 
         it("revoking PC session leaves phone session valid", async () => {
-            await ctx.service.revokeToken(defaultServerContext, systemSec, { token: pcToken });
-            expect(await ctx.service.validateToken(defaultServerContext, systemSec, { token: pcToken })).toBeNull();
-            expect(await ctx.service.validateToken(defaultServerContext, systemSec, { token: phoneToken })).not.toBeNull();
+            await ctx.service.revokeToken(buildServerContext(ctx.store), systemSec, { token: pcToken });
+            expect(await ctx.service.validateToken(buildServerContext(ctx.store), systemSec, { token: pcToken })).toBeNull();
+            expect(await ctx.service.validateToken(buildServerContext(ctx.store), systemSec, { token: phoneToken })).not.toBeNull();
         });
 
         it("revoking phone session leaves PC session valid", async () => {
-            await ctx.service.revokeToken(defaultServerContext, systemSec, { token: phoneToken });
-            expect(await ctx.service.validateToken(defaultServerContext, systemSec, { token: phoneToken })).toBeNull();
-            expect(await ctx.service.validateToken(defaultServerContext, systemSec, { token: pcToken })).not.toBeNull();
+            await ctx.service.revokeToken(buildServerContext(ctx.store), systemSec, { token: phoneToken });
+            expect(await ctx.service.validateToken(buildServerContext(ctx.store), systemSec, { token: phoneToken })).toBeNull();
+            expect(await ctx.service.validateToken(buildServerContext(ctx.store), systemSec, { token: pcToken })).not.toBeNull();
         });
 
         it("listSessions returns both sessions", async () => {
-            const all = await ctx.service.listSessions(defaultServerContext, systemSec, { userId });
+            const all = await ctx.service.listSessions(buildServerContext(ctx.store), systemSec, { userId });
             expect(all).toHaveLength(2);
             expect(all.every((s) => s.isActive)).toBe(true);
         });
 
         it("revokeAllSessions revokes every session", async () => {
-            const count = await ctx.service.revokeAllSessions(defaultServerContext, systemSec, { userId });
+            const count = await ctx.service.revokeAllSessions(buildServerContext(ctx.store), systemSec, { userId });
             expect(count).toBe(2);
-            expect(await ctx.service.validateToken(defaultServerContext, systemSec, { token: pcToken })).toBeNull();
-            expect(await ctx.service.validateToken(defaultServerContext, systemSec, { token: phoneToken })).toBeNull();
+            expect(await ctx.service.validateToken(buildServerContext(ctx.store), systemSec, { token: pcToken })).toBeNull();
+            expect(await ctx.service.validateToken(buildServerContext(ctx.store), systemSec, { token: phoneToken })).toBeNull();
         });
 
         it("revokeAllSessions clears the fast-path session store", async () => {
@@ -316,7 +316,7 @@ for (const db of providers) {
             expect(await ctx.memStore.get(`tern:session:${pcToken}`)).not.toBeNull();
             expect(await ctx.memStore.get(`tern:session:${phoneToken}`)).not.toBeNull();
 
-            await ctx.service.revokeAllSessions(defaultServerContext, systemSec, { userId });
+            await ctx.service.revokeAllSessions(buildServerContext(ctx.store), systemSec, { userId });
 
             expect(await ctx.memStore.get(`tern:session:${pcToken}`)).toBeNull();
             expect(await ctx.memStore.get(`tern:session:${phoneToken}`)).toBeNull();
@@ -352,7 +352,7 @@ for (const db of providers) {
                 device: {}, // no userAgent, same user
             });
 
-            const devices = await ctx.devices.findByUserId(defaultServerContext, systemSec, { userId: u1.id });
+            const devices = await ctx.devices.findByUserId(buildServerContext(ctx.store), systemSec, { userId: u1.id });
             // Two distinct anonymous devices — not reused
             expect(devices).toHaveLength(2);
         });
@@ -375,7 +375,7 @@ for (const db of providers) {
                 device: { userAgent: PC_UA },
             });
 
-            const devices = await ctx.devices.findByUserId(defaultServerContext, systemSec, { userId: user.id });
+            const devices = await ctx.devices.findByUserId(buildServerContext(ctx.store), systemSec, { userId: user.id });
             expect(devices).toHaveLength(1);
         });
 
@@ -397,7 +397,7 @@ for (const db of providers) {
                 device: { userAgent: PHONE_UA },
             });
 
-            const devices = await ctx.devices.findByUserId(defaultServerContext, systemSec, { userId: user.id });
+            const devices = await ctx.devices.findByUserId(buildServerContext(ctx.store), systemSec, { userId: user.id });
             expect(devices).toHaveLength(2);
         });
     });
@@ -424,28 +424,28 @@ for (const db of providers) {
         });
 
         it("validateToken returns null immediately after revokeToken", async () => {
-            await ctx.service.revokeToken(defaultServerContext, systemSec, { token });
-            expect(await ctx.service.validateToken(defaultServerContext, systemSec, { token })).toBeNull();
+            await ctx.service.revokeToken(buildServerContext(ctx.store), systemSec, { token });
+            expect(await ctx.service.validateToken(buildServerContext(ctx.store), systemSec, { token })).toBeNull();
         });
 
         it("revokeToken removes token from the session store cache", async () => {
             const key = `tern:session:${token}`;
             expect(await ctx.memStore.get(key)).not.toBeNull();
-            await ctx.service.revokeToken(defaultServerContext, systemSec, { token });
+            await ctx.service.revokeToken(buildServerContext(ctx.store), systemSec, { token });
             expect(await ctx.memStore.get(key)).toBeNull();
         });
 
         it("validateToken falls back to DB and returns null for revoked session", async () => {
             // Simulate cache miss by clearing the store (e.g., Redis restart)
             ctx.memStore.clear();
-            await ctx.service.revokeToken(defaultServerContext, systemSec, { token }); // marks isActive=false in DB
+            await ctx.service.revokeToken(buildServerContext(ctx.store), systemSec, { token }); // marks isActive=false in DB
             ctx.memStore.clear(); // ensure no cache re-entry
-            expect(await ctx.service.validateToken(defaultServerContext, systemSec, { token })).toBeNull();
+            expect(await ctx.service.validateToken(buildServerContext(ctx.store), systemSec, { token })).toBeNull();
         });
 
         it("session is marked isActive=false in DB after revoke", async () => {
-            await ctx.service.revokeToken(defaultServerContext, systemSec, { token });
-            const session = await ctx.sessions.findByToken(defaultServerContext, systemSec, { token });
+            await ctx.service.revokeToken(buildServerContext(ctx.store), systemSec, { token });
+            const session = await ctx.sessions.findByToken(buildServerContext(ctx.store), systemSec, { token });
             expect(session?.isActive).toBe(false);
         });
     });
@@ -542,7 +542,7 @@ for (const db of providers) {
                 redirectUri: "http://localhost/cb",
                 device: {},
             });
-            const sessions = await ctx.service.listSessions(defaultServerContext, systemSec, { userId: user.id });
+            const sessions = await ctx.service.listSessions(buildServerContext(ctx.store), systemSec, { userId: user.id });
             expect(sessions).toHaveLength(1);
         });
 
@@ -554,8 +554,8 @@ for (const db of providers) {
                 redirectUri: "http://localhost/cb",
                 device: {},
             });
-            await ctx.service.revokeToken(defaultServerContext, systemSec, { token: session.sessionToken });
-            const count = await ctx.service.revokeAllSessions(defaultServerContext, systemSec, { userId: user.id });
+            await ctx.service.revokeToken(buildServerContext(ctx.store), systemSec, { token: session.sessionToken });
+            const count = await ctx.service.revokeAllSessions(buildServerContext(ctx.store), systemSec, { userId: user.id });
             expect(count).toBe(0);
         });
     });

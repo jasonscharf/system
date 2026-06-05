@@ -22,7 +22,7 @@ import {
     TenantRepository,
     UserGroupRepository,
 } from "@jasonscharf/rbac";
-import { defaultServerContext, type SecurityContext, systemSec } from "@jasonscharf/server";
+import { buildServerContext, type SecurityContext, systemSec } from "@jasonscharf/server";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -61,7 +61,7 @@ function secActingAs(principalIri: string, actingAsIri: string): SecurityContext
 
 const knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
 const store = new TripleStore(knex);
-const ctx = defaultServerContext;
+const ctx = buildServerContext(store);
 await seedSystemData(ctx, store); // installs system root tenant, superusers group, wildcard
 
 const rbac = new RbacService({

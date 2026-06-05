@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import {
     anonymousSec,
-    defaultServerContext,
+    buildServerContext,
     type SecurityContext,
     type ServerContext,
     systemSec,
@@ -56,6 +56,10 @@ export class AuthService {
         this._devices = opts.devices;
     }
 
+    get store() {
+        return this._users.store;
+    }
+
     getProvider(name: OAuthProvider): IOAuthProvider {
         const p = this._providers.get(name);
         if (!p) {
@@ -83,7 +87,7 @@ export class AuthService {
 
         // All DB writes are atomic within a single transaction.
         const { user, session } = await this._users.store.withTransaction(
-            defaultServerContext,
+            buildServerContext(this._users.store),
             async (ctx) => {
                 const sec = systemSec;
 

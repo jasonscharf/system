@@ -14,12 +14,10 @@ import type { HttpCtx, HttpRouter } from "@jasonscharf/flow";
 import type { RbacService } from "@jasonscharf/rbac";
 import {
     anonymousSec,
-    defaultServerContext,
+    buildServerContext,
     type SecurityContext,
     systemSec,
 } from "@jasonscharf/server";
-
-const ctx = defaultServerContext;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -38,6 +36,7 @@ function q(c: HttpCtx, key: string): string | undefined {
 // ── Auto-provision ────────────────────────────────────────────────────────────
 
 async function ensureUserProvisioned(
+    ctx: ReturnType<typeof buildServerContext>,
     rbac: RbacService,
     userSec: SecurityContext,
     userRoleIri: string,
@@ -66,13 +65,14 @@ export function mountDiscussionsRoutes(
     auth: AuthRouterComponent,
     userRoleIri: string,
 ): void {
+    const ctx = buildServerContext(svc.store);
     const sessionMW = auth.sessionMiddleware();
 
     async function handle(c: HttpCtx, handler: (c: HttpCtx) => Promise<void>): Promise<void> {
         await sessionMW(c, async () => {});
         const userSec = sec(c);
         if (userSec.principalIri) {
-            await ensureUserProvisioned(rbac, userSec, userRoleIri);
+            await ensureUserProvisioned(ctx, rbac, userSec, userRoleIri);
         }
         try {
             await handler(c);

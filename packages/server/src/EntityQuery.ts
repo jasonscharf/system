@@ -18,7 +18,7 @@ interface OrderClause {
     dir: "asc" | "desc";
 }
 
-export class EntityQuery {
+export class EntityQuery<Props extends Record<string, unknown>> {
     private readonly _es: EntityStore;
     private _filters: Filter[] = [];
     private _order?: OrderClause;
@@ -27,17 +27,17 @@ export class EntityQuery {
 
     constructor(
         private readonly _store: TripleStore,
-        private readonly _schema: EntitySchema,
+        private readonly _schema: EntitySchema<Props>,
     ) {
         this._es = new EntityStore(_store);
     }
 
-    where(prop: string, op: FilterOp, value: unknown): this {
+    where(prop: keyof Props & string, op: FilterOp, value: unknown): this {
         this._filters.push({ prop, op, value });
         return this;
     }
 
-    orderBy(prop: string, dir: "asc" | "desc" = "asc"): this {
+    orderBy(prop: keyof Props & string, dir: "asc" | "desc" = "asc"): this {
         this._order = { prop, dir };
         return this;
     }
@@ -52,7 +52,7 @@ export class EntityQuery {
         return this;
     }
 
-    async all(ctx: ServerContext): Promise<EntityRecord[]> {
+    async all(ctx: ServerContext): Promise<EntityRecord<Props>[]> {
         return this._store.withTransaction(ctx, async (txCtx) => {
             let candidateIris = await this._allEntityIris(txCtx);
 
@@ -88,7 +88,7 @@ export class EntityQuery {
         });
     }
 
-    async first(ctx: ServerContext): Promise<EntityRecord | null> {
+    async first(ctx: ServerContext): Promise<EntityRecord<Props> | null> {
         const results = await this.limit(1).all(ctx);
         return results[0] ?? null;
     }
@@ -103,8 +103,30 @@ export class EntityQuery {
         });
     }
 
+    async create(ctx: ServerContext, data: Partial<Props>): Promise<EntityRecord<Props>> {
+        return this._es.create(ctx, this._schema, data);
+    }
+
+    async save(ctx: ServerContext, record: EntityRecord<Props>): Promise<void> {
+        return this._es.update(ctx, this._schema, record.id, record.props);
+    }
+
+    async delete(ctx: ServerContext, id: string): Promise<void> {
+        return this._es.delete(ctx, this._schema, id);
+    }
+
     get store(): TripleStore {
         return this._store;
+    }
+
+    // ── Static / free function ────────────────────────────────────────────────
+
+    /** Convenience: start a query from a raw store (no ctx required at this point). */
+    static from<Props extends Record<string, unknown>>(
+        store: TripleStore,
+        schema: EntitySchema<Props>,
+    ): EntityQuery<Props> {
+        return new EntityQuery(store, schema);
     }
 
     // ── Private ───────────────────────────────────────────────────────────────
@@ -130,7 +152,7 @@ export class EntityQuery {
         return iris.filter((iri) => matchingEntities.has(iri));
     }
 
-    private _matchFilter(record: EntityRecord, f: Filter): boolean {
+    private _matchFilter(record: EntityRecord<Props>, f: Filter): boolean {
         const value = record.props[f.prop];
         switch (f.op) {
             case "!=":
@@ -153,14 +175,4 @@ export class EntityQuery {
                 return false;
         }
     }
-}
-
-// ── Entry point ───────────────────────────────────────────────────────────────
-
-export function entities(store: TripleStore) {
-    return {
-        find(schema: EntitySchema): EntityQuery {
-            return new EntityQuery(store, schema);
-        },
-    };
 }

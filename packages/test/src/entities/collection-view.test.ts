@@ -21,7 +21,7 @@ import { UserSchema } from "@jasonscharf/auth";
 import { IRI } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import { EntitySchema } from "@jasonscharf/entities";
-import { CollectionViewStore, defaultServerContext, EntityStore } from "@jasonscharf/server";
+import { CollectionViewStore, buildServerContext, EntityStore } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -73,7 +73,7 @@ async function setup(db: DbProvider) {
     const store = new TripleStore(knex);
     const es = new EntityStore(store);
     const cvs = new CollectionViewStore(store);
-    return { ...defaultServerContext, knex, trx, store, es, cvs };
+    return { ...buildServerContext(store, { trx }), knex, trx, store, es, cvs };
 }
 
 async function teardown(ctx: Awaited<ReturnType<typeof setup>>) {

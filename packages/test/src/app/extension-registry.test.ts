@@ -6,7 +6,7 @@
 
 import type { ExtensionInstallContext, TernExtension } from "@jasonscharf/app";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { defaultServerContext, ExtensionManager, ExtensionRegistry, type ServerContext } from "@jasonscharf/server";
+import { buildServerContext, ExtensionManager, ExtensionRegistry, type ServerContext } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { up as seedData } from "../../../data/src/migrations/001_init.js";
@@ -44,7 +44,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
         await seedData(knex);
         trx = await knex.transaction();
-        ctx = { ...defaultServerContext, trx };
+        ctx = buildServerContext(store, { trx });
         store = new TripleStore(knex);
         registry = new ExtensionRegistry(store);
         extCtx = { store, context: {}, extensions: new Map() };

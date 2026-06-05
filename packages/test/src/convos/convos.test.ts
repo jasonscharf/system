@@ -51,7 +51,7 @@ import {
     UserGroupRepository,
 } from "@jasonscharf/rbac";
 import {
-    defaultServerContext,
+    buildServerContext,
     type SecurityContext,
     type ServerContext,
     systemSec,
@@ -153,7 +153,7 @@ for (const provider of providers) {
         beforeEach(async () => {
             knex = await provider.create();
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             repo = new ConversationRepository(store);
         });
@@ -257,7 +257,7 @@ for (const provider of providers) {
         beforeEach(async () => {
             knex = await provider.create();
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             convRepo = new ConversationRepository(store);
             msgRepo = new MessageRepository(store);
@@ -413,7 +413,7 @@ for (const provider of providers) {
         beforeEach(async () => {
             knex = await provider.create();
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             convRepo = new ConversationRepository(store);
             partRepo = new ParticipantRepository(store);
@@ -484,7 +484,7 @@ for (const provider of providers) {
         beforeEach(async () => {
             knex = await provider.create();
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             convRepo = new ConversationRepository(store);
             draftRepo = new DraftRepository(store);
@@ -563,7 +563,7 @@ for (const provider of providers) {
         beforeEach(async () => {
             knex = await provider.create();
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             inboxRepo = new InboxRepository(store);
         });
@@ -628,7 +628,7 @@ for (const provider of providers) {
         beforeEach(async () => {
             knex = await provider.create();
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             notifRepo = new NotificationRepository(store);
         });
@@ -709,7 +709,7 @@ for (const provider of providers) {
         beforeEach(async () => {
             knex = await provider.create();
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             convRepo = new ConversationRepository(store);
             msgRepo = new MessageRepository(store);
@@ -790,7 +790,7 @@ for (const provider of providers) {
         beforeEach(async () => {
             knex = await provider.create();
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             svc = makeService(store);
         });
@@ -982,7 +982,7 @@ for (const provider of providers) {
         beforeEach(async () => {
             knex = await provider.create();
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             svc = makeService(store);
         });
@@ -1088,7 +1088,7 @@ for (const provider of providers) {
             knex = await provider.create();
             await seedRbac(knex);
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             rbac = makeRbacService(store);
             svc = makeServiceWithRbac(store, rbac);
@@ -1263,7 +1263,7 @@ for (const provider of providers) {
             knex = await provider.create();
             await seedRbac(knex);
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             rbac = makeRbacService(store);
         });
@@ -1338,7 +1338,7 @@ for (const provider of providers) {
         beforeEach(async () => {
             knex = await provider.create();
             trx = await knex.transaction();
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
             notifRepo = new NotificationRepository(store);
             svc = new NotificationService({ notifications: notifRepo });

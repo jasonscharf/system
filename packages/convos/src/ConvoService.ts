@@ -180,6 +180,10 @@ export class ConvoService {
         this._rbac = opts.rbac;
     }
 
+    get store() {
+        return this._conversations.store;
+    }
+
     // ── Conversations ─────────────────────────────────────────────────────────
 
     async createConversation(

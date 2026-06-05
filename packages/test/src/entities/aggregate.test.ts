@@ -16,7 +16,7 @@ import {
     TernAggregate,
 } from "@jasonscharf/entities";
 import type { ServerContext } from "@jasonscharf/server";
-import { AggregateRepository, defaultServerContext, EntityStore } from "@jasonscharf/server";
+import { AggregateRepository, buildServerContext, EntityStore } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { up as seedData } from "../../../data/src/migrations/001_init.js";
@@ -90,7 +90,7 @@ describe("TernAggregate + AggregateRepository", () => {
         knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
         await seedData(knex);
         trx = await knex.transaction();
-        ctx = { ...defaultServerContext, trx };
+        ctx = buildServerContext(store, { trx });
         store = new TripleStore(knex);
         entityStore = new EntityStore(store);
         repo = new WidgetRepository(entityStore);

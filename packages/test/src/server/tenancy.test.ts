@@ -9,7 +9,7 @@
 import { IRI } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import { EntitySchema } from "@jasonscharf/entities";
-import { defaultServerContext, EntityStore, type ServerContext } from "@jasonscharf/server";
+import { buildServerContext, EntityStore, type ServerContext } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { up as seedData } from "../../../data/src/migrations/001_init.js";
@@ -39,7 +39,7 @@ describe("EntityStore — tenant isolation", () => {
     let trx: Knex.Transaction;
 
     function ctx(tenantId?: string): ServerContext {
-        return tenantId ? { ...defaultServerContext, trx, tenantId } : { ...defaultServerContext, trx };
+        return tenantId ? buildServerContext(store, { trx, tenantId }) : buildServerContext(store, { trx });
     }
 
     beforeEach(async () => {

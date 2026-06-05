@@ -1,5 +1,5 @@
-# Analytics Extension Ontology — Turtle format
-# Namespace:  http://tern.dev/ns/analytics/
+# Labs Extension Ontology — Turtle format
+# Namespace:  http://tern.dev/ns/labs/
 # Extends:    http://tern.dev/ns/auth/ (User)
 #
 # Strategy: add new OWL properties whose rdfs:domain points at an existing
@@ -13,50 +13,50 @@
 @prefix owl:       <http://www.w3.org/2002/07/owl#> .
 @prefix xsd:       <http://www.w3.org/2001/XMLSchema#> .
 @prefix auth:      <http://tern.dev/ns/auth/> .
-@prefix analytics: <http://tern.dev/ns/analytics/> .
+@prefix labs:      <http://tern.dev/ns/labs/> .
 
 # ── New class ─────────────────────────────────────────────────────────────────
 
-analytics:Project a owl:Class ;
+labs:Project a owl:Class ;
     rdfs:comment "An analytics workspace scoped to a team or product." .
 
 # ── Property group: User extensions ──────────────────────────────────────────
 # rdfs:domain auth:User — codegen emits these into a declare module augmentation.
 
-analytics:analyticsRole a owl:DatatypeProperty ;
+labs:analyticsRole a owl:DatatypeProperty ;
     rdfs:domain auth:User ;
     rdfs:range  xsd:string ;
     rdfs:comment "Platform role: 'owner', 'member', or 'viewer'." .
 
-analytics:lastActiveAt a owl:DatatypeProperty ;
+labs:lastActiveAt a owl:DatatypeProperty ;
     rdfs:domain auth:User ;
     rdfs:range  xsd:dateTime ;
     rdfs:comment "Timestamp of the user's most recent analytics activity." .
 
-analytics:consentedToTracking a owl:DatatypeProperty ;
+labs:consentedToTracking a owl:DatatypeProperty ;
     rdfs:domain auth:User ;
     rdfs:range  xsd:boolean ;
     rdfs:comment "GDPR tracking consent flag." .
 
 # ── Property group: Project data ──────────────────────────────────────────────
 
-analytics:projectName a owl:DatatypeProperty ;
-    rdfs:domain analytics:Project ;
+labs:projectName a owl:DatatypeProperty ;
+    rdfs:domain labs:Project ;
     rdfs:range  xsd:string ;
     rdfs:comment "Human-readable project name." .
 
-analytics:projectSlug a owl:DatatypeProperty ;
-    rdfs:domain analytics:Project ;
+labs:projectSlug a owl:DatatypeProperty ;
+    rdfs:domain labs:Project ;
     rdfs:range  xsd:string ;
     rdfs:comment "URL-safe identifier.  SHACL pattern: ^[a-z0-9][a-z0-9-]+[a-z0-9]$" .
 
-analytics:isActive a owl:DatatypeProperty ;
-    rdfs:domain analytics:Project ;
+labs:isActive a owl:DatatypeProperty ;
+    rdfs:domain labs:Project ;
     rdfs:range  xsd:boolean ;
     rdfs:comment "Whether this project is currently active." .
 
-analytics:projectCreatedAt a owl:DatatypeProperty ;
-    rdfs:domain analytics:Project ;
+labs:projectCreatedAt a owl:DatatypeProperty ;
+    rdfs:domain labs:Project ;
     rdfs:range  xsd:dateTime ;
     rdfs:comment "Project creation timestamp." .
 
@@ -65,12 +65,12 @@ analytics:projectCreatedAt a owl:DatatypeProperty ;
 # The codegen resolves auth:User → TypeScript type 'User' and imports it from
 # '@system/core' automatically.
 
-analytics:projectOwner a owl:ObjectProperty ;
-    rdfs:domain analytics:Project ;
+labs:projectOwner a owl:ObjectProperty ;
+    rdfs:domain labs:Project ;
     rdfs:range  auth:User ;
     rdfs:comment "The user who created and owns this project." .
 
-analytics:projectMember a owl:ObjectProperty ;
-    rdfs:domain analytics:Project ;
+labs:projectMember a owl:ObjectProperty ;
+    rdfs:domain labs:Project ;
     rdfs:range  auth:User ;
     rdfs:comment "A collaborator with access to this project (0 or more)." .

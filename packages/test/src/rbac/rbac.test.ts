@@ -23,7 +23,7 @@ import {
     UserGroupRepository,
 } from "@jasonscharf/rbac";
 import {
-    defaultServerContext,
+    buildServerContext,
     type SecurityContext,
     type ServerContext,
     systemSec,
@@ -100,7 +100,7 @@ for (const provider of providers) {
             await seedRbac(knex); // inserts system tenant, superusers, superadmin, wildcard
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            ctx = { ...defaultServerContext, trx };
+            ctx = buildServerContext(store, { trx });
 
             const tenants = new TenantRepository(store);
             const groups = new UserGroupRepository(store);
@@ -1310,7 +1310,7 @@ describe("migration 004 down()", () => {
         const store = new TripleStore(knex);
         const grants = new PolicyGrantRepository(store);
         const checker = new AccessChecker(store, grants);
-        const allowed = await checker.check(defaultServerContext, {
+        const allowed = await checker.check(buildServerContext(store), {
             principal: ALICE,
             permission: "anything",
         });

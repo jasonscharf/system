@@ -1,5 +1,5 @@
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
-import { defaultServerContext, systemSec } from "@jasonscharf/server";
+import { buildServerContext, systemSec } from "@jasonscharf/server";
 import type { UserRepository } from "../repository/UserRepository.js";
 import type { UserSessionRepository } from "../repository/UserSessionRepository.js";
 import type { ISessionStore } from "../session/ISessionStore.js";
@@ -79,7 +79,7 @@ export class SessionComponent extends FlowComponent {
     }
 
     private async _validate(req: ValidateRequest): Promise<void> {
-        const ctx = defaultServerContext;
+        const ctx = buildServerContext(this._users.store);
         const sec = systemSec;
         const key = `tern:session:${req.token}`;
 
@@ -120,7 +120,7 @@ export class SessionComponent extends FlowComponent {
     }
 
     private async _revoke(req: RevokeRequest): Promise<void> {
-        const ctx = defaultServerContext;
+        const ctx = buildServerContext(this._users.store);
         const sec = systemSec;
         const [storeOk, dbOk] = await Promise.all([
             this._store

@@ -39,6 +39,8 @@ export interface GenConfig {
     schemasOut?: string;
     /** Import path for EntitySchema in the generated schemas file.  Defaults to `@jasonscharf/entities`. */
     entitiesImport?: string;
+    /** Absolute named-graph IRI to pin every generated schema to (global-backbone ontologies like RBAC). */
+    schemaGraphIri?: string;
     /**
      * Import path for the `IRI` class.  Defaults to `'@system/core'`.
      * Override to `'../semantics/IRI.js'` when generating types inside @system/core itself.
@@ -134,6 +136,7 @@ export async function generateFromConfig(configPath: string): Promise<void> {
             localNamespace: config.localNamespace,
             entitiesImport: config.entitiesImport,
             iriImport: config.iriImport,
+            graphIri: config.schemaGraphIri,
             schemaImports,
         });
         const schemasPath = path.resolve(dir, config.schemasOut);

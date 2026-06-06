@@ -125,6 +125,7 @@ rbac:isMemberOf       a owl:ObjectProperty ;
     rdfs:comment "A principal or group is a direct member of a group. Transitive membership is resolved at query time." .
 
 rbac:isInTenant       a owl:ObjectProperty ;
+    rdfs:domain rbac:UserGroup, rbac:Role, rbac:ServiceAccount, rbac:ResourceNode ;
     rdfs:range  rbac:Tenant ;
     rdfs:comment "Scopes a group, role, service account, or resource to a tenant." .
 

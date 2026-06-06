@@ -7,6 +7,7 @@ import { EntitySchema } from "@jasonscharf/entities";
 export const TenantSchema: EntitySchema = new EntitySchema({
     typeIRI: new IRI("http://tern.dev/ns/rbac/Tenant"),
     ns: "http://tern.dev/ns/rbac/",
+    graphIri: new IRI("http://tern.dev/ns/rbac/graph"),
     properties: {
         tenantName: new IRI("http://tern.dev/ns/rbac/tenantName"),
         isSystemTenant: new IRI("http://tern.dev/ns/rbac/isSystemTenant"),
@@ -17,9 +18,18 @@ export const TenantSchema: EntitySchema = new EntitySchema({
 export const UserGroupSchema: EntitySchema = new EntitySchema({
     typeIRI: new IRI("http://tern.dev/ns/rbac/UserGroup"),
     ns: "http://tern.dev/ns/rbac/",
+    graphIri: new IRI("http://tern.dev/ns/rbac/graph"),
     properties: {
         groupName: new IRI("http://tern.dev/ns/rbac/groupName"),
         isSystemGroup: new IRI("http://tern.dev/ns/rbac/isSystemGroup"),
+    },
+    edges: {
+        isInTenant: {
+            predicate: new IRI("http://tern.dev/ns/rbac/isInTenant"),
+            target: () => TenantSchema,
+            cardinality: "many",
+            direction: "out",
+        },
     },
 });
 
@@ -27,10 +37,19 @@ export const UserGroupSchema: EntitySchema = new EntitySchema({
 export const ServiceAccountSchema: EntitySchema = new EntitySchema({
     typeIRI: new IRI("http://tern.dev/ns/rbac/ServiceAccount"),
     ns: "http://tern.dev/ns/rbac/",
+    graphIri: new IRI("http://tern.dev/ns/rbac/graph"),
     properties: {
         serviceAccountName: new IRI("http://tern.dev/ns/rbac/serviceAccountName"),
         serviceAccountToken: new IRI("http://tern.dev/ns/rbac/serviceAccountToken"),
         isActive: new IRI("http://tern.dev/ns/rbac/isActive"),
+    },
+    edges: {
+        isInTenant: {
+            predicate: new IRI("http://tern.dev/ns/rbac/isInTenant"),
+            target: () => TenantSchema,
+            cardinality: "many",
+            direction: "out",
+        },
     },
 });
 
@@ -38,11 +57,18 @@ export const ServiceAccountSchema: EntitySchema = new EntitySchema({
 export const RoleSchema: EntitySchema = new EntitySchema({
     typeIRI: new IRI("http://tern.dev/ns/rbac/Role"),
     ns: "http://tern.dev/ns/rbac/",
+    graphIri: new IRI("http://tern.dev/ns/rbac/graph"),
     properties: {
         roleName: new IRI("http://tern.dev/ns/rbac/roleName"),
         isSystemRole: new IRI("http://tern.dev/ns/rbac/isSystemRole"),
     },
     edges: {
+        isInTenant: {
+            predicate: new IRI("http://tern.dev/ns/rbac/isInTenant"),
+            target: () => TenantSchema,
+            cardinality: "many",
+            direction: "out",
+        },
         inheritsFrom: {
             predicate: new IRI("http://tern.dev/ns/rbac/inheritsFrom"),
             target: () => RoleSchema,
@@ -62,6 +88,7 @@ export const RoleSchema: EntitySchema = new EntitySchema({
 export const PermissionSchema: EntitySchema = new EntitySchema({
     typeIRI: new IRI("http://tern.dev/ns/rbac/Permission"),
     ns: "http://tern.dev/ns/rbac/",
+    graphIri: new IRI("http://tern.dev/ns/rbac/graph"),
     properties: {
         permissionKey: new IRI("http://tern.dev/ns/rbac/permissionKey"),
     },
@@ -71,6 +98,7 @@ export const PermissionSchema: EntitySchema = new EntitySchema({
 export const PolicyGrantSchema: EntitySchema = new EntitySchema({
     typeIRI: new IRI("http://tern.dev/ns/rbac/PolicyGrant"),
     ns: "http://tern.dev/ns/rbac/",
+    graphIri: new IRI("http://tern.dev/ns/rbac/graph"),
     properties: {
         isDenial: new IRI("http://tern.dev/ns/rbac/isDenial"),
         grantExpiresAt: new IRI("http://tern.dev/ns/rbac/grantExpiresAt"),
@@ -116,10 +144,17 @@ export const PolicyGrantSchema: EntitySchema = new EntitySchema({
 export const ResourceNodeSchema: EntitySchema = new EntitySchema({
     typeIRI: new IRI("http://tern.dev/ns/rbac/ResourceNode"),
     ns: "http://tern.dev/ns/rbac/",
+    graphIri: new IRI("http://tern.dev/ns/rbac/graph"),
     properties: {
         resourceType: new IRI("http://tern.dev/ns/rbac/resourceType"),
     },
     edges: {
+        isInTenant: {
+            predicate: new IRI("http://tern.dev/ns/rbac/isInTenant"),
+            target: () => TenantSchema,
+            cardinality: "many",
+            direction: "out",
+        },
         hasParent: {
             predicate: new IRI("http://tern.dev/ns/rbac/hasParent"),
             target: () => ResourceNodeSchema,

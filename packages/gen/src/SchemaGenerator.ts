@@ -20,6 +20,12 @@ export interface SchemaGenConfig {
     /** Import path for the IRI class.  Defaults to `@system/core`. */
     iriImport?: string;
     /**
+     * Absolute named-graph IRI to pin every generated schema to (graphIri).
+     * Use for global-backbone ontologies like RBAC whose entities are not
+     * tenant-scoped.
+     */
+    graphIri?: string;
+    /**
      * Maps an external (base-ontology) class IRI → the EntitySchema to import for
      * it.  Used when an edge targets a class owned by another package.
      */
@@ -110,6 +116,9 @@ function renderClass(
     lines.push(`export const ${schemaConstName(cls.iri)}: EntitySchema = new EntitySchema({`);
     lines.push(`    typeIRI: new IRI("${cls.iri}"),`);
     lines.push(`    ns: "${config.localNamespace}",`);
+    if (config.graphIri) {
+        lines.push(`    graphIri: new IRI("${config.graphIri}"),`);
+    }
 
     lines.push(`    properties: {`);
     for (const prop of dataProps) {

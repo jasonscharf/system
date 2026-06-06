@@ -50,13 +50,13 @@ import {
     type SecurityContext,
     type ServerContext,
     ServiceAccountRepository,
+    seedSystemData,
     systemSec,
     TenantRepository,
     UserGroupRepository,
 } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { up as seedRbac } from "../../../data/src/migrations/004_rbac.js";
 import { assertEmptyStore } from "../assertEmptyStore.js";
 
 // ── Provider matrix ───────────────────────────────────────────────────────────
@@ -1414,11 +1414,12 @@ for (const provider of providers) {
 
         beforeEach(async () => {
             knex = await provider.create();
-            await seedRbac(knex);
             trx = await knex.transaction();
-            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
+            ctx = buildServerContext(store, { trx });
             rbac = makeRbacService(store);
+            // Seed inside the test transaction so afterEach's rollback removes it.
+            await seedSystemData(ctx, store);
             svc = makeServiceWithRbac(store, rbac);
         });
         afterEach(async () => {
@@ -1654,11 +1655,12 @@ for (const provider of providers) {
 
         beforeEach(async () => {
             knex = await provider.create();
-            await seedRbac(knex);
             trx = await knex.transaction();
-            ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
+            ctx = buildServerContext(store, { trx });
             rbac = makeRbacService(store);
+            // Seed inside the test transaction so afterEach's rollback removes it.
+            await seedSystemData(ctx, store);
         });
         afterEach(async () => {
             await trx.rollback();

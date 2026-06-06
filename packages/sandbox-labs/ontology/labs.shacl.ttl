@@ -1,5 +1,5 @@
 # Analytics SHACL Shapes — Turtle format
-# Namespace: http://tern.dev/ns/labs/shapes/
+# Namespace: urn:sys:ext:labs:shapes:
 #
 # UserAnalyticsShape  — targets auth:User
 #   Constrains only the fields that are meaningful in the analytics context;
@@ -11,9 +11,9 @@
 
 @prefix xsd:       <http://www.w3.org/2001/XMLSchema#> .
 @prefix sh:        <http://www.w3.org/ns/shacl#> .
-@prefix auth:      <http://tern.dev/ns/auth/> .
-@prefix labs:      <http://tern.dev/ns/labs/> .
-@prefix shapes:    <http://tern.dev/ns/labs/shapes/> .
+@prefix auth:      <urn:sys:core:auth:> .
+@prefix labs:      <urn:sys:ext:labs:> .
+@prefix shapes:    <urn:sys:ext:labs:shapes:> .
 
 # ── UserAnalyticsShape ────────────────────────────────────────────────────────
 

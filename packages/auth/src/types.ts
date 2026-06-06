@@ -46,6 +46,27 @@ export interface UserDeviceEntity {
     createdAt: Date;
 }
 
+export type LoginAttemptStatus = "pending" | "success" | "error";
+
+export interface LoginAttemptEntity {
+    id: string;
+    iri: string;
+    provider: OAuthProvider;
+    status: LoginAttemptStatus;
+    nonce: string;
+    userId?: string;
+    errorCode?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    claim?: string;
+    utmSource?: string;
+    utmMedium?: string;
+    utmCampaign?: string;
+    authRedirectUrl?: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
 export interface SessionData {
     userId: string;
     deviceId: string;

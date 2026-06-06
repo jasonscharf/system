@@ -152,7 +152,7 @@ export class ReadReceiptRepository {
 
         for (const q of quads) {
             const subjIri = (q.subject as IRI).value;
-            if (!subjIri.includes("/receipt/")) {
+            if (!subjIri.includes(":receipt:")) {
                 continue;
             }
             const all = await this._store.find(ctx, {
@@ -187,7 +187,7 @@ export class ReadReceiptRepository {
 
         for (const q of quads) {
             const subjIri = (q.subject as IRI).value;
-            if (!subjIri.includes("/receipt/")) {
+            if (!subjIri.includes(":receipt:")) {
                 continue;
             }
             const all = await this._store.find(ctx, {

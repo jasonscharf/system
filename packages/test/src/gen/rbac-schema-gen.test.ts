@@ -30,7 +30,7 @@ beforeAll(async () => {
     src = generateSchemas(
         ontology,
         { nodeShapes: new Map(), byTargetClass: new Map() },
-        { localNamespace: "http://tern.dev/ns/rbac/", iriImport: "@jasonscharf/core" },
+        { localNamespace: "urn:sys:core:rbac:", iriImport: "@jasonscharf/core" },
     );
 });
 
@@ -49,8 +49,8 @@ describe("generateSchemas — real rbac.ttl", () => {
     });
 
     it("keeps datatype properties as literal properties (no fooId)", () => {
-        expect(src).toContain('tenantName: new IRI("http://tern.dev/ns/rbac/tenantName")');
-        expect(src).toContain('permissionKey: new IRI("http://tern.dev/ns/rbac/permissionKey")');
+        expect(src).toContain('tenantName: new IRI("urn:sys:core:rbac:tenantName")');
+        expect(src).toContain('permissionKey: new IRI("urn:sys:core:rbac:permissionKey")');
         // FK scalars must not appear as literal properties.
         expect(src).not.toContain("tenantId:");
         expect(src).not.toContain("parentIri:");
@@ -74,10 +74,10 @@ describe("generateSchemas — real rbac.ttl", () => {
         // hasPrincipal / hasScope are scoped to PolicyGrant but have no single
         // target class (principal: User|Group|ServiceAccount; scope: Resource|Tenant).
         expect(src).toContain(
-            'hasPrincipal: { predicate: new IRI("http://tern.dev/ns/rbac/hasPrincipal"), cardinality: "many", direction: "out" }',
+            'hasPrincipal: { predicate: new IRI("urn:sys:core:rbac:hasPrincipal"), cardinality: "many", direction: "out" }',
         );
         expect(src).toContain(
-            'hasScope: { predicate: new IRI("http://tern.dev/ns/rbac/hasScope"), cardinality: "many", direction: "out" }',
+            'hasScope: { predicate: new IRI("urn:sys:core:rbac:hasScope"), cardinality: "many", direction: "out" }',
         );
         // A polymorphic edge carries no target thunk.
         for (const edge of ["hasPrincipal", "hasScope"]) {

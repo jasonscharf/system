@@ -303,7 +303,7 @@ export class RbacInspector {
             chain.push(current);
             const parentQuads = await this._store.find(ctx, {
                 subject: new IRI(current),
-                predicate: { value: "http://tern.dev/ns/rbac/parentResource" } as IRI,
+                predicate: { value: "urn:sys:core:rbac:parentResource" } as IRI,
                 graph: RBAC_GRAPH,
             });
             current = parentQuads.length > 0 ? (iriValue(parentQuads[0].object) ?? null) : null;

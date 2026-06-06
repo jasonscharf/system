@@ -16,6 +16,7 @@ import {
 } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 
 // ── Schemas ─────────────────────────────────────────────────────────────────────
 
@@ -91,17 +92,21 @@ if (process.env.TERN_PG_URL) {
 for (const provider of providers) {
     describe(`EntityQuery topology — ${provider.name}`, () => {
         let knex: Knex;
+        let trx: Knex.Transaction;
         let store: TripleStore;
         let es: EntityStore;
         let ctx: ServerContext;
 
         beforeEach(async () => {
             knex = await provider.create();
+            trx = await knex.transaction();
             store = new TripleStore(knex);
             es = new EntityStore(store);
-            ctx = buildServerContext(store);
+            ctx = buildServerContext(store, { trx });
         });
         afterEach(async () => {
+            await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 

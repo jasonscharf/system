@@ -1,12 +1,12 @@
-import { DEFAULT_GRAPH, IRI } from "@jasonscharf/core";
+import { DEFAULT_GRAPH, IRI, NS_ROOT } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import { toLiteral } from "@jasonscharf/entities";
 import type { ServerContext } from "./ServerContext.js";
 
 // ── Ontology constants ────────────────────────────────────────────────────────
 
-const NS = "http://tern.dev/ns/app/";
-const EXT_NS = `${NS}ext/`;
+const NS = `${NS_ROOT}app:`;
+const EXT_NS = `${NS}ext:`;
 
 const EXT_TYPE = new IRI(`${NS}InstalledExtension`);
 const RDF_TYPE = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");

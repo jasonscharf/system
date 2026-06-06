@@ -10,19 +10,19 @@
  */
 
 export const userPropertyMap: Record<string, string> = {
-    email: "http://tern.dev/ns/auth/email",
-    displayName: "http://tern.dev/ns/auth/displayName",
-    avatarUrl: "http://tern.dev/ns/auth/avatarUrl",
-    analyticsRole: "http://tern.dev/ns/labs/analyticsRole",
-    lastActiveAt: "http://tern.dev/ns/labs/lastActiveAt",
-    consentedToTracking: "http://tern.dev/ns/labs/consentedToTracking",
+    email: "urn:sys:core:auth:email",
+    displayName: "urn:sys:core:auth:displayName",
+    avatarUrl: "urn:sys:core:auth:avatarUrl",
+    analyticsRole: "urn:sys:ext:labs:analyticsRole",
+    lastActiveAt: "urn:sys:ext:labs:lastActiveAt",
+    consentedToTracking: "urn:sys:ext:labs:consentedToTracking",
 };
 
 export const projectPropertyMap: Record<string, string> = {
-    projectName: "http://tern.dev/ns/labs/projectName",
-    projectSlug: "http://tern.dev/ns/labs/projectSlug",
-    projectOwner: "http://tern.dev/ns/labs/projectOwner",
-    projectMember: "http://tern.dev/ns/labs/projectMember",
-    isActive: "http://tern.dev/ns/labs/isActive",
-    projectCreatedAt: "http://tern.dev/ns/labs/projectCreatedAt",
+    projectName: "urn:sys:ext:labs:projectName",
+    projectSlug: "urn:sys:ext:labs:projectSlug",
+    projectOwner: "urn:sys:ext:labs:projectOwner",
+    projectMember: "urn:sys:ext:labs:projectMember",
+    isActive: "urn:sys:ext:labs:isActive",
+    projectCreatedAt: "urn:sys:ext:labs:projectCreatedAt",
 };

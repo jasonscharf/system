@@ -18,6 +18,7 @@ import {
     GitHubProvider,
     GoogleProvider,
     type IOAuthProvider,
+    LoginAttemptRepository,
     listActiveSessions,
     listInactiveSessions,
     listUserDevices,
@@ -51,6 +52,7 @@ import {
 } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 
 function startServer(
     handler: (req: IncomingMessage, res: ServerResponse) => void,
@@ -258,11 +260,15 @@ for (const db of dbProviders) {
         });
         afterEach(async () => {
             await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 
         it("creates a user and retrieves it by id", async () => {
-            const user = await repo.create(ctx, systemSec, { email: "a@test.com", displayName: "Alice" });
+            const user = await repo.create(ctx, systemSec, {
+                email: "a@test.com",
+                displayName: "Alice",
+            });
             expect(user.id).toBeTruthy();
             expect(user.email).toBe("a@test.com");
             expect(user.displayName).toBe("Alice");
@@ -285,17 +291,22 @@ for (const db of dbProviders) {
 
         it("updates displayName and avatarUrl", async () => {
             const user = await repo.create(ctx, systemSec, { email: "c@test.com" });
-            const updated = await repo.update(ctx, systemSec, { id: user.id, patch: {
-                displayName: "Charlie",
-                avatarUrl: "http://avatar",
-            } });
+            const updated = await repo.update(ctx, systemSec, {
+                id: user.id,
+                patch: {
+                    displayName: "Charlie",
+                    avatarUrl: "http://avatar",
+                },
+            });
             expect(updated?.displayName).toBe("Charlie");
             expect(updated?.avatarUrl).toBe("http://avatar");
             expect(updated?.updatedAt.getTime()).toBeGreaterThanOrEqual(user.updatedAt.getTime());
         });
 
         it("update returns null for unknown id", async () => {
-            expect(await repo.update(ctx, systemSec, { id: "ghost", patch: { displayName: "X" } })).toBeNull();
+            expect(
+                await repo.update(ctx, systemSec, { id: "ghost", patch: { displayName: "X" } }),
+            ).toBeNull();
         });
 
         it("deletes a user", async () => {
@@ -306,8 +317,104 @@ for (const db of dbProviders) {
 
         it("stores the user IRI in the graph", async () => {
             const user = await repo.create(ctx, systemSec, { email: "e@test.com" });
-            expect(user.iri).toContain("http://tern.dev/ns/auth/user/");
+            expect(user.iri).toContain("urn:sys:core:auth:user:");
             expect(user.iri).toContain(user.id);
+        });
+    });
+
+    describe(`LoginAttemptRepository — ${db.name}`, () => {
+        let knex: Knex;
+        let trx: Knex.Transaction;
+        let ctx: ServerContext;
+        let store: TripleStore;
+        let userRepo: UserRepository;
+        let repo: LoginAttemptRepository;
+
+        beforeEach(async () => {
+            knex = await db.create();
+            trx = await knex.transaction();
+            ctx = buildServerContext(store, { trx });
+            store = new TripleStore(knex);
+            userRepo = new UserRepository(store);
+            repo = new LoginAttemptRepository(store);
+        });
+        afterEach(async () => {
+            await trx.rollback();
+            await assertEmptyStore(knex);
+            await knex.destroy();
+        });
+
+        it("creates a pending attempt and finds it by nonce", async () => {
+            const created = await repo.create(ctx, systemSec, {
+                provider: "google",
+                nonce: "nonce-abc",
+                ipAddress: "10.0.0.1",
+                userAgent: "Mozilla/5.0",
+                claim: "invite-1",
+                utmSource: "newsletter",
+                utmMedium: "email",
+                utmCampaign: "spring",
+                authRedirectUrl: "https://app.example/welcome",
+            });
+            expect(created.id).toBeTruthy();
+            expect(created.status).toBe("pending");
+            expect(created.iri).toContain("urn:sys:core:auth:loginattempt:");
+            expect(created.iri).toContain(created.id);
+
+            const found = await repo.findByNonce(ctx, systemSec, { nonce: "nonce-abc" });
+            expect(found).not.toBeNull();
+            expect(found?.id).toBe(created.id);
+            expect(found?.provider).toBe("google");
+            expect(found?.status).toBe("pending");
+            expect(found?.ipAddress).toBe("10.0.0.1");
+            expect(found?.userAgent).toBe("Mozilla/5.0");
+            expect(found?.claim).toBe("invite-1");
+            expect(found?.utmSource).toBe("newsletter");
+            expect(found?.utmMedium).toBe("email");
+            expect(found?.utmCampaign).toBe("spring");
+            expect(found?.authRedirectUrl).toBe("https://app.example/welcome");
+            expect(found?.userId).toBeUndefined();
+            expect(found?.createdAt).toBeInstanceOf(Date);
+        });
+
+        it("returns null for an unknown nonce", async () => {
+            expect(await repo.findByNonce(ctx, systemSec, { nonce: "ghost" })).toBeNull();
+        });
+
+        it("marks an attempt successful and links the resolved user via an edge", async () => {
+            const user = await userRepo.create(ctx, systemSec, { email: "f@test.com" });
+            const created = await repo.create(ctx, systemSec, {
+                provider: "github",
+                nonce: "nonce-ok",
+            });
+
+            await repo.updateStatus(ctx, systemSec, {
+                id: created.id,
+                status: "success",
+                userId: user.id,
+            });
+
+            const found = await repo.findByNonce(ctx, systemSec, { nonce: "nonce-ok" });
+            expect(found?.status).toBe("success");
+            expect(found?.userId).toBe(user.id);
+            expect(found?.updatedAt.getTime()).toBeGreaterThanOrEqual(created.updatedAt.getTime());
+        });
+
+        it("records an error code on a failed attempt", async () => {
+            const created = await repo.create(ctx, systemSec, {
+                provider: "google",
+                nonce: "nonce-fail",
+            });
+            await repo.updateStatus(ctx, systemSec, {
+                id: created.id,
+                status: "error",
+                errorCode: "access_denied",
+            });
+
+            const found = await repo.findByNonce(ctx, systemSec, { nonce: "nonce-fail" });
+            expect(found?.status).toBe("error");
+            expect(found?.errorCode).toBe("access_denied");
+            expect(found?.userId).toBeUndefined();
         });
     });
 
@@ -329,22 +436,19 @@ for (const db of dbProviders) {
         });
         afterEach(async () => {
             await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 
         it("creates an identity and links it to a user", async () => {
             const user = await userRepo.create(ctx, systemSec, { email: "f@test.com" });
-            const identity = await idRepo.create(
-                ctx,
-                systemSec,
-                {
-                    provider: "google",
-                    providerUserId: "g-001",
-                    providerEmail: "f@gmail.com",
-                    accessToken: "at-xxx",
-                    userId: user.id,
-                },
-            );
+            const identity = await idRepo.create(ctx, systemSec, {
+                provider: "google",
+                providerUserId: "g-001",
+                providerEmail: "f@gmail.com",
+                accessToken: "at-xxx",
+                userId: user.id,
+            });
             expect(identity.provider).toBe("google");
             expect(identity.providerUserId).toBe("g-001");
             expect(identity.userId).toBe(user.id);
@@ -352,50 +456,46 @@ for (const db of dbProviders) {
 
         it("finds identity by provider + providerUserId", async () => {
             const user = await userRepo.create(ctx, systemSec, { email: "g@test.com" });
-            await idRepo.create(
-                ctx,
-                systemSec,
-                {
-                    provider: "github",
-                    providerUserId: "gh-42",
-                    providerEmail: "g@gh.com",
-                    accessToken: "at",
-                    userId: user.id,
-                },
-            );
+            await idRepo.create(ctx, systemSec, {
+                provider: "github",
+                providerUserId: "gh-42",
+                providerEmail: "g@gh.com",
+                accessToken: "at",
+                userId: user.id,
+            });
 
-            const found = await idRepo.findByProvider(ctx, systemSec, { provider: "github", providerUserId: "gh-42" });
+            const found = await idRepo.findByProvider(ctx, systemSec, {
+                provider: "github",
+                providerUserId: "gh-42",
+            });
             expect(found?.providerUserId).toBe("gh-42");
         });
 
         it("returns null when provider identity not found", async () => {
-            expect(await idRepo.findByProvider(ctx, systemSec, { provider: "google", providerUserId: "nobody" })).toBeNull();
+            expect(
+                await idRepo.findByProvider(ctx, systemSec, {
+                    provider: "google",
+                    providerUserId: "nobody",
+                }),
+            ).toBeNull();
         });
 
         it("finds all identities for a user", async () => {
             const user = await userRepo.create(ctx, systemSec, { email: "h@test.com" });
-            await idRepo.create(
-                ctx,
-                systemSec,
-                {
-                    provider: "google",
-                    providerUserId: "g1",
-                    providerEmail: "h@g.com",
-                    accessToken: "a1",
-                    userId: user.id,
-                },
-            );
-            await idRepo.create(
-                ctx,
-                systemSec,
-                {
-                    provider: "github",
-                    providerUserId: "gh1",
-                    providerEmail: "h@gh.com",
-                    accessToken: "a2",
-                    userId: user.id,
-                },
-            );
+            await idRepo.create(ctx, systemSec, {
+                provider: "google",
+                providerUserId: "g1",
+                providerEmail: "h@g.com",
+                accessToken: "a1",
+                userId: user.id,
+            });
+            await idRepo.create(ctx, systemSec, {
+                provider: "github",
+                providerUserId: "gh1",
+                providerEmail: "h@gh.com",
+                accessToken: "a2",
+                userId: user.id,
+            });
 
             const all = await idRepo.findByUserId(ctx, systemSec, { userId: user.id });
             expect(all).toHaveLength(2);
@@ -403,25 +503,27 @@ for (const db of dbProviders) {
 
         it("updates tokens on an existing identity", async () => {
             const user = await userRepo.create(ctx, systemSec, { email: "i@test.com" });
-            const identity = await idRepo.create(
-                ctx,
-                systemSec,
-                {
-                    provider: "google",
-                    providerUserId: "g2",
-                    providerEmail: "i@g.com",
-                    accessToken: "old",
-                    userId: user.id,
+            const identity = await idRepo.create(ctx, systemSec, {
+                provider: "google",
+                providerUserId: "g2",
+                providerEmail: "i@g.com",
+                accessToken: "old",
+                userId: user.id,
+            });
+
+            await idRepo.updateTokens(ctx, systemSec, {
+                id: identity.id,
+                tokens: {
+                    accessToken: "new-at",
+                    refreshToken: "new-rt",
+                    tokenExpiresAt: undefined,
                 },
-            );
+            });
 
-            await idRepo.updateTokens(ctx, systemSec, { id: identity.id, tokens: {
-                accessToken: "new-at",
-                refreshToken: "new-rt",
-                tokenExpiresAt: undefined,
-            } });
-
-            const found = await idRepo.findByProvider(ctx, systemSec, { provider: "google", providerUserId: "g2" });
+            const found = await idRepo.findByProvider(ctx, systemSec, {
+                provider: "google",
+                providerUserId: "g2",
+            });
             expect(found?.accessToken).toBe("new-at");
             expect(found?.refreshToken).toBe("new-rt");
         });
@@ -445,30 +547,46 @@ for (const db of dbProviders) {
         });
         afterEach(async () => {
             await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 
         it("creates a device on first findOrCreate", async () => {
             const user = await userRepo.create(ctx, systemSec, { email: "j@test.com" });
-            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {
-                userAgent: "Chrome/120",
-                platform: "web",
-            } });
+            const device = await devRepo.findOrCreate(ctx, systemSec, {
+                userId: user.id,
+                info: {
+                    userAgent: "Chrome/120",
+                    platform: "web",
+                },
+            });
             expect(device.userId).toBe(user.id);
             expect(device.deviceUserAgent).toBe("Chrome/120");
         });
 
         it("returns existing device on second findOrCreate with same userAgent", async () => {
             const user = await userRepo.create(ctx, systemSec, { email: "k@test.com" });
-            const d1 = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: { userAgent: "Firefox/118" } });
-            const d2 = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: { userAgent: "Firefox/118" } });
+            const d1 = await devRepo.findOrCreate(ctx, systemSec, {
+                userId: user.id,
+                info: { userAgent: "Firefox/118" },
+            });
+            const d2 = await devRepo.findOrCreate(ctx, systemSec, {
+                userId: user.id,
+                info: { userAgent: "Firefox/118" },
+            });
             expect(d1.id).toBe(d2.id);
         });
 
         it("finds all devices for a user", async () => {
             const user = await userRepo.create(ctx, systemSec, { email: "l@test.com" });
-            await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: { userAgent: "Safari/17" } });
-            await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: { userAgent: "Edge/118" } });
+            await devRepo.findOrCreate(ctx, systemSec, {
+                userId: user.id,
+                info: { userAgent: "Safari/17" },
+            });
+            await devRepo.findOrCreate(ctx, systemSec, {
+                userId: user.id,
+                info: { userAgent: "Edge/118" },
+            });
             const all = await devRepo.findByUserId(ctx, systemSec, { userId: user.id });
             expect(all).toHaveLength(2);
         });
@@ -498,6 +616,7 @@ for (const db of dbProviders) {
         });
         afterEach(async () => {
             await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 
@@ -507,16 +626,19 @@ for (const db of dbProviders) {
             opts: { daysFromNow?: number } = {},
         ) {
             const offset = (opts.daysFromNow ?? 7) * 24 * 3600 * 1000;
-            return sessRepo.create(
-                ctx,
-                systemSec,
-                { userId, deviceId, expiresAt: new Date(Date.now() + offset) },
-            );
+            return sessRepo.create(ctx, systemSec, {
+                userId,
+                deviceId,
+                expiresAt: new Date(Date.now() + offset),
+            });
         }
 
         it("creates a session with a secure token", async () => {
             const user = await userRepo.create(ctx, systemSec, { email: "m@test.com" });
-            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {} });
+            const device = await devRepo.findOrCreate(ctx, systemSec, {
+                userId: user.id,
+                info: {},
+            });
             const sess = await makeSession(user.id, device.id);
 
             expect(sess.sessionToken).toHaveLength(64);
@@ -526,7 +648,10 @@ for (const db of dbProviders) {
 
         it("finds session by token", async () => {
             const user = await userRepo.create(ctx, systemSec, { email: "n@test.com" });
-            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {} });
+            const device = await devRepo.findOrCreate(ctx, systemSec, {
+                userId: user.id,
+                info: {},
+            });
             const sess = await makeSession(user.id, device.id);
 
             const found = await sessRepo.findByToken(ctx, systemSec, { token: sess.sessionToken });
@@ -534,12 +659,17 @@ for (const db of dbProviders) {
         });
 
         it("returns null for unknown token", async () => {
-            expect(await sessRepo.findByToken(ctx, systemSec, { token: "not-a-real-token" })).toBeNull();
+            expect(
+                await sessRepo.findByToken(ctx, systemSec, { token: "not-a-real-token" }),
+            ).toBeNull();
         });
 
         it("finds all sessions for a user", async () => {
             const user = await userRepo.create(ctx, systemSec, { email: "o@test.com" });
-            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {} });
+            const device = await devRepo.findOrCreate(ctx, systemSec, {
+                userId: user.id,
+                info: {},
+            });
             await makeSession(user.id, device.id);
             await makeSession(user.id, device.id);
             const all = await sessRepo.findByUserId(ctx, systemSec, { userId: user.id });
@@ -548,7 +678,10 @@ for (const db of dbProviders) {
 
         it("revoke() marks session inactive", async () => {
             const user = await userRepo.create(ctx, systemSec, { email: "p@test.com" });
-            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {} });
+            const device = await devRepo.findOrCreate(ctx, systemSec, {
+                userId: user.id,
+                info: {},
+            });
             const sess = await makeSession(user.id, device.id);
 
             const ok = await sessRepo.revoke(ctx, systemSec, { token: sess.sessionToken });
@@ -564,7 +697,10 @@ for (const db of dbProviders) {
 
         it("revokeAllForUser() revokes all active sessions", async () => {
             const user = await userRepo.create(ctx, systemSec, { email: "q@test.com" });
-            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {} });
+            const device = await devRepo.findOrCreate(ctx, systemSec, {
+                userId: user.id,
+                info: {},
+            });
             await makeSession(user.id, device.id);
             await makeSession(user.id, device.id);
             const count = await sessRepo.revokeAllForUser(ctx, systemSec, { userId: user.id });
@@ -573,7 +709,10 @@ for (const db of dbProviders) {
 
         it("deleteExpired() removes expired sessions", async () => {
             const user = await userRepo.create(ctx, systemSec, { email: "r@test.com" });
-            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {} });
+            const device = await devRepo.findOrCreate(ctx, systemSec, {
+                userId: user.id,
+                info: {},
+            });
             await makeSession(user.id, device.id, { daysFromNow: -1 }); // already expired
             await makeSession(user.id, device.id, { daysFromNow: 7 }); // valid
 
@@ -625,6 +764,7 @@ describe("AuthService", () => {
     });
     afterEach(async () => {
         await trx.rollback();
+        await assertEmptyStore(knex);
         await knex.destroy();
         vi.unstubAllGlobals();
     });
@@ -673,12 +813,18 @@ describe("AuthService", () => {
             device: {},
         });
 
-        const user = await service.validateToken(buildServerContext(store), systemSec, { token: session.sessionToken });
+        const user = await service.validateToken(buildServerContext(store), systemSec, {
+            token: session.sessionToken,
+        });
         expect(user?.email).toBe("svc@test.com");
     });
 
     it("validateToken() returns null for unknown token", async () => {
-        expect(await service.validateToken(buildServerContext(store), systemSec, { token: "fake-token" })).toBeNull();
+        expect(
+            await service.validateToken(buildServerContext(store), systemSec, {
+                token: "fake-token",
+            }),
+        ).toBeNull();
     });
 
     it("revokeToken() invalidates the session", async () => {
@@ -690,8 +836,14 @@ describe("AuthService", () => {
             device: {},
         });
 
-        await service.revokeToken(buildServerContext(store), systemSec, { token: session.sessionToken });
-        expect(await service.validateToken(buildServerContext(store), systemSec, { token: session.sessionToken })).toBeNull();
+        await service.revokeToken(buildServerContext(store), systemSec, {
+            token: session.sessionToken,
+        });
+        expect(
+            await service.validateToken(buildServerContext(store), systemSec, {
+                token: session.sessionToken,
+            }),
+        ).toBeNull();
     });
 
     it("buildAuthUrl() returns a URL with correct state", () => {
@@ -787,6 +939,7 @@ describe("SessionComponent", () => {
     });
     afterEach(async () => {
         await trx.rollback();
+        await assertEmptyStore(knex);
         await knex.destroy();
     });
 
@@ -826,7 +979,10 @@ describe("SessionComponent", () => {
         const userRepo = new UserRepository(store);
         const sessRepo = new UserSessionRepository(store);
         const ctx = buildServerContext(store);
-        const user = await userRepo.create(ctx, systemSec, { email: "slow@test.com", displayName: "Slow" });
+        const user = await userRepo.create(ctx, systemSec, {
+            email: "slow@test.com",
+            displayName: "Slow",
+        });
         const session = await sessRepo.create(ctx, systemSec, {
             userId: user.id,
             deviceId: "d-slow",
@@ -844,7 +1000,10 @@ describe("SessionComponent", () => {
         const userRepo = new UserRepository(store);
         const sessRepo = new UserSessionRepository(store);
         const ctx = buildServerContext(store);
-        const user = await userRepo.create(ctx, systemSec, { email: "fast@test.com", displayName: "Fast" });
+        const user = await userRepo.create(ctx, systemSec, {
+            email: "fast@test.com",
+            displayName: "Fast",
+        });
         const session = await sessRepo.create(ctx, systemSec, {
             userId: user.id,
             deviceId: "d-fast",
@@ -937,6 +1096,7 @@ describe("CallbackComponent (FBP)", () => {
 
     afterEach(async () => {
         await trx.rollback();
+        await assertEmptyStore(knex);
         await knex.destroy();
     });
 
@@ -1035,7 +1195,9 @@ describe("AuthService.validateToken — fallback path", () => {
         // Simulate session store miss (e.g. Redis restart)
         memStore.clear();
 
-        const user = await svc.validateToken(buildServerContext(store), systemSec, { token: session.sessionToken });
+        const user = await svc.validateToken(buildServerContext(store), systemSec, {
+            token: session.sessionToken,
+        });
         expect(user?.email).toBe("fb@test.com");
 
         vi.unstubAllGlobals();
@@ -1184,6 +1346,7 @@ describe("AuthRouterComponent HTTP routes", () => {
 
     afterEach(async () => {
         await trx.rollback();
+        await assertEmptyStore(knex);
         await knex.destroy();
     });
 
@@ -1478,7 +1641,9 @@ describe("AuthService.validateToken — cache hit", () => {
         });
 
         // Token is already cached from handleCallback — validateToken should use the cache
-        const validated = await svc.validateToken(buildServerContext(store), systemSec, { token: session.sessionToken });
+        const validated = await svc.validateToken(buildServerContext(store), systemSec, {
+            token: session.sessionToken,
+        });
         expect(validated?.email).toBe("cache@test.com");
         expect(validated?.id).toBe(user.id);
 
@@ -1509,7 +1674,9 @@ describe("AuthService.validateToken — cache hit", () => {
         );
 
         // validateToken should detect the expiry, delete it from cache, and return null
-        const result = await svc.validateToken(buildServerContext(store), systemSec, { token: fakeToken });
+        const result = await svc.validateToken(buildServerContext(store), systemSec, {
+            token: fakeToken,
+        });
         expect(result).toBeNull();
 
         await knex.destroy();
@@ -1541,6 +1708,7 @@ for (const db of dbProviders) {
         });
         afterEach(async () => {
             await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 
@@ -1553,20 +1721,26 @@ for (const db of dbProviders) {
 
         it("listUserDevices returns all created devices", async () => {
             const user = await userRepo.create(ctx, systemSec, { email: "lud@test.com" });
-            await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: { userAgent: "Chrome" } });
+            await devRepo.findOrCreate(ctx, systemSec, {
+                userId: user.id,
+                info: { userAgent: "Chrome" },
+            });
             const result = await listUserDevices(ctx, es);
             expect(result.length).toBeGreaterThanOrEqual(1);
         });
 
         it("listActiveSessions returns only active sessions", async () => {
             const user = await userRepo.create(ctx, systemSec, { email: "las@test.com" });
-            const device = await devRepo.findOrCreate(ctx, systemSec, { userId: user.id, info: {} });
+            const device = await devRepo.findOrCreate(ctx, systemSec, {
+                userId: user.id,
+                info: {},
+            });
             const expiresAt = new Date(Date.now() + 3600_000);
-            const sess = await sessRepo.create(
-                ctx,
-                systemSec,
-                { userId: user.id, deviceId: device.id, expiresAt },
-            );
+            const sess = await sessRepo.create(ctx, systemSec, {
+                userId: user.id,
+                deviceId: device.id,
+                expiresAt,
+            });
             await sessRepo.revoke(ctx, systemSec, { token: sess.sessionToken });
 
             const active = await listActiveSessions(ctx, es);
@@ -1619,7 +1793,7 @@ for (const db of dbProviders) {
             // Store a session whose sessionDevice IRI points to a non-existent entity
             await es.create(ctx, UserSessionSchema, {
                 sessionUser: userRec.iri,
-                sessionDevice: "http://tern.dev/ns/auth/device/ghost",
+                sessionDevice: "urn:sys:core:auth:device:ghost",
                 expiresAt: new Date(Date.now() + 3600_000),
             });
 

@@ -208,9 +208,23 @@ export class TripleStore {
         return this._knex;
     }
 
-    /** Returns the Knex instance to use: the transaction if present, else the base knex. */
+    /**
+     * Returns the transaction to run a query on. Every store operation MUST run
+     * inside a transaction — nothing executes outside one, not even a single
+     * read. Callers establish a transaction with `withTransaction(ctx, ...)`,
+     * which threads `ctx.trx`. Hitting the raw connection would commit
+     * immediately and outside any unit of work, so the absence of `ctx.trx` is
+     * a programming error and throws rather than silently falling back.
+     */
     private _db(ctx: ServerContext): Knex {
-        return (ctx.trx as Knex | undefined) ?? this._knex;
+        const trx = ctx.trx as Knex | undefined;
+        if (!trx) {
+            throw new Error(
+                "TripleStore: no active transaction. Every store operation must run inside " +
+                    "store.withTransaction(ctx, ...) — no query may execute outside a transaction.",
+            );
+        }
+        return trx;
     }
 
     /** Inserts a row and returns its auto-increment ID, for both Postgres and SQLite. */
@@ -244,6 +258,14 @@ export class TripleStore {
     // ── Namespace registry ────────────────────────────────────────────────────
 
     async ensureNamespace(ctx: ServerContext, prefix: string, iriStr: string): Promise<number> {
+        return this.withTransaction(ctx, (ctx) => this._ensureNamespace(ctx, prefix, iriStr));
+    }
+
+    private async _ensureNamespace(
+        ctx: ServerContext,
+        prefix: string,
+        iriStr: string,
+    ): Promise<number> {
         const row = await this._db(ctx)(T.namespaces)
             .where(C.prefix, prefix)
             .first<{ id: number }>();
@@ -256,6 +278,10 @@ export class TripleStore {
     // ── Term internment ───────────────────────────────────────────────────────
 
     async ensureName(ctx: ServerContext, iriStr: string): Promise<number> {
+        return this.withTransaction(ctx, (ctx) => this._ensureName(ctx, iriStr));
+    }
+
+    private async _ensureName(ctx: ServerContext, iriStr: string): Promise<number> {
         const row = await this._db(ctx)(T.names).where(C.iri, iriStr).first<NameRow>();
         if (row) {
             return row.id;
@@ -264,6 +290,10 @@ export class TripleStore {
     }
 
     async ensureNode(ctx: ServerContext, term: RdfTerm): Promise<number> {
+        return this.withTransaction(ctx, (ctx) => this._ensureNode(ctx, term));
+    }
+
+    private async _ensureNode(ctx: ServerContext, term: RdfTerm): Promise<number> {
         if (isIRI(term)) {
             const nameId = await this.ensureName(ctx, term.value);
             const row = await this._db(ctx)(T.nodes)
@@ -318,6 +348,10 @@ export class TripleStore {
      * a fresh edge row (the soft-deleted row is left as history).
      */
     async insert(ctx: ServerContext, quad: Quad): Promise<void> {
+        return this.withTransaction(ctx, (ctx) => this._insertQuad(ctx, quad));
+    }
+
+    private async _insertQuad(ctx: ServerContext, quad: Quad): Promise<void> {
         const [sId, pId, oId] = await Promise.all([
             this.ensureNode(ctx, quad.subject as RdfTerm),
             this.ensureNode(ctx, quad.predicate as IRI),
@@ -353,9 +387,11 @@ export class TripleStore {
     }
 
     async insertMany(ctx: ServerContext, quads: readonly Quad[]): Promise<void> {
-        for (const q of quads) {
-            await this.insert(ctx, q);
-        }
+        return this.withTransaction(ctx, async (ctx) => {
+            for (const q of quads) {
+                await this.insert(ctx, q);
+            }
+        });
     }
 
     // ── Read ──────────────────────────────────────────────────────────────────
@@ -365,6 +401,10 @@ export class TripleStore {
      * To include historical (soft-deleted) quads, use findHistory().
      */
     async find(ctx: ServerContext, pattern: QuadPattern = {}): Promise<Quad[]> {
+        return this.withTransaction(ctx, (ctx) => this._find(ctx, pattern));
+    }
+
+    private async _find(ctx: ServerContext, pattern: QuadPattern = {}): Promise<Quad[]> {
         let q = this._db(ctx)(T.edges).where(C.isDeleted, false).select<EdgeRow[]>("*");
         const ids = await this._patternIds(ctx, pattern);
         if (ids === null) {
@@ -383,6 +423,10 @@ export class TripleStore {
      * Use this when the order of results is semantically meaningful (e.g. ordered collections).
      */
     async findOrdered(ctx: ServerContext, pattern: QuadPattern): Promise<Quad[]> {
+        return this.withTransaction(ctx, (ctx) => this._findOrdered(ctx, pattern));
+    }
+
+    private async _findOrdered(ctx: ServerContext, pattern: QuadPattern): Promise<Quad[]> {
         let q = this._db(ctx)(T.edges)
             .where(C.isDeleted, false)
             .orderBy(C.id, "asc")
@@ -404,6 +448,13 @@ export class TripleStore {
      * ones, in ascending creation order.  Each result is annotated with temporal metadata.
      */
     async findHistory(ctx: ServerContext, pattern: QuadPattern = {}): Promise<QuadHistory[]> {
+        return this.withTransaction(ctx, (ctx) => this._findHistory(ctx, pattern));
+    }
+
+    private async _findHistory(
+        ctx: ServerContext,
+        pattern: QuadPattern = {},
+    ): Promise<QuadHistory[]> {
         let q = this._db(ctx)(T.edges).orderBy(C.createdAt, "asc").select<EdgeRow[]>("*");
         const ids = await this._patternIds(ctx, pattern);
         if (ids === null) {
@@ -470,6 +521,10 @@ export class TripleStore {
      * No data is physically removed.
      */
     async delete(ctx: ServerContext, pattern: QuadPattern): Promise<number> {
+        return this.withTransaction(ctx, (ctx) => this._delete(ctx, pattern));
+    }
+
+    private async _delete(ctx: ServerContext, pattern: QuadPattern): Promise<number> {
         const ids = await this._patternIds(ctx, pattern);
         if (ids === null) {
             return 0;
@@ -484,6 +539,14 @@ export class TripleStore {
      * Single SQL round-trip — use instead of calling delete() N times.
      */
     async deleteSubjects(
+        ctx: ServerContext,
+        subjects: readonly (IRI | BlankNode)[],
+        graph?: IRI | null,
+    ): Promise<number> {
+        return this.withTransaction(ctx, (ctx) => this._deleteSubjects(ctx, subjects, graph));
+    }
+
+    private async _deleteSubjects(
         ctx: ServerContext,
         subjects: readonly (IRI | BlankNode)[],
         graph?: IRI | null,
@@ -513,6 +576,17 @@ export class TripleStore {
      * of N × delete(predicate).
      */
     async deleteBySubjectPredicates(
+        ctx: ServerContext,
+        subject: IRI | BlankNode,
+        predicates: readonly IRI[],
+        graph?: IRI | null,
+    ): Promise<number> {
+        return this.withTransaction(ctx, (ctx) =>
+            this._deleteBySubjectPredicates(ctx, subject, predicates, graph),
+        );
+    }
+
+    private async _deleteBySubjectPredicates(
         ctx: ServerContext,
         subject: IRI | BlankNode,
         predicates: readonly IRI[],
@@ -551,6 +625,14 @@ export class TripleStore {
      * Returns a Map keyed by subject IRI string (or `_:id` for blank nodes).
      */
     async findForSubjects(
+        ctx: ServerContext,
+        subjects: readonly (IRI | BlankNode)[],
+        graph?: IRI | null,
+    ): Promise<Map<string, Quad[]>> {
+        return this.withTransaction(ctx, (ctx) => this._findForSubjects(ctx, subjects, graph));
+    }
+
+    private async _findForSubjects(
         ctx: ServerContext,
         subjects: readonly (IRI | BlankNode)[],
         graph?: IRI | null,
@@ -657,6 +739,10 @@ export class TripleStore {
      * only the boolean literal differs.
      */
     async reachable(ctx: ServerContext, opts: ReachOptions): Promise<IRI[]> {
+        return this.withTransaction(ctx, (ctx) => this._reachable(ctx, opts));
+    }
+
+    private async _reachable(ctx: ServerContext, opts: ReachOptions): Promise<IRI[]> {
         const includeRoots = opts.includeRoots ?? true;
 
         const rootIds = (
@@ -755,6 +841,10 @@ export class TripleStore {
     // ── Stats ─────────────────────────────────────────────────────────────────
 
     async stats(ctx: ServerContext): Promise<StoreStats> {
+        return this.withTransaction(ctx, (ctx) => this._stats(ctx));
+    }
+
+    private async _stats(ctx: ServerContext): Promise<StoreStats> {
         const [ns, na, no, ne, net] = await Promise.all([
             this._db(ctx)(T.namespaces).count<[{ count: number }]>(`${C.id} as count`),
             this._db(ctx)(T.names).count<[{ count: number }]>(`${C.id} as count`),

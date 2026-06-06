@@ -4,8 +4,8 @@
 # Role.inheritsFrom and Role.grants are intentionally many.
 
 @prefix sh:     <http://www.w3.org/ns/shacl#> .
-@prefix rbac:   <http://tern.dev/ns/rbac/> .
-@prefix shapes: <http://tern.dev/ns/rbac/shapes/> .
+@prefix rbac:   <urn:sys:core:rbac:> .
+@prefix shapes: <urn:sys:core:rbac:shapes:> .
 
 shapes:UserGroupShape a sh:NodeShape ;
     sh:targetClass rbac:UserGroup ;

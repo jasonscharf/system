@@ -173,10 +173,10 @@ await rbac.grant(ctx, systemSec, { principalIri: editorsGroup.iri, roleIri: edit
 await rbac.grant(ctx, systemSec, { principalIri: viewersGroup.iri, roleIri: viewerRole.iri });
 
 // Synthetic user IRIs
-const alice = "http://tern.dev/ns/auth/user/alice";
-const bob = "http://tern.dev/ns/auth/user/bob";
-const charlie = "http://tern.dev/ns/auth/user/charlie";
-const dave = "http://tern.dev/ns/auth/user/dave";
+const alice = "urn:sys:core:auth:user:alice";
+const bob = "urn:sys:core:auth:user:bob";
+const charlie = "urn:sys:core:auth:user:charlie";
+const dave = "urn:sys:core:auth:user:dave";
 
 await rbac.addMember(ctx, systemSec, { groupIri: ownersGroup.iri, memberIri: alice });
 await rbac.addMember(ctx, systemSec, { groupIri: editorsGroup.iri, memberIri: bob });
@@ -418,7 +418,7 @@ ok(
 
 section("12. Superusers (system wildcard)");
 
-const superAdmin = "http://tern.dev/ns/auth/user/super-admin";
+const superAdmin = "urn:sys:core:auth:user:super-admin";
 ok(
     "superAdmin cannot anything before being added to superusers",
     !(await rbac.can(ctx, secFor(superAdmin), { permission: "billing.delete" })),

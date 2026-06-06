@@ -10,20 +10,17 @@
 import type { DomainEvent } from "@jasonscharf/core";
 import { IRI } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
-import {
-    type EntityRecord,
-    EntitySchema,
-    TernAggregate,
-} from "@jasonscharf/entities";
+import { type EntityRecord, EntitySchema, TernAggregate } from "@jasonscharf/entities";
 import type { ServerContext } from "@jasonscharf/server";
 import { AggregateRepository, buildServerContext, EntityStore } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { up as seedData } from "../../../data/src/migrations/001_init.js";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 
 // ── Widget domain objects ─────────────────────────────────────────────────────
 
-const NS = "http://tern.dev/test/widget/";
+const NS = "urn:sys:test:widget:";
 const WIDGET_IRI = new IRI(`${NS}Widget`);
 const NAME_IRI = new IRI(`${NS}name`);
 const COLOR_IRI = new IRI(`${NS}color`);
@@ -40,7 +37,7 @@ const WidgetSchema = new EntitySchema<WidgetProps>({
 });
 
 class Widget extends TernAggregate<WidgetProps> {
-    static readonly RENAMED = "http://tern.dev/test/widget.renamed";
+    static readonly RENAMED = "urn:sys:test:widget.renamed";
 
     get name(): string | undefined {
         return this._get("name");
@@ -98,6 +95,7 @@ describe("TernAggregate + AggregateRepository", () => {
 
     afterEach(async () => {
         await trx.rollback();
+        await assertEmptyStore(knex);
         await knex.destroy();
     });
 

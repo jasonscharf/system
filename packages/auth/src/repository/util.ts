@@ -6,12 +6,15 @@ export function newId(): string {
     return randomBytes(16).toString("hex");
 }
 
-export function iriFor(type: "user" | "identity" | "session" | "device", id: string): IRI {
-    return new IRI(`${AUTH_NS}${type}/${id}`);
+export function iriFor(
+    type: "user" | "identity" | "session" | "device" | "loginattempt",
+    id: string,
+): IRI {
+    return new IRI(`${AUTH_NS}${type}:${id}`);
 }
 
 export function idFrom(iriStr: string): string {
-    const seg = iriStr.split("/").pop();
+    const seg = iriStr.match(/[^:/#]+$/)?.[0];
     if (seg == null) {
         throw new Error(`idFrom: could not extract id from IRI "${iriStr}"`);
     }

@@ -83,6 +83,12 @@ for (const db of providers) {
             env = await setup(db);
         });
         afterEach(async () => {
+            // Some tests here intentionally exercise the auto-commit path (no ambient
+            // trx), so their writes commit. Clear the store before destroying the
+            // connection so nothing leaks across the shared Postgres database.
+            for (const t of ["tern_edges", "tern_nodes", "tern_names", "tern_namespaces"]) {
+                await env.knex(t).del();
+            }
             await env.knex.destroy();
         });
 

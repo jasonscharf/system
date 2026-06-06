@@ -16,8 +16,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 // ── Fixture IRIs ──────────────────────────────────────────────────────────────
 
-const USER_CREATED = "http://tern.dev/ns/auth/user.created";
-const USER_UPDATED = "http://tern.dev/ns/auth/user.updated";
+const USER_CREATED = "urn:sys:core:auth:user.created";
+const USER_UPDATED = "urn:sys:core:auth:user.updated";
 
 interface UserPayload { userId: string; email: string; }
 
@@ -28,7 +28,7 @@ function uniqueId(): string {
 }
 
 function makeEvent(type: string, payload: unknown, id = uniqueId()): DomainEvent<unknown> {
-    return { id, type, source: "http://tern.dev/test", timestamp: Date.now(), payload };
+    return { id, type, source: "urn:sys:test", timestamp: Date.now(), payload };
 }
 
 function delay(ms: number): Promise<void> {

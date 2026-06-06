@@ -206,7 +206,7 @@ describe("loadAppConfig", () => {
             const extYaml = `
 name: test-ext
 handlers:
-  - type: "http://tern.dev/ns/msg/ping"
+  - type: "urn:sys:core:msg:ping"
     module: "./handler.js"
     export: "handlePing"
     priority: 100
@@ -225,7 +225,7 @@ handlers: []
             const { config, resolvedHandlers } = await loadAppConfig(join(dir, "app.yaml"));
             expect(config.name).toBe("test-app");
             expect(resolvedHandlers).toHaveLength(1);
-            expect(resolvedHandlers[0].typeIri).toBe("http://tern.dev/ns/msg/ping");
+            expect(resolvedHandlers[0].typeIri).toBe("urn:sys:core:msg:ping");
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
@@ -235,8 +235,8 @@ handlers: []
         const dir = await mkdtemp(join(tmpdir(), "tern-test-"));
         try {
             const ttl = `
-@prefix ternapp: <http://tern.dev/ns/app/> .
-@prefix msg:     <http://tern.dev/ns/msg/> .
+@prefix ternapp: <urn:sys:core:app:> .
+@prefix msg:     <urn:sys:core:msg:> .
 @prefix ext:     <http://test.org/ext#> .
 
 ext:TestExt
@@ -260,7 +260,7 @@ handlers: []
 
             const { resolvedHandlers } = await loadAppConfig(join(dir, "app.yaml"));
             expect(resolvedHandlers).toHaveLength(1);
-            expect(resolvedHandlers[0].typeIri).toBe("http://tern.dev/ns/msg/ping");
+            expect(resolvedHandlers[0].typeIri).toBe("urn:sys:core:msg:ping");
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
@@ -398,7 +398,7 @@ describe("TernApp.fromYAML", () => {
         try {
             await writeFile(
                 join(dir, "ext.yaml"),
-                'name: e\nhandlers:\n  - type: "http://tern.dev/ns/msg/ping"\n    module: "./noop.js"\n    export: "handlePing"',
+                'name: e\nhandlers:\n  - type: "urn:sys:core:msg:ping"\n    module: "./noop.js"\n    export: "handlePing"',
             );
             await writeFile(
                 join(dir, "app.yaml"),
@@ -649,8 +649,8 @@ describe("loader.ts: optional field branches", () => {
         const dir = await mkdtemp(join(tmpdir(), "tern-loader-"));
         try {
             const ttl = `
-@prefix ternapp: <http://tern.dev/ns/app/> .
-@prefix msg:     <http://tern.dev/ns/msg/> .
+@prefix ternapp: <urn:sys:core:app:> .
+@prefix msg:     <urn:sys:core:msg:> .
 @prefix ext:     <http://test.org/ext#> .
 ext:Ext a ternapp:Extension ;
     ternapp:name "e" ;
@@ -799,8 +799,8 @@ describe("loader.ts: Turtle extension handler with export and priority", () => {
         const dir = await mkdtemp(join(tmpdir(), "tern-ttl-"));
         try {
             const ttl = [
-                "@prefix ternapp: <http://tern.dev/ns/app/> .",
-                "@prefix msg:     <http://tern.dev/ns/msg/> .",
+                "@prefix ternapp: <urn:sys:core:app:> .",
+                "@prefix msg:     <urn:sys:core:msg:> .",
                 "@prefix ext:     <http://test.org/ext#> .",
                 "ext:Ext a ternapp:Extension ;",
                 '    ternapp:name    "testExt" ;',
@@ -1187,7 +1187,7 @@ describe("loader.ts: Turtle extension without ternapp:name triple", () => {
         const dir = await mkdtemp(join(tmpdir(), "tern-noname-"));
         try {
             const ttl = [
-                "@prefix ternapp: <http://tern.dev/ns/app/> .",
+                "@prefix ternapp: <urn:sys:core:app:> .",
                 "@prefix ext:     <http://test.org/ext#> .",
                 "ext:Ext a ternapp:Extension .",
             ].join("\n");
@@ -1211,7 +1211,7 @@ describe("loader.ts: Turtle handler bnode missing type and module triples", () =
         const dir = await mkdtemp(join(tmpdir(), "tern-empty-h-"));
         try {
             const ttl = [
-                "@prefix ternapp: <http://tern.dev/ns/app/> .",
+                "@prefix ternapp: <urn:sys:core:app:> .",
                 "@prefix ext:     <http://test.org/ext#> .",
                 "ext:Ext a ternapp:Extension ;",
                 '    ternapp:name "e" ;',

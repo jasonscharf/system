@@ -129,7 +129,7 @@ export class InboxRepository {
         const subjects = quads
             .map((q) => q.subject as IRI)
             .filter((s) => {
-                if (!s.value.includes("/inbox/") || seen.has(s.value)) {
+                if (!s.value.includes(":inbox:") || seen.has(s.value)) {
                     return false;
                 }
                 seen.add(s.value);

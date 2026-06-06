@@ -2,7 +2,7 @@
     "bases": [],
     "extensions": ["./ontology/auth.ttl"],
     "shapes": ["./ontology/auth.shacl.ttl"],
-    "localNamespace": "http://tern.dev/ns/auth/",
+    "localNamespace": "urn:sys:core:auth:",
     "iriImport": "../semantics/IRI.js",
     "out": "./src/auth/types.generated.ts"
 }

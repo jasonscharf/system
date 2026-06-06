@@ -19,7 +19,7 @@ export interface Project {
     projectMember?: User[];
 }
 
-export const ProjectIRI = new IRI("http://tern.dev/ns/labs/Project");
+export const ProjectIRI = new IRI("urn:sys:ext:labs:Project");
 
 declare module "@jasonscharf/core" {
     interface User {
@@ -32,12 +32,12 @@ declare module "@jasonscharf/core" {
     }
 }
 
-export const analyticsRoleIRI = new IRI("http://tern.dev/ns/labs/analyticsRole");
-export const lastActiveAtIRI = new IRI("http://tern.dev/ns/labs/lastActiveAt");
-export const consentedToTrackingIRI = new IRI("http://tern.dev/ns/labs/consentedToTracking");
-export const projectNameIRI = new IRI("http://tern.dev/ns/labs/projectName");
-export const projectSlugIRI = new IRI("http://tern.dev/ns/labs/projectSlug");
-export const isActiveIRI = new IRI("http://tern.dev/ns/labs/isActive");
-export const projectCreatedAtIRI = new IRI("http://tern.dev/ns/labs/projectCreatedAt");
-export const projectOwnerIRI = new IRI("http://tern.dev/ns/labs/projectOwner");
-export const projectMemberIRI = new IRI("http://tern.dev/ns/labs/projectMember");
+export const analyticsRoleIRI = new IRI("urn:sys:ext:labs:analyticsRole");
+export const lastActiveAtIRI = new IRI("urn:sys:ext:labs:lastActiveAt");
+export const consentedToTrackingIRI = new IRI("urn:sys:ext:labs:consentedToTracking");
+export const projectNameIRI = new IRI("urn:sys:ext:labs:projectName");
+export const projectSlugIRI = new IRI("urn:sys:ext:labs:projectSlug");
+export const isActiveIRI = new IRI("urn:sys:ext:labs:isActive");
+export const projectCreatedAtIRI = new IRI("urn:sys:ext:labs:projectCreatedAt");
+export const projectOwnerIRI = new IRI("urn:sys:ext:labs:projectOwner");
+export const projectMemberIRI = new IRI("urn:sys:ext:labs:projectMember");

@@ -137,7 +137,7 @@ for (const db of providers) {
             await es.create(ctx, UserSchema, { email: "alice@test.com", displayName: "Alice" });
             const [user] = await listUsers(ctx, es);
             expect(user?.id).toBeTruthy();
-            expect(user?.iri).toContain("http://tern.dev/ns/auth/user/");
+            expect(user?.iri).toContain("urn:sys:core:auth:user:");
             expect(user?.props.email).toBe("alice@test.com");
             expect(user?.props.displayName).toBe("Alice");
         });

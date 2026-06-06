@@ -3,19 +3,19 @@ import type { ShaclNodeShape, ShaclShapes } from "@jasonscharf/gen";
 
 const list: ShaclNodeShape[] = [
     {
-        iri: "http://tern.dev/ns/labs/shapes/UserAnalyticsShape",
-        targetClass: "http://tern.dev/ns/auth/User",
+        iri: "urn:sys:ext:labs:shapes:UserAnalyticsShape",
+        targetClass: "urn:sys:core:auth:User",
         closed: false,
         properties: [
             {
-                path: "http://tern.dev/ns/auth/email",
+                path: "urn:sys:core:auth:email",
                 minCount: 1,
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#string",
                 message: "A valid email address is required.",
             },
             {
-                path: "http://tern.dev/ns/labs/analyticsRole",
+                path: "urn:sys:ext:labs:analyticsRole",
                 minCount: 1,
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#string",
@@ -23,31 +23,31 @@ const list: ShaclNodeShape[] = [
                 message: "analyticsRole must be 'owner', 'member', or 'viewer'.",
             },
             {
-                path: "http://tern.dev/ns/labs/consentedToTracking",
+                path: "urn:sys:ext:labs:consentedToTracking",
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#boolean",
             },
             {
-                path: "http://tern.dev/ns/labs/lastActiveAt",
+                path: "urn:sys:ext:labs:lastActiveAt",
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#dateTime",
             },
         ],
     },
     {
-        iri: "http://tern.dev/ns/labs/shapes/ProjectShape",
-        targetClass: "http://tern.dev/ns/labs/Project",
+        iri: "urn:sys:ext:labs:shapes:ProjectShape",
+        targetClass: "urn:sys:ext:labs:Project",
         closed: true,
         properties: [
             {
-                path: "http://tern.dev/ns/labs/projectName",
+                path: "urn:sys:ext:labs:projectName",
                 minCount: 1,
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#string",
                 message: "projectName is required.",
             },
             {
-                path: "http://tern.dev/ns/labs/projectSlug",
+                path: "urn:sys:ext:labs:projectSlug",
                 minCount: 1,
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#string",
@@ -55,23 +55,23 @@ const list: ShaclNodeShape[] = [
                 message: "projectSlug must be lowercase-kebab-case (e.g. 'my-project').",
             },
             {
-                path: "http://tern.dev/ns/labs/projectOwner",
+                path: "urn:sys:ext:labs:projectOwner",
                 minCount: 1,
                 maxCount: 1,
-                classConstraint: "http://tern.dev/ns/auth/User",
+                classConstraint: "urn:sys:core:auth:User",
                 message: "Every project must have exactly one owner.",
             },
             {
-                path: "http://tern.dev/ns/labs/projectMember",
-                classConstraint: "http://tern.dev/ns/auth/User",
+                path: "urn:sys:ext:labs:projectMember",
+                classConstraint: "urn:sys:core:auth:User",
             },
             {
-                path: "http://tern.dev/ns/labs/isActive",
+                path: "urn:sys:ext:labs:isActive",
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#boolean",
             },
             {
-                path: "http://tern.dev/ns/labs/projectCreatedAt",
+                path: "urn:sys:ext:labs:projectCreatedAt",
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#dateTime",
             },

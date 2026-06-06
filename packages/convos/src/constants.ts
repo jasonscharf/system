@@ -1,6 +1,6 @@
-import { IRI } from "@jasonscharf/core";
+import { IRI, NS_EXT } from "@jasonscharf/core";
 
-export const CONVOS_NS = "http://tern.dev/ns/convos/";
+export const CONVOS_NS = `${NS_EXT}convos:`;
 export const CONVOS_GRAPH = new IRI(`${CONVOS_NS}graph`);
 
 export const RDF_TYPE = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");

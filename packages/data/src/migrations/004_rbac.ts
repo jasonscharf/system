@@ -1,3 +1,4 @@
+import { NS_ROOT } from "@jasonscharf/core";
 import type { Knex } from "knex";
 import { C, T } from "../schema.js";
 
@@ -16,7 +17,7 @@ import { C, T } from "../schema.js";
  * are predictable and importable as constants without a DB lookup.
  */
 
-const RBAC_NS = "http://tern.dev/ns/rbac/";
+const RBAC_NS = `${NS_ROOT}rbac:`;
 const RBAC_GRAPH_IRI = `${RBAC_NS}graph`;
 const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 const XSD_STRING = "http://www.w3.org/2001/XMLSchema#string";
@@ -31,11 +32,11 @@ const SYS_WILDCARD_ID = "sys0000000000000000000000000004";
 const SYS_GRANT_ID = "sys0000000000000000000000000005";
 
 // Derived IRIs
-const SYS_TENANT_IRI = `${RBAC_NS}tenant/${SYS_TENANT_ID}`;
-const SYS_SUPERUSERS_IRI = `${RBAC_NS}group/${SYS_SUPERUSERS_ID}`;
-const SYS_SUPERADMIN_IRI = `${RBAC_NS}role/${SYS_SUPERADMIN_ID}`;
-const SYS_WILDCARD_IRI = `${RBAC_NS}permission/${SYS_WILDCARD_ID}`;
-const SYS_GRANT_IRI = `${RBAC_NS}grant/${SYS_GRANT_ID}`;
+const SYS_TENANT_IRI = `${RBAC_NS}tenant:${SYS_TENANT_ID}`;
+const SYS_SUPERUSERS_IRI = `${RBAC_NS}group:${SYS_SUPERUSERS_ID}`;
+const SYS_SUPERADMIN_IRI = `${RBAC_NS}role:${SYS_SUPERADMIN_ID}`;
+const SYS_WILDCARD_IRI = `${RBAC_NS}permission:${SYS_WILDCARD_ID}`;
+const SYS_GRANT_IRI = `${RBAC_NS}grant:${SYS_GRANT_ID}`;
 
 // Class IRIs
 const CLS_TENANT = `${RBAC_NS}Tenant`;

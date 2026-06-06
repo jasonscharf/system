@@ -197,11 +197,7 @@ export class UserRepository {
     }
 
     /** @insecure @nochecks */
-    async delete(
-        ctx: ServerContext,
-        _sec: SecurityContext,
-        args: IdArgs,
-    ): Promise<void> {
+    async delete(ctx: ServerContext, _sec: SecurityContext, args: IdArgs): Promise<void> {
         await this._store.delete(ctx, { subject: iriFor("user", args.id), graph: AUTH_GRAPH });
     }
 

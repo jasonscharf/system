@@ -30,7 +30,8 @@ function xsdToTs(rangeIRI: string | null): string {
     // For object properties that reference another class, use the local name
     const hash = rangeIRI.lastIndexOf("#");
     const slash = rangeIRI.lastIndexOf("/");
-    return rangeIRI.slice(Math.max(hash, slash) + 1);
+    const colon = rangeIRI.lastIndexOf(":");
+    return rangeIRI.slice(Math.max(hash, slash, colon) + 1);
 }
 
 function iriConstName(localName: string): string {

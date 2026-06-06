@@ -3,43 +3,43 @@ import { IRI } from "../semantics/IRI.js";
 
 // ── Classes ────────────────────────────────────────────────────────────────
 
-export const TenantIRI = new IRI("http://tern.dev/ns/rbac/Tenant");
-export const UserGroupIRI = new IRI("http://tern.dev/ns/rbac/UserGroup");
-export const ServiceAccountIRI = new IRI("http://tern.dev/ns/rbac/ServiceAccount");
-export const RoleIRI = new IRI("http://tern.dev/ns/rbac/Role");
-export const PermissionIRI = new IRI("http://tern.dev/ns/rbac/Permission");
-export const PolicyGrantIRI = new IRI("http://tern.dev/ns/rbac/PolicyGrant");
-export const ResourceNodeIRI = new IRI("http://tern.dev/ns/rbac/ResourceNode");
+export const TenantIRI = new IRI("urn:tern:core:rbac:Tenant");
+export const UserGroupIRI = new IRI("urn:tern:core:rbac:UserGroup");
+export const ServiceAccountIRI = new IRI("urn:tern:core:rbac:ServiceAccount");
+export const RoleIRI = new IRI("urn:tern:core:rbac:Role");
+export const PermissionIRI = new IRI("urn:tern:core:rbac:Permission");
+export const PolicyGrantIRI = new IRI("urn:tern:core:rbac:PolicyGrant");
+export const ResourceNodeIRI = new IRI("urn:tern:core:rbac:ResourceNode");
 
 // ── Predicate IRIs ─────────────────────────────────────────────────────────
 
-export const tenantNameIRI = new IRI("http://tern.dev/ns/rbac/tenantName");
-export const isSystemTenantIRI = new IRI("http://tern.dev/ns/rbac/isSystemTenant");
-export const groupNameIRI = new IRI("http://tern.dev/ns/rbac/groupName");
-export const isSystemUserGroupIRI = new IRI("http://tern.dev/ns/rbac/isSystemGroup");
-export const serviceAccountNameIRI = new IRI("http://tern.dev/ns/rbac/serviceAccountName");
-export const serviceAccountTokenIRI = new IRI("http://tern.dev/ns/rbac/serviceAccountToken");
-export const rbacIsActiveIRI = new IRI("http://tern.dev/ns/rbac/isActive");
-export const roleNameIRI = new IRI("http://tern.dev/ns/rbac/roleName");
-export const isSystemRoleIRI = new IRI("http://tern.dev/ns/rbac/isSystemRole");
-export const permissionKeyIRI = new IRI("http://tern.dev/ns/rbac/permissionKey");
-export const isDenialIRI = new IRI("http://tern.dev/ns/rbac/isDenial");
-export const grantExpiresAtIRI = new IRI("http://tern.dev/ns/rbac/grantExpiresAt");
-export const resourceTypeIRI = new IRI("http://tern.dev/ns/rbac/resourceType");
-export const rbacCreatedAtIRI = new IRI("http://tern.dev/ns/rbac/createdAt");
-export const rbacUpdatedAtIRI = new IRI("http://tern.dev/ns/rbac/updatedAt");
-export const isMemberOfIRI = new IRI("http://tern.dev/ns/rbac/isMemberOf");
-export const isInTenantIRI = new IRI("http://tern.dev/ns/rbac/isInTenant");
-export const inheritsFromIRI = new IRI("http://tern.dev/ns/rbac/inheritsFrom");
-export const rbacGrantsIRI = new IRI("http://tern.dev/ns/rbac/grants");
-export const hasParentIRI = new IRI("http://tern.dev/ns/rbac/hasParent");
-export const hasPrincipalIRI = new IRI("http://tern.dev/ns/rbac/hasPrincipal");
-export const hasRoleIRI = new IRI("http://tern.dev/ns/rbac/hasRole");
-export const hasPermissionIRI = new IRI("http://tern.dev/ns/rbac/hasPermission");
-export const hasScopeIRI = new IRI("http://tern.dev/ns/rbac/hasScope");
-export const grantedByIRI = new IRI("http://tern.dev/ns/rbac/grantedBy");
-export const delegatedFromIRI = new IRI("http://tern.dev/ns/rbac/delegatedFrom");
-export const actsForIRI = new IRI("http://tern.dev/ns/rbac/actsFor");
+export const tenantNameIRI = new IRI("urn:tern:core:rbac:tenantName");
+export const isSystemTenantIRI = new IRI("urn:tern:core:rbac:isSystemTenant");
+export const groupNameIRI = new IRI("urn:tern:core:rbac:groupName");
+export const isSystemUserGroupIRI = new IRI("urn:tern:core:rbac:isSystemGroup");
+export const serviceAccountNameIRI = new IRI("urn:tern:core:rbac:serviceAccountName");
+export const serviceAccountTokenIRI = new IRI("urn:tern:core:rbac:serviceAccountToken");
+export const rbacIsActiveIRI = new IRI("urn:tern:core:rbac:isActive");
+export const roleNameIRI = new IRI("urn:tern:core:rbac:roleName");
+export const isSystemRoleIRI = new IRI("urn:tern:core:rbac:isSystemRole");
+export const permissionKeyIRI = new IRI("urn:tern:core:rbac:permissionKey");
+export const isDenialIRI = new IRI("urn:tern:core:rbac:isDenial");
+export const grantExpiresAtIRI = new IRI("urn:tern:core:rbac:grantExpiresAt");
+export const resourceTypeIRI = new IRI("urn:tern:core:rbac:resourceType");
+export const rbacCreatedAtIRI = new IRI("urn:tern:core:rbac:createdAt");
+export const rbacUpdatedAtIRI = new IRI("urn:tern:core:rbac:updatedAt");
+export const isMemberOfIRI = new IRI("urn:tern:core:rbac:isMemberOf");
+export const isInTenantIRI = new IRI("urn:tern:core:rbac:isInTenant");
+export const inheritsFromIRI = new IRI("urn:tern:core:rbac:inheritsFrom");
+export const rbacGrantsIRI = new IRI("urn:tern:core:rbac:grants");
+export const hasParentIRI = new IRI("urn:tern:core:rbac:hasParent");
+export const hasPrincipalIRI = new IRI("urn:tern:core:rbac:hasPrincipal");
+export const hasRoleIRI = new IRI("urn:tern:core:rbac:hasRole");
+export const hasPermissionIRI = new IRI("urn:tern:core:rbac:hasPermission");
+export const hasScopeIRI = new IRI("urn:tern:core:rbac:hasScope");
+export const grantedByIRI = new IRI("urn:tern:core:rbac:grantedBy");
+export const delegatedFromIRI = new IRI("urn:tern:core:rbac:delegatedFrom");
+export const actsForIRI = new IRI("urn:tern:core:rbac:actsFor");
 
 // ── Shape interfaces ───────────────────────────────────────────────────────
 

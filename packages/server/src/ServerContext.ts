@@ -32,7 +32,7 @@ export interface ServerContext extends ApplicationContext {
     session?: UserSession;
     /**
      * When set, reads/writes are scoped to the named tenant graph
-     * (http://tern.dev/ns/tenant/{tenantId}).  Absent means DEFAULT_GRAPH.
+     * (urn:tern:core:tenant:{tenantId}).  Absent means DEFAULT_GRAPH.
      */
     tenantId?: string;
     /** The underlying quad store for this context. */

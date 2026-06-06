@@ -169,7 +169,7 @@ export class MessageRepository {
 
         for (const q of quads) {
             const subjIri = (q.subject as IRI).value;
-            if (!subjIri.includes("/message/")) {
+            if (!subjIri.includes(":message:")) {
                 continue;
             }
             const msgId = idFrom(subjIri);

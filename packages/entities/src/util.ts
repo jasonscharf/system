@@ -9,7 +9,7 @@ export function newId(): string {
 
 /** Build the IRI for an entity of a given type within a namespace. */
 export function entityIri(ns: string, typeLocalName: string, id: string): IRI {
-    return new IRI(`${ns}${typeLocalName.toLowerCase()}/${id}`);
+    return new IRI(`${ns}${typeLocalName.toLowerCase()}:${id}`);
 }
 
 /**
@@ -21,19 +21,22 @@ export function entityIriFor(
     id: string,
 ): IRI {
     const segment = schema.idSegment ?? localName(schema.typeIRI.value).toLowerCase();
-    return new IRI(`${schema.ns}${segment}/${id}`);
+    return new IRI(`${schema.ns}${segment}:${id}`);
 }
 
-/** Derive the local name (last path/fragment segment) from an IRI string. */
+/**
+ * Derive the local name (final segment) from an IRI string.
+ * Segments are delimited by ':' (URN), '/' (path), or '#' (fragment), so this
+ * handles both urn:tern:* IRIs and external http(s) IRIs.
+ */
 export function localName(iri: string): string {
-    const hash = iri.lastIndexOf("#");
-    const slash = iri.lastIndexOf("/");
-    return iri.slice(Math.max(hash, slash) + 1);
+    const seg = iri.match(/[^:/#]+$/)?.[0];
+    return seg ?? iri;
 }
 
-/** Extract the entity id from its IRI (last path segment). */
+/** Extract the entity id from its IRI (final ':' / '/' / '#' segment). */
 export function idFromIri(iriStr: string): string {
-    const seg = iriStr.split("/").pop();
+    const seg = iriStr.match(/[^:/#]+$/)?.[0];
     if (seg == null) {
         throw new Error(`idFromIri: could not extract id from IRI "${iriStr}"`);
     }

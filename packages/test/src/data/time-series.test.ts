@@ -1031,7 +1031,7 @@ for (const db of providers) {
             // Update displayName — this should soft-delete the old edge and create a new one
             await es.update(ctx, UserSchema, user.id, { displayName: "New" });
 
-            const iri = `http://tern.dev/ns/auth/displayName`;
+            const iri = `urn:tern:core:auth:displayName`;
             const history = await store.findHistory(ctx);
             const displayNameHistory = history.filter((h) => (h.predicate as IRI).value === iri);
 

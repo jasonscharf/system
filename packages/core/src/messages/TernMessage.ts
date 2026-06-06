@@ -16,7 +16,7 @@ export type TernKind = "command" | "query" | "operation" | "event" | "result";
  * keyed by integer rather than string comparison.
  */
 export interface TernTypeRef {
-    /** Full IRI of the type (e.g. "http://tern.dev/ns/msg/ping"). */
+    /** Full IRI of the type (e.g. "urn:tern:core:msg:ping"). */
     readonly iri: string;
     /** PK in tern_names — present only after local resolution; never sent on the wire. */
     readonly id?: number;
@@ -29,7 +29,7 @@ export function typeRef(iri: string, id?: number): TernTypeRef {
 
 // ── Well-known message types ──────────────────────────────────────────────────
 
-const NS = "http://tern.dev/ns/msg/";
+const NS = "urn:tern:core:msg:";
 
 export const TERN_TYPES = {
     ping: typeRef(`${NS}ping`),

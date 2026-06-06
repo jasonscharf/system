@@ -23,7 +23,7 @@ export interface UserWithActivity {
 
 /** Extract the trailing path segment of an entity IRI to get its stored id. */
 function idOf(iri: string): string {
-    const seg = iri.split("/").pop();
+    const seg = iri.match(/[^:/#]+$/)?.[0];
     if (seg == null) {
         throw new Error(`idOf: could not extract id from IRI "${iri}"`);
     }
@@ -50,16 +50,12 @@ export function listUserDevices(ctx: ServerContext, es: EntityStore): Promise<En
 
 /** Returns all UserSession entities where isActive = true. */
 export function listActiveSessions(ctx: ServerContext, es: EntityStore): Promise<EntityRecord[]> {
-    return EntityQuery.from(es.store, UserSessionSchema)
-        .where("isActive", "=", true)
-        .all(ctx);
+    return EntityQuery.from(es.store, UserSessionSchema).where("isActive", "=", true).all(ctx);
 }
 
 /** Returns all UserSession entities where isActive = false. */
 export function listInactiveSessions(ctx: ServerContext, es: EntityStore): Promise<EntityRecord[]> {
-    return EntityQuery.from(es.store, UserSessionSchema)
-        .where("isActive", "=", false)
-        .all(ctx);
+    return EntityQuery.from(es.store, UserSessionSchema).where("isActive", "=", false).all(ctx);
 }
 
 // ── Join queries ──────────────────────────────────────────────────────────────

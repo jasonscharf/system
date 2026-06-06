@@ -1,6 +1,6 @@
 import { IRI } from "@jasonscharf/core";
 
-export const TERN_NS = "http://tern.dev/ns/core/";
+export const TERN_NS = "urn:tern:core:core:";
 export const XSD_NS = "http://www.w3.org/2001/XMLSchema#";
 
 export const RDF_TYPE = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
@@ -13,7 +13,7 @@ export const XSD_DATETIME = new IRI(`${XSD_NS}dateTime`);
 
 // ── CollectionView / CollectionViewItem IRIs (see core/ontology/core.ttl) ────
 
-export const TERN_VIEW_NS = `${TERN_NS}view/`;
+export const TERN_VIEW_NS = `${TERN_NS}view:`;
 
 export const TERN_COLLECTION_VIEW = new IRI(`${TERN_NS}CollectionView`);
 export const TERN_COLLECTION_VIEW_ITEM = new IRI(`${TERN_NS}CollectionViewItem`);

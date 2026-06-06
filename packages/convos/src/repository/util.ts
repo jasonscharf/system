@@ -18,11 +18,11 @@ export function newId(): string {
 }
 
 export function iriFor(type: ConvosEntityType, id: string): IRI {
-    return new IRI(`${CONVOS_NS}${type}/${id}`);
+    return new IRI(`${CONVOS_NS}${type}:${id}`);
 }
 
 export function idFrom(iriStr: string): string {
-    const seg = iriStr.split("/").pop();
+    const seg = iriStr.match(/[^:/#]+$/)?.[0];
     if (seg == null) {
         throw new Error(`idFrom: could not extract id from IRI "${iriStr}"`);
     }

@@ -306,7 +306,7 @@ for (const db of dbProviders) {
 
         it("stores the user IRI in the graph", async () => {
             const user = await repo.create(ctx, systemSec, { email: "e@test.com" });
-            expect(user.iri).toContain("http://tern.dev/ns/auth/user/");
+            expect(user.iri).toContain("urn:tern:core:auth:user:");
             expect(user.iri).toContain(user.id);
         });
     });
@@ -1619,7 +1619,7 @@ for (const db of dbProviders) {
             // Store a session whose sessionDevice IRI points to a non-existent entity
             await es.create(ctx, UserSessionSchema, {
                 sessionUser: userRec.iri,
-                sessionDevice: "http://tern.dev/ns/auth/device/ghost",
+                sessionDevice: "urn:tern:core:auth:device:ghost",
                 expiresAt: new Date(Date.now() + 3600_000),
             });
 

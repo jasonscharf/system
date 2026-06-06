@@ -579,7 +579,7 @@ export class ConvoService {
             for (const n of notifs) {
                 if (
                     n.sourceIri &&
-                    (n.sourceIri === lastReadMsg.iri || n.sourceIri.includes("/message/"))
+                    (n.sourceIri === lastReadMsg.iri || n.sourceIri.includes(":message:"))
                 ) {
                     await this._notifications.dismiss(ctx, sec, { id: n.id });
                 }

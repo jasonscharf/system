@@ -127,7 +127,7 @@ for (const db of providers) {
         });
 
         it("getView returns null for unknown viewIri", async () => {
-            const view = await cvs.getView(ctx, "http://tern.dev/ns/core/view/no-such-view");
+            const view = await cvs.getView(ctx, "urn:tern:core:core:view:no-such-view");
             expect(view).toBeNull();
         });
     });
@@ -294,7 +294,7 @@ for (const db of providers) {
         afterEach(() => teardown(ctx));
 
         it("sortProp asc sorts items by property on referenced entity", async () => {
-            const displayNameIRI = new IRI("http://tern.dev/ns/auth/displayName");
+            const displayNameIRI = new IRI("urn:tern:core:auth:displayName");
             const viewIri = await es.createCollectionView(ctx, schema, groupId, "member", {
                 sortProp: displayNameIRI,
                 sortDir: "asc",
@@ -313,7 +313,7 @@ for (const db of providers) {
         });
 
         it("sortProp desc reverses the sort", async () => {
-            const displayNameIRI = new IRI("http://tern.dev/ns/auth/displayName");
+            const displayNameIRI = new IRI("urn:tern:core:auth:displayName");
             const viewIri = await es.createCollectionView(ctx, schema, groupId, "member", {
                 sortProp: displayNameIRI,
                 sortDir: "desc",
@@ -332,7 +332,7 @@ for (const db of providers) {
         });
 
         it("sortProp stores config on the view", async () => {
-            const displayNameIRI = new IRI("http://tern.dev/ns/auth/displayName");
+            const displayNameIRI = new IRI("urn:tern:core:auth:displayName");
             const viewIri = await es.createCollectionView(ctx, schema, groupId, "member", {
                 sortProp: displayNameIRI,
                 sortDir: "asc",

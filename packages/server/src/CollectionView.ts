@@ -32,7 +32,7 @@ function viewIri(id: string): IRI {
     return new IRI(`${TERN_VIEW_NS}${id}`);
 }
 function viewItemIri(id: string): IRI {
-    return new IRI(`${TERN_VIEW_NS}item/${id}`);
+    return new IRI(`${TERN_VIEW_NS}item:${id}`);
 }
 function str(term: unknown): string {
     return String(fromLiteral(term) ?? "");

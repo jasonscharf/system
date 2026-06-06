@@ -23,7 +23,7 @@ import { up as seedData } from "../../../data/src/migrations/001_init.js";
 
 // ── Widget domain objects ─────────────────────────────────────────────────────
 
-const NS = "http://tern.dev/test/widget/";
+const NS = "urn:tern:test:widget:";
 const WIDGET_IRI = new IRI(`${NS}Widget`);
 const NAME_IRI = new IRI(`${NS}name`);
 const COLOR_IRI = new IRI(`${NS}color`);
@@ -40,7 +40,7 @@ const WidgetSchema = new EntitySchema<WidgetProps>({
 });
 
 class Widget extends TernAggregate<WidgetProps> {
-    static readonly RENAMED = "http://tern.dev/test/widget.renamed";
+    static readonly RENAMED = "urn:tern:test:widget.renamed";
 
     get name(): string | undefined {
         return this._get("name");

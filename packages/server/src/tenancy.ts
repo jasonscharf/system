@@ -1,13 +1,13 @@
 import { DEFAULT_GRAPH, type DefaultGraph, IRI } from "@jasonscharf/core";
 import type { ServerContext } from "./ServerContext.js";
 
-const TENANT_NS = "http://tern.dev/ns/tenant/";
+const TENANT_NS = "urn:tern:core:tenant:";
 
 /**
  * Returns the named graph IRI for this tenant, optionally scoped to a domain.
  *
- *   tenantGraph(ctx)          → http://tern.dev/ns/tenant/{id}
- *   tenantGraph(ctx, "labs")  → http://tern.dev/ns/tenant/{id}/labs
+ *   tenantGraph(ctx)          → urn:tern:core:tenant:{id}
+ *   tenantGraph(ctx, "labs")  → urn:tern:core:tenant:{id}/labs
  *
  * Returns null when ctx carries no tenantId (DEFAULT_GRAPH semantics).
  */

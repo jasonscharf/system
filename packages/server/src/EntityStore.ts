@@ -803,7 +803,9 @@ export function edgeTargetIri(value: EdgeInput, targetSchema?: EntitySchema): st
         return (value as EntityRecord).iri;
     }
     const str = String(value);
-    if (str.includes("://")) {
+    // Absolute IRI (has a scheme, e.g. urn:… or http://…) — use as-is.
+    // Bare entity ids are scheme-less (hex / sys-prefixed), so this distinguishes them.
+    if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(str)) {
         return str;
     }
     if (!targetSchema) {

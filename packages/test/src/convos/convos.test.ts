@@ -90,12 +90,12 @@ if (process.env.TERN_PG_URL) {
 
 // ── Synthetic IRIs ────────────────────────────────────────────────────────────
 
-const ALICE = "http://tern.dev/ns/auth/user/alice";
-const BOB = "http://tern.dev/ns/auth/user/bob";
-const CHARLIE = "http://tern.dev/ns/auth/user/charlie";
+const ALICE = "urn:tern:core:auth:user:alice";
+const BOB = "urn:tern:core:auth:user:bob";
+const CHARLIE = "urn:tern:core:auth:user:charlie";
 
-const CONTRACT_IRI = "http://tern.dev/ns/crm/contract/c001";
-const USER_SUBJECT_IRI = "http://tern.dev/ns/auth/user/alice";
+const CONTRACT_IRI = "urn:tern:ext:crm:contract:c001";
+const USER_SUBJECT_IRI = "urn:tern:core:auth:user:alice";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -175,7 +175,7 @@ for (const provider of providers) {
 
         it("stores the IRI under the convos namespace", async () => {
             const c = await repo.create(ctx, systemSec, { subjectIri: CONTRACT_IRI, title: "t", createdBy: ALICE });
-            expect(c.iri).toContain("http://tern.dev/ns/convos/conversation/");
+            expect(c.iri).toContain("urn:tern:ext:convos:conversation:");
             expect(c.iri).toContain(c.id);
         });
 
@@ -1616,14 +1616,14 @@ for (const provider of providers) {
             const n = await svc.send(ctx, systemSec, {
                     userId: ALICE,
                     templateKey: "insights:link",
-                    sourceIri: "http://tern.dev/events/ev123",
+                    sourceIri: "urn:tern:test:events:ev123",
                     dedupe: { kind: "window", hours: 0 },
                 });
             expect(n).not.toBeNull();
             if (!n) {
                 return;
             }
-            expect(n.sourceIri).toBe("http://tern.dev/events/ev123");
+            expect(n.sourceIri).toBe("urn:tern:test:events:ev123");
         });
 
         // ── notifType default ─────────────────────────────────────────────────

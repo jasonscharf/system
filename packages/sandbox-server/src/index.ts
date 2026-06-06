@@ -97,7 +97,7 @@ async function main(): Promise<void> {
     }
 
     const store = new TripleStore(knex);
-    await store.ensureNamespace(buildServerContext(store), "tern", "urn:tern:");
+    await store.ensureNamespace(buildServerContext(store), "tern", "urn:sys:");
     await store.ensureNamespace(
         buildServerContext(store),
         "rdf",
@@ -108,7 +108,7 @@ async function main(): Promise<void> {
         "rdfs",
         "http://www.w3.org/2000/01/rdf-schema#",
     );
-    await store.ensureNamespace(buildServerContext(store), "auth", "urn:tern:core:auth:");
+    await store.ensureNamespace(buildServerContext(store), "auth", "urn:sys:core:auth:");
 
     // ── Session store ─────────────────────────────────────────────────────────
     const redisUrl = await secrets.getWithDefault("REDIS_URL", process.env.REDIS_URL ?? "");

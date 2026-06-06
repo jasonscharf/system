@@ -1,11 +1,11 @@
-import { DEFAULT_GRAPH, IRI } from "@jasonscharf/core";
+import { DEFAULT_GRAPH, IRI, NS_ROOT } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import { toLiteral } from "@jasonscharf/entities";
 import type { ServerContext } from "./ServerContext.js";
 
 // ── Ontology constants ────────────────────────────────────────────────────────
 
-const NS = "urn:tern:core:app:";
+const NS = `${NS_ROOT}app:`;
 const EXT_NS = `${NS}ext:`;
 
 const EXT_TYPE = new IRI(`${NS}InstalledExtension`);

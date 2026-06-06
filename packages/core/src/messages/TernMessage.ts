@@ -1,3 +1,4 @@
+import { NS_ROOT } from "../constants.js";
 import { uuidv4Binary } from "../util/random.js";
 
 // ── Wire format ───────────────────────────────────────────────────────────────
@@ -16,7 +17,7 @@ export type TernKind = "command" | "query" | "operation" | "event" | "result";
  * keyed by integer rather than string comparison.
  */
 export interface TernTypeRef {
-    /** Full IRI of the type (e.g. "urn:tern:core:msg:ping"). */
+    /** Full IRI of the type (e.g. "urn:sys:core:msg:ping"). */
     readonly iri: string;
     /** PK in tern_names — present only after local resolution; never sent on the wire. */
     readonly id?: number;
@@ -29,7 +30,7 @@ export function typeRef(iri: string, id?: number): TernTypeRef {
 
 // ── Well-known message types ──────────────────────────────────────────────────
 
-const NS = "urn:tern:core:msg:";
+const NS = `${NS_ROOT}msg:`;
 
 export const TERN_TYPES = {
     ping: typeRef(`${NS}ping`),

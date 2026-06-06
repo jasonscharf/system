@@ -16,7 +16,7 @@ import { up as seedData } from "../../../data/src/migrations/001_init.js";
 
 // ── Widget schema ─────────────────────────────────────────────────────────────
 
-const NS = "urn:tern:test:tenancy:";
+const NS = "urn:sys:test:tenancy:";
 const WIDGET_IRI = new IRI(`${NS}Widget`);
 const NAME_IRI = new IRI(`${NS}name`);
 

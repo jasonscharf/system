@@ -1,10 +1,10 @@
 # Tern Auth SHACL Shapes — Turtle format
-# Namespace: urn:tern:core:auth:shapes:
+# Namespace: urn:sys:core:auth:shapes:
 
 @prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
 @prefix sh:     <http://www.w3.org/ns/shacl#> .
-@prefix auth:   <urn:tern:core:auth:> .
-@prefix shapes: <urn:tern:core:auth:shapes:> .
+@prefix auth:   <urn:sys:core:auth:> .
+@prefix shapes: <urn:sys:core:auth:shapes:> .
 
 shapes:UserSessionShape a sh:NodeShape ;
     sh:targetClass auth:UserSession ;

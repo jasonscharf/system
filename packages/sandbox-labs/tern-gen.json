@@ -8,7 +8,7 @@
     ],
     "extensions": ["./ontology/labs.ttl"],
     "shapes": ["./ontology/labs.shacl.ttl"],
-    "localNamespace": "urn:tern:ext:labs:",
+    "localNamespace": "urn:sys:ext:labs:",
     "out": "./src/labs/types.generated.ts",
     "shapesOut": "./src/labs/shapes.generated.ts"
 }

@@ -27,7 +27,7 @@ export function entityIriFor(
 /**
  * Derive the local name (final segment) from an IRI string.
  * Segments are delimited by ':' (URN), '/' (path), or '#' (fragment), so this
- * handles both urn:tern:* IRIs and external http(s) IRIs.
+ * handles both urn:sys:* IRIs and external http(s) IRIs.
  */
 export function localName(iri: string): string {
     const seg = iri.match(/[^:/#]+$/)?.[0];

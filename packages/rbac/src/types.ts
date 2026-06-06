@@ -1,11 +1,8 @@
-// TODO: These should be generated
 export interface TenantEntity {
     id: string;
     iri: string;
     tenantName: string;
     isSystemTenant: boolean;
-    createdAt: Date;
-    updatedAt: Date;
 }
 
 export interface UserGroupEntity {
@@ -43,7 +40,6 @@ export interface PermissionEntity {
     id: string;
     iri: string;
     permissionKey: string;
-    createdAt: Date;
 }
 
 /**

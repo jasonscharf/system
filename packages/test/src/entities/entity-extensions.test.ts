@@ -17,6 +17,7 @@ import {
 } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 
 const NS = "http://test.dev/ext/";
 const FIXED_GRAPH = new IRI(`${NS}graph`);
@@ -65,22 +66,26 @@ if (process.env.TERN_PG_URL) {
 for (const provider of providers) {
     describe(`entity-layer extensions — ${provider.name}`, () => {
         let knex: Knex;
+        let trx: Knex.Transaction;
         let store: TripleStore;
         let es: EntityStore;
         let ctx: ServerContext;
 
         beforeEach(async () => {
             knex = await provider.create();
+            trx = await knex.transaction();
             store = new TripleStore(knex);
             es = new EntityStore(store);
-            ctx = buildServerContext(store);
+            ctx = buildServerContext(store, { trx });
         });
         afterEach(async () => {
+            await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 
         it("graphIri pins reads/writes to a fixed graph regardless of tenant", async () => {
-            const tenantCtx = buildServerContext(store, { tenantId: "acme" });
+            const tenantCtx = buildServerContext(store, { tenantId: "acme", trx });
             const g = await es.create(tenantCtx, GroupSchema, { groupName: "admins" });
 
             // The entity is written to the fixed graph, not the tenant graph.

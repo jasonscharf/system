@@ -13,6 +13,7 @@ import { type EdgeRef, EntitySchema } from "@jasonscharf/entities";
 import { buildServerContext, EntityStore, type ServerContext } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 
 // ── Schemas: Author 1──* Book, Book ──1 Author ─────────────────────────────────
 
@@ -89,19 +90,23 @@ if (process.env.TERN_PG_URL) {
 for (const provider of providers) {
     describe(`EntityStore edges — ${provider.name}`, () => {
         let knex: Knex;
+        let trx: Knex.Transaction;
         let es: EntityStore;
         let ctx: ServerContext;
         let schemas: ReturnType<typeof makeSchemas>;
 
         beforeEach(async () => {
             knex = await provider.create();
+            trx = await knex.transaction();
             const store = new TripleStore(knex);
             es = new EntityStore(store);
-            ctx = buildServerContext(store);
+            ctx = buildServerContext(store, { trx });
             schemas = makeSchemas();
         });
 
         afterEach(async () => {
+            await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 

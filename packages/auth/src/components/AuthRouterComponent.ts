@@ -189,7 +189,9 @@ export class AuthRouterComponent extends FlowComponent {
      * Bearer token).  Returns the user entity or null.
      */
     validateToken(token: string): Promise<UserEntity | null> {
-        return this._service.validateToken(buildServerContext(this._service.store), systemSec, { token });
+        return this._service.validateToken(buildServerContext(this._service.store), systemSec, {
+            token,
+        });
     }
 
     /**
@@ -204,9 +206,13 @@ export class AuthRouterComponent extends FlowComponent {
                 getBearer(ctx.req.headers as Record<string, string | undefined>);
 
             if (token) {
-                const user = await this._service.validateToken(buildServerContext(this._service.store), systemSec, {
-                    token,
-                });
+                const user = await this._service.validateToken(
+                    buildServerContext(this._service.store),
+                    systemSec,
+                    {
+                        token,
+                    },
+                );
                 if (user) {
                     const sessions = await this._service.listSessions(
                         buildServerContext(this._service.store),
@@ -243,9 +249,13 @@ export class AuthRouterComponent extends FlowComponent {
                 return;
             }
 
-            const user = await this._service.validateToken(buildServerContext(this._service.store), systemSec, {
-                token,
-            });
+            const user = await this._service.validateToken(
+                buildServerContext(this._service.store),
+                systemSec,
+                {
+                    token,
+                },
+            );
             if (!user) {
                 ctx.unauthorized();
                 return;
@@ -270,17 +280,25 @@ export class AuthRouterComponent extends FlowComponent {
                 return;
             }
 
-            const user = await this._service.validateToken(buildServerContext(this._service.store), systemSec, {
-                token,
-            });
+            const user = await this._service.validateToken(
+                buildServerContext(this._service.store),
+                systemSec,
+                {
+                    token,
+                },
+            );
             if (!user) {
                 ctx.unauthorized();
                 return;
             }
 
-            const sessions = await this._service.listSessions(buildServerContext(this._service.store), systemSec, {
-                userId: user.id,
-            });
+            const sessions = await this._service.listSessions(
+                buildServerContext(this._service.store),
+                systemSec,
+                {
+                    userId: user.id,
+                },
+            );
             ctx.body = sessions.map((s) => ({
                 id: s.id,
                 isActive: s.isActive,
@@ -297,7 +315,11 @@ export class AuthRouterComponent extends FlowComponent {
                 getBearer(ctx.req.headers as Record<string, string | undefined>);
 
             if (token) {
-                await this._service.revokeToken(buildServerContext(this._service.store), systemSec, { token });
+                await this._service.revokeToken(
+                    buildServerContext(this._service.store),
+                    systemSec,
+                    { token },
+                );
             }
 
             ctx.status = 200;
@@ -316,17 +338,25 @@ export class AuthRouterComponent extends FlowComponent {
                 return;
             }
 
-            const user = await this._service.validateToken(buildServerContext(this._service.store), systemSec, {
-                token,
-            });
+            const user = await this._service.validateToken(
+                buildServerContext(this._service.store),
+                systemSec,
+                {
+                    token,
+                },
+            );
             if (!user) {
                 ctx.unauthorized();
                 return;
             }
 
-            const revoked = await this._service.revokeAllSessions(buildServerContext(this._service.store), systemSec, {
-                userId: user.id,
-            });
+            const revoked = await this._service.revokeAllSessions(
+                buildServerContext(this._service.store),
+                systemSec,
+                {
+                    userId: user.id,
+                },
+            );
 
             ctx.status = 200;
             ctx.headers["set-cookie"] = cookieClear(SESSION_COOKIE);

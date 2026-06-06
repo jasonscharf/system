@@ -21,6 +21,7 @@ export type {
     ValidateResult,
 } from "./components/SessionComponent.js";
 export { SessionComponent } from "./components/SessionComponent.js";
+export { LoginAttemptSchema } from "./entities/LoginAttemptSchema.js";
 export { UserDeviceSchema } from "./entities/UserDeviceSchema.js";
 export { UserSchema } from "./entities/UserSchema.js";
 export { UserSessionSchema } from "./entities/UserSessionSchema.js";
@@ -39,9 +40,15 @@ export {
     listUserDevices,
     listUsers,
 } from "./queries.js";
+// ── Repositories ──────────────────────────────────────────────────────────────
+export type {
+    CreateLoginAttemptArgs,
+    NonceArgs,
+    UpdateStatusArgs,
+} from "./repository/LoginAttemptRepository.js";
+export { LoginAttemptRepository } from "./repository/LoginAttemptRepository.js";
 export { UserDeviceRepository } from "./repository/UserDeviceRepository.js";
 export { UserIdentityRepository } from "./repository/UserIdentityRepository.js";
-// ── Repositories ──────────────────────────────────────────────────────────────
 export { UserRepository } from "./repository/UserRepository.js";
 export { UserSessionRepository } from "./repository/UserSessionRepository.js";
 export type { ISessionStore } from "./session/ISessionStore.js";
@@ -51,6 +58,8 @@ export { RedisSessionStore } from "./session/RedisSessionStore.js";
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type {
     DeviceInfo,
+    LoginAttemptEntity,
+    LoginAttemptStatus,
     OAuthProvider,
     SessionData,
     UserDeviceEntity,

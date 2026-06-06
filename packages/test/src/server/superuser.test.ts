@@ -17,13 +17,14 @@ import {
     type ServerContext,
     ServiceAccountRepository,
     SuperuserService,
+    seedSystemData,
     systemSec,
     TenantRepository,
     UserGroupRepository,
 } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { up as seedRbac } from "../../../data/src/migrations/004_rbac.js";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 
 interface DbProvider {
     name: string;
@@ -66,10 +67,11 @@ for (const provider of providers) {
 
         beforeEach(async () => {
             knex = await provider.create();
-            await seedRbac(knex);
             trx = await knex.transaction();
             store = new TripleStore(knex);
             ctx = buildServerContext(store, { trx });
+            // Seed inside the transaction so afterEach's rollback removes it.
+            await seedSystemData(ctx, store);
 
             const rbac = new RbacService({
                 store,
@@ -85,6 +87,7 @@ for (const provider of providers) {
         });
         afterEach(async () => {
             await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 

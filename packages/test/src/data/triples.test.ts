@@ -18,6 +18,7 @@ import { buildServerContext, type ServerContext } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { down as migration001Down } from "../../../data/src/migrations/001_init.js";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -92,6 +93,7 @@ for (const provider of providers) {
 
         afterEach(async () => {
             await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 

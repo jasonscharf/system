@@ -14,6 +14,7 @@ import {
 } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 
 interface DbProvider {
     name: string;
@@ -63,6 +64,7 @@ for (const provider of providers) {
         });
         afterEach(async () => {
             await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 

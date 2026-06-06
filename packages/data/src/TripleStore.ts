@@ -208,9 +208,23 @@ export class TripleStore {
         return this._knex;
     }
 
-    /** Returns the Knex instance to use: the transaction if present, else the base knex. */
+    /**
+     * Returns the transaction to run a query on. Every store operation MUST run
+     * inside a transaction — nothing executes outside one, not even a single
+     * read. Callers establish a transaction with `withTransaction(ctx, ...)`,
+     * which threads `ctx.trx`. Hitting the raw connection would commit
+     * immediately and outside any unit of work, so the absence of `ctx.trx` is
+     * a programming error and throws rather than silently falling back.
+     */
     private _db(ctx: ServerContext): Knex {
-        return (ctx.trx as Knex | undefined) ?? this._knex;
+        const trx = ctx.trx as Knex | undefined;
+        if (!trx) {
+            throw new Error(
+                "TripleStore: no active transaction. Every store operation must run inside " +
+                    "store.withTransaction(ctx, ...) — no query may execute outside a transaction.",
+            );
+        }
+        return trx;
     }
 
     /** Inserts a row and returns its auto-increment ID, for both Postgres and SQLite. */

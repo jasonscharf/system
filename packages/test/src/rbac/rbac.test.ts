@@ -22,13 +22,14 @@ import {
     type ServerContext,
     ServiceAccountRepository,
     SYS_SUPERUSERS_IRI,
+    seedSystemData,
     systemSec,
     TenantRepository,
     UserGroupRepository,
 } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { up as seedRbac } from "../../../data/src/migrations/004_rbac.js";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 
 // ── Provider matrix ───────────────────────────────────────────────────────────
 
@@ -95,10 +96,12 @@ for (const provider of providers) {
 
         beforeEach(async () => {
             knex = await provider.create();
-            await seedRbac(knex); // inserts system tenant, superusers, superadmin, wildcard
             trx = await knex.transaction();
             store = new TripleStore(knex);
             ctx = buildServerContext(store, { trx });
+            // Seed inside the test transaction so afterEach's rollback removes it —
+            // seeding on the raw knex would commit and leak across the shared PG DB.
+            await seedSystemData(ctx, store);
 
             const tenants = new TenantRepository(store);
             const groups = new UserGroupRepository(store);
@@ -122,6 +125,7 @@ for (const provider of providers) {
 
         afterEach(async () => {
             await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 
@@ -136,12 +140,9 @@ for (const provider of providers) {
                 expect(allowed).toBe(false);
             });
 
-            it("seeding is idempotent — running migration twice does not error", async () => {
-                // Use a separate DB to avoid conflicting with the open test transaction
-                const freshKnex = await provider.create();
-                await seedRbac(freshKnex);
-                await expect(seedRbac(freshKnex)).resolves.toBeUndefined();
-                await freshKnex.destroy();
+            it("seeding is idempotent — running it twice does not error", async () => {
+                // beforeEach already seeded once; seeding again must be a no-op.
+                await expect(seedSystemData(ctx, store)).resolves.toBeUndefined();
             });
         });
 

@@ -10,16 +10,13 @@
 import type { DomainEvent } from "@jasonscharf/core";
 import { IRI } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
-import {
-    type EntityRecord,
-    EntitySchema,
-    TernAggregate,
-} from "@jasonscharf/entities";
+import { type EntityRecord, EntitySchema, TernAggregate } from "@jasonscharf/entities";
 import type { ServerContext } from "@jasonscharf/server";
 import { AggregateRepository, buildServerContext, EntityStore } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { up as seedData } from "../../../data/src/migrations/001_init.js";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 
 // ── Widget domain objects ─────────────────────────────────────────────────────
 
@@ -98,6 +95,7 @@ describe("TernAggregate + AggregateRepository", () => {
 
     afterEach(async () => {
         await trx.rollback();
+        await assertEmptyStore(knex);
         await knex.destroy();
     });
 

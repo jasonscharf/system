@@ -23,7 +23,7 @@ const RNS = "http://test.dev/res/";
 interface ResProps extends Record<string, unknown> {
     name: string;
 }
-const ResourceSchema = new EntitySchema<ResProps>({
+const ResourceSchema: EntitySchema<ResProps> = new EntitySchema<ResProps>({
     typeIRI: new IRI(`${RNS}Resource`),
     ns: RNS,
     properties: { name: new IRI(`${RNS}name`) },

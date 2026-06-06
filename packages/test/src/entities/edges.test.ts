@@ -26,7 +26,7 @@ interface BookProps extends Record<string, unknown> {
 }
 
 function makeSchemas() {
-    const BookSchema = new EntitySchema<BookProps>({
+    const BookSchema: EntitySchema<BookProps> = new EntitySchema<BookProps>({
         typeIRI: new IRI(`${NS}Book`),
         ns: NS,
         properties: { title: new IRI(`${NS}title`) },
@@ -39,7 +39,7 @@ function makeSchemas() {
             },
         },
     });
-    const AuthorSchema = new EntitySchema<AuthorProps>({
+    const AuthorSchema: EntitySchema<AuthorProps> = new EntitySchema<AuthorProps>({
         typeIRI: new IRI(`${NS}Author`),
         ns: NS,
         properties: { name: new IRI(`${NS}name`) },

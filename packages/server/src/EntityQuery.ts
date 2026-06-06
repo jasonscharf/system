@@ -91,12 +91,12 @@ export class EntityQuery<Props extends Record<string, unknown>> {
         if (!def) {
             throw new Error(`EntityQuery.connectedToAny: schema has no edge "${edge}"`);
         }
-        if (targets.length > 0) {
-            this._edgeAnyFilters.push({
-                edgeName: edge,
-                targetIris: targets.map((t) => edgeTargetIri(t, def.target?.())),
-            });
-        }
+        // Always record the filter, even when empty: "connected to any of nothing"
+        // matches nothing (rather than degrading to no filter / match-all).
+        this._edgeAnyFilters.push({
+            edgeName: edge,
+            targetIris: targets.map((t) => edgeTargetIri(t, def.target?.())),
+        });
         return this;
     }
 
@@ -253,6 +253,10 @@ export class EntityQuery<Props extends Record<string, unknown>> {
         /* v8 ignore next 3 -- guarded at connectedToAny() call time */
         if (!def) {
             return iris;
+        }
+        // Empty target set ⇒ nothing qualifies; skip the query entirely.
+        if (f.targetIris.length === 0) {
+            return [];
         }
         const targetSet = new Set(f.targetIris);
         const edgeQuads = await this._store.find(ctx, {

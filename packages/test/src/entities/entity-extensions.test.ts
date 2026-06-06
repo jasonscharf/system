@@ -128,5 +128,14 @@ for (const provider of providers) {
                 .all(ctx);
             expect(matches.map((m) => m.props.groupName).sort()).toEqual(["g1", "g2"]);
         });
+
+        it("connectedToAny with an empty target set matches nothing", async () => {
+            const g = await es.create(ctx, GroupSchema, { groupName: "g" });
+            await es.addEdge(ctx, GroupSchema, g.id, "isMemberOf", `${NS}org/x`);
+            const matches = await EntityQuery.from(store, GroupSchema)
+                .connectedToAny("isMemberOf", [])
+                .all(ctx);
+            expect(matches).toEqual([]);
+        });
     });
 }

@@ -6,10 +6,16 @@
 
 import type { ExtensionInstallContext, TernExtension } from "@jasonscharf/app";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { buildServerContext, ExtensionManager, ExtensionRegistry, type ServerContext } from "@jasonscharf/server";
+import {
+    buildServerContext,
+    ExtensionManager,
+    ExtensionRegistry,
+    type ServerContext,
+} from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { up as seedData } from "../../../data/src/migrations/001_init.js";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -23,9 +29,16 @@ function makeExt(
         name,
         version,
         requires,
-        async install() { calls.push(`install:${name}@${version}`); return {}; },
-        async uninstall() { calls.push(`uninstall:${name}@${version}`); },
-        async upgrade(from, to) { calls.push(`upgrade:${name}:${from}->${to}`); },
+        async install() {
+            calls.push(`install:${name}@${version}`);
+            return {};
+        },
+        async uninstall() {
+            calls.push(`uninstall:${name}@${version}`);
+        },
+        async upgrade(from, to) {
+            calls.push(`upgrade:${name}:${from}->${to}`);
+        },
     };
 }
 
@@ -53,6 +66,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
 
     afterEach(async () => {
         await trx.rollback();
+        await assertEmptyStore(knex);
         await knex.destroy();
     });
 
@@ -128,10 +142,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         await manager.install(makeExt("tern.rbac", "1.0.0", calls));
         await manager.install(makeExt("tern.rbac", "2.0.0", calls));
 
-        expect(calls).toEqual([
-            "install:tern.rbac@1.0.0",
-            "upgrade:tern.rbac:1.0.0->2.0.0",
-        ]);
+        expect(calls).toEqual(["install:tern.rbac@1.0.0", "upgrade:tern.rbac:1.0.0->2.0.0"]);
         expect(await registry.getVersion(ctx, "tern.rbac")).toBe("2.0.0");
     });
 
@@ -192,7 +203,9 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         const badExt: import("@jasonscharf/app").TernExtension = {
             name: "ext.bad",
             version: "1.0.0",
-            async install() { throw new Error("setup failed"); },
+            async install() {
+                throw new Error("setup failed");
+            },
         };
 
         await expect(manager.install(badExt)).rejects.toThrow("setup failed");
@@ -208,7 +221,10 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         const v2: import("@jasonscharf/app").TernExtension = {
             name: "ext.no-migrate",
             version: "2.0.0",
-            async install() { calls.push("install:v2"); return {}; },
+            async install() {
+                calls.push("install:v2");
+                return {};
+            },
             // No upgrade() hook
         };
 

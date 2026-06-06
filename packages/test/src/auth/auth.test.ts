@@ -52,6 +52,7 @@ import {
 } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 
 function startServer(
     handler: (req: IncomingMessage, res: ServerResponse) => void,
@@ -259,6 +260,7 @@ for (const db of dbProviders) {
         });
         afterEach(async () => {
             await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 
@@ -338,6 +340,7 @@ for (const db of dbProviders) {
         });
         afterEach(async () => {
             await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 
@@ -433,6 +436,7 @@ for (const db of dbProviders) {
         });
         afterEach(async () => {
             await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 
@@ -543,6 +547,7 @@ for (const db of dbProviders) {
         });
         afterEach(async () => {
             await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 
@@ -611,6 +616,7 @@ for (const db of dbProviders) {
         });
         afterEach(async () => {
             await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 
@@ -758,6 +764,7 @@ describe("AuthService", () => {
     });
     afterEach(async () => {
         await trx.rollback();
+        await assertEmptyStore(knex);
         await knex.destroy();
         vi.unstubAllGlobals();
     });
@@ -932,6 +939,7 @@ describe("SessionComponent", () => {
     });
     afterEach(async () => {
         await trx.rollback();
+        await assertEmptyStore(knex);
         await knex.destroy();
     });
 
@@ -1088,6 +1096,7 @@ describe("CallbackComponent (FBP)", () => {
 
     afterEach(async () => {
         await trx.rollback();
+        await assertEmptyStore(knex);
         await knex.destroy();
     });
 
@@ -1337,6 +1346,7 @@ describe("AuthRouterComponent HTTP routes", () => {
 
     afterEach(async () => {
         await trx.rollback();
+        await assertEmptyStore(knex);
         await knex.destroy();
     });
 
@@ -1698,6 +1708,7 @@ for (const db of dbProviders) {
         });
         afterEach(async () => {
             await trx.rollback();
+            await assertEmptyStore(knex);
             await knex.destroy();
         });
 

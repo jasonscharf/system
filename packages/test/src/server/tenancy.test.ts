@@ -13,6 +13,7 @@ import { buildServerContext, EntityStore, type ServerContext } from "@jasonschar
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { up as seedData } from "../../../data/src/migrations/001_init.js";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 
 // ── Widget schema ─────────────────────────────────────────────────────────────
 
@@ -39,7 +40,9 @@ describe("EntityStore — tenant isolation", () => {
     let trx: Knex.Transaction;
 
     function ctx(tenantId?: string): ServerContext {
-        return tenantId ? buildServerContext(store, { trx, tenantId }) : buildServerContext(store, { trx });
+        return tenantId
+            ? buildServerContext(store, { trx, tenantId })
+            : buildServerContext(store, { trx });
     }
 
     beforeEach(async () => {
@@ -52,6 +55,7 @@ describe("EntityStore — tenant isolation", () => {
 
     afterEach(async () => {
         await trx.rollback();
+        await assertEmptyStore(knex);
         await knex.destroy();
     });
 
@@ -112,7 +116,9 @@ describe("EntityStore — tenant isolation", () => {
 
     it("test tenant id with special characters is encoded", async () => {
         const weirdTenantId = "acme corp/division & branch";
-        const record = await entityStore.create(ctx(weirdTenantId), WidgetSchema, { name: "Quirky" });
+        const record = await entityStore.create(ctx(weirdTenantId), WidgetSchema, {
+            name: "Quirky",
+        });
 
         const found = await entityStore.findById(ctx(weirdTenantId), WidgetSchema, record.id);
         expect(found?.id).toBe(record.id);

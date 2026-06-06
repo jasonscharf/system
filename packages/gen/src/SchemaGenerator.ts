@@ -64,17 +64,27 @@ function renderEdge(
     shapes: ShaclShapes,
     config: SchemaGenConfig,
 ): { line: string; import?: { importPath: string; schemaName: string } } | null {
+    const cardinality = maxCountFor(prop.iri, classIri, shapes) === 1 ? "one" : "many";
+
+    // Polymorphic edge (no rdfs:range) — a first-class topological link with no
+    // single target type (e.g. a grant's principal: User | Group | ServiceAccount).
     if (!prop.range) {
-        return null;
-    }
-    const target = resolveTarget(prop.range, config);
-    if (!target) {
-        // Edge to an unmapped external class — skip with a breadcrumb.
         return {
-            line: `        // ${prop.name}: edge target "${prop.range}" has no schema mapping`,
+            line:
+                `        ${prop.name}: { predicate: new IRI("${prop.iri}"), ` +
+                `cardinality: "${cardinality}", direction: "out" },`,
         };
     }
-    const cardinality = maxCountFor(prop.iri, classIri, shapes) === 1 ? "one" : "many";
+
+    const target = resolveTarget(prop.range, config);
+    if (!target) {
+        // Edge to an unmapped external class — emit as a targetless link with a breadcrumb.
+        return {
+            line:
+                `        ${prop.name}: { predicate: new IRI("${prop.iri}"), ` +
+                `cardinality: "${cardinality}", direction: "out" }, // target "${prop.range}" unmapped`,
+        };
+    }
     const line =
         `        ${prop.name}: { predicate: new IRI("${prop.iri}"), ` +
         `target: () => ${target.name}, cardinality: "${cardinality}", direction: "out" },`;

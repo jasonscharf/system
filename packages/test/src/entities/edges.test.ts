@@ -182,6 +182,29 @@ for (const provider of providers) {
             expect(found?.edges).toBeUndefined();
         });
 
+        it("supports a polymorphic edge (no target): navigable by IRI, load rejects", async () => {
+            const NS2 = "http://test.dev/poly/";
+            const GrantSchema = new EntitySchema<{ label: string }>({
+                typeIRI: new IRI(`${NS2}Grant`),
+                ns: NS2,
+                properties: { label: new IRI(`${NS2}label`) },
+                edges: {
+                    // principal may be any kind of entity — no single target schema
+                    principal: { predicate: new IRI(`${NS2}principal`), direction: "out" },
+                },
+            });
+            const principalIri = `${NS2}user/abc123`;
+            const grant = await es.create(ctx, GrantSchema, {
+                label: "g1",
+                principal: principalIri,
+            });
+
+            const found = await es.findById(ctx, GrantSchema, grant.id);
+            const ref = found?.edges?.principal as EdgeRef;
+            expect(ref.iri).toBe(principalIri);
+            await expect(ref.load(ctx)).rejects.toThrow(/no target schema/);
+        });
+
         it("exposes an empty EdgeSet for a 'many' edge with no targets", async () => {
             // 'books' on Author is an inbound 'many' edge; out-hydration leaves it
             // empty (inbound collections are resolved by query, not on the record).

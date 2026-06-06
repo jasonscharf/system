@@ -22,8 +22,15 @@ export type EdgeDirection = "out" | "in";
 export interface EdgeDef {
     /** Predicate IRI for the edge. */
     predicate: IRI;
-    /** The entity type on the other end of the edge. */
-    target: () => EntitySchema;
+    /**
+     * The entity type on the other end of the edge.  Optional: a polymorphic edge
+     * (e.g. a grant's principal, which may be a User, Group, or ServiceAccount) has
+     * no single target type.  When absent, the edge is still a first-class
+     * topological link — it can be filtered, traversed, and navigated by IRI — but
+     * a target id alone cannot be expanded to an IRI and `EdgeRef.load` is
+     * unavailable (use the handle's `iri`, or pass a schema explicitly).
+     */
+    target?: () => EntitySchema;
     /** Single related entity ("one", default) or a set ("many"). */
     cardinality?: EdgeCardinality;
     /** Edge orientation relative to this entity.  Defaults to "out". */

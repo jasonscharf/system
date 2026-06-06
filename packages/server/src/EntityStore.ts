@@ -418,6 +418,11 @@ export class EntityStore {
                 `EntityStore.related: edge "${edgeName}" is inbound; use ctx.entities(...).connectedTo()`,
             );
         }
+        if (!def.target) {
+            throw new Error(
+                `EntityStore.related: edge "${edgeName}" is polymorphic (no target schema); load targets explicitly`,
+            );
+        }
         const targetSchema = def.target() as EntitySchema<Target>;
 
         const perSource = new Map<string, string[]>();
@@ -550,21 +555,31 @@ export class EntityStore {
     }
 
     private _edgeRef(def: EdgeDef, targetIri: string): EdgeRef {
-        const targetSchema = def.target();
+        const targetThunk = def.target;
         const id = idFromIri(targetIri);
         return {
             iri: targetIri,
             id,
-            load: (ctx) => this.findById(ctx as ServerContext, targetSchema, id),
+            load: targetThunk
+                ? (ctx) => this.findById(ctx as ServerContext, targetThunk(), id)
+                : () =>
+                      Promise.reject(
+                          new Error("EdgeRef.load: edge has no target schema (polymorphic edge)"),
+                      ),
         };
     }
 
     private _edgeSet(def: EdgeDef, targetIris: string[]): EdgeSet {
-        const targetSchema = def.target();
+        const targetThunk = def.target;
         return {
             iris: targetIris,
             ids: targetIris.map(idFromIri),
-            load: (ctx) => this.hydrateMany(ctx as ServerContext, targetSchema, targetIris),
+            load: targetThunk
+                ? (ctx) => this.hydrateMany(ctx as ServerContext, targetThunk(), targetIris)
+                : () =>
+                      Promise.reject(
+                          new Error("EdgeSet.load: edge has no target schema (polymorphic edge)"),
+                      ),
         };
     }
 
@@ -700,24 +715,33 @@ function resolveEdgeTargets(schema: EntitySchema, data: Record<string, unknown>)
         if (value === undefined || value === null) {
             continue;
         }
-        const targetSchema = def.target();
+        const targetSchema = def.target?.();
         const values = Array.isArray(value) ? value : [value];
         resolved.push({
             predicate: def.predicate,
-            targetIris: values.map((v) => edgeTargetIri(targetSchema, v as EdgeInput)),
+            targetIris: values.map((v) => edgeTargetIri(v as EdgeInput, targetSchema)),
         });
     }
     return resolved;
 }
 
-/** Resolves a single edge input (id, IRI, or record) to the target entity's IRI string. */
-export function edgeTargetIri(targetSchema: EntitySchema, value: EdgeInput): string {
+/**
+ * Resolves a single edge input (id, IRI, or record) to the target entity's IRI.
+ * A bare id requires `targetSchema` to build the IRI; a polymorphic edge (no
+ * target) therefore accepts only a full IRI or a record.
+ */
+export function edgeTargetIri(value: EdgeInput, targetSchema?: EntitySchema): string {
     if (typeof value === "object" && value !== null && "iri" in value) {
         return (value as EntityRecord).iri;
     }
     const str = String(value);
     if (str.includes("://")) {
         return str;
+    }
+    if (!targetSchema) {
+        throw new Error(
+            `edgeTargetIri: "${str}" is a bare id but the edge is polymorphic (no target schema); pass a full IRI or a record`,
+        );
     }
     return entityIri(targetSchema.ns, localName(targetSchema.typeIRI.value), str).value;
 }

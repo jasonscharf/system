@@ -67,7 +67,10 @@ export class EntityQuery<Props extends Record<string, unknown>> {
         if (!def) {
             throw new Error(`EntityQuery.connectedTo: schema has no edge "${edge}"`);
         }
-        this._edgeFilters.push({ edgeName: edge, targetIri: edgeTargetIri(def.target(), target) });
+        this._edgeFilters.push({
+            edgeName: edge,
+            targetIri: edgeTargetIri(target, def.target?.()),
+        });
         return this;
     }
 
@@ -81,7 +84,7 @@ export class EntityQuery<Props extends Record<string, unknown>> {
         if (!def) {
             throw new Error(`EntityQuery.within: schema has no edge "${edge}"`);
         }
-        this._withinFilters.push({ edgeName: edge, rootIri: edgeTargetIri(def.target(), root) });
+        this._withinFilters.push({ edgeName: edge, rootIri: edgeTargetIri(root, def.target?.()) });
         return this;
     }
 

@@ -112,7 +112,7 @@ describe("generateSchemas", () => {
         expect(src).toContain("target: () => UserSchema");
     });
 
-    it("leaves a breadcrumb for an unmapped external edge target", async () => {
+    it("emits an unmapped external edge target as a targetless link with a breadcrumb", async () => {
         const ontology = readOntology(
             await triples(`${PREFIXES}
             lib:Book a owl:Class .
@@ -126,7 +126,28 @@ describe("generateSchemas", () => {
                 localNamespace: "http://ex.org/lib/",
             },
         );
-        expect(src).toContain("// ownedBy: edge target");
+        expect(src).toContain('ownedBy: { predicate: new IRI("http://ex.org/lib/ownedBy")');
+        expect(src).toContain('// target "http://ex.org/auth/User" unmapped');
+        expect(src).not.toContain("target: () =>");
+    });
+
+    it("emits a polymorphic edge (no rdfs:range) as a targetless link", async () => {
+        const ontology = readOntology(
+            await triples(`${PREFIXES}
+            lib:Grant a owl:Class .
+            lib:principal a owl:ObjectProperty ; rdfs:domain lib:Grant .
+        `),
+        );
+        const src = generateSchemas(
+            ontology,
+            { nodeShapes: new Map(), byTargetClass: new Map() },
+            {
+                localNamespace: "http://ex.org/lib/",
+            },
+        );
+        expect(src).toContain(
+            'principal: { predicate: new IRI("http://ex.org/lib/principal"), cardinality: "many", direction: "out" }',
+        );
         expect(src).not.toContain("target: () =>");
     });
 });

@@ -31,8 +31,8 @@ export interface GenConfig {
     shapes?: string[];
     /** IRI prefix that identifies all classes and properties defined in this extension. */
     localNamespace: string;
-    /** Output path for the generated TypeScript types file, relative to the config. */
-    out: string;
+    /** Output path for the generated TypeScript types file, relative to the config.  Omit to skip type generation. */
+    out?: string;
     /** Optional output path for the generated runtime shapes descriptor. */
     shapesOut?: string;
     /** Optional output path for generated EntitySchema constants (properties + edges). */
@@ -113,11 +113,13 @@ export async function generateFromConfig(configPath: string): Promise<void> {
         localNamespace: config.localNamespace,
         iriImport: config.iriImport,
     };
-    const typesSource = generateAugmentedTypes(merged, allShapes, augConfig);
-    const outPath = path.resolve(dir, config.out);
-    await mkdir(path.dirname(outPath), { recursive: true });
-    await writeFile(outPath, typesSource, "utf-8");
-    console.log(`[gen] merged types → ${path.relative(process.cwd(), outPath)}`);
+    if (config.out) {
+        const typesSource = generateAugmentedTypes(merged, allShapes, augConfig);
+        const outPath = path.resolve(dir, config.out);
+        await mkdir(path.dirname(outPath), { recursive: true });
+        await writeFile(outPath, typesSource, "utf-8");
+        console.log(`[gen] merged types → ${path.relative(process.cwd(), outPath)}`);
+    }
 
     if (config.shapesOut) {
         const shapesSource = generateShapesDescriptor(allShapes);

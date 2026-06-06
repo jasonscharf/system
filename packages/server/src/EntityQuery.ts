@@ -20,6 +20,12 @@ interface EdgeFilter {
     targetIri: string;
 }
 
+/** An edge-membership filter: entity --edge--> any of targetIris. */
+interface EdgeAnyFilter {
+    edgeName: string;
+    targetIris: string[];
+}
+
 /** A subtree-membership filter: entity is reachable from rootIri via the edge's predicate. */
 interface WithinFilter {
     edgeName: string;
@@ -35,6 +41,7 @@ export class EntityQuery<Props extends Record<string, unknown>> {
     private readonly _es: EntityStore;
     private _filters: Filter[] = [];
     private _edgeFilters: EdgeFilter[] = [];
+    private _edgeAnyFilters: EdgeAnyFilter[] = [];
     private _withinFilters: WithinFilter[] = [];
     private _order?: OrderClause;
     private _limit?: number;
@@ -71,6 +78,25 @@ export class EntityQuery<Props extends Record<string, unknown>> {
             edgeName: edge,
             targetIri: edgeTargetIri(target, def.target?.()),
         });
+        return this;
+    }
+
+    /**
+     * Filter to entities whose `edge` points at ANY of `targets` — the reverse
+     * batched form of connectedTo (e.g. grants whose hasPrincipal is in a
+     * principal set).  Evaluated in one query, not a per-target loop.
+     */
+    connectedToAny(edge: string, targets: EdgeInput[]): this {
+        const def = this._schema.edges?.[edge];
+        if (!def) {
+            throw new Error(`EntityQuery.connectedToAny: schema has no edge "${edge}"`);
+        }
+        if (targets.length > 0) {
+            this._edgeAnyFilters.push({
+                edgeName: edge,
+                targetIris: targets.map((t) => edgeTargetIri(t, def.target?.())),
+            });
+        }
         return this;
     }
 
@@ -181,6 +207,9 @@ export class EntityQuery<Props extends Record<string, unknown>> {
         for (const ef of this._edgeFilters) {
             iris = await this._applyEdgeFilter(ctx, iris, ef);
         }
+        for (const ef of this._edgeAnyFilters) {
+            iris = await this._applyEdgeAnyFilter(ctx, iris, ef);
+        }
         for (const wf of this._withinFilters) {
             iris = await this._applyWithinFilter(ctx, iris, wf);
         }
@@ -214,6 +243,30 @@ export class EntityQuery<Props extends Record<string, unknown>> {
         return iris.filter((iri) => matching.has(iri));
     }
 
+    /** Narrows to entities whose edge points at any IRI in the target set (one query). */
+    private async _applyEdgeAnyFilter(
+        ctx: ServerContext,
+        iris: string[],
+        f: EdgeAnyFilter,
+    ): Promise<string[]> {
+        const def = this._schema.edges?.[f.edgeName];
+        /* v8 ignore next 3 -- guarded at connectedToAny() call time */
+        if (!def) {
+            return iris;
+        }
+        const targetSet = new Set(f.targetIris);
+        const edgeQuads = await this._store.find(ctx, {
+            predicate: def.predicate,
+            graph: this._schema.graphIri ?? tenantGraph(ctx, this._schema.graph),
+        });
+        const matching = new Set(
+            edgeQuads
+                .filter((q) => targetSet.has((q.object as IRI).value))
+                .map((q) => (q.subject as IRI).value),
+        );
+        return iris.filter((iri) => matching.has(iri));
+    }
+
     /** Narrows to entities within the subtree rooted at rootIri (one recursive CTE). */
     private async _applyWithinFilter(
         ctx: ServerContext,
@@ -230,7 +283,7 @@ export class EntityQuery<Props extends Record<string, unknown>> {
             roots: [{ value: f.rootIri } as IRI],
             predicates: [def.predicate],
             direction: "in",
-            graph: tenantGraph(ctx, this._schema.graph),
+            graph: this._schema.graphIri ?? tenantGraph(ctx, this._schema.graph),
         });
         const subtreeSet = new Set(subtree.map((i) => i.value));
         return iris.filter((iri) => subtreeSet.has(iri));

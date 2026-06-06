@@ -61,6 +61,16 @@ export class EntityStore {
         return this._store.withTransaction(ctx, fn);
     }
 
+    /** Graph for read/delete filters: a fixed graphIri wins, else tenant scoping. */
+    private _filterGraph(ctx: ServerContext, schema: EntitySchema): IRI | null {
+        return schema.graphIri ?? tenantGraph(ctx, schema.graph);
+    }
+
+    /** Graph for inserts: a fixed graphIri wins, else tenant scoping (DEFAULT_GRAPH fallback). */
+    private _insertGraph(ctx: ServerContext, schema: EntitySchema): IRI | DefaultGraph {
+        return schema.graphIri ?? tenantGraphForInsert(ctx, schema.graph);
+    }
+
     // ── Create ────────────────────────────────────────────────────────────────
 
     async create<Props extends Record<string, unknown>>(
@@ -76,7 +86,7 @@ export class EntityStore {
         const edgeTargets = resolveEdgeTargets(schema, data);
 
         return this._withTrx(ctx, async (txCtx) => {
-            const graph = tenantGraphForInsert(txCtx, schema.graph);
+            const graph = this._insertGraph(txCtx, schema);
             await this._store.insertMany(txCtx, [
                 { subject: ent, predicate: RDF_TYPE, object: schema.typeIRI, graph },
                 ...this._propQuads(ent, schema, withDefs, graph),
@@ -104,7 +114,7 @@ export class EntityStore {
     ): Promise<EntityRecord<Props> | null> {
         return this._withTrx(ctx, async (txCtx) => {
             const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-            const graph = tenantGraph(txCtx, schema.graph);
+            const graph = this._filterGraph(txCtx, schema);
             const typeQ = await this._store.find(txCtx, {
                 subject: ent,
                 predicate: RDF_TYPE,
@@ -144,8 +154,8 @@ export class EntityStore {
         ];
 
         return this._withTrx(ctx, async (txCtx) => {
-            const filterGraph = tenantGraph(txCtx, schema.graph);
-            const insertGraph = tenantGraphForInsert(txCtx, schema.graph);
+            const filterGraph = this._filterGraph(txCtx, schema);
+            const insertGraph = this._insertGraph(txCtx, schema);
             if (predIris.length > 0) {
                 await this._store.deleteBySubjectPredicates(txCtx, ent, predIris, filterGraph);
             }
@@ -181,8 +191,63 @@ export class EntityStore {
         return this._withTrx(ctx, async (txCtx) => {
             await this._store.delete(txCtx, {
                 subject: ent,
-                graph: tenantGraph(txCtx, schema.graph),
+                graph: this._filterGraph(txCtx, schema),
             });
+        });
+    }
+
+    // ── Edge mutation ─────────────────────────────────────────────────────────
+
+    /**
+     * Append a single edge (entity --edgeName--> target) without disturbing the
+     * entity's other edges.  Idempotent.  Use for many-edges like group
+     * membership or role inheritance, where update() would replace the whole set.
+     */
+    async addEdge(
+        ctx: ServerContext,
+        schema: EntitySchema,
+        id: string,
+        edgeName: string,
+        target: EdgeInput,
+    ): Promise<void> {
+        const def = schema.edges?.[edgeName];
+        if (!def) {
+            throw new Error(`EntityStore.addEdge: schema has no edge "${edgeName}"`);
+        }
+        const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+        const targetIri = edgeTargetIri(target, def.target?.());
+        return this._withTrx(ctx, async (txCtx) => {
+            await this._store.insert(txCtx, {
+                subject: ent,
+                predicate: def.predicate,
+                object: { value: targetIri } as IRI,
+                graph: this._insertGraph(txCtx, schema),
+            });
+        });
+    }
+
+    /** Soft-delete a single edge (entity --edgeName--> target). */
+    async removeEdge(
+        ctx: ServerContext,
+        schema: EntitySchema,
+        id: string,
+        edgeName: string,
+        target: EdgeInput,
+    ): Promise<boolean> {
+        const def = schema.edges?.[edgeName];
+        if (!def) {
+            throw new Error(`EntityStore.removeEdge: schema has no edge "${edgeName}"`);
+        }
+        const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+        const targetIri = edgeTargetIri(target, def.target?.());
+        return this._withTrx(ctx, async (txCtx) => {
+            const n = await this._store.delete(txCtx, {
+                subject: ent,
+                predicate: def.predicate,
+                object: { value: targetIri } as IRI,
+                graph: this._filterGraph(txCtx, schema),
+            });
+            return n > 0;
         });
     }
 
@@ -203,7 +268,7 @@ export class EntityStore {
             const quads = await this._store.findOrdered(txCtx, {
                 subject: ent,
                 predicate: propIri,
-                graph: tenantGraph(txCtx, schema.graph),
+                graph: this._filterGraph(txCtx, schema),
             });
             return quads.map((q) => fromLiteral(q.object)).filter((v) => v !== undefined);
         });
@@ -224,7 +289,7 @@ export class EntityStore {
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
 
         return this._withTrx(ctx, async (txCtx) => {
-            const graph = tenantGraphForInsert(txCtx, schema.graph);
+            const graph = this._insertGraph(txCtx, schema);
             const viewIris = await this._cvs().findViewsForSource(txCtx, ent.value, propIri.value);
 
             await this._store.insertMany(
@@ -264,7 +329,7 @@ export class EntityStore {
                 subject: ent,
                 predicate: propIri,
                 object: toLiteral(value),
-                graph: tenantGraph(txCtx, schema.graph),
+                graph: this._filterGraph(txCtx, schema),
             });
             deleted = count > 0;
             if (deleted) {
@@ -311,8 +376,8 @@ export class EntityStore {
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
 
         return this._withTrx(ctx, async (txCtx) => {
-            const filterGraph = tenantGraph(txCtx, schema.graph);
-            const insertGraph = tenantGraphForInsert(txCtx, schema.graph);
+            const filterGraph = this._filterGraph(txCtx, schema);
+            const insertGraph = this._insertGraph(txCtx, schema);
             await this._store.delete(txCtx, {
                 subject: ent,
                 predicate: propIri,
@@ -384,7 +449,7 @@ export class EntityStore {
         iris: string[],
     ): Promise<EntityRecord<Props>[]> {
         return this._withTrx(ctx, async (txCtx) => {
-            const graph = tenantGraph(txCtx, schema.graph);
+            const graph = this._filterGraph(txCtx, schema);
             // Single round-trip for all subjects — no per-IRI N+1.
             const subjects = iris.map((iri) => ({ value: iri }) as IRI);
             const bySubject = await this._store.findForSubjects(txCtx, subjects, graph);

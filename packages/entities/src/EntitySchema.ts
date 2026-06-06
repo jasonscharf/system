@@ -30,6 +30,13 @@ export class EntitySchema<Props extends Record<string, unknown> = Record<string,
      * DEFAULT_GRAPH when no tenantId is on ctx).
      */
     readonly graph?: string;
+    /**
+     * Absolute, tenant-independent named graph for entities that form a global
+     * backbone rather than tenant-scoped data (e.g. the RBAC graph).  When set,
+     * all reads/writes use this graph directly and tenant scoping is ignored.
+     * Takes precedence over `graph`.
+     */
+    readonly graphIri?: IRI;
 
     constructor(opts: {
         typeIRI: IRI;
@@ -39,6 +46,7 @@ export class EntitySchema<Props extends Record<string, unknown> = Record<string,
         defaults?: { readonly [K in keyof Props]?: DefaultValue<Props[K]> };
         shape?: ShaclNodeShape;
         graph?: string;
+        graphIri?: IRI;
     }) {
         this.typeIRI = opts.typeIRI;
         this.ns = opts.ns;
@@ -46,6 +54,7 @@ export class EntitySchema<Props extends Record<string, unknown> = Record<string,
         this.edges = opts.edges;
         this.defaults = opts.defaults;
         this.shape = opts.shape;
+        this.graphIri = opts.graphIri;
         this.graph = opts.graph;
     }
 }

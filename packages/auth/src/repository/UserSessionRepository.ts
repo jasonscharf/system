@@ -155,11 +155,7 @@ export class UserSessionRepository {
     }
 
     /** @insecure @nochecks */
-    async revoke(
-        ctx: ServerContext,
-        sec: SecurityContext,
-        args: TokenArgs,
-    ): Promise<boolean> {
+    async revoke(ctx: ServerContext, sec: SecurityContext, args: TokenArgs): Promise<boolean> {
         return this._store.withTransaction(ctx, async (ctx) => {
             const session = await this.findByToken(ctx, sec, args);
             if (!session) {

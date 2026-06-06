@@ -191,11 +191,7 @@ export class AuthService {
     }
 
     /** @insecure @nochecks */
-    async revokeToken(
-        ctx: ServerContext,
-        _sec: SecurityContext,
-        args: TokenArgs,
-    ): Promise<void> {
+    async revokeToken(ctx: ServerContext, _sec: SecurityContext, args: TokenArgs): Promise<void> {
         await Promise.all([
             this._store.del(`tern:session:${args.token}`),
             this._sessions.revoke(ctx, systemSec, { token: args.token }),

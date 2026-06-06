@@ -13,6 +13,7 @@ auth:User         a owl:Class ; rdfs:comment "A Tern platform user." .
 auth:UserIdentity a owl:Class ; rdfs:comment "An OAuth identity linked to a user." .
 auth:UserSession  a owl:Class ; rdfs:comment "An active session for a user on a device." .
 auth:UserDevice   a owl:Class ; rdfs:comment "A device from which a user authenticates." .
+auth:LoginAttempt a owl:Class ; rdfs:comment "An in-flight or completed OAuth login attempt." .
 
 # ── User properties ───────────────────────────────────────────────────────────
 
@@ -34,7 +35,7 @@ auth:avatarUrl a owl:DatatypeProperty ;
 # ── UserIdentity properties ───────────────────────────────────────────────────
 
 auth:provider a owl:DatatypeProperty ;
-    rdfs:domain auth:UserIdentity ;
+    rdfs:domain auth:UserIdentity, auth:LoginAttempt ;
     rdfs:range  xsd:string ;
     rdfs:comment "OAuth provider identifier (e.g. 'google', 'github')." .
 
@@ -98,19 +99,66 @@ auth:isActive a owl:DatatypeProperty ;
     rdfs:comment "Whether the session is currently valid." .
 
 auth:ipAddress a owl:DatatypeProperty ;
-    rdfs:domain auth:UserSession ;
+    rdfs:domain auth:UserSession, auth:LoginAttempt ;
     rdfs:range  xsd:string ;
     rdfs:comment "Client IP address at time of login." .
+
+# ── LoginAttempt properties ───────────────────────────────────────────────────
+
+auth:status a owl:DatatypeProperty ;
+    rdfs:domain auth:LoginAttempt ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Lifecycle status of the login attempt (e.g. 'pending', 'success', 'error')." .
+
+auth:nonce a owl:DatatypeProperty ;
+    rdfs:domain auth:LoginAttempt ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Opaque single-use nonce correlating the OAuth redirect round-trip." .
+
+auth:claim a owl:DatatypeProperty ;
+    rdfs:domain auth:LoginAttempt ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Optional claim/invite token presented at the start of the attempt." .
+
+auth:userAgent a owl:DatatypeProperty ;
+    rdfs:domain auth:LoginAttempt ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Raw HTTP User-Agent string captured at attempt time." .
+
+auth:errorCode a owl:DatatypeProperty ;
+    rdfs:domain auth:LoginAttempt ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Error code recorded when the attempt fails." .
+
+auth:utmSource a owl:DatatypeProperty ;
+    rdfs:domain auth:LoginAttempt ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "UTM source attribution captured at attempt time." .
+
+auth:utmMedium a owl:DatatypeProperty ;
+    rdfs:domain auth:LoginAttempt ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "UTM medium attribution captured at attempt time." .
+
+auth:utmCampaign a owl:DatatypeProperty ;
+    rdfs:domain auth:LoginAttempt ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "UTM campaign attribution captured at attempt time." .
+
+auth:authRedirectUrl a owl:DatatypeProperty ;
+    rdfs:domain auth:LoginAttempt ;
+    rdfs:range  xsd:anyURI ;
+    rdfs:comment "Post-login redirect URL requested at attempt time." .
 
 # ── Shared properties (multiple domains) ─────────────────────────────────────
 
 auth:createdAt a owl:DatatypeProperty ;
-    rdfs:domain auth:User, auth:UserIdentity, auth:UserSession, auth:UserDevice ;
+    rdfs:domain auth:User, auth:UserIdentity, auth:UserSession, auth:UserDevice, auth:LoginAttempt ;
     rdfs:range  xsd:dateTime ;
     rdfs:comment "Creation timestamp." .
 
 auth:updatedAt a owl:DatatypeProperty ;
-    rdfs:domain auth:User, auth:UserIdentity ;
+    rdfs:domain auth:User, auth:UserIdentity, auth:LoginAttempt ;
     rdfs:range  xsd:dateTime ;
     rdfs:comment "Last-updated timestamp." .
 
@@ -135,3 +183,8 @@ auth:deviceUser a owl:ObjectProperty ;
     rdfs:domain auth:UserDevice ;
     rdfs:range  auth:User ;
     rdfs:comment "The user who owns this device record." .
+
+auth:attemptUser a owl:ObjectProperty ;
+    rdfs:domain auth:LoginAttempt ;
+    rdfs:range  auth:User ;
+    rdfs:comment "The user resolved by a successful login attempt." .

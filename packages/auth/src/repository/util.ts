@@ -6,7 +6,10 @@ export function newId(): string {
     return randomBytes(16).toString("hex");
 }
 
-export function iriFor(type: "user" | "identity" | "session" | "device", id: string): IRI {
+export function iriFor(
+    type: "user" | "identity" | "session" | "device" | "loginattempt",
+    id: string,
+): IRI {
     return new IRI(`${AUTH_NS}${type}:${id}`);
 }
 

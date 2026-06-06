@@ -115,7 +115,7 @@ export class ParticipantRepository {
 
         const subjects = quads
             .map((q) => q.subject as IRI)
-            .filter((s) => s.value.includes("/participant/"));
+            .filter((s) => s.value.includes(":participant:"));
 
         if (subjects.length === 0) {
             return [];
@@ -176,11 +176,7 @@ export class ParticipantRepository {
     }
 
     /** @insecure @nochecks */
-    async remove(
-        ctx: ServerContext,
-        _sec: SecurityContext,
-        args: IdArgs,
-    ): Promise<void> {
+    async remove(ctx: ServerContext, _sec: SecurityContext, args: IdArgs): Promise<void> {
         await this._store.delete(ctx, {
             subject: iriFor("participant", args.id),
             graph: CONVOS_GRAPH,

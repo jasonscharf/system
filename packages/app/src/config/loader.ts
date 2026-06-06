@@ -62,15 +62,15 @@ function appConfigFromYaml(
 
 const NS = {
     type: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
-    ext: "http://tern.dev/ns/app/Extension",
-    name: "http://tern.dev/ns/app/name",
-    version: "http://tern.dev/ns/app/version",
-    desc: "http://tern.dev/ns/app/description",
-    handler: "http://tern.dev/ns/app/handler",
-    hType: "http://tern.dev/ns/app/type",
-    hModule: "http://tern.dev/ns/app/module",
-    hExport: "http://tern.dev/ns/app/export",
-    hPriority: "http://tern.dev/ns/app/priority",
+    ext: "urn:tern:core:app:Extension",
+    name: "urn:tern:core:app:name",
+    version: "urn:tern:core:app:version",
+    desc: "urn:tern:core:app:description",
+    handler: "urn:tern:core:app:handler",
+    hType: "urn:tern:core:app:type",
+    hModule: "urn:tern:core:app:module",
+    hExport: "urn:tern:core:app:export",
+    hPriority: "urn:tern:core:app:priority",
 } as const;
 
 function extensionConfigFromTurtle(turtle: string): ExtensionConfig {

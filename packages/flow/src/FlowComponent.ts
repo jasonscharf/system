@@ -6,7 +6,7 @@ import { FlowPort } from "./FlowPort.js";
 import type { ComponentState, ID, IDisposable, PortDirection, ReadMode } from "./types.js";
 
 // RDF namespace for flow entities
-const FLOW_NS = "http://tern.dev/ns/flow/";
+const FLOW_NS = "urn:tern:core:flow:";
 const XSD_NS = "http://www.w3.org/2001/XMLSchema#";
 
 const RDF_TYPE = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
@@ -137,7 +137,9 @@ export class FlowComponent implements FlowNode {
         //    The queue is finite (bounded by puts to inControl), so this terminates.
         while (this.inControl.size > 0) {
             const signal = this.inControl.read();
-            if (signal === undefined) { break; }
+            if (signal === undefined) {
+                break;
+            }
             switch (signal.type) {
                 case "start":
                     this._controlState = "running";
@@ -214,7 +216,7 @@ export class FlowComponent implements FlowNode {
                       .join("")
                 : this.id.toString(16);
 
-        const subject = this.iri ?? new IRI(`${FLOW_NS}component/${idHex}`);
+        const subject = this.iri ?? new IRI(`${FLOW_NS}component:${idHex}`);
         const graph = FLOW_DEFAULT_GRAPH;
 
         const quads: Quad[] = [
@@ -224,7 +226,7 @@ export class FlowComponent implements FlowNode {
         ];
 
         for (const [, port] of this._ports) {
-            const portIRI = new IRI(`${FLOW_NS}port/${idHex}/${port.name}`);
+            const portIRI = new IRI(`${FLOW_NS}port:${idHex}:${port.name}`);
             quads.push(quad(subject, FLOW_PORT_PRED, portIRI, graph));
             quads.push(quad(portIRI, RDF_TYPE, FLOW_PORT_TYPE, graph));
             quads.push(quad(portIRI, FLOW_PORT_NAME, literal(port.name, XSD_STRING), graph));

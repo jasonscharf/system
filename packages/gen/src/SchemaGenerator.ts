@@ -37,7 +37,8 @@ export interface SchemaGenConfig {
 function localName(iri: string): string {
     const hash = iri.lastIndexOf("#");
     const slash = iri.lastIndexOf("/");
-    return iri.slice(Math.max(hash, slash) + 1);
+    const colon = iri.lastIndexOf(":");
+    return iri.slice(Math.max(hash, slash, colon) + 1);
 }
 
 function schemaConstName(classIri: string): string {

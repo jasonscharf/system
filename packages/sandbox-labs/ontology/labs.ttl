@@ -1,6 +1,6 @@
 # Labs Extension Ontology — Turtle format
-# Namespace:  http://tern.dev/ns/labs/
-# Extends:    http://tern.dev/ns/auth/ (User)
+# Namespace:  urn:tern:ext:labs:
+# Extends:    urn:tern:core:auth: (User)
 #
 # Strategy: add new OWL properties whose rdfs:domain points at an existing
 # class (auth:User).  RDF's Open World Assumption makes this valid without
@@ -12,8 +12,8 @@
 @prefix rdfs:      <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl:       <http://www.w3.org/2002/07/owl#> .
 @prefix xsd:       <http://www.w3.org/2001/XMLSchema#> .
-@prefix auth:      <http://tern.dev/ns/auth/> .
-@prefix labs:      <http://tern.dev/ns/labs/> .
+@prefix auth:      <urn:tern:core:auth:> .
+@prefix labs:      <urn:tern:ext:labs:> .
 
 # ── New class ─────────────────────────────────────────────────────────────────
 

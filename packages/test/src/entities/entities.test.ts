@@ -102,7 +102,7 @@ for (const db of providers) {
         it("creates a user and returns an id / iri", async () => {
             const rec = await es.create(ctx, UserSchema, { email: "alice@example.com" });
             expect(rec.id).toBeTruthy();
-            expect(rec.iri).toContain("http://tern.dev/ns/auth/user/");
+            expect(rec.iri).toContain("urn:tern:core:auth:user:");
             expect(rec.iri).toContain(rec.id);
         });
 

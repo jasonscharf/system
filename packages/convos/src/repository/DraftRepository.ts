@@ -146,7 +146,7 @@ export class DraftRepository {
 
         for (const q of quads) {
             const subjIri = (q.subject as IRI).value;
-            if (!subjIri.includes("/draft/")) {
+            if (!subjIri.includes(":draft:")) {
                 continue;
             }
             const draftId = idFrom(subjIri);
@@ -216,11 +216,7 @@ export class DraftRepository {
     }
 
     /** @insecure @nochecks */
-    async delete(
-        ctx: ServerContext,
-        _sec: SecurityContext,
-        args: IdArgs,
-    ): Promise<void> {
+    async delete(ctx: ServerContext, _sec: SecurityContext, args: IdArgs): Promise<void> {
         await this._store.delete(ctx, { subject: iriFor("draft", args.id), graph: CONVOS_GRAPH });
     }
 

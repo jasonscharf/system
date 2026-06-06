@@ -38,7 +38,6 @@ export default defineConfig({
             "@jasonscharf/entities": pkg("entities"),
             "@jasonscharf/flow": pkg("flow"),
             "@jasonscharf/gen": pkg("gen"),
-            "@jasonscharf/rbac": pkg("rbac"),
             "@jasonscharf/server": pkg("server"),
             "@jasonscharf/vaults": pkg("vaults"),
             "@jasonscharf/worker": pkg("worker"),

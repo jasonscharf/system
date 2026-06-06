@@ -34,7 +34,6 @@
         "@jasonscharf/app": "workspace:^",
         "@jasonscharf/core": "workspace:^",
         "@jasonscharf/data": "workspace:^",
-        "@jasonscharf/rbac": "workspace:^",
         "@jasonscharf/server": "workspace:^"
     },
     "devDependencies": {

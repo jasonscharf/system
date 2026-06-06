@@ -1,7 +1,9 @@
 import { IRI, inheritsFromIRI, rbacGrantsIRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import type { EntityRecord } from "@jasonscharf/entities";
-import { EntityStore, type SecurityContext, type ServerContext } from "@jasonscharf/server";
+import { EntityStore } from "../../EntityStore.js";
+import type { SecurityContext } from "../../SecurityContext.js";
+import type { ServerContext } from "../../ServerContext.js";
 import { RBAC_GRAPH } from "../constants.js";
 import { RoleSchema } from "../schemas.generated.js";
 import type { RoleEntity } from "../types.js";

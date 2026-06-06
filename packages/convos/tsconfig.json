@@ -10,7 +10,6 @@
         { "path": "../app" },
         { "path": "../core" },
         { "path": "../data" },
-        { "path": "../rbac" },
         { "path": "../server" }
     ],
     "include": ["src"]

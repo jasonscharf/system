@@ -38,7 +38,7 @@ import {
     UserGroupIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
+import type { ServerContext } from "../ServerContext.js";
 import {
     RBAC_GRAPH,
     RDF_TYPE,

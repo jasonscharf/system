@@ -8,7 +8,8 @@ import {
     roleNameIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import { type SecurityContext, type ServerContext, systemSec } from "@jasonscharf/server";
+import { type SecurityContext, systemSec } from "../SecurityContext.js";
+import type { ServerContext } from "../ServerContext.js";
 import type { AccessChecker } from "./AccessChecker.js";
 import { RBAC_GRAPH } from "./constants.js";
 import type { PolicyGrantRepository } from "./repository/PolicyGrantRepository.js";

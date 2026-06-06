@@ -1,5 +1,4 @@
-import type { RbacService } from "@jasonscharf/rbac";
-import type { SecurityContext, ServerContext } from "@jasonscharf/server";
+import type { RbacService, SecurityContext, ServerContext } from "@jasonscharf/server";
 import {
     PERM_CONVO_ARCHIVE,
     PERM_CONVO_ASSIGN,
@@ -453,11 +452,7 @@ export class ConvoService {
         return message;
     }
 
-    async discardDraft(
-        ctx: ServerContext,
-        sec: SecurityContext,
-        args: DraftIdArgs,
-    ): Promise<void> {
+    async discardDraft(ctx: ServerContext, sec: SecurityContext, args: DraftIdArgs): Promise<void> {
         await this._drafts.delete(ctx, sec, { id: args.draftId });
     }
 

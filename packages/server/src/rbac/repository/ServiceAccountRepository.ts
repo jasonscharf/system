@@ -1,6 +1,8 @@
 import type { TripleStore } from "@jasonscharf/data";
 import type { EntityRecord } from "@jasonscharf/entities";
-import { EntityStore, type SecurityContext, type ServerContext } from "@jasonscharf/server";
+import { EntityStore } from "../../EntityStore.js";
+import type { SecurityContext } from "../../SecurityContext.js";
+import type { ServerContext } from "../../ServerContext.js";
 import { ServiceAccountSchema } from "../schemas.generated.js";
 import type { ServiceAccountEntity } from "../types.js";
 import { edgeRefOf, idFrom, iriFor } from "./util.js";

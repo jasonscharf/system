@@ -64,7 +64,7 @@ describe("generateSchemas", () => {
         });
 
         // Datatype properties → properties; no fooId.
-        expect(src).toContain("export const BookSchema = new EntitySchema({");
+        expect(src).toContain("export const BookSchema: EntitySchema = new EntitySchema({");
         expect(src).toContain('typeIRI: new IRI("http://ex.org/lib/Book")');
         expect(src).toContain('title: new IRI("http://ex.org/lib/title")');
 
@@ -80,7 +80,7 @@ describe("generateSchemas", () => {
         // Author has only a literal property, so no edges block.
         const authorBlock = src.slice(src.indexOf("AuthorSchema"));
         expect(authorBlock).toContain('name: new IRI("http://ex.org/lib/name")');
-        expect(src.indexOf("AuthorSchema = new EntitySchema")).toBeGreaterThan(-1);
+        expect(src).toContain("export const AuthorSchema: EntitySchema = new EntitySchema({");
     });
 
     it("imports an external schema for a cross-package edge target", async () => {

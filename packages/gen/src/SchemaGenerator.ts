@@ -104,7 +104,10 @@ function renderClass(
     if (cls.comment) {
         lines.push(`/** ${cls.comment} */`);
     }
-    lines.push(`export const ${schemaConstName(cls.iri)} = new EntitySchema({`);
+    // Explicit annotation breaks the self-reference cycle for schemas whose edges
+    // target themselves (e.g. ResourceNode.hasParent) — tsc rejects implicit-any
+    // consts referenced in their own initializer.
+    lines.push(`export const ${schemaConstName(cls.iri)}: EntitySchema = new EntitySchema({`);
     lines.push(`    typeIRI: new IRI("${cls.iri}"),`);
     lines.push(`    ns: "${config.localNamespace}",`);
 

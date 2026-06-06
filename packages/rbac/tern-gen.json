@@ -1,0 +1,9 @@
+{
+    "bases": [],
+    "extensions": ["../core/ontology/rbac.ttl"],
+    "shapes": [],
+    "localNamespace": "http://tern.dev/ns/rbac/",
+    "iriImport": "@jasonscharf/core",
+    "entitiesImport": "@jasonscharf/entities",
+    "schemasOut": "./src/schemas.generated.ts"
+}

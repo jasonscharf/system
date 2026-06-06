@@ -44,7 +44,7 @@ describe("generateSchemas — real rbac.ttl", () => {
             "PolicyGrantSchema",
             "ResourceNodeSchema",
         ]) {
-            expect(src).toContain(`export const ${name} = new EntitySchema({`);
+            expect(src).toContain(`export const ${name}: EntitySchema = new EntitySchema({`);
         }
     });
 

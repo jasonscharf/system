@@ -107,160 +107,121 @@ export class AccessChecker {
 
     /**
      * Returns the principal IRI itself plus all group IRIs it transitively belongs
-     * to via `rbac:memberOf` edges. BFS — handles nested groups.
+     * to via `rbac:memberOf` edges — one recursive-CTE reachability query (cycle-safe),
+     * not a per-hop BFS.
      */
     private async _resolvePrincipalSet(
         ctx: ServerContext,
         principalIri: string,
     ): Promise<Set<string>> {
-        const visited = new Set<string>([principalIri]);
-        const queue = [principalIri];
-
-        while (queue.length > 0) {
-            const current = queue.shift();
-            if (!current) {
-                break;
-            }
-            const quads = await this._store.find(ctx, {
-                subject: new IRI(current),
-                predicate: memberOfIRI,
-                graph: RBAC_GRAPH,
-            });
-            for (const q of quads) {
-                const groupIri = iriValue(q.object);
-                if (groupIri && !visited.has(groupIri)) {
-                    visited.add(groupIri);
-                    queue.push(groupIri);
-                }
-            }
-        }
-
-        return visited;
+        const reached = await this._store.reachable(ctx, {
+            roots: [new IRI(principalIri)],
+            predicates: [memberOfIRI],
+            direction: "out",
+            graph: RBAC_GRAPH,
+        });
+        const set = new Set(reached.map((i) => i.value));
+        set.add(principalIri); // always include the caller, even with no membership edges
+        return set;
     }
 
     /**
-     * Returns the resource IRI chain: the resource itself, then each parent
-     * resource, up to the root. Also appends the tenant IRI if found.
-     * The result is used to match grants whose scope is any ancestor of the target.
+     * Returns the resource itself plus every ancestor reachable via
+     * `rbac:parentResource` — the scope chain used to match grants on any ancestor.
+     * One recursive-CTE query (cycle-safe), not a per-hop parent walk.
      */
     private async _resolveScopeChain(ctx: ServerContext, scopeIri: string): Promise<string[]> {
-        const chain: string[] = [];
-        const visited = new Set<string>();
-        let current: string | null = scopeIri;
-
-        while (current && !visited.has(current)) {
-            visited.add(current);
-            chain.push(current);
-
-            const parentQuads = await this._store.find(ctx, {
-                subject: new IRI(current),
-                predicate: parentResourceIRI,
-                graph: RBAC_GRAPH,
-            });
-            current = parentQuads.length > 0 ? (iriValue(parentQuads[0].object) ?? null) : null;
+        const reached = await this._store.reachable(ctx, {
+            roots: [new IRI(scopeIri)],
+            predicates: [parentResourceIRI],
+            direction: "out",
+            graph: RBAC_GRAPH,
+        });
+        const chain = reached.map((i) => i.value);
+        if (!chain.includes(scopeIri)) {
+            chain.push(scopeIri);
         }
-
         return chain;
     }
 
     /**
-     * Expand a list of grants into a flat set of permission keys, resolving role
-     * permissions (with transitive inheritance) and direct permission grants.
+     * Expand a list of grants into a flat set of permission keys.  Role grants
+     * expand through their `rbac:inheritsFrom` closure (one reachability query for
+     * all granted roles at once); role→permission edges and permission→key lookups
+     * are then resolved in single batched round-trips — no per-role/per-permission
+     * query loops.
      */
     private async _expandGrantsToKeys(
         ctx: ServerContext,
         grants: PolicyGrantEntity[],
     ): Promise<Set<string>> {
-        const keySets = await Promise.all(
-            grants.map(async (grant) => {
-                const keys = new Set<string>();
-                if (grant.roleIri) {
-                    const roleKeys = await this._expandRoleToKeys(ctx, grant.roleIri, new Set());
-                    for (const k of roleKeys) {
-                        keys.add(k);
+        const roleIris = grants.map((g) => g.roleIri).filter((x): x is string => x != null);
+        const permIris = new Set<string>(
+            grants.map((g) => g.permissionIri).filter((x): x is string => x != null),
+        );
+
+        // 1. inheritsFrom closure over all granted roles (includes the roles themselves).
+        const allRoles = new Set<string>(roleIris);
+        if (roleIris.length > 0) {
+            const closure = await this._store.reachable(ctx, {
+                roots: roleIris.map((r) => new IRI(r)),
+                predicates: [inheritsFromIRI],
+                direction: "out",
+                graph: RBAC_GRAPH,
+            });
+            for (const r of closure) {
+                allRoles.add(r.value);
+            }
+        }
+
+        // 2. Batched role→permission edges for every role in the closure.
+        if (allRoles.size > 0) {
+            const bySubject = await this._store.findForSubjects(
+                ctx,
+                [...allRoles].map((r) => new IRI(r)),
+                RBAC_GRAPH,
+            );
+            for (const quads of bySubject.values()) {
+                for (const q of quads) {
+                    if ((q.predicate as IRI).value === rbacGrantsIRI.value) {
+                        const permIri = iriValue(q.object);
+                        if (permIri) {
+                            permIris.add(permIri);
+                        }
                     }
                 }
-                if (grant.permissionIri) {
-                    const key = await this._permissionKey(ctx, grant.permissionIri);
+            }
+        }
+
+        // 3. Batched permission→key resolution.
+        return this._permissionKeys(ctx, [...permIris]);
+    }
+
+    /** Resolve a set of Permission IRIs to their permissionKey literals in one round-trip. */
+    private async _permissionKeys(
+        ctx: ServerContext,
+        permissionIris: string[],
+    ): Promise<Set<string>> {
+        const keys = new Set<string>();
+        if (permissionIris.length === 0) {
+            return keys;
+        }
+        const bySubject = await this._store.findForSubjects(
+            ctx,
+            permissionIris.map((p) => new IRI(p)),
+            RBAC_GRAPH,
+        );
+        for (const quads of bySubject.values()) {
+            for (const q of quads) {
+                if ((q.predicate as IRI).value === permissionKeyIRI.value) {
+                    const key = literalValue(q.object);
                     if (key) {
                         keys.add(key);
                     }
                 }
-                return keys;
-            }),
-        );
-
-        const result = new Set<string>();
-        for (const s of keySets) {
-            for (const k of s) {
-                result.add(k);
             }
         }
-        return result;
-    }
-
-    /**
-     * Collect all permission keys granted by a role, following `rbac:inheritsFrom`
-     * edges transitively. Cycle guard via `visited` set.
-     */
-    private async _expandRoleToKeys(
-        ctx: ServerContext,
-        roleIri: string,
-        visited: Set<string>,
-    ): Promise<Set<string>> {
-        if (visited.has(roleIri)) {
-            return new Set();
-        }
-        visited.add(roleIri);
-
-        const keys = new Set<string>();
-
-        // Direct grants on this role
-        const grantQuads = await this._store.find(ctx, {
-            subject: new IRI(roleIri),
-            predicate: rbacGrantsIRI,
-            graph: RBAC_GRAPH,
-        });
-        for (const q of grantQuads) {
-            const permIri = iriValue(q.object);
-            if (permIri) {
-                const key = await this._permissionKey(ctx, permIri);
-                if (key) {
-                    keys.add(key);
-                }
-            }
-        }
-
-        // Inherited permissions
-        const inheritQuads = await this._store.find(ctx, {
-            subject: new IRI(roleIri),
-            predicate: inheritsFromIRI,
-            graph: RBAC_GRAPH,
-        });
-        for (const q of inheritQuads) {
-            const parentIri = iriValue(q.object);
-            if (parentIri) {
-                const parentKeys = await this._expandRoleToKeys(ctx, parentIri, visited);
-                for (const k of parentKeys) {
-                    keys.add(k);
-                }
-            }
-        }
-
         return keys;
-    }
-
-    /** Fetch the permissionKey literal for a Permission IRI. */
-    private async _permissionKey(
-        ctx: ServerContext,
-        permissionIri: string,
-    ): Promise<string | null> {
-        const quads = await this._store.find(ctx, {
-            subject: new IRI(permissionIri),
-            predicate: permissionKeyIRI,
-            graph: RBAC_GRAPH,
-        });
-        return quads.length > 0 ? (literalValue(quads[0].object) ?? null) : null;
     }
 
     /** Verify that `fromIri` has an `rbac:actsFor` edge pointing to `toIri`. */

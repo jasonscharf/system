@@ -26,6 +26,9 @@
             "path": "packages/flow"
         },
         {
+            "path": "packages/telemetry"
+        },
+        {
             "path": "packages/test"
         },
         {

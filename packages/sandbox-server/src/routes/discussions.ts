@@ -11,6 +11,7 @@
 import type { AuthRouterComponent } from "@jasonscharf/auth";
 import type { ConvoService } from "@jasonscharf/convos";
 import type { HttpCtx, HttpRouter } from "@jasonscharf/flow";
+import type { Logger } from "@jasonscharf/core";
 import type { RbacService } from "@jasonscharf/server";
 import {
     anonymousSec,
@@ -40,6 +41,7 @@ async function ensureUserProvisioned(
     rbac: RbacService,
     userSec: SecurityContext,
     userRoleIri: string,
+    logger?: Logger,
 ): Promise<void> {
     if (!userSec.principalIri) {
         return;
@@ -52,7 +54,7 @@ async function ensureUserProvisioned(
             principalIri: userSec.principalIri,
             roleIri: userRoleIri,
         });
-        console.log(`[convos] auto-provisioned ConvoUser for ${userSec.principalIri}`);
+        logger?.info("Auto-provisioned ConvoUser", { principalIri: userSec.principalIri });
     }
 }
 
@@ -64,6 +66,7 @@ export function mountDiscussionsRoutes(
     rbac: RbacService,
     auth: AuthRouterComponent,
     userRoleIri: string,
+    logger?: Logger,
 ): void {
     const ctx = buildServerContext(svc.store);
     const sessionMW = auth.sessionMiddleware();
@@ -72,7 +75,7 @@ export function mountDiscussionsRoutes(
         await sessionMW(c, async () => {});
         const userSec = sec(c);
         if (userSec.principalIri) {
-            await ensureUserProvisioned(ctx, rbac, userSec, userRoleIri);
+            await ensureUserProvisioned(ctx, rbac, userSec, userRoleIri, logger);
         }
         try {
             await handler(c);
@@ -84,7 +87,7 @@ export function mountDiscussionsRoutes(
             } else {
                 c.status = 500;
                 c.body = { error: "Internal server error" };
-                console.error("[convos] unhandled error:", err);
+                logger?.error("Unhandled error", { error: String(err) });
             }
         }
     }

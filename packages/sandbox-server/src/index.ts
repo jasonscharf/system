@@ -26,7 +26,7 @@ import {
     UserSessionRepository,
 } from "@jasonscharf/auth";
 import { convosExtension, getConvoService, getConvosInstall } from "@jasonscharf/convos";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
+import { createDataContext, TripleStore, type SqlLogSink } from "@jasonscharf/data";
 import {
     FlowApp,
     HttpDecoder,
@@ -37,6 +37,7 @@ import {
 } from "@jasonscharf/flow";
 import { buildServerContext, getRbacService, rbacExtension } from "@jasonscharf/server";
 import { SecretsManager } from "@jasonscharf/vaults";
+import { PinoLogger } from "@jasonscharf/telemetry";
 import { MessageDecoder } from "./components/MessageDecoder.js";
 import { MessageEncoder } from "./components/MessageEncoder.js";
 import { MessageRouter } from "./components/MessageRouter.js";
@@ -58,6 +59,8 @@ const BASE_URL = process.env.AUTH_BASE_URL ?? `http://localhost:${HTTP_PORT}`;
 const CONFIG = resolve(fileURLToPath(new URL("../config/app.yaml", import.meta.url)));
 
 async function main(): Promise<void> {
+    const logger = new PinoLogger("sandbox-server");
+
     // ── Secrets ───────────────────────────────────────────────────────────────
     // Azure Key Vault when AZURE_KEY_VAULT_URI is set; process.env otherwise.
     const secrets = SecretsManager.fromEnvironment();
@@ -68,32 +71,37 @@ async function main(): Promise<void> {
         process.env.TERN_DB_CLIENT ?? "sqlite",
     )) as "sqlite" | "pg";
 
+    const sqlSink: SqlLogSink = (line) => logger.debug(line);
+
     let knex: Awaited<ReturnType<typeof createDataContext>>;
     if (dbClient === "pg") {
-        knex = await createDataContext({
-            client: "pg",
-            host: await secrets.getWithDefault(
-                "TERN_PG_HOST",
-                process.env.TERN_PG_HOST ?? "localhost",
-            ),
-            port: Number(
-                await secrets.getWithDefault("TERN_PG_PORT", process.env.TERN_PG_PORT ?? "5432"),
-            ),
-            database: await secrets.getWithDefault(
-                "TERN_PG_DATABASE",
-                process.env.TERN_PG_DATABASE ?? "tern",
-            ),
-            user: await secrets.getWithDefault("TERN_PG_USER", process.env.TERN_PG_USER ?? "tern"),
-            password: await secrets.getRequired("TERN_PG_PASSWORD"),
-        });
-        console.log("[sandbox-server] DB: PostgreSQL");
+        knex = await createDataContext(
+            {
+                client: "pg",
+                host: await secrets.getWithDefault(
+                    "TERN_PG_HOST",
+                    process.env.TERN_PG_HOST ?? "localhost",
+                ),
+                port: Number(
+                    await secrets.getWithDefault("TERN_PG_PORT", process.env.TERN_PG_PORT ?? "5432"),
+                ),
+                database: await secrets.getWithDefault(
+                    "TERN_PG_DATABASE",
+                    process.env.TERN_PG_DATABASE ?? "tern",
+                ),
+                user: await secrets.getWithDefault("TERN_PG_USER", process.env.TERN_PG_USER ?? "tern"),
+                password: await secrets.getRequired("TERN_PG_PASSWORD"),
+            },
+            sqlSink,
+        );
+        logger.info("DB: PostgreSQL");
     } else {
         const dbPath = await secrets.getWithDefault(
             "TERN_DB_PATH",
             process.env.TERN_DB_PATH ?? ":memory:",
         );
-        knex = await createDataContext({ client: "sqlite", filename: dbPath });
-        console.log(`[sandbox-server] DB: SQLite (${dbPath})`);
+        knex = await createDataContext({ client: "sqlite", filename: dbPath }, sqlSink);
+        logger.info("DB: SQLite", { path: dbPath });
     }
 
     const store = new TripleStore(knex);
@@ -116,10 +124,10 @@ async function main(): Promise<void> {
     if (redisUrl) {
         const { Redis: RedisClient } = await import("ioredis");
         sessionStore = new RedisSessionStore(new RedisClient(redisUrl));
-        console.log(`[sandbox-server] Session store: Redis (${redisUrl})`);
+        logger.info("Session store: Redis", { url: redisUrl });
     } else {
         sessionStore = new MemorySessionStore();
-        console.log("[sandbox-server] Session store: in-memory (dev only)");
+        logger.info("Session store: in-memory (dev only)");
     }
 
     // ── Auth repositories ─────────────────────────────────────────────────────
@@ -147,16 +155,17 @@ async function main(): Promise<void> {
     );
 
     // ── Application config + infrastructure extensions ───────────────────────
-    const ternApp = await TernApp.fromYAML(CONFIG, { context: { store } });
+    const ternApp = await TernApp.fromYAML(CONFIG, { context: { store }, logger });
     const rbacInstalled = await ternApp.use(rbacExtension);
     const convosInstalled = await ternApp.use(convosExtension);
     const rbac = getRbacService(rbacInstalled);
     const convos = getConvoService(convosInstalled);
     const convosInstall = getConvosInstall(convosInstalled);
-    console.log(
-        `[sandbox-server] Loaded: ${ternApp.config.name} v${ternApp.config.version ?? "?"}`,
-    );
-    console.log(`[sandbox-server] Handlers: ${ternApp.registry.registeredTypes.join(", ")}`);
+    logger.info("Loaded app config", {
+        name: ternApp.config.name,
+        version: ternApp.config.version ?? "?",
+    });
+    logger.debug("Registered handler types", { types: ternApp.registry.registeredTypes });
 
     // ── Shared FBP app ────────────────────────────────────────────────────────
     const flowApp = new FlowApp({ mode: "push" });
@@ -208,7 +217,7 @@ async function main(): Promise<void> {
 
     topRouter.mount("/auth", authRouter.httpRouter);
 
-    mountDiscussionsRoutes(topRouter, convos, rbac, authRouter, convosInstall.userRoleIri);
+    mountDiscussionsRoutes(topRouter, convos, rbac, authRouter, convosInstall.userRoleIri, logger);
 
     flowApp
         .addComponent(httpServer)
@@ -245,11 +254,11 @@ async function main(): Promise<void> {
     await flowApp.start();
     flowApp.scheduler.start();
 
-    console.log(`[sandbox-server] WS   → ws://0.0.0.0:${WS_PORT}`);
-    console.log(`[sandbox-server] HTTP → http://0.0.0.0:${HTTP_PORT}`);
+    logger.info("WS server ready", { port: WS_PORT });
+    logger.info("HTTP server ready", { port: HTTP_PORT });
 
     process.once("SIGINT", async () => {
-        console.log("\n[sandbox-server] Shutting down…");
+        logger.info("Shutting down");
         await flowApp.stop();
         await secrets.close();
         await knex.destroy();
@@ -258,6 +267,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-    console.error("[sandbox-server] Fatal:", err);
+    console.error("Fatal error:", err);
     process.exit(1);
 });

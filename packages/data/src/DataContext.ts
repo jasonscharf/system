@@ -2,7 +2,7 @@ import type { Knex } from "knex";
 import { up as migrate001 } from "./migrations/001_init.js";
 import { up as migrate002 } from "./migrations/002_time_series.js";
 import { up as migrate003 } from "./migrations/003_timestamps.js";
-import { attachSqlLogging, sqlLoggingEnabled } from "./sqlLogging.js";
+import { attachSqlLogging, sqlLoggingEnabled, type SqlLogSink } from "./sqlLogging.js";
 
 export type DbClient = "sqlite" | "pg";
 
@@ -27,7 +27,7 @@ export type DataConfig = SqliteConfig | PgConfig;
  * Creates and migrates a Knex instance for the given configuration.
  * Call `knex.destroy()` when finished to release the connection pool.
  */
-export async function createDataContext(config: DataConfig): Promise<Knex> {
+export async function createDataContext(config: DataConfig, sqlSink?: SqlLogSink): Promise<Knex> {
     const { default: Knex } = await import("knex");
 
     let knex: Knex;
@@ -56,7 +56,7 @@ export async function createDataContext(config: DataConfig): Promise<Knex> {
     }
 
     if (sqlLoggingEnabled()) {
-        attachSqlLogging(knex, (line) => console.log(line));
+        attachSqlLogging(knex, sqlSink ?? ((line) => console.log(line)));
     }
 
     await migrate001(knex);

@@ -1,5 +1,5 @@
 import { dirname, resolve } from "node:path";
-import type { TernTypeRef } from "@jasonscharf/core";
+import type { Logger, TernTypeRef } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import { FlowApp } from "@jasonscharf/flow";
 import { loadAppConfig, mergeHandlers } from "./config/loader.js";
@@ -25,6 +25,8 @@ export interface TernAppOptions {
     context?: Record<string, unknown>;
     /** Scheduler mode for the underlying FBP runtime. */
     mode?: "push" | "pull";
+    /** Optional logger instance for application operations. */
+    logger?: Logger;
 }
 
 /**
@@ -70,7 +72,7 @@ export class TernApp {
     static async fromYAML(configPath: string, options: TernAppOptions = {}): Promise<TernApp> {
         const absPath = resolve(configPath);
         const { config, resolvedHandlers } = await loadAppConfig(absPath);
-        const registry = new HandlerRegistry(dirname(absPath));
+        const registry = new HandlerRegistry(dirname(absPath), options.logger);
         registry.registerAll(resolvedHandlers);
         return new TernApp(config, registry, options);
     }
@@ -84,7 +86,7 @@ export class TernApp {
         entries: HandlerEntry[],
         options: TernAppOptions = {},
     ): TernApp {
-        const registry = new HandlerRegistry(process.cwd());
+        const registry = new HandlerRegistry(process.cwd(), options.logger);
         registry.registerAll(mergeHandlers([], entries));
         return new TernApp(config, registry, options);
     }

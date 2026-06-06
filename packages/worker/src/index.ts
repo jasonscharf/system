@@ -1,8 +1,11 @@
 import { IRI } from "@jasonscharf/core";
+import { PinoLogger } from "@jasonscharf/telemetry";
 
-console.log("--- Worker start ---");
+const logger = new PinoLogger("worker");
+
+logger.info("Worker start");
 
 setInterval(() => {
     const _foo = new IRI("http://foo");
-    console.log(`Hello from worker!`);
+    logger.debug("Worker heartbeat");
 }, 2000);

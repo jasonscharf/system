@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { errResult, type TernRequest, type TernResult, type TernTypeRef } from "@jasonscharf/core";
+import { errResult, type Logger, type TernRequest, type TernResult, type TernTypeRef } from "@jasonscharf/core";
 import type { HandlerEntry } from "../config/types.js";
 import type { Dispatcher } from "../routing/Dispatcher.js";
 
@@ -37,9 +37,11 @@ interface LoadedEntry {
 export class HandlerRegistry implements Dispatcher {
     private readonly _entries = new Map<string, LoadedEntry[]>();
     private readonly _baseDir: string;
+    private readonly _logger?: Logger;
 
-    constructor(baseDir: string = process.cwd()) {
+    constructor(baseDir: string = process.cwd(), logger?: Logger) {
         this._baseDir = baseDir;
+        this._logger = logger;
     }
 
     // ── Registration ──────────────────────────────────────────────────────────
@@ -99,10 +101,11 @@ export class HandlerRegistry implements Dispatcher {
                 }
             } catch (err) {
                 // Log the failure and try the next registered handler
-                console.error(
-                    `[HandlerRegistry] Handler ${entry.moduleUrl}#${entry.exportName} threw:`,
-                    err,
-                );
+                this._logger?.error("Handler threw", {
+                    module: entry.moduleUrl,
+                    export: entry.exportName,
+                    error: String(err),
+                });
             }
         }
 

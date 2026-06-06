@@ -1,6 +1,45 @@
 services:
 
   #
+  # Observability — Jaeger distributed tracing
+  #
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4318:4318"     # OTLP HTTP receiver
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+
+  #
+  # Observability — Prometheus metrics
+  #
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  #
+  # Observability — Grafana dashboards
+  #
+  grafana:
+    image: grafana/grafana:11.4.0
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    depends_on:
+      - prometheus
+      - jaeger
+
+  #
   # Build
   #
   builder:
@@ -44,8 +83,14 @@ services:
     entrypoint: []
     command: yarn workspace @jasonscharf/worker start:debug
     stop_grace_period: 1s
+    environment:
+      OTEL_SERVICE_NAME: worker
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_PROMETHEUS_PORT: "9465"
+      LOG_LEVEL: info
     ports:
       - "9230:9000"
+      - "9465:9465"
     volumes:
       - ./:/app
 
@@ -82,7 +127,7 @@ services:
       retries: 10
 
   #
-  # Sandbox server  —  WS :8080, HTTP :8081, inspector :9229
+  # Sandbox server  —  WS :8080, HTTP :8081, inspector :9229, metrics :9464
   #
   sandbox-server:
     build:
@@ -95,6 +140,10 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      OTEL_SERVICE_NAME: sandbox-server
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_PROMETHEUS_PORT: "9464"
+      LOG_LEVEL: info
       TERN_PG_HOST:     postgres
       TERN_PG_DATABASE: tern
       TERN_PG_USER:     tern
@@ -103,6 +152,7 @@ services:
       - "8080:8080"
       - "8081:8081"
       - "9229:9229"
+      - "9464:9464"
     volumes:
       - ./:/app
 
@@ -123,3 +173,4 @@ services:
 
 volumes:
   postgres_data:
+  grafana_data:

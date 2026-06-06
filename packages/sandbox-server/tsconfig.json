@@ -13,6 +13,7 @@
         { "path": "../data" },
         { "path": "../flow" },
         { "path": "../server" },
+        { "path": "../telemetry" },
         { "path": "../vaults" }
     ],
     "include": ["src"]

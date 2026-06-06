@@ -1,6 +1,6 @@
 import {
     IRI,
-    inTenantIRI,
+    isInTenantIRI,
     literal,
     rbacCreatedAtIRI,
     rbacIsActiveIRI,
@@ -76,7 +76,7 @@ export class ServiceAccountRepository {
         if (args.tenantId) {
             quads.push({
                 subject: sub,
-                predicate: inTenantIRI,
+                predicate: isInTenantIRI,
                 object: iriFor("tenant", args.tenantId),
                 graph: RBAC_GRAPH,
             });
@@ -120,11 +120,7 @@ export class ServiceAccountRepository {
     }
 
     /** @insecure @nochecks */
-    async deactivate(
-        ctx: ServerContext,
-        _sec: SecurityContext,
-        args: IdArgs,
-    ): Promise<void> {
+    async deactivate(ctx: ServerContext, _sec: SecurityContext, args: IdArgs): Promise<void> {
         return this._store.withTransaction(ctx, async (ctx) => {
             const sub = iriFor("sa", args.id);
             await this._store.delete(ctx, {
@@ -175,7 +171,7 @@ export class ServiceAccountRepository {
             throw new Error(`ServiceAccountRepository: missing createdAt for id "${id}"`);
         }
 
-        const tenantIri = getIri(inTenantIRI);
+        const tenantIri = getIri(isInTenantIRI);
         return {
             id,
             iri: iriFor("sa", id).value,

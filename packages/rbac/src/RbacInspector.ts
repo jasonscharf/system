@@ -2,7 +2,7 @@ import {
     groupNameIRI,
     IRI,
     inheritsFromIRI,
-    memberOfIRI,
+    isMemberOfIRI,
     permissionKeyIRI,
     rbacGrantsIRI,
     roleNameIRI,
@@ -279,7 +279,7 @@ export class RbacInspector {
             }
             const quads = await this._store.find(ctx, {
                 subject: new IRI(current),
-                predicate: memberOfIRI,
+                predicate: isMemberOfIRI,
                 graph: RBAC_GRAPH,
             });
             for (const q of quads) {
@@ -329,7 +329,7 @@ export class RbacInspector {
             }
             const quads = await this._store.find(ctx, {
                 subject: new IRI(current),
-                predicate: memberOfIRI,
+                predicate: isMemberOfIRI,
                 graph: RBAC_GRAPH,
             });
             for (const q of quads) {

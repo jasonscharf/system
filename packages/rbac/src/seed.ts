@@ -16,9 +16,9 @@
  */
 
 import {
-    grantPrincipalIRI,
-    grantRoleIRI,
     groupNameIRI,
+    hasPrincipalIRI,
+    hasRoleIRI,
     IRI,
     isDenialIRI,
     isSystemRoleIRI,
@@ -130,8 +130,8 @@ export async function seedSystemData(ctx: ServerContext, store: TripleStore): Pr
 
         // PolicyGrant: superusers → superadmin (no scope = system-wide)
         { subject: gr, predicate: RDF_TYPE, object: PolicyGrantIRI, graph: RBAC_GRAPH },
-        { subject: gr, predicate: grantPrincipalIRI, object: g, graph: RBAC_GRAPH },
-        { subject: gr, predicate: grantRoleIRI, object: r, graph: RBAC_GRAPH },
+        { subject: gr, predicate: hasPrincipalIRI, object: g, graph: RBAC_GRAPH },
+        { subject: gr, predicate: hasRoleIRI, object: r, graph: RBAC_GRAPH },
         {
             subject: gr,
             predicate: isDenialIRI,

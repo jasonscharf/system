@@ -53,10 +53,10 @@ const P_ROLE_NAME = `${RBAC_NS}roleName`;
 const P_IS_SYSTEM_ROLE = `${RBAC_NS}isSystemRole`;
 const P_PERMISSION_KEY = `${RBAC_NS}permissionKey`;
 const P_IS_DENIAL = `${RBAC_NS}isDenial`;
-const P_IN_TENANT = `${RBAC_NS}inTenant`;
+const P_IN_TENANT = `${RBAC_NS}isInTenant`;
 const P_GRANTS = `${RBAC_NS}grants`;
-const P_GRANT_PRINCIPAL = `${RBAC_NS}grantPrincipal`;
-const P_GRANT_ROLE = `${RBAC_NS}grantRole`;
+const P_GRANT_PRINCIPAL = `${RBAC_NS}hasPrincipal`;
+const P_GRANT_ROLE = `${RBAC_NS}hasRole`;
 const P_CREATED_AT = `${RBAC_NS}createdAt`;
 const P_UPDATED_AT = `${RBAC_NS}updatedAt`;
 

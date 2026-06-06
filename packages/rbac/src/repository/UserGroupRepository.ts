@@ -1,10 +1,10 @@
 import {
     groupNameIRI,
     IRI,
-    inTenantIRI,
+    isInTenantIRI,
+    isMemberOfIRI,
     isSystemUserGroupIRI,
     literal,
-    memberOfIRI,
     rbacCreatedAtIRI,
     rbacUpdatedAtIRI,
     UserGroupIRI,
@@ -103,7 +103,7 @@ export class UserGroupRepository {
         if (args.tenantId) {
             quads.push({
                 subject: sub,
-                predicate: inTenantIRI,
+                predicate: isInTenantIRI,
                 object: iriFor("tenant", args.tenantId),
                 graph: RBAC_GRAPH,
             });
@@ -212,7 +212,7 @@ export class UserGroupRepository {
     ): Promise<UserGroupEntity[]> {
         const tenantNode = iriFor("tenant", args.tenantId);
         const tenantEdges = await this._store.find(ctx, {
-            predicate: inTenantIRI,
+            predicate: isInTenantIRI,
             object: tenantNode,
             graph: RBAC_GRAPH,
         });
@@ -279,16 +279,12 @@ export class UserGroupRepository {
     }
 
     /** @insecure @nochecks Removes the group and all its membership/grant edges. */
-    async delete(
-        ctx: ServerContext,
-        _sec: SecurityContext,
-        args: IdArgs,
-    ): Promise<void> {
+    async delete(ctx: ServerContext, _sec: SecurityContext, args: IdArgs): Promise<void> {
         return this._store.withTransaction(ctx, async (ctx) => {
             const sub = iriFor("group", args.id);
             await this._store.delete(ctx, { subject: sub, graph: RBAC_GRAPH });
             await this._store.delete(ctx, {
-                predicate: memberOfIRI,
+                predicate: isMemberOfIRI,
                 object: sub,
                 graph: RBAC_GRAPH,
             });
@@ -305,7 +301,7 @@ export class UserGroupRepository {
     ): Promise<void> {
         await this._store.insert(ctx, {
             subject: new IRI(args.memberIri),
-            predicate: memberOfIRI,
+            predicate: isMemberOfIRI,
             object: new IRI(args.groupIri),
             graph: RBAC_GRAPH,
         });
@@ -319,7 +315,7 @@ export class UserGroupRepository {
     ): Promise<void> {
         await this._store.delete(ctx, {
             subject: new IRI(args.memberIri),
-            predicate: memberOfIRI,
+            predicate: isMemberOfIRI,
             object: new IRI(args.groupIri),
             graph: RBAC_GRAPH,
         });
@@ -332,7 +328,7 @@ export class UserGroupRepository {
         args: GroupIriArgs,
     ): Promise<string[]> {
         const quads = await this._store.find(ctx, {
-            predicate: memberOfIRI,
+            predicate: isMemberOfIRI,
             object: new IRI(args.groupIri),
             graph: RBAC_GRAPH,
         });
@@ -347,7 +343,7 @@ export class UserGroupRepository {
     ): Promise<string[]> {
         const quads = await this._store.find(ctx, {
             subject: new IRI(args.principalIri),
-            predicate: memberOfIRI,
+            predicate: isMemberOfIRI,
             graph: RBAC_GRAPH,
         });
         return quads.map((q) => iriValue(q.object)).filter((v): v is string => v != null);
@@ -377,7 +373,7 @@ export class UserGroupRepository {
             throw new Error(`UserGroupRepository: missing createdAt for id "${id}"`);
         }
 
-        const tenantIri = getIri(inTenantIRI);
+        const tenantIri = getIri(isInTenantIRI);
         return {
             id,
             iri: iriFor("group", id).value,

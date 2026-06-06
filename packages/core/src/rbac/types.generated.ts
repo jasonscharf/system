@@ -28,15 +28,15 @@ export const grantExpiresAtIRI = new IRI("http://tern.dev/ns/rbac/grantExpiresAt
 export const resourceTypeIRI = new IRI("http://tern.dev/ns/rbac/resourceType");
 export const rbacCreatedAtIRI = new IRI("http://tern.dev/ns/rbac/createdAt");
 export const rbacUpdatedAtIRI = new IRI("http://tern.dev/ns/rbac/updatedAt");
-export const memberOfIRI = new IRI("http://tern.dev/ns/rbac/memberOf");
-export const inTenantIRI = new IRI("http://tern.dev/ns/rbac/inTenant");
+export const isMemberOfIRI = new IRI("http://tern.dev/ns/rbac/isMemberOf");
+export const isInTenantIRI = new IRI("http://tern.dev/ns/rbac/isInTenant");
 export const inheritsFromIRI = new IRI("http://tern.dev/ns/rbac/inheritsFrom");
 export const rbacGrantsIRI = new IRI("http://tern.dev/ns/rbac/grants");
-export const parentResourceIRI = new IRI("http://tern.dev/ns/rbac/parentResource");
-export const grantPrincipalIRI = new IRI("http://tern.dev/ns/rbac/grantPrincipal");
-export const grantRoleIRI = new IRI("http://tern.dev/ns/rbac/grantRole");
-export const grantPermissionIRI = new IRI("http://tern.dev/ns/rbac/grantPermission");
-export const grantScopeIRI = new IRI("http://tern.dev/ns/rbac/grantScope");
+export const hasParentIRI = new IRI("http://tern.dev/ns/rbac/hasParent");
+export const hasPrincipalIRI = new IRI("http://tern.dev/ns/rbac/hasPrincipal");
+export const hasRoleIRI = new IRI("http://tern.dev/ns/rbac/hasRole");
+export const hasPermissionIRI = new IRI("http://tern.dev/ns/rbac/hasPermission");
+export const hasScopeIRI = new IRI("http://tern.dev/ns/rbac/hasScope");
 export const grantedByIRI = new IRI("http://tern.dev/ns/rbac/grantedBy");
 export const delegatedFromIRI = new IRI("http://tern.dev/ns/rbac/delegatedFrom");
 export const actsForIRI = new IRI("http://tern.dev/ns/rbac/actsFor");
@@ -57,7 +57,7 @@ export interface UserGroup {
     isSystemGroup?: boolean;
     createdAt?: Date;
     updatedAt?: Date;
-    inTenant?: Tenant[];
+    isInTenant?: Tenant[];
 }
 
 /** Non-human principal for automation. */
@@ -67,7 +67,7 @@ export interface ServiceAccount {
     isActive?: boolean;
     createdAt?: Date;
     updatedAt?: Date;
-    inTenant?: Tenant[];
+    isInTenant?: Tenant[];
 }
 
 /** Named set of permissions. */
@@ -76,7 +76,7 @@ export interface Role {
     isSystemRole?: boolean;
     createdAt?: Date;
     updatedAt?: Date;
-    inTenant?: Tenant[];
+    isInTenant?: Tenant[];
     inheritsFrom?: Role[];
 }
 
@@ -92,10 +92,10 @@ export interface PolicyGrant {
     grantExpiresAt?: Date;
     createdAt?: Date;
     updatedAt?: Date;
-    grantPrincipal?: unknown[];
-    grantRole?: Role[];
-    grantPermission?: Permission[];
-    grantScope?: unknown[];
+    hasPrincipal?: unknown[];
+    hasRole?: Role[];
+    hasPermission?: Permission[];
+    hasScope?: unknown[];
     grantedBy?: unknown[];
     delegatedFrom?: PolicyGrant[];
 }
@@ -105,6 +105,6 @@ export interface ResourceNode {
     resourceType?: string;
     createdAt?: Date;
     updatedAt?: Date;
-    parentResource?: ResourceNode[];
-    inTenant?: Tenant[];
+    hasParent?: ResourceNode[];
+    isInTenant?: Tenant[];
 }

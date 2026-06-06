@@ -1,8 +1,8 @@
 import {
+    hasParentIRI,
     IRI,
-    inTenantIRI,
+    isInTenantIRI,
     literal,
-    parentResourceIRI,
     ResourceNodeIRI,
     rbacCreatedAtIRI,
     rbacUpdatedAtIRI,
@@ -74,7 +74,7 @@ export class ResourceNodeRepository {
         if (args.tenantId) {
             quads.push({
                 subject: sub,
-                predicate: inTenantIRI,
+                predicate: isInTenantIRI,
                 object: iriFor("tenant", args.tenantId),
                 graph: RBAC_GRAPH,
             });
@@ -82,7 +82,7 @@ export class ResourceNodeRepository {
         if (args.parentIri) {
             quads.push({
                 subject: sub,
-                predicate: parentResourceIRI,
+                predicate: hasParentIRI,
                 object: new IRI(args.parentIri),
                 graph: RBAC_GRAPH,
             });
@@ -126,20 +126,16 @@ export class ResourceNodeRepository {
     }
 
     /** @insecure @nochecks Set the parent of a resource (replaces existing parentResource edge). */
-    async setParent(
-        ctx: ServerContext,
-        _sec: SecurityContext,
-        args: SetParentArgs,
-    ): Promise<void> {
+    async setParent(ctx: ServerContext, _sec: SecurityContext, args: SetParentArgs): Promise<void> {
         return this._store.withTransaction(ctx, async (ctx) => {
             await this._store.delete(ctx, {
                 subject: new IRI(args.resourceIri),
-                predicate: parentResourceIRI,
+                predicate: hasParentIRI,
                 graph: RBAC_GRAPH,
             });
             await this._store.insert(ctx, {
                 subject: new IRI(args.resourceIri),
-                predicate: parentResourceIRI,
+                predicate: hasParentIRI,
                 object: new IRI(args.parentIri),
                 graph: RBAC_GRAPH,
             });
@@ -168,12 +164,12 @@ export class ResourceNodeRepository {
             throw new Error(`ResourceNodeRepository: missing createdAt for id "${id}"`);
         }
 
-        const tenantIri = getIri(inTenantIRI);
+        const tenantIri = getIri(isInTenantIRI);
         return {
             id,
             iri: iriFor("resource", id).value,
             resourceType,
-            parentIri: getIri(parentResourceIRI) ?? null,
+            parentIri: getIri(hasParentIRI) ?? null,
             tenantId: tenantIri ? idFrom(tenantIri) : null,
             createdAt: new Date(createdAtStr),
             updatedAt: new Date(getLit(rbacUpdatedAtIRI) ?? createdAtStr),

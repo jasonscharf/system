@@ -262,11 +262,7 @@ export class RbacService {
     }
 
     /** @insecure @nochecks */
-    async deleteUserGroup(
-        ctx: ServerContext,
-        sec: SecurityContext,
-        args: IdArgs,
-    ): Promise<void> {
+    async deleteUserGroup(ctx: ServerContext, sec: SecurityContext, args: IdArgs): Promise<void> {
         return this._groups.delete(ctx, sec, args);
     }
 
@@ -350,11 +346,7 @@ export class RbacService {
     }
 
     /** @insecure @nochecks */
-    async revoke(
-        ctx: ServerContext,
-        sec: SecurityContext,
-        args: GrantIriArgs,
-    ): Promise<void> {
+    async revoke(ctx: ServerContext, sec: SecurityContext, args: GrantIriArgs): Promise<void> {
         return this._grants.revoke(ctx, sec, args);
     }
 

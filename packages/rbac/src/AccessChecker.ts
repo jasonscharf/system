@@ -1,9 +1,9 @@
 import {
     actsForIRI,
+    hasParentIRI,
     IRI,
     inheritsFromIRI,
-    memberOfIRI,
-    parentResourceIRI,
+    isMemberOfIRI,
     permissionKeyIRI,
     rbacGrantsIRI,
 } from "@jasonscharf/core";
@@ -116,7 +116,7 @@ export class AccessChecker {
     ): Promise<Set<string>> {
         const reached = await this._store.reachable(ctx, {
             roots: [new IRI(principalIri)],
-            predicates: [memberOfIRI],
+            predicates: [isMemberOfIRI],
             direction: "out",
             graph: RBAC_GRAPH,
         });
@@ -133,7 +133,7 @@ export class AccessChecker {
     private async _resolveScopeChain(ctx: ServerContext, scopeIri: string): Promise<string[]> {
         const reached = await this._store.reachable(ctx, {
             roots: [new IRI(scopeIri)],
-            predicates: [parentResourceIRI],
+            predicates: [hasParentIRI],
             direction: "out",
             graph: RBAC_GRAPH,
         });

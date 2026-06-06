@@ -2,10 +2,10 @@ import {
     delegatedFromIRI,
     grantExpiresAtIRI,
     grantedByIRI,
-    grantPermissionIRI,
-    grantPrincipalIRI,
-    grantRoleIRI,
-    grantScopeIRI,
+    hasPermissionIRI,
+    hasPrincipalIRI,
+    hasRoleIRI,
+    hasScopeIRI,
     IRI,
     isDenialIRI,
     literal,
@@ -61,7 +61,7 @@ export class PolicyGrantRepository {
             { subject: sub, predicate: RDF_TYPE, object: PolicyGrantIRI, graph: RBAC_GRAPH },
             {
                 subject: sub,
-                predicate: grantPrincipalIRI,
+                predicate: hasPrincipalIRI,
                 object: new IRI(args.principalIri),
                 graph: RBAC_GRAPH,
             },
@@ -88,7 +88,7 @@ export class PolicyGrantRepository {
         if (args.roleIri) {
             quads.push({
                 subject: sub,
-                predicate: grantRoleIRI,
+                predicate: hasRoleIRI,
                 object: new IRI(args.roleIri),
                 graph: RBAC_GRAPH,
             });
@@ -96,7 +96,7 @@ export class PolicyGrantRepository {
         if (args.permissionIri) {
             quads.push({
                 subject: sub,
-                predicate: grantPermissionIRI,
+                predicate: hasPermissionIRI,
                 object: new IRI(args.permissionIri),
                 graph: RBAC_GRAPH,
             });
@@ -104,7 +104,7 @@ export class PolicyGrantRepository {
         if (args.scopeIri) {
             quads.push({
                 subject: sub,
-                predicate: grantScopeIRI,
+                predicate: hasScopeIRI,
                 object: new IRI(args.scopeIri),
                 graph: RBAC_GRAPH,
             });
@@ -153,11 +153,7 @@ export class PolicyGrantRepository {
     }
 
     /** @insecure @nochecks Soft-delete a grant by IRI (revokes the assignment). */
-    async revoke(
-        ctx: ServerContext,
-        _sec: SecurityContext,
-        args: GrantIriArgs,
-    ): Promise<void> {
+    async revoke(ctx: ServerContext, _sec: SecurityContext, args: GrantIriArgs): Promise<void> {
         await this._store.delete(ctx, { subject: new IRI(args.grantIri), graph: RBAC_GRAPH });
     }
 
@@ -176,7 +172,7 @@ export class PolicyGrantRepository {
 
         for (const principalIri of args.principalIris) {
             const principalEdges = await this._store.find(ctx, {
-                predicate: grantPrincipalIRI,
+                predicate: hasPrincipalIRI,
                 object: new IRI(principalIri),
                 graph: RBAC_GRAPH,
             });
@@ -220,10 +216,10 @@ export class PolicyGrantRepository {
         return {
             id: lastSeg,
             iri: grantIri,
-            principalIri: getIri(grantPrincipalIRI) ?? "",
-            roleIri: getIri(grantRoleIRI) ?? null,
-            permissionIri: getIri(grantPermissionIRI) ?? null,
-            scopeIri: getIri(grantScopeIRI) ?? null,
+            principalIri: getIri(hasPrincipalIRI) ?? "",
+            roleIri: getIri(hasRoleIRI) ?? null,
+            permissionIri: getIri(hasPermissionIRI) ?? null,
+            scopeIri: getIri(hasScopeIRI) ?? null,
             grantedByIri: getIri(grantedByIRI) ?? null,
             delegatedFromIri: getIri(delegatedFromIRI) ?? null,
             grantExpiresAt: expiresAtStr ? new Date(expiresAtStr) : null,

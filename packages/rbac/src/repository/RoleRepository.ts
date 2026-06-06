@@ -1,7 +1,7 @@
 import {
     IRI,
     inheritsFromIRI,
-    inTenantIRI,
+    isInTenantIRI,
     isSystemRoleIRI,
     literal,
     RoleIRI,
@@ -85,7 +85,7 @@ export class RoleRepository {
         if (args.tenantId) {
             quads.push({
                 subject: sub,
-                predicate: inTenantIRI,
+                predicate: isInTenantIRI,
                 object: iriFor("tenant", args.tenantId),
                 graph: RBAC_GRAPH,
             });
@@ -230,7 +230,7 @@ export class RoleRepository {
             throw new Error(`RoleRepository: missing createdAt for id "${id}"`);
         }
 
-        const tenantIri = getIri(inTenantIRI);
+        const tenantIri = getIri(isInTenantIRI);
         return {
             id,
             iri: iriFor("role", id).value,

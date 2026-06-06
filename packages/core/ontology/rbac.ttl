@@ -121,10 +121,10 @@ rbac:updatedAt      a owl:DatatypeProperty ;
 
 # ── Object properties ─────────────────────────────────────────────────────────
 
-rbac:memberOf       a owl:ObjectProperty ;
+rbac:isMemberOf       a owl:ObjectProperty ;
     rdfs:comment "A principal or group is a direct member of a group. Transitive membership is resolved at query time." .
 
-rbac:inTenant       a owl:ObjectProperty ;
+rbac:isInTenant       a owl:ObjectProperty ;
     rdfs:range  rbac:Tenant ;
     rdfs:comment "Scopes a group, role, service account, or resource to a tenant." .
 
@@ -138,26 +138,26 @@ rbac:grants         a owl:ObjectProperty ;
     rdfs:range  rbac:Permission ;
     rdfs:comment "A role directly grants a permission." .
 
-rbac:parentResource a owl:ObjectProperty ;
+rbac:hasParent a owl:ObjectProperty ;
     rdfs:domain rbac:ResourceNode ;
     rdfs:range  rbac:ResourceNode ;
     rdfs:comment "Parent resource in the hierarchy. Grants made on a parent propagate to all descendants." .
 
-rbac:grantPrincipal a owl:ObjectProperty ;
+rbac:hasPrincipal a owl:ObjectProperty ;
     rdfs:domain rbac:PolicyGrant ;
     rdfs:comment "The principal (User, UserGroup, or ServiceAccount) receiving the grant." .
 
-rbac:grantRole      a owl:ObjectProperty ;
+rbac:hasRole      a owl:ObjectProperty ;
     rdfs:domain rbac:PolicyGrant ;
     rdfs:range  rbac:Role ;
     rdfs:comment "The role being granted. Mutually exclusive with grantPermission." .
 
-rbac:grantPermission a owl:ObjectProperty ;
+rbac:hasPermission a owl:ObjectProperty ;
     rdfs:domain rbac:PolicyGrant ;
     rdfs:range  rbac:Permission ;
     rdfs:comment "A direct permission grant. Mutually exclusive with grantRole." .
 
-rbac:grantScope     a owl:ObjectProperty ;
+rbac:hasScope     a owl:ObjectProperty ;
     rdfs:domain rbac:PolicyGrant ;
     rdfs:comment "The resource or tenant the grant is scoped to. Absent means the grant is system-wide." .
 

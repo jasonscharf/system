@@ -58,28 +58,29 @@ describe("generateSchemas — real rbac.ttl", () => {
     });
 
     it("models typed object properties as edges via forward thunks", () => {
+        // Edge names follow the has*/is* convention so they read as edges.
         // Role --inheritsFrom--> Role, Role --grants--> Permission (self/local targets).
         expect(src).toContain("inheritsFrom: { predicate:");
         expect(src).toContain("target: () => RoleSchema");
         expect(src).toContain("target: () => PermissionSchema");
-        // ResourceNode --parentResource--> ResourceNode (the subtree edge).
-        expect(src).toContain("parentResource: { predicate:");
+        // ResourceNode --hasParent--> ResourceNode (the subtree edge).
+        expect(src).toContain("hasParent: { predicate:");
         expect(src).toContain("target: () => ResourceNodeSchema");
-        // PolicyGrant --grantRole--> Role.
-        expect(src).toContain("grantRole: { predicate:");
+        // PolicyGrant --hasRole--> Role.
+        expect(src).toContain("hasRole: { predicate:");
     });
 
     it("models polymorphic object properties (no rdfs:range) as targetless edges", () => {
-        // grantPrincipal / grantScope are scoped to PolicyGrant but have no single
+        // hasPrincipal / hasScope are scoped to PolicyGrant but have no single
         // target class (principal: User|Group|ServiceAccount; scope: Resource|Tenant).
         expect(src).toContain(
-            'grantPrincipal: { predicate: new IRI("http://tern.dev/ns/rbac/grantPrincipal"), cardinality: "many", direction: "out" }',
+            'hasPrincipal: { predicate: new IRI("http://tern.dev/ns/rbac/hasPrincipal"), cardinality: "many", direction: "out" }',
         );
         expect(src).toContain(
-            'grantScope: { predicate: new IRI("http://tern.dev/ns/rbac/grantScope"), cardinality: "many", direction: "out" }',
+            'hasScope: { predicate: new IRI("http://tern.dev/ns/rbac/hasScope"), cardinality: "many", direction: "out" }',
         );
         // A polymorphic edge carries no target thunk.
-        for (const edge of ["grantPrincipal", "grantScope"]) {
+        for (const edge of ["hasPrincipal", "hasScope"]) {
             const line = src.split("\n").find((l) => l.includes(`${edge}: { predicate:`));
             expect(line).toBeDefined();
             expect(line).not.toContain("target:");

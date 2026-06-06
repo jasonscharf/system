@@ -22,6 +22,8 @@ export {
     XSD_INTEGER,
     XSD_STRING,
 } from "./constants.js";
+export type { EdgeCardinality, EdgeDef, EdgeDirection } from "./EdgeDef.js";
+export type { EdgeHandle, EdgeRef, EdgeSet } from "./EdgeHandle.js";
 export type { EntityRecord } from "./EntityRecord.js";
 export { type DefaultValue, EntitySchema } from "./EntitySchema.js";
 export { EntityValidationError } from "./EntityValidationError.js";

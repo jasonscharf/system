@@ -139,6 +139,36 @@ export interface QuadHistory extends Quad {
     deletedAt: Date | null;
 }
 
+/**
+ * Options for a transitive-closure (reachability) walk over the edge graph.
+ *
+ * Starting from `roots`, follow edges whose predicate is in `predicates`,
+ * in the given `direction`, and return every node reached (including the roots
+ * unless `includeRoots` is false).  The walk is evaluated as a single recursive
+ * CTE — one round-trip regardless of depth — and is cycle-safe.
+ */
+export interface ReachOptions {
+    /** Starting nodes for the walk. */
+    roots: readonly IRI[];
+    /** Edge predicates to follow.  Empty ⇒ only the roots are reachable. */
+    predicates: readonly IRI[];
+    /**
+     * "out" follows subject → object (e.g. memberOf, inheritsFrom, parent).
+     * "in"  follows object → subject (e.g. find a subtree's descendants from its root).
+     */
+    direction: "out" | "in";
+    /** Graph scope: an IRI for a named graph, null for the default graph, undefined for any graph. */
+    graph?: IRI | null;
+    /**
+     * Maximum number of hops from the roots.  When set, depth is bounded
+     * (roots are depth 0).  When omitted, the walk runs to full closure using
+     * set semantics, which terminates even on cyclic graphs.
+     */
+    maxDepth?: number;
+    /** Include the root IRIs in the result.  Defaults to true. */
+    includeRoots?: boolean;
+}
+
 export interface StoreStats {
     namespaces: number;
     names: number;
@@ -189,8 +219,7 @@ export class TripleStore {
         table: string,
         data: Record<string, unknown>,
     ): Promise<number> {
-        const client = (this._knex.client as { config: { client: string } }).config.client;
-        if (client === "pg" || client === "postgresql") {
+        if (this._isPg()) {
             const [row] = (await this._db(ctx)(table).insert(data).returning("id")) as [
                 { id: number },
             ];
@@ -470,7 +499,10 @@ export class TripleStore {
 
         let q = this._db(ctx)(T.edges).whereIn(C.subject, validIds).where(C.isDeleted, false);
         if (graph !== undefined) {
-            q = graph === null ? q.whereNull(C.graph) : q.where(C.graph, await this._nodeId(ctx, graph));
+            q =
+                graph === null
+                    ? q.whereNull(C.graph)
+                    : q.where(C.graph, await this._nodeId(ctx, graph));
         }
         return q.update({ [C.isDeleted]: true });
     }
@@ -504,7 +536,10 @@ export class TripleStore {
             .whereIn(C.predicate, validPIds)
             .where(C.isDeleted, false);
         if (graph !== undefined) {
-            q = graph === null ? q.whereNull(C.graph) : q.where(C.graph, await this._nodeId(ctx, graph));
+            q =
+                graph === null
+                    ? q.whereNull(C.graph)
+                    : q.where(C.graph, await this._nodeId(ctx, graph));
         }
         return q.update({ [C.isDeleted]: true });
     }
@@ -533,9 +568,12 @@ export class TripleStore {
         }
 
         const idToSubject = new Map(validPairs.map(([term, id]) => [id, term]));
-        const graphId = graph !== undefined
-            ? (graph === null ? null : await this._nodeId(ctx, graph))
-            : undefined;
+        const graphId =
+            graph !== undefined
+                ? graph === null
+                    ? null
+                    : await this._nodeId(ctx, graph)
+                : undefined;
 
         let edgesQ = this._db(ctx)(T.edges)
             .whereIn(
@@ -603,6 +641,115 @@ export class TripleStore {
             });
         }
         return result;
+    }
+
+    // ── Graph reachability ────────────────────────────────────────────────────
+
+    /**
+     * Transitive closure over the edge graph: starting from `opts.roots`, follow
+     * edges of the given predicate(s) in the given direction and return every
+     * IRI node reached.  Evaluated as a single recursive CTE — one round-trip
+     * regardless of path length — and cycle-safe.
+     *
+     * This is the topology primitive that replaces every client-side BFS/while
+     * graph walk (RBAC scope chains, group membership, role inheritance,
+     * entity ownership).  Postgres and SQLite share the WITH RECURSIVE syntax;
+     * only the boolean literal differs.
+     */
+    async reachable(ctx: ServerContext, opts: ReachOptions): Promise<IRI[]> {
+        const includeRoots = opts.includeRoots ?? true;
+
+        const rootIds = (
+            await Promise.all(opts.roots.map((r) => this._nodeId(ctx, r as RdfTerm)))
+        ).filter((id): id is number => id !== null);
+        if (rootIds.length === 0) {
+            return [];
+        }
+
+        const predIds = (
+            await Promise.all(opts.predicates.map((p) => this._nodeId(ctx, p as RdfTerm)))
+        ).filter((id): id is number => id !== null);
+
+        // No resolvable predicates ⇒ no edges to follow; only the roots qualify.
+        if (predIds.length === 0) {
+            const rootSet = new Set(rootIds);
+            return includeRoots ? this._idsToIris(ctx, [...rootSet]) : [];
+        }
+
+        let graphClause = "1 = 1";
+        if (opts.graph !== undefined) {
+            if (opts.graph === null) {
+                graphClause = `e.${C.graph} IS NULL`;
+            } else {
+                const gId = await this._nodeId(ctx, opts.graph as RdfTerm);
+                if (gId === null) {
+                    // Graph never interned ⇒ no edges in it; only roots qualify.
+                    return includeRoots ? this._idsToIris(ctx, rootIds) : [];
+                }
+                graphClause = `e.${C.graph} = ${gId}`;
+            }
+        }
+
+        const fromCol = opts.direction === "out" ? C.subject : C.object;
+        const toCol = opts.direction === "out" ? C.object : C.subject;
+        const isPg = this._isPg();
+        const falseLit = isPg ? "false" : "0";
+        const rootList = rootIds.join(", ");
+        const predList = predIds.join(", ");
+
+        const sql =
+            opts.maxDepth !== undefined
+                ? `WITH RECURSIVE reach(node, depth) AS (
+                    SELECT ${C.id}, 0 FROM ${T.nodes} WHERE ${C.id} IN (${rootList})
+                    UNION ALL
+                    SELECT e.${toCol}, r.depth + 1
+                    FROM ${T.edges} e JOIN reach r ON e.${fromCol} = r.node
+                    WHERE r.depth < ${Number(opts.maxDepth)}
+                      AND e.${C.predicate} IN (${predList})
+                      AND e.${C.isDeleted} = ${falseLit}
+                      AND ${graphClause}
+                   ) SELECT DISTINCT node FROM reach`
+                : `WITH RECURSIVE reach(node) AS (
+                    SELECT ${C.id} FROM ${T.nodes} WHERE ${C.id} IN (${rootList})
+                    UNION
+                    SELECT e.${toCol}
+                    FROM ${T.edges} e JOIN reach r ON e.${fromCol} = r.node
+                    WHERE e.${C.predicate} IN (${predList})
+                      AND e.${C.isDeleted} = ${falseLit}
+                      AND ${graphClause}
+                   ) SELECT node FROM reach`;
+
+        const raw = await this._db(ctx).raw(sql);
+        const rows = (Array.isArray(raw) ? raw : raw.rows) as Array<{ node: number }>;
+
+        const rootSet = new Set(rootIds);
+        const ids = rows
+            .map((r) => Number(r.node))
+            .filter((id) => includeRoots || !rootSet.has(id));
+        return this._idsToIris(ctx, ids);
+    }
+
+    /** Resolves a set of node ids to their IRI terms, dropping any non-IRI (literal/blank) nodes. */
+    private async _idsToIris(ctx: ServerContext, ids: number[]): Promise<IRI[]> {
+        if (ids.length === 0) {
+            return [];
+        }
+        const unique = [...new Set(ids)];
+        const nodeMap = await this._loadNodes(ctx, unique);
+        const result: IRI[] = [];
+        for (const id of unique) {
+            const term = nodeMap.get(id);
+            if (term && isIRI(term)) {
+                result.push(term);
+            }
+        }
+        return result;
+    }
+
+    /** True when the underlying Knex client is Postgres. */
+    private _isPg(): boolean {
+        const client = (this._knex.client as { config: { client: string } }).config.client;
+        return client === "pg" || client === "postgresql";
     }
 
     // ── Stats ─────────────────────────────────────────────────────────────────

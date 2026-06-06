@@ -2,8 +2,9 @@ import type { IRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import type { EntityRecord, EntitySchema, FilterOp } from "@jasonscharf/entities";
 import { RDF_TYPE, toLiteral } from "@jasonscharf/entities";
-import { EntityStore } from "./EntityStore.js";
+import { type EdgeInput, type EntityInput, EntityStore, edgeTargetIri } from "./EntityStore.js";
 import type { ServerContext } from "./ServerContext.js";
+import { tenantGraph } from "./tenancy.js";
 
 export type { FilterOp };
 
@@ -11,6 +12,18 @@ interface Filter {
     prop: string;
     op: FilterOp;
     value: unknown;
+}
+
+/** An edge-equality filter: entity --edge--> targetIri. */
+interface EdgeFilter {
+    edgeName: string;
+    targetIri: string;
+}
+
+/** A subtree-membership filter: entity is reachable from rootIri via the edge's predicate. */
+interface WithinFilter {
+    edgeName: string;
+    rootIri: string;
 }
 
 interface OrderClause {
@@ -21,6 +34,8 @@ interface OrderClause {
 export class EntityQuery<Props extends Record<string, unknown>> {
     private readonly _es: EntityStore;
     private _filters: Filter[] = [];
+    private _edgeFilters: EdgeFilter[] = [];
+    private _withinFilters: WithinFilter[] = [];
     private _order?: OrderClause;
     private _limit?: number;
     private _offset?: number;
@@ -42,6 +57,34 @@ export class EntityQuery<Props extends Record<string, unknown>> {
         return this;
     }
 
+    /**
+     * Filter to entities whose `edge` points at `target` (an id, IRI, or record).
+     * This is the topological replacement for `.where('fooId', '=', …)` — it
+     * matches on the IRI-object edge, not a foreign-key scalar.
+     */
+    connectedTo(edge: string, target: EdgeInput): this {
+        const def = this._schema.edges?.[edge];
+        if (!def) {
+            throw new Error(`EntityQuery.connectedTo: schema has no edge "${edge}"`);
+        }
+        this._edgeFilters.push({ edgeName: edge, targetIri: edgeTargetIri(def.target(), target) });
+        return this;
+    }
+
+    /**
+     * Filter to entities that lie within the subtree rooted at `root`, following
+     * the given `edge`'s predicate (e.g. `.within('parent', folderId)` returns the
+     * folder and everything transitively under it).  Evaluated as one recursive CTE.
+     */
+    within(edge: string, root: EdgeInput): this {
+        const def = this._schema.edges?.[edge];
+        if (!def) {
+            throw new Error(`EntityQuery.within: schema has no edge "${edge}"`);
+        }
+        this._withinFilters.push({ edgeName: edge, rootIri: edgeTargetIri(def.target(), root) });
+        return this;
+    }
+
     limit(n: number): this {
         this._limit = n;
         return this;
@@ -54,14 +97,9 @@ export class EntityQuery<Props extends Record<string, unknown>> {
 
     async all(ctx: ServerContext): Promise<EntityRecord<Props>[]> {
         return this._store.withTransaction(ctx, async (txCtx) => {
-            let candidateIris = await this._allEntityIris(txCtx);
+            const candidateIris = await this._narrow(txCtx);
 
-            const eqFilters = this._filters.filter((f) => f.op === "=");
             const otherFilters = this._filters.filter((f) => f.op !== "=");
-
-            for (const f of eqFilters) {
-                candidateIris = await this._applyEqFilter(txCtx, candidateIris, f);
-            }
 
             let records = await this._es.hydrateMany(txCtx, this._schema, candidateIris);
 
@@ -95,15 +133,12 @@ export class EntityQuery<Props extends Record<string, unknown>> {
 
     async count(ctx: ServerContext): Promise<number> {
         return this._store.withTransaction(ctx, async (txCtx) => {
-            let iris = await this._allEntityIris(txCtx);
-            for (const f of this._filters.filter((ff) => ff.op === "=")) {
-                iris = await this._applyEqFilter(txCtx, iris, f);
-            }
+            const iris = await this._narrow(txCtx);
             return iris.length;
         });
     }
 
-    async create(ctx: ServerContext, data: Partial<Props>): Promise<EntityRecord<Props>> {
+    async create(ctx: ServerContext, data: EntityInput<Props>): Promise<EntityRecord<Props>> {
         return this._es.create(ctx, this._schema, data);
     }
 
@@ -131,12 +166,71 @@ export class EntityQuery<Props extends Record<string, unknown>> {
 
     // ── Private ───────────────────────────────────────────────────────────────
 
+    /**
+     * Narrows the entity set by every server-side filter (equality, edge, and
+     * subtree) and returns the surviving IRIs.  Shared by all() and count().
+     */
+    private async _narrow(ctx: ServerContext): Promise<string[]> {
+        let iris = await this._allEntityIris(ctx);
+        for (const f of this._filters.filter((ff) => ff.op === "=")) {
+            iris = await this._applyEqFilter(ctx, iris, f);
+        }
+        for (const ef of this._edgeFilters) {
+            iris = await this._applyEdgeFilter(ctx, iris, ef);
+        }
+        for (const wf of this._withinFilters) {
+            iris = await this._applyWithinFilter(ctx, iris, wf);
+        }
+        return iris;
+    }
+
     private async _allEntityIris(ctx: ServerContext): Promise<string[]> {
         const quads = await this._store.find(ctx, {
             predicate: RDF_TYPE,
             object: this._schema.typeIRI,
         });
         return quads.map((q) => (q.subject as IRI).value);
+    }
+
+    /** Narrows to entities that have an out-edge pointing at the target IRI. */
+    private async _applyEdgeFilter(
+        ctx: ServerContext,
+        iris: string[],
+        f: EdgeFilter,
+    ): Promise<string[]> {
+        const def = this._schema.edges?.[f.edgeName];
+        /* v8 ignore next 3 -- guarded at connectedTo() call time */
+        if (!def) {
+            return iris;
+        }
+        const edgeQuads = await this._store.find(ctx, {
+            predicate: def.predicate,
+            object: { value: f.targetIri } as IRI,
+        });
+        const matching = new Set(edgeQuads.map((q) => (q.subject as IRI).value));
+        return iris.filter((iri) => matching.has(iri));
+    }
+
+    /** Narrows to entities within the subtree rooted at rootIri (one recursive CTE). */
+    private async _applyWithinFilter(
+        ctx: ServerContext,
+        iris: string[],
+        f: WithinFilter,
+    ): Promise<string[]> {
+        const def = this._schema.edges?.[f.edgeName];
+        /* v8 ignore next 3 -- guarded at within() call time */
+        if (!def) {
+            return iris;
+        }
+        // Descendants of the root: follow the edge predicate inbound (child --edge--> parent).
+        const subtree = await this._store.reachable(ctx, {
+            roots: [{ value: f.rootIri } as IRI],
+            predicates: [def.predicate],
+            direction: "in",
+            graph: tenantGraph(ctx, this._schema.graph),
+        });
+        const subtreeSet = new Set(subtree.map((i) => i.value));
+        return iris.filter((iri) => subtreeSet.has(iri));
     }
 
     private async _applyEqFilter(ctx: ServerContext, iris: string[], f: Filter): Promise<string[]> {

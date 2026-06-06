@@ -7,6 +7,7 @@ export type {
 export { CollectionViewStore } from "./CollectionView.js";
 export type { FilterOp } from "./EntityQuery.js";
 export { EntityQuery } from "./EntityQuery.js";
+export type { EdgeInput, EntityInput } from "./EntityStore.js";
 export { EntityStore } from "./EntityStore.js";
 export { EntityValidationError } from "./EntityValidationError.js";
 export { ExtensionManager } from "./ExtensionManager.js";

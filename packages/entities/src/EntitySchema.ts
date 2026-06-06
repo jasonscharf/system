@@ -1,5 +1,6 @@
 import type { IRI } from "@jasonscharf/core";
 import type { ShaclNodeShape } from "@jasonscharf/gen";
+import type { EdgeDef } from "./EdgeDef.js";
 
 export type DefaultValue<T> = T | (() => T);
 
@@ -14,6 +15,12 @@ export class EntitySchema<Props extends Record<string, unknown> = Record<string,
     readonly typeIRI: IRI;
     readonly ns: string;
     readonly properties: { readonly [K in keyof Props]: IRI };
+    /**
+     * Topological relationships — edges whose object is another entity's IRI.
+     * These replace foreign-key scalars (`domainId`, `tenantId`, `parentIri`…):
+     * a value that *is another entity's identity* is an edge, never a literal.
+     */
+    readonly edges?: Readonly<Record<string, EdgeDef>>;
     readonly defaults?: { readonly [K in keyof Props]?: DefaultValue<Props[K]> };
     readonly shape?: ShaclNodeShape;
     /**
@@ -28,6 +35,7 @@ export class EntitySchema<Props extends Record<string, unknown> = Record<string,
         typeIRI: IRI;
         ns: string;
         properties: { readonly [K in keyof Props]: IRI };
+        edges?: Readonly<Record<string, EdgeDef>>;
         defaults?: { readonly [K in keyof Props]?: DefaultValue<Props[K]> };
         shape?: ShaclNodeShape;
         graph?: string;
@@ -35,6 +43,7 @@ export class EntitySchema<Props extends Record<string, unknown> = Record<string,
         this.typeIRI = opts.typeIRI;
         this.ns = opts.ns;
         this.properties = opts.properties;
+        this.edges = opts.edges;
         this.defaults = opts.defaults;
         this.shape = opts.shape;
         this.graph = opts.graph;

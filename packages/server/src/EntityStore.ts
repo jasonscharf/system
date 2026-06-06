@@ -1,6 +1,13 @@
-import { DEFAULT_GRAPH, type DefaultGraph, type IRI } from "@jasonscharf/core";
+import { DEFAULT_GRAPH, type DefaultGraph, type IRI, type Quad } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { EntityRecord, EntitySchema } from "@jasonscharf/entities";
+import type {
+    EdgeDef,
+    EdgeHandle,
+    EdgeRef,
+    EdgeSet,
+    EntityRecord,
+    EntitySchema,
+} from "@jasonscharf/entities";
 import {
     EntityValidationError,
     entityIri,
@@ -44,9 +51,7 @@ export class EntityStore {
         if (!maybeFn) {
             throw new Error("inTransaction(ctx, fn): fn is required when ctx is provided");
         }
-        return this._store.knex.transaction(async (trx) =>
-            maybeFn({ ...ctxOrFn, trx }),
-        );
+        return this._store.knex.transaction(async (trx) => maybeFn({ ...ctxOrFn, trx }));
     }
 
     private async _withTrx<T>(
@@ -61,21 +66,32 @@ export class EntityStore {
     async create<Props extends Record<string, unknown>>(
         ctx: ServerContext,
         schema: EntitySchema<Props>,
-        data: Partial<Props>,
+        data: EntityInput<Props>,
     ): Promise<EntityRecord<Props>> {
         const withDefs = this._applyDefaults(schema, data);
         this._validate(schema, withDefs);
 
         const id = _newId();
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+        const edgeTargets = resolveEdgeTargets(schema, data);
 
         return this._withTrx(ctx, async (txCtx) => {
             const graph = tenantGraphForInsert(txCtx, schema.graph);
             await this._store.insertMany(txCtx, [
                 { subject: ent, predicate: RDF_TYPE, object: schema.typeIRI, graph },
                 ...this._propQuads(ent, schema, withDefs, graph),
+                ...edgeQuads(ent, edgeTargets, graph),
             ]);
-            return { id, iri: ent.value, props: withDefs as Props };
+            const record: EntityRecord<Props> = {
+                id,
+                iri: ent.value,
+                props: pickProps(schema, withDefs) as Props,
+            };
+            const edges = this._buildEdgeHandles(schema, edgeTargetMap(schema, edgeTargets));
+            if (edges) {
+                record.edges = edges;
+            }
+            return record;
         });
     }
 
@@ -89,7 +105,11 @@ export class EntityStore {
         return this._withTrx(ctx, async (txCtx) => {
             const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
             const graph = tenantGraph(txCtx, schema.graph);
-            const typeQ = await this._store.find(txCtx, { subject: ent, predicate: RDF_TYPE, graph });
+            const typeQ = await this._store.find(txCtx, {
+                subject: ent,
+                predicate: RDF_TYPE,
+                graph,
+            });
             if (typeQ.length === 0) {
                 return null;
             }
@@ -103,7 +123,7 @@ export class EntityStore {
         ctx: ServerContext,
         schema: EntitySchema<Props>,
         id: string,
-        patch: Partial<Props>,
+        patch: EntityInput<Props>,
     ): Promise<void> {
         this._validate(schema, patch);
 
@@ -111,13 +131,17 @@ export class EntityStore {
         const patchEntries = Object.entries(patch).filter(
             ([propName]) => !!(schema.properties as Record<string, IRI>)[propName],
         );
-        const predIris = patchEntries.map(([propName]) => {
-            const iri = (schema.properties as Record<string, IRI>)[propName];
-            if (iri == null) {
-                throw new Error(`EntityStore.update: missing IRI for property "${propName}"`);
-            }
-            return iri;
-        });
+        const edgeTargets = resolveEdgeTargets(schema, patch);
+        const predIris = [
+            ...patchEntries.map(([propName]) => {
+                const iri = (schema.properties as Record<string, IRI>)[propName];
+                if (iri == null) {
+                    throw new Error(`EntityStore.update: missing IRI for property "${propName}"`);
+                }
+                return iri;
+            }),
+            ...edgeTargets.map((e) => e.predicate),
+        ];
 
         return this._withTrx(ctx, async (txCtx) => {
             const filterGraph = tenantGraph(txCtx, schema.graph);
@@ -125,15 +149,25 @@ export class EntityStore {
             if (predIris.length > 0) {
                 await this._store.deleteBySubjectPredicates(txCtx, ent, predIris, filterGraph);
             }
-            const quads = patchEntries
-                .filter(([, value]) => value !== undefined)
-                .flatMap(([propName, value]) => {
-                    const propIri = (schema.properties as Record<string, IRI>)[propName];
-                    if (propIri == null) {
-                        throw new Error(`EntityStore.update: missing IRI for property "${propName}"`);
-                    }
-                    return [{ subject: ent, predicate: propIri, object: toLiteral(value), graph: insertGraph }];
-                });
+            const quads = [
+                ...patchEntries
+                    .filter(([, value]) => value !== undefined)
+                    .map(([propName, value]) => {
+                        const propIri = (schema.properties as Record<string, IRI>)[propName];
+                        if (propIri == null) {
+                            throw new Error(
+                                `EntityStore.update: missing IRI for property "${propName}"`,
+                            );
+                        }
+                        return {
+                            subject: ent,
+                            predicate: propIri,
+                            object: toLiteral(value),
+                            graph: insertGraph,
+                        };
+                    }),
+                ...edgeQuads(ent, edgeTargets, insertGraph),
+            ];
             if (quads.length > 0) {
                 await this._store.insertMany(txCtx, quads);
             }
@@ -145,7 +179,10 @@ export class EntityStore {
     async delete(ctx: ServerContext, schema: EntitySchema, id: string): Promise<void> {
         const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
         return this._withTrx(ctx, async (txCtx) => {
-            await this._store.delete(txCtx, { subject: ent, graph: tenantGraph(txCtx, schema.graph) });
+            await this._store.delete(txCtx, {
+                subject: ent,
+                graph: tenantGraph(txCtx, schema.graph),
+            });
         });
     }
 
@@ -163,7 +200,11 @@ export class EntityStore {
                 return [];
             }
             const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
-            const quads = await this._store.findOrdered(txCtx, { subject: ent, predicate: propIri, graph: tenantGraph(txCtx, schema.graph) });
+            const quads = await this._store.findOrdered(txCtx, {
+                subject: ent,
+                predicate: propIri,
+                graph: tenantGraph(txCtx, schema.graph),
+            });
             return quads.map((q) => fromLiteral(q.object)).filter((v) => v !== undefined);
         });
     }
@@ -188,7 +229,12 @@ export class EntityStore {
 
             await this._store.insertMany(
                 txCtx,
-                values.map((v) => ({ subject: ent, predicate: propIri, object: toLiteral(v), graph })),
+                values.map((v) => ({
+                    subject: ent,
+                    predicate: propIri,
+                    object: toLiteral(v),
+                    graph,
+                })),
             );
             for (const v of values) {
                 for (const vIri of viewIris) {
@@ -267,11 +313,20 @@ export class EntityStore {
         return this._withTrx(ctx, async (txCtx) => {
             const filterGraph = tenantGraph(txCtx, schema.graph);
             const insertGraph = tenantGraphForInsert(txCtx, schema.graph);
-            await this._store.delete(txCtx, { subject: ent, predicate: propIri, graph: filterGraph });
+            await this._store.delete(txCtx, {
+                subject: ent,
+                predicate: propIri,
+                graph: filterGraph,
+            });
             if (values.length > 0) {
                 await this._store.insertMany(
                     txCtx,
-                    values.map((v) => ({ subject: ent, predicate: propIri, object: toLiteral(v), graph: insertGraph })),
+                    values.map((v) => ({
+                        subject: ent,
+                        predicate: propIri,
+                        object: toLiteral(v),
+                        graph: insertGraph,
+                    })),
                 );
             }
             const viewIris = await this._cvs().findViewsForSource(txCtx, ent.value, propIri.value);
@@ -330,11 +385,11 @@ export class EntityStore {
     ): Promise<EntityRecord<Props>[]> {
         return this._withTrx(ctx, async (txCtx) => {
             const graph = tenantGraph(txCtx, schema.graph);
-            return Promise.all(
-                iris.map((iri) => {
-                    const id = idFromIri(iri);
-                    return this._hydrate(txCtx, schema, id, iri, graph);
-                }),
+            // Single round-trip for all subjects — no per-IRI N+1.
+            const subjects = iris.map((iri) => ({ value: iri }) as IRI);
+            const bySubject = await this._store.findForSubjects(txCtx, subjects, graph);
+            return iris.map((iri) =>
+                this._recordFromQuads(schema, idFromIri(iri), iri, bySubject.get(iri) ?? []),
             );
         });
     }
@@ -355,14 +410,37 @@ export class EntityStore {
         entIri: string,
         graph?: IRI | null,
     ): Promise<EntityRecord<Props>> {
-        const iriToName = invertPropertyMap(schema.properties as Record<string, IRI>);
         const entNode = { value: entIri } as IRI;
         const quads = await this._store.find(ctx, { subject: entNode, graph });
+        return this._recordFromQuads(schema, id, entIri, quads);
+    }
+
+    /** Builds an EntityRecord from a subject's quads — pure, no DB access. */
+    private _recordFromQuads<Props extends Record<string, unknown>>(
+        schema: EntitySchema<Props>,
+        id: string,
+        entIri: string,
+        quads: Quad[],
+    ): EntityRecord<Props> {
+        const iriToName = invertPropertyMap(schema.properties as Record<string, IRI>);
+        const edgePredToName = outEdgePredMap(schema);
 
         const raw: Record<string, unknown[]> = {};
+        const edgeTargets: Record<string, string[]> = {};
         for (const q of quads) {
             const predStr = (q.predicate as IRI).value;
             if (predStr === RDF_TYPE.value) {
+                continue;
+            }
+            const edgeName = edgePredToName.get(predStr);
+            if (edgeName) {
+                const targetIri = objectIri(q.object);
+                if (targetIri) {
+                    if (!edgeTargets[edgeName]) {
+                        edgeTargets[edgeName] = [];
+                    }
+                    edgeTargets[edgeName]?.push(targetIri);
+                }
                 continue;
             }
             const propName = iriToName.get(predStr);
@@ -380,7 +458,60 @@ export class EntityStore {
         for (const [k, vals] of Object.entries(raw)) {
             props[k] = vals.length === 1 ? vals[0] : vals;
         }
-        return { id, iri: entIri, props: props as Props };
+
+        const record: EntityRecord<Props> = { id, iri: entIri, props: props as Props };
+        const edges = this._buildEdgeHandles(schema, edgeTargets);
+        if (edges) {
+            record.edges = edges;
+        }
+        return record;
+    }
+
+    /**
+     * Builds the lazy edge handles for an entity's "out" edges.  Returns
+     * undefined when the schema declares no out edges, so edgeless entities keep
+     * their original `{ id, iri, props }` shape.
+     */
+    private _buildEdgeHandles(
+        schema: EntitySchema,
+        edgeTargets: Record<string, string[]>,
+    ): Record<string, EdgeHandle> | undefined {
+        const outEdges = Object.entries(schema.edges ?? {}).filter(
+            ([, def]) => (def.direction ?? "out") === "out",
+        );
+        if (outEdges.length === 0) {
+            return undefined;
+        }
+
+        const handles: Record<string, EdgeHandle> = {};
+        for (const [name, def] of outEdges) {
+            const targets = edgeTargets[name] ?? [];
+            if ((def.cardinality ?? "one") === "many") {
+                handles[name] = this._edgeSet(def, targets);
+            } else if (targets.length > 0) {
+                handles[name] = this._edgeRef(def, targets[0]);
+            }
+        }
+        return handles;
+    }
+
+    private _edgeRef(def: EdgeDef, targetIri: string): EdgeRef {
+        const targetSchema = def.target();
+        const id = idFromIri(targetIri);
+        return {
+            iri: targetIri,
+            id,
+            load: (ctx) => this.findById(ctx as ServerContext, targetSchema, id),
+        };
+    }
+
+    private _edgeSet(def: EdgeDef, targetIris: string[]): EdgeSet {
+        const targetSchema = def.target();
+        return {
+            iris: targetIris,
+            ids: targetIris.map(idFromIri),
+            load: (ctx) => this.hydrateMany(ctx as ServerContext, targetSchema, targetIris),
+        };
     }
 
     private _propQuads(
@@ -397,10 +528,20 @@ export class EntityStore {
             }
             if (Array.isArray(value)) {
                 for (const v of value) {
-                    results.push({ subject: ent, predicate: propIri as IRI, object: toLiteral(v), graph });
+                    results.push({
+                        subject: ent,
+                        predicate: propIri as IRI,
+                        object: toLiteral(v),
+                        graph,
+                    });
                 }
             } else {
-                results.push({ subject: ent, predicate: propIri as IRI, object: toLiteral(value), graph });
+                results.push({
+                    subject: ent,
+                    predicate: propIri as IRI,
+                    object: toLiteral(value),
+                    graph,
+                });
             }
         }
         return results;
@@ -444,4 +585,120 @@ import { randomBytes } from "node:crypto";
 
 function _newId(): string {
     return randomBytes(16).toString("hex");
+}
+
+/** Returns only the declared literal-property keys from an input object. */
+function pickProps(schema: EntitySchema, data: Record<string, unknown>): Record<string, unknown> {
+    const props: Record<string, unknown> = {};
+    for (const key of Object.keys(schema.properties)) {
+        if (data[key] !== undefined) {
+            props[key] = data[key];
+        }
+    }
+    return props;
+}
+
+/** Maps predicate IRI → edge name for a schema's "out" edges. */
+function outEdgePredMap(schema: EntitySchema): Map<string, string> {
+    const map = new Map<string, string>();
+    for (const [name, def] of Object.entries(schema.edges ?? {})) {
+        if ((def.direction ?? "out") === "out") {
+            map.set(def.predicate.value, name);
+        }
+    }
+    return map;
+}
+
+/** Returns the IRI string of a quad object when it is an IRI node, else null. */
+function objectIri(object: Quad["object"]): string | null {
+    if (object && typeof object === "object" && !("termType" in object)) {
+        return (object as IRI).value;
+    }
+    return null;
+}
+
+// ── Edge write helpers ──────────────────────────────────────────────────────────
+
+/** A value supplied for an edge: a target id, a full target IRI, or a record. */
+export type EdgeInput = string | EntityRecord;
+
+/**
+ * Create/update input.  Literal properties are typed by `Props`; edge values are
+ * supplied under their edge name (a target id, IRI, or record).  The index
+ * signature admits edge keys without losing type-checking on the `Props` keys.
+ */
+export type EntityInput<Props extends Record<string, unknown>> = Partial<Props> &
+    Record<string, unknown>;
+
+interface ResolvedEdge {
+    predicate: IRI;
+    targetIris: string[];
+}
+
+/** Resolves the "out" edge values present in `data` to concrete target IRIs. */
+function resolveEdgeTargets(schema: EntitySchema, data: Record<string, unknown>): ResolvedEdge[] {
+    const resolved: ResolvedEdge[] = [];
+    for (const [name, def] of Object.entries(schema.edges ?? {})) {
+        if ((def.direction ?? "out") !== "out") {
+            continue;
+        }
+        const value = data[name];
+        if (value === undefined || value === null) {
+            continue;
+        }
+        const targetSchema = def.target();
+        const values = Array.isArray(value) ? value : [value];
+        resolved.push({
+            predicate: def.predicate,
+            targetIris: values.map((v) => edgeTargetIri(targetSchema, v as EdgeInput)),
+        });
+    }
+    return resolved;
+}
+
+/** Resolves a single edge input (id, IRI, or record) to the target entity's IRI string. */
+export function edgeTargetIri(targetSchema: EntitySchema, value: EdgeInput): string {
+    if (typeof value === "object" && value !== null && "iri" in value) {
+        return (value as EntityRecord).iri;
+    }
+    const str = String(value);
+    if (str.includes("://")) {
+        return str;
+    }
+    return entityIri(targetSchema.ns, localName(targetSchema.typeIRI.value), str).value;
+}
+
+/** Builds the IRI-object quads for a set of resolved edges. */
+function edgeQuads(
+    subject: IRI,
+    edges: ResolvedEdge[],
+    graph: IRI | DefaultGraph,
+): Array<Parameters<TripleStore["insert"]>[1]> {
+    const quads: Array<Parameters<TripleStore["insert"]>[1]> = [];
+    for (const edge of edges) {
+        for (const targetIri of edge.targetIris) {
+            quads.push({
+                subject,
+                predicate: edge.predicate,
+                object: { value: targetIri } as IRI,
+                graph,
+            });
+        }
+    }
+    return quads;
+}
+
+/** Inverts resolved edges into the predicate→targets map keyed by edge name. */
+function edgeTargetMap(schema: EntitySchema, edges: ResolvedEdge[]): Record<string, string[]> {
+    const predToName = new Map(
+        Object.entries(schema.edges ?? {}).map(([name, def]) => [def.predicate.value, name]),
+    );
+    const map: Record<string, string[]> = {};
+    for (const edge of edges) {
+        const name = predToName.get(edge.predicate.value);
+        if (name) {
+            map[name] = edge.targetIris;
+        }
+    }
+    return map;
 }

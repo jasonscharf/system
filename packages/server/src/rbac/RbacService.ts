@@ -1,6 +1,7 @@
 import { actsForIRI, IRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { SecurityContext, ServerContext } from "@jasonscharf/server";
+import type { SecurityContext } from "../SecurityContext.js";
+import type { ServerContext } from "../ServerContext.js";
 import { AccessChecker } from "./AccessChecker.js";
 import { RBAC_GRAPH } from "./constants.js";
 import { RbacInspector } from "./RbacInspector.js";

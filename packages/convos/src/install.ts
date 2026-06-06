@@ -10,7 +10,7 @@
  *                     they issued and drop the extension data via migrations.
  */
 
-import type { RbacService } from "@jasonscharf/rbac";
+import type { RbacService } from "@jasonscharf/server";
 import { type SecurityContext, type ServerContext, systemSec } from "@jasonscharf/server";
 import {
     ALL_CONVOS_PERMISSIONS,
@@ -59,7 +59,10 @@ export async function installConvos(
     for (const key of CONVO_USER_PERMISSIONS) {
         const pIri = permissionIris[key];
         if (pIri) {
-            await rbac.addPermissionToRole(ctx, sec, { roleIri: userRole.iri, permissionIri: pIri });
+            await rbac.addPermissionToRole(ctx, sec, {
+                roleIri: userRole.iri,
+                permissionIri: pIri,
+            });
         }
     }
 

@@ -14,6 +14,8 @@ export { ExtensionManager } from "./ExtensionManager.js";
 export type { ExtensionRecord } from "./ExtensionRegistry.js";
 export { ExtensionRegistry } from "./ExtensionRegistry.js";
 export * from "./env.js";
+// ── RBAC (moved in from the retired @jasonscharf/rbac package) ───────────────
+export * from "./rbac/index.js";
 export type { SecurityContext } from "./SecurityContext.js";
 export { anonymousSec, systemSec } from "./SecurityContext.js";
 export type { EntityLookup, ServerContext } from "./ServerContext.js";

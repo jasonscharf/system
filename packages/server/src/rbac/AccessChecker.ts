@@ -8,7 +8,8 @@ import {
     rbacGrantsIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import { type ServerContext, systemSec } from "@jasonscharf/server";
+import { systemSec } from "../SecurityContext.js";
+import type { ServerContext } from "../ServerContext.js";
 import { RBAC_GRAPH, WILDCARD_PERMISSION } from "./constants.js";
 import type { PolicyGrantRepository } from "./repository/PolicyGrantRepository.js";
 import { iriValue, literalValue } from "./repository/util.js";

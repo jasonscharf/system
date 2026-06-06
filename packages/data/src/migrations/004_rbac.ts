@@ -23,7 +23,7 @@ const XSD_STRING = "http://www.w3.org/2001/XMLSchema#string";
 const XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
 const XSD_DATETIME = "http://www.w3.org/2001/XMLSchema#dateTime";
 
-// Stable system IDs — must match constants in @jasonscharf/rbac
+// Stable system IDs — must match constants in @jasonscharf/server
 const SYS_TENANT_ID = "sys0000000000000000000000000001";
 const SYS_SUPERUSERS_ID = "sys0000000000000000000000000002";
 const SYS_SUPERADMIN_ID = "sys0000000000000000000000000003";

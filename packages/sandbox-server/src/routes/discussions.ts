@@ -11,7 +11,7 @@
 import type { AuthRouterComponent } from "@jasonscharf/auth";
 import type { ConvoService } from "@jasonscharf/convos";
 import type { HttpCtx, HttpRouter } from "@jasonscharf/flow";
-import type { RbacService } from "@jasonscharf/rbac";
+import type { RbacService } from "@jasonscharf/server";
 import {
     anonymousSec,
     buildServerContext,

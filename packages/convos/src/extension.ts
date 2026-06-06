@@ -8,7 +8,7 @@
  *
  * Usage in a consuming app:
  *
- *   import { rbacExtension, getRbacService }  from "@jasonscharf/rbac";
+ *   import { rbacExtension, getRbacService }  from "@jasonscharf/server";
  *   import { convosExtension, getConvoService, getNotificationService,
  *             getConvosInstall }               from "@jasonscharf/convos";
  *
@@ -27,9 +27,8 @@
 
 import type { ExtensionInstallContext, InstalledExtension, TernExtension } from "@jasonscharf/app";
 import type { TripleStore } from "@jasonscharf/data";
-import type { RbacService } from "@jasonscharf/rbac";
-import { getRbacService } from "@jasonscharf/rbac";
-import { buildServerContext } from "@jasonscharf/server";
+import type { RbacService } from "@jasonscharf/server";
+import { buildServerContext, getRbacService } from "@jasonscharf/server";
 import { ConvoService } from "./ConvoService.js";
 import type { ConvosInstallResult } from "./install.js";
 import { installConvos } from "./install.js";

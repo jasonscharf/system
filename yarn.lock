@@ -1247,7 +1247,6 @@ __metadata:
     "@jasonscharf/app": "workspace:^"
     "@jasonscharf/core": "workspace:^"
     "@jasonscharf/data": "workspace:^"
-    "@jasonscharf/rbac": "workspace:^"
     "@jasonscharf/server": "workspace:^"
     "@types/node": "npm:^22.0.0"
     "@types/react": "npm:^19"
@@ -1322,19 +1321,6 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@jasonscharf/rbac@workspace:^, @jasonscharf/rbac@workspace:packages/rbac":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/rbac@workspace:packages/rbac"
-  dependencies:
-    "@jasonscharf/app": "workspace:^"
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/data": "workspace:^"
-    "@jasonscharf/entities": "workspace:^"
-    "@jasonscharf/server": "workspace:^"
-    "@types/node": "npm:^22.0.0"
-  languageName: unknown
-  linkType: soft
-
 "@jasonscharf/sandbox-cli@workspace:packages/sandbox-cli":
   version: 0.0.0-use.local
   resolution: "@jasonscharf/sandbox-cli@workspace:packages/sandbox-cli"
@@ -1367,7 +1353,6 @@ __metadata:
     "@jasonscharf/core": "workspace:^"
     "@jasonscharf/data": "workspace:^"
     "@jasonscharf/flow": "workspace:^"
-    "@jasonscharf/rbac": "workspace:^"
     "@jasonscharf/server": "workspace:^"
     "@jasonscharf/vaults": "workspace:^"
     better-sqlite3: "npm:^11.10.0"
@@ -1420,7 +1405,6 @@ __metadata:
     "@jasonscharf/events": "workspace:^"
     "@jasonscharf/flow": "workspace:^"
     "@jasonscharf/gen": "workspace:^"
-    "@jasonscharf/rbac": "workspace:^"
     "@jasonscharf/server": "workspace:^"
     "@jasonscharf/vaults": "workspace:^"
     "@jasonscharf/worker": "workspace:^"

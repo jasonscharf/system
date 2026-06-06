@@ -8,7 +8,7 @@
  *
  * Usage in a consuming app:
  *
- *   import { rbacExtension, getRbacService } from "@jasonscharf/rbac";
+ *   import { rbacExtension, getRbacService } from "@jasonscharf/server";
  *
  *   const installed = await ternApp.use(rbacExtension);
  *   const rbac = getRbacService(installed);
@@ -19,7 +19,7 @@
 
 import type { ExtensionInstallContext, InstalledExtension, TernExtension } from "@jasonscharf/app";
 import type { TripleStore } from "@jasonscharf/data";
-import { buildServerContext } from "@jasonscharf/server";
+import { buildServerContext } from "../ServerContext.js";
 import { RbacService } from "./RbacService.js";
 import { PermissionRepository } from "./repository/PermissionRepository.js";
 import { PolicyGrantRepository } from "./repository/PolicyGrantRepository.js";

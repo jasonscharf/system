@@ -41,20 +41,18 @@ import {
 } from "@jasonscharf/convos";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import {
+    buildServerContext,
     PermissionRepository,
     PolicyGrantRepository,
     RbacService,
     ResourceNodeRepository,
     RoleRepository,
-    ServiceAccountRepository,
-    TenantRepository,
-    UserGroupRepository,
-} from "@jasonscharf/rbac";
-import {
-    buildServerContext,
     type SecurityContext,
     type ServerContext,
+    ServiceAccountRepository,
     systemSec,
+    TenantRepository,
+    UserGroupRepository,
 } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

@@ -35,8 +35,7 @@ import {
     HttpServer,
     WebSocketServer,
 } from "@jasonscharf/flow";
-import { getRbacService, rbacExtension } from "@jasonscharf/rbac";
-import { buildServerContext } from "@jasonscharf/server";
+import { buildServerContext, getRbacService, rbacExtension } from "@jasonscharf/server";
 import { SecretsManager } from "@jasonscharf/vaults";
 import { MessageDecoder } from "./components/MessageDecoder.js";
 import { MessageEncoder } from "./components/MessageEncoder.js";

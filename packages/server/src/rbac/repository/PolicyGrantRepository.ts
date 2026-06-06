@@ -1,12 +1,10 @@
 import { IRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import type { EntityRecord } from "@jasonscharf/entities";
-import {
-    EntityQuery,
-    EntityStore,
-    type SecurityContext,
-    type ServerContext,
-} from "@jasonscharf/server";
+import { EntityQuery } from "../../EntityQuery.js";
+import { EntityStore } from "../../EntityStore.js";
+import type { SecurityContext } from "../../SecurityContext.js";
+import type { ServerContext } from "../../ServerContext.js";
 import { RBAC_GRAPH } from "../constants.js";
 import { PolicyGrantSchema } from "../schemas.generated.js";
 import type { PolicyGrantEntity } from "../types.js";

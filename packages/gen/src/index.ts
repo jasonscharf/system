@@ -3,6 +3,8 @@ export { generate, generateFromConfig } from "./generate.js";
 export { parseNTriples } from "./NTriplesParser.js";
 export type { Ontology, OntologyClass, OntologyProperty } from "./OntologyReader.js";
 export { readOntology } from "./OntologyReader.js";
+export type { SchemaGenConfig } from "./SchemaGenerator.js";
+export { generateSchemas } from "./SchemaGenerator.js";
 export type { ShaclNodeShape, ShaclPropertyShape, ShaclShapes } from "./ShaclReader.js";
 export { mergeShapes, readShaclShapes } from "./ShaclReader.js";
 export type { ValidationResult, ValidationViolation } from "./ShaclValidator.js";

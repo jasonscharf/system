@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Triple } from "@jasonscharf/core";
 import { generateTypes, parseNTriples, readOntology } from "./index.js";
+import { generateSchemas } from "./SchemaGenerator.js";
 import type { ShaclShapes } from "./ShaclReader.js";
 import { mergeShapes, readShaclShapes } from "./ShaclReader.js";
 import { generateShapesDescriptor } from "./ShapeGenerator.js";
@@ -34,6 +35,10 @@ export interface GenConfig {
     out: string;
     /** Optional output path for the generated runtime shapes descriptor. */
     shapesOut?: string;
+    /** Optional output path for generated EntitySchema constants (properties + edges). */
+    schemasOut?: string;
+    /** Import path for EntitySchema in the generated schemas file.  Defaults to `@jasonscharf/entities`. */
+    entitiesImport?: string;
     /**
      * Import path for the `IRI` class.  Defaults to `'@system/core'`.
      * Override to `'../semantics/IRI.js'` when generating types inside @system/core itself.
@@ -68,6 +73,8 @@ export async function generateFromConfig(configPath: string): Promise<void> {
     const config = JSON.parse(await readFile(configPath, "utf-8")) as GenConfig;
 
     const externalClasses = new Map<string, string>(); // classIRI → importPath
+    // classIRI → the EntitySchema to import when an edge targets a base class.
+    const schemaImports = new Map<string, { importPath: string; schemaName: string }>();
     const allTriples: Triple[] = [];
     let allShapes: ShaclShapes = { nodeShapes: new Map(), byTargetClass: new Map() };
 
@@ -80,6 +87,7 @@ export async function generateFromConfig(configPath: string): Promise<void> {
         const importPath = base.importPath ?? base.package;
         for (const cls of readOntology(triples).classes.values()) {
             externalClasses.set(cls.iri, importPath);
+            schemaImports.set(cls.iri, { importPath, schemaName: `${cls.name}Schema` });
         }
     }
 
@@ -117,6 +125,19 @@ export async function generateFromConfig(configPath: string): Promise<void> {
         await mkdir(path.dirname(shapesPath), { recursive: true });
         await writeFile(shapesPath, shapesSource, "utf-8");
         console.log(`[gen] shapes descriptor → ${path.relative(process.cwd(), shapesPath)}`);
+    }
+
+    if (config.schemasOut) {
+        const schemasSource = generateSchemas(merged, allShapes, {
+            localNamespace: config.localNamespace,
+            entitiesImport: config.entitiesImport,
+            iriImport: config.iriImport,
+            schemaImports,
+        });
+        const schemasPath = path.resolve(dir, config.schemasOut);
+        await mkdir(path.dirname(schemasPath), { recursive: true });
+        await writeFile(schemasPath, schemasSource, "utf-8");
+        console.log(`[gen] entity schemas → ${path.relative(process.cwd(), schemasPath)}`);
     }
 }
 

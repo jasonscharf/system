@@ -351,13 +351,15 @@ export class EntityStore {
         id: string,
         prop: string,
     ): Promise<unknown> {
-        const items = await this.collectionGet(ctx, schema, id, prop);
-        if (items.length === 0) {
-            return undefined;
-        }
-        const last = items[items.length - 1];
-        await this.collectionRemove(ctx, schema, id, prop, last);
-        return last;
+        return this._withTrx(ctx, async (txCtx) => {
+            const items = await this.collectionGet(txCtx, schema, id, prop);
+            if (items.length === 0) {
+                return undefined;
+            }
+            const last = items[items.length - 1];
+            await this.collectionRemove(txCtx, schema, id, prop, last);
+            return last;
+        });
     }
 
     async collectionSet(
@@ -408,10 +410,12 @@ export class EntityStore {
         index: number,
         value: unknown,
     ): Promise<void> {
-        const current = await this.collectionGet(ctx, schema, id, prop);
-        const clamped = Math.max(0, Math.min(index, current.length));
-        current.splice(clamped, 0, value);
-        await this.collectionSet(ctx, schema, id, prop, current);
+        return this._withTrx(ctx, async (txCtx) => {
+            const current = await this.collectionGet(txCtx, schema, id, prop);
+            const clamped = Math.max(0, Math.min(index, current.length));
+            current.splice(clamped, 0, value);
+            await this.collectionSet(txCtx, schema, id, prop, current);
+        });
     }
 
     // ── CollectionView convenience ────────────────────────────────────────────
@@ -429,9 +433,9 @@ export class EntityStore {
         }
 
         const ent = entityIriFor(schema, id);
-        const currentRefs = (await this.collectionGet(ctx, schema, id, prop)).map(String);
 
         return this._withTrx(ctx, async (txCtx) => {
+            const currentRefs = (await this.collectionGet(txCtx, schema, id, prop)).map(String);
             return this._cvs().create(txCtx, ent.value, propIri.value, currentRefs, opts);
         });
     }

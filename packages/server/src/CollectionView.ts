@@ -55,175 +55,189 @@ export class CollectionViewStore {
         const id = newId();
         const vIri = viewIri(id);
 
-        await this._store.insertMany(ctx, [
-            {
-                subject: vIri,
-                predicate: RDF_TYPE,
-                object: TERN_COLLECTION_VIEW,
-                graph: DEFAULT_GRAPH,
-            },
-            {
-                subject: vIri,
-                predicate: TERN_CV_SOURCE,
-                object: toLiteral(sourcePgIri),
-                graph: DEFAULT_GRAPH,
-            },
-            {
-                subject: vIri,
-                predicate: TERN_CV_PROP,
-                object: toLiteral(sourcePropIri),
-                graph: DEFAULT_GRAPH,
-            },
-            ...(opts.sortProp
-                ? [
-                      {
-                          subject: vIri,
-                          predicate: TERN_CV_SORT_PROP,
-                          object: toLiteral(opts.sortProp.value),
-                          graph: DEFAULT_GRAPH,
-                      },
-                  ]
-                : []),
-            ...(opts.sortDir
-                ? [
-                      {
-                          subject: vIri,
-                          predicate: TERN_CV_SORT_DIR,
-                          object: toLiteral(opts.sortDir),
-                          graph: DEFAULT_GRAPH,
-                      },
-                  ]
-                : []),
-        ]);
+        return this._store.withTransaction(ctx, async (txCtx) => {
+            await this._store.insertMany(txCtx, [
+                {
+                    subject: vIri,
+                    predicate: RDF_TYPE,
+                    object: TERN_COLLECTION_VIEW,
+                    graph: DEFAULT_GRAPH,
+                },
+                {
+                    subject: vIri,
+                    predicate: TERN_CV_SOURCE,
+                    object: toLiteral(sourcePgIri),
+                    graph: DEFAULT_GRAPH,
+                },
+                {
+                    subject: vIri,
+                    predicate: TERN_CV_PROP,
+                    object: toLiteral(sourcePropIri),
+                    graph: DEFAULT_GRAPH,
+                },
+                ...(opts.sortProp
+                    ? [
+                          {
+                              subject: vIri,
+                              predicate: TERN_CV_SORT_PROP,
+                              object: toLiteral(opts.sortProp.value),
+                              graph: DEFAULT_GRAPH,
+                          },
+                      ]
+                    : []),
+                ...(opts.sortDir
+                    ? [
+                          {
+                              subject: vIri,
+                              predicate: TERN_CV_SORT_DIR,
+                              object: toLiteral(opts.sortDir),
+                              graph: DEFAULT_GRAPH,
+                          },
+                      ]
+                    : []),
+            ]);
 
-        for (const [pos, ref] of currentRefs.entries()) {
-            await this._createItem(ctx, vIri.value, ref, pos);
-        }
+            for (const [pos, ref] of currentRefs.entries()) {
+                await this._createItem(txCtx, vIri.value, ref, pos);
+            }
 
-        return vIri.value;
+            return vIri.value;
+        });
     }
 
     // ── Item management ───────────────────────────────────────────────────────
 
     /** Appends a CollectionViewItem for a new value. Idempotent — no-op if the ref is already present. */
     async addItem(ctx: ServerContext, viewIriStr: string, ref: string): Promise<void> {
-        const items = await this._getItems(ctx, viewIriStr);
-        if (items.some((i) => i.ref === ref)) {
-            return;
-        }
-        await this._createItem(ctx, viewIriStr, ref, items.length);
+        return this._store.withTransaction(ctx, async (txCtx) => {
+            const items = await this._getItems(txCtx, viewIriStr);
+            if (items.some((i) => i.ref === ref)) {
+                return;
+            }
+            await this._createItem(txCtx, viewIriStr, ref, items.length);
+        });
     }
 
     /** Removes the CollectionViewItem for the given ref. Returns true if something was removed. */
     async removeItem(ctx: ServerContext, viewIriStr: string, ref: string): Promise<boolean> {
-        const items = await this._getItems(ctx, viewIriStr);
-        const item = items.find((i) => i.ref === ref);
-        if (!item) {
-            return false;
-        }
+        return this._store.withTransaction(ctx, async (txCtx) => {
+            const items = await this._getItems(txCtx, viewIriStr);
+            const item = items.find((i) => i.ref === ref);
+            if (!item) {
+                return false;
+            }
 
-        const itemNode = new IRI(item.iri);
-        const viewNode = new IRI(viewIriStr);
-        await this._store.delete(ctx, {
-            subject: viewNode,
-            predicate: TERN_CV_ITEM,
-            object: itemNode,
+            const itemNode = new IRI(item.iri);
+            const viewNode = new IRI(viewIriStr);
+            await this._store.delete(txCtx, {
+                subject: viewNode,
+                predicate: TERN_CV_ITEM,
+                object: itemNode,
+            });
+            await this._store.delete(txCtx, { subject: itemNode });
+            return true;
         });
-        await this._store.delete(ctx, { subject: itemNode });
-        return true;
     }
 
     // ── Read ──────────────────────────────────────────────────────────────────
 
     async getView(ctx: ServerContext, viewIriStr: string): Promise<CollectionViewRecord | null> {
-        const vNode = new IRI(viewIriStr);
-        const quads = await this._store.find(ctx, { subject: vNode });
-        if (quads.length === 0) {
-            return null;
-        }
-
-        let sourcePg = "";
-        let prop = "";
-        let sortProp: string | undefined;
-        let sortDir: "asc" | "desc" | undefined;
-
-        for (const q of quads) {
-            const pred = (q.predicate as IRI).value;
-            const val = str(q.object);
-            if (pred === TERN_CV_SOURCE.value) {
-                sourcePg = val;
+        return this._store.withTransaction(ctx, async (txCtx) => {
+            const vNode = new IRI(viewIriStr);
+            const quads = await this._store.find(txCtx, { subject: vNode });
+            if (quads.length === 0) {
+                return null;
             }
-            if (pred === TERN_CV_PROP.value) {
-                prop = val;
-            }
-            if (pred === TERN_CV_SORT_PROP.value) {
-                sortProp = val;
-            }
-            if (pred === TERN_CV_SORT_DIR.value) {
-                sortDir = val as "asc" | "desc";
-            }
-        }
 
-        let items = await this._getItems(ctx, viewIriStr);
-        items.sort((a, b) => a.pos - b.pos);
-        if (sortProp) {
-            items = await this._sortByProp(ctx, items, sortProp, sortDir ?? "asc");
-        }
+            let sourcePg = "";
+            let prop = "";
+            let sortProp: string | undefined;
+            let sortDir: "asc" | "desc" | undefined;
 
-        return { iri: viewIriStr, sourcePg, prop, sortProp, sortDir, items };
+            for (const q of quads) {
+                const pred = (q.predicate as IRI).value;
+                const val = str(q.object);
+                if (pred === TERN_CV_SOURCE.value) {
+                    sourcePg = val;
+                }
+                if (pred === TERN_CV_PROP.value) {
+                    prop = val;
+                }
+                if (pred === TERN_CV_SORT_PROP.value) {
+                    sortProp = val;
+                }
+                if (pred === TERN_CV_SORT_DIR.value) {
+                    sortDir = val as "asc" | "desc";
+                }
+            }
+
+            let items = await this._getItems(txCtx, viewIriStr);
+            items.sort((a, b) => a.pos - b.pos);
+            if (sortProp) {
+                items = await this._sortByProp(txCtx, items, sortProp, sortDir ?? "asc");
+            }
+
+            return { iri: viewIriStr, sourcePg, prop, sortProp, sortDir, items };
+        });
     }
 
     // ── Mutation ──────────────────────────────────────────────────────────────
 
     async reorder(ctx: ServerContext, viewIriStr: string, orderedRefs: string[]): Promise<void> {
-        const items = await this._getItems(ctx, viewIriStr);
-        for (const [newPos, ref] of orderedRefs.entries()) {
-            const item = items.find((i) => i.ref === ref);
-            if (!item) {
-                continue;
+        return this._store.withTransaction(ctx, async (txCtx) => {
+            const items = await this._getItems(txCtx, viewIriStr);
+            for (const [newPos, ref] of orderedRefs.entries()) {
+                const item = items.find((i) => i.ref === ref);
+                if (!item) {
+                    continue;
+                }
+                const itemNode = new IRI(item.iri);
+                await this._store.delete(txCtx, { subject: itemNode, predicate: TERN_CVI_POS });
+                await this._store.insert(txCtx, {
+                    subject: itemNode,
+                    predicate: TERN_CVI_POS,
+                    object: toLiteral(newPos),
+                    graph: DEFAULT_GRAPH,
+                });
             }
-            const itemNode = new IRI(item.iri);
-            await this._store.delete(ctx, { subject: itemNode, predicate: TERN_CVI_POS });
-            await this._store.insert(ctx, {
-                subject: itemNode,
-                predicate: TERN_CVI_POS,
-                object: toLiteral(newPos),
-                graph: DEFAULT_GRAPH,
-            });
-        }
+        });
     }
 
     /** Syncs the view to match a fresh snapshot of the source collection. Adds missing refs; removes stale ones. */
     async sync(ctx: ServerContext, viewIriStr: string, currentRefs: string[]): Promise<void> {
-        const items = await this._getItems(ctx, viewIriStr);
-        const existing = new Set(items.map((i) => i.ref));
-        const current = new Set(currentRefs);
+        return this._store.withTransaction(ctx, async (txCtx) => {
+            const items = await this._getItems(txCtx, viewIriStr);
+            const existing = new Set(items.map((i) => i.ref));
+            const current = new Set(currentRefs);
 
-        for (const ref of currentRefs) {
-            if (!existing.has(ref)) {
-                await this.addItem(ctx, viewIriStr, ref);
+            for (const ref of currentRefs) {
+                if (!existing.has(ref)) {
+                    await this.addItem(txCtx, viewIriStr, ref);
+                }
             }
-        }
-        for (const item of items) {
-            if (!current.has(item.ref)) {
-                await this.removeItem(ctx, viewIriStr, item.ref);
+            for (const item of items) {
+                if (!current.has(item.ref)) {
+                    await this.removeItem(txCtx, viewIriStr, item.ref);
+                }
             }
-        }
+        });
     }
 
     async delete(ctx: ServerContext, viewIriStr: string): Promise<void> {
-        const items = await this._getItems(ctx, viewIriStr);
-        const viewNode = new IRI(viewIriStr);
-        for (const item of items) {
-            const itemNode = new IRI(item.iri);
-            await this._store.delete(ctx, {
-                subject: viewNode,
-                predicate: TERN_CV_ITEM,
-                object: itemNode,
-            });
-            await this._store.delete(ctx, { subject: itemNode });
-        }
-        await this._store.delete(ctx, { subject: viewNode });
+        return this._store.withTransaction(ctx, async (txCtx) => {
+            const items = await this._getItems(txCtx, viewIriStr);
+            const viewNode = new IRI(viewIriStr);
+            for (const item of items) {
+                const itemNode = new IRI(item.iri);
+                await this._store.delete(txCtx, {
+                    subject: viewNode,
+                    predicate: TERN_CV_ITEM,
+                    object: itemNode,
+                });
+                await this._store.delete(txCtx, { subject: itemNode });
+            }
+            await this._store.delete(txCtx, { subject: viewNode });
+        });
     }
 
     // ── Lookup (used by EntityStore auto-update) ──────────────────────────────
@@ -233,27 +247,29 @@ export class CollectionViewStore {
         sourcePgIri: string,
         propIri: string,
     ): Promise<string[]> {
-        const bySource = await this._store.find(ctx, {
-            predicate: TERN_CV_SOURCE,
-            object: toLiteral(sourcePgIri),
-        });
-        if (bySource.length === 0) {
-            return [];
-        }
-
-        const result: string[] = [];
-        for (const q of bySource) {
-            const viewNode = q.subject as IRI;
-            const propQ = await this._store.find(ctx, {
-                subject: viewNode,
-                predicate: TERN_CV_PROP,
-                object: toLiteral(propIri),
+        return this._store.withTransaction(ctx, async (txCtx) => {
+            const bySource = await this._store.find(txCtx, {
+                predicate: TERN_CV_SOURCE,
+                object: toLiteral(sourcePgIri),
             });
-            if (propQ.length > 0) {
-                result.push(viewNode.value);
+            if (bySource.length === 0) {
+                return [];
             }
-        }
-        return result;
+
+            const result: string[] = [];
+            for (const q of bySource) {
+                const viewNode = q.subject as IRI;
+                const propQ = await this._store.find(txCtx, {
+                    subject: viewNode,
+                    predicate: TERN_CV_PROP,
+                    object: toLiteral(propIri),
+                });
+                if (propQ.length > 0) {
+                    result.push(viewNode.value);
+                }
+            }
+            return result;
+        });
     }
 
     // ── Private ───────────────────────────────────────────────────────────────

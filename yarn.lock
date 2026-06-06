@@ -1329,19 +1329,9 @@ __metadata:
     "@jasonscharf/app": "workspace:^"
     "@jasonscharf/core": "workspace:^"
     "@jasonscharf/data": "workspace:^"
+    "@jasonscharf/entities": "workspace:^"
     "@jasonscharf/server": "workspace:^"
     "@types/node": "npm:^22.0.0"
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/sandbox-analytics@workspace:packages/sandbox-analytics":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/sandbox-analytics@workspace:packages/sandbox-analytics"
-  dependencies:
-    "@jasonscharf/auth": "workspace:^"
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/entities": "workspace:^"
-    "@jasonscharf/gen": "workspace:^"
   languageName: unknown
   linkType: soft
 
@@ -1353,6 +1343,17 @@ __metadata:
     "@jasonscharf/flow": "workspace:^"
   bin:
     sandbox: ./dist/bin.js
+  languageName: unknown
+  linkType: soft
+
+"@jasonscharf/sandbox-labs@workspace:packages/sandbox-labs":
+  version: 0.0.0-use.local
+  resolution: "@jasonscharf/sandbox-labs@workspace:packages/sandbox-labs"
+  dependencies:
+    "@jasonscharf/auth": "workspace:^"
+    "@jasonscharf/core": "workspace:^"
+    "@jasonscharf/entities": "workspace:^"
+    "@jasonscharf/gen": "workspace:^"
   languageName: unknown
   linkType: soft
 

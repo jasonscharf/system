@@ -47,6 +47,10 @@ export async function createDataContext(config: DataConfig): Promise<Knex> {
                 user: config.user,
                 password: config.password,
             },
+            // Cap per-context pools and don't hoard idle connections — many test
+            // files open pools concurrently against one Postgres, so an
+            // unbounded default pool (min 2, max 10) starves the shared server.
+            pool: { min: 0, max: 4 },
         });
     }
 

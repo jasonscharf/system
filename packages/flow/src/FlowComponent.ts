@@ -1,4 +1,4 @@
-import { IRI, literal, type Quad, quad, uuidv4Binary } from "@jasonscharf/core";
+import { IRI, literal, NS_ROOT, type Quad, quad, uuidv4Binary } from "@jasonscharf/core";
 import { Control, type ControlSignal } from "./ControlSignal.js";
 import type { FlowContext } from "./FlowContext.js";
 import type { FlowNode } from "./FlowNode.js";
@@ -6,7 +6,7 @@ import { FlowPort } from "./FlowPort.js";
 import type { ComponentState, ID, IDisposable, PortDirection, ReadMode } from "./types.js";
 
 // RDF namespace for flow entities
-const FLOW_NS = "urn:tern:core:flow:";
+const FLOW_NS = `${NS_ROOT}flow:`;
 const XSD_NS = "http://www.w3.org/2001/XMLSchema#";
 
 const RDF_TYPE = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");

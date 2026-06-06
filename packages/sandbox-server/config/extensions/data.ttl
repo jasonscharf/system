@@ -6,7 +6,7 @@
 #
 #   name: tern-data
 #   handlers:
-#     - type: "urn:tern:core:msg:triple.find"
+#     - type: "urn:sys:core:msg:triple.find"
 #       module: "../src/handlers/triples.js"
 #       export: "handleFind"
 #     ...
@@ -16,9 +16,9 @@
 # versioned, and reasoned over.
 
 @prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix ternapp: <urn:tern:core:app:> .
-@prefix msg:     <urn:tern:core:msg:> .
-@prefix ext:     <urn:tern:test:sandbox:ext:data#> .
+@prefix ternapp: <urn:sys:core:app:> .
+@prefix msg:     <urn:sys:core:msg:> .
+@prefix ext:     <urn:sys:test:sandbox:ext:data#> .
 
 ext:DataExtension
     a ternapp:Extension ;

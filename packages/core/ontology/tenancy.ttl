@@ -1,5 +1,5 @@
 # Tern Tenancy Ontology — Turtle format
-# Namespace: urn:tern:core:tenancy:
+# Namespace: urn:sys:core:tenancy:
 #
 # Defines the multi-tenancy primitives used by all Tern deployments:
 #   Tenant       — the billing/platform entity backing an Org
@@ -14,7 +14,7 @@
 @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl:     <http://www.w3.org/2002/07/owl#> .
 @prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
-@prefix tenancy: <urn:tern:core:tenancy:> .
+@prefix tenancy: <urn:sys:core:tenancy:> .
 
 # ── Classes ───────────────────────────────────────────────────────────────────
 

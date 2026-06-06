@@ -13,7 +13,7 @@ export interface SecurityContext {
 
 /** Used for internal system operations (seeding, migrations, background jobs). */
 export const systemSec: SecurityContext = Object.freeze({
-    principalIri: "urn:tern:core:system",
+    principalIri: "urn:sys:core:system",
     sessionId: null,
     sessionToken: null,
     isImpersonating: false,

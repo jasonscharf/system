@@ -13,20 +13,20 @@ import { describe, expect, it } from "vitest";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
-const CREATE_WIDGET = typeRef("urn:tern:test:widget.create");
-const PING = typeRef("urn:tern:test:ping");
+const CREATE_WIDGET = typeRef("urn:sys:test:widget.create");
+const PING = typeRef("urn:sys:test:ping");
 
 const WIDGET_SHAPE: ShaclNodeShape = {
-    iri: "urn:tern:test:WidgetShape",
-    targetClass: "urn:tern:test:Widget",
+    iri: "urn:sys:test:WidgetShape",
+    targetClass: "urn:sys:test:Widget",
     properties: [
         {
-            path: "urn:tern:test:name",
+            path: "urn:sys:test:name",
             minCount: 1,
             datatype: "http://www.w3.org/2001/XMLSchema#string",
         },
         {
-            path: "urn:tern:test:color",
+            path: "urn:sys:test:color",
             minCount: 1,
             datatype: "http://www.w3.org/2001/XMLSchema#string",
         },
@@ -34,8 +34,8 @@ const WIDGET_SHAPE: ShaclNodeShape = {
 };
 
 const WIDGET_PROP_MAP: Record<string, string> = {
-    name: "urn:tern:test:name",
-    color: "urn:tern:test:color",
+    name: "urn:sys:test:name",
+    color: "urn:sys:test:color",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

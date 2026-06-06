@@ -1,6 +1,6 @@
-import { IRI } from "@jasonscharf/core";
+import { IRI, NS_ROOT } from "@jasonscharf/core";
 
-export const TERN_NS = "urn:tern:core:core:";
+export const TERN_NS = `${NS_ROOT}core:`;
 export const XSD_NS = "http://www.w3.org/2001/XMLSchema#";
 
 export const RDF_TYPE = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");

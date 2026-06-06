@@ -1,7 +1,7 @@
 // auto-generated — do not edit by hand
 import { IRI } from "../semantics/IRI.js";
 
-export const TENANCY_NS = "urn:tern:core:tenancy:";
+export const TENANCY_NS = "urn:sys:core:tenancy:";
 export const TENANCY_GRAPH = new IRI(`${TENANCY_NS}graph`);
 
 /** A customer organisation — the licensee of the platform. */

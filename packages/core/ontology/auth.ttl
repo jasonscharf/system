@@ -1,11 +1,11 @@
 # Tern Auth Ontology — Turtle format
-# Namespace: urn:tern:core:auth:
+# Namespace: urn:sys:core:auth:
 
 @prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl:  <http://www.w3.org/2002/07/owl#> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
-@prefix auth: <urn:tern:core:auth:> .
+@prefix auth: <urn:sys:core:auth:> .
 
 # ── Classes ───────────────────────────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 # Tern Core Platform Ontology — Turtle format
-# Namespace: urn:tern:core:core:
+# Namespace: urn:sys:core:core:
 #
 # Defines the fundamental graph constructs used by @system/entities:
 #   PropGroup / Handle — property grouping for extension model
@@ -10,7 +10,7 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl:  <http://www.w3.org/2002/07/owl#> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
-@prefix tern: <urn:tern:core:core:> .
+@prefix tern: <urn:sys:core:core:> .
 
 # ── PropGroup infrastructure ──────────────────────────────────────────────────
 
@@ -36,11 +36,11 @@ tern:handle a owl:DatatypeProperty ;
 #   group:abc/pg/tern_core_v1  ← PropGroup that owns the members collection
 #   view:xyz  tern:cvSource  "group:abc/pg/tern_core_v1"
 #   view:xyz  tern:cvProp    "http://test.dev/group/member"
-#   view:xyz  tern:cvSortProp "urn:tern:core:auth:displayName"
+#   view:xyz  tern:cvSortProp "urn:sys:core:auth:displayName"
 #   view:xyz  tern:cvSortDir  "asc"
 #   view:xyz  tern:cvItem    view-item:1
 #   view-item:1  tern:cviView  view:xyz
-#   view-item:1  tern:cviRef   "urn:tern:core:auth:user:alice_id"
+#   view-item:1  tern:cviRef   "urn:sys:core:auth:user:alice_id"
 #   view-item:1  tern:cviPos   0
 
 tern:CollectionView a owl:Class ;

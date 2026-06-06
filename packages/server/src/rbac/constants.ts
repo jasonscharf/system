@@ -1,6 +1,6 @@
-import { IRI } from "@jasonscharf/core";
+import { IRI, NS_ROOT } from "@jasonscharf/core";
 
-export const RBAC_NS = "urn:tern:core:rbac:";
+export const RBAC_NS = `${NS_ROOT}rbac:`;
 export const RBAC_GRAPH = new IRI(`${RBAC_NS}graph`);
 
 // Stable system entity IDs — must match values in migration 004_rbac

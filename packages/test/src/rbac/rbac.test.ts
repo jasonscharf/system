@@ -62,10 +62,10 @@ if (process.env.TERN_PG_URL) {
 
 // ── Synthetic user IRIs (no auth dependency) ──────────────────────────────────
 
-const ALICE = "urn:tern:core:auth:user:test-alice";
-const BOB = "urn:tern:core:auth:user:test-bob";
-const CHARLIE = "urn:tern:core:auth:user:test-charlie";
-const DAVE = "urn:tern:core:auth:user:test-dave"; // Globex user
+const ALICE = "urn:sys:core:auth:user:test-alice";
+const BOB = "urn:sys:core:auth:user:test-bob";
+const CHARLIE = "urn:sys:core:auth:user:test-charlie";
+const DAVE = "urn:sys:core:auth:user:test-dave"; // Globex user
 
 // ── Shared suite (runs once per provider) ─────────────────────────────────────
 

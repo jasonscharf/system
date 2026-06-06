@@ -1,4 +1,6 @@
 export { AggregateRepository } from "./AggregateRepository.js";
+// ── Audit (append-only trail of sensitive actions) ──────────────────────────
+export * from "./audit/index.js";
 export type {
     CollectionViewItemRecord,
     CollectionViewOpts,
@@ -20,4 +22,6 @@ export type { SecurityContext } from "./SecurityContext.js";
 export { anonymousSec, systemSec } from "./SecurityContext.js";
 export type { EntityLookup, ServerContext } from "./ServerContext.js";
 export { buildServerContext } from "./ServerContext.js";
+// ── Superuser (membership of the system SYS_SUPERUSERS group) ────────────────
+export * from "./superuser/index.js";
 export { tenantGraph, tenantGraphForInsert } from "./tenancy.js";

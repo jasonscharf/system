@@ -394,6 +394,60 @@ export class EntityStore {
         });
     }
 
+    /**
+     * Batched edge traversal: given many source records, load the entities on
+     * the far side of `edgeName` in a single round-trip and return them grouped
+     * by source id.  This is the no-N+1 way to walk a level of the graph (e.g.
+     * load the Domain for 100 Experiments with one query, not 100).
+     *
+     * Supports "out" edges (the foreign-key replacements).  Inbound collections
+     * are resolved by query (EntityQuery.connectedTo), not here.
+     */
+    async related<Target extends Record<string, unknown>>(
+        ctx: ServerContext,
+        sources: EntityRecord[],
+        schema: EntitySchema,
+        edgeName: string,
+    ): Promise<Map<string, EntityRecord<Target>[]>> {
+        const def = schema.edges?.[edgeName];
+        if (!def) {
+            throw new Error(`EntityStore.related: schema has no edge "${edgeName}"`);
+        }
+        if ((def.direction ?? "out") !== "out") {
+            throw new Error(
+                `EntityStore.related: edge "${edgeName}" is inbound; use ctx.entities(...).connectedTo()`,
+            );
+        }
+        const targetSchema = def.target() as EntitySchema<Target>;
+
+        const perSource = new Map<string, string[]>();
+        const allIris = new Set<string>();
+        for (const src of sources) {
+            const handle = src.edges?.[edgeName];
+            const iris = handle ? ("iris" in handle ? handle.iris : [handle.iri]) : [];
+            perSource.set(src.id, iris);
+            for (const iri of iris) {
+                allIris.add(iri);
+            }
+        }
+
+        const targets = await this.hydrateMany(ctx, targetSchema, [...allIris]);
+        const byIri = new Map(targets.map((t) => [t.iri, t]));
+
+        const result = new Map<string, EntityRecord<Target>[]>();
+        for (const src of sources) {
+            const records: EntityRecord<Target>[] = [];
+            for (const iri of perSource.get(src.id) ?? []) {
+                const rec = byIri.get(iri);
+                if (rec) {
+                    records.push(rec);
+                }
+            }
+            result.set(src.id, records);
+        }
+        return result;
+    }
+
     // ── Private ───────────────────────────────────────────────────────────────
 
     private _cvs(): CollectionViewStore {

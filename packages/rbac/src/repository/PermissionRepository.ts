@@ -34,7 +34,7 @@ export class PermissionRepository {
     /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: Pick<PermissionEntity, "permissionKey">,
     ): Promise<PermissionEntity> {
         const rec = await this._es.create(ctx, PermissionSchema, {
@@ -46,7 +46,7 @@ export class PermissionRepository {
     /** @insecure @nochecks */
     async findById(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: IdArgs,
     ): Promise<PermissionEntity | null> {
         const rec = await this._es.findById(ctx, PermissionSchema, args.id);
@@ -65,7 +65,7 @@ export class PermissionRepository {
     /** @insecure @nochecks Find a permission by its dot-separated key (e.g. "invoice.read"). */
     async findByKey(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: KeyArgs,
     ): Promise<PermissionEntity | null> {
         const rec = await EntityQuery.from(this._store, PermissionSchema)

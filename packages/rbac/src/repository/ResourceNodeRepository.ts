@@ -1,18 +1,9 @@
-import {
-    hasParentIRI,
-    IRI,
-    isInTenantIRI,
-    literal,
-    ResourceNodeIRI,
-    rbacCreatedAtIRI,
-    rbacUpdatedAtIRI,
-    resourceTypeIRI,
-} from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import { RBAC_GRAPH, RDF_TYPE, XSD_DATETIME, XSD_STRING } from "../constants.js";
+import type { EntityRecord } from "@jasonscharf/entities";
+import { EntityStore, type SecurityContext, type ServerContext } from "@jasonscharf/server";
+import { ResourceNodeSchema } from "../schemas.generated.js";
 import type { ResourceNodeEntity } from "../types.js";
-import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
+import { edgeRefOf, idFrom, iriFor } from "./util.js";
 
 export interface CreateResourceInput {
     resourceType: string;
@@ -34,145 +25,59 @@ export interface SetParentArgs {
 }
 
 export class ResourceNodeRepository {
-    private readonly _store: TripleStore;
+    private readonly _es: EntityStore;
 
     constructor(store: TripleStore) {
-        this._store = store;
+        this._es = new EntityStore(store);
     }
 
     /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: CreateResourceInput,
     ): Promise<ResourceNodeEntity> {
-        const id = newId();
-        const now = new Date();
-        const sub = iriFor("resource", id);
-
-        const quads = [
-            { subject: sub, predicate: RDF_TYPE, object: ResourceNodeIRI, graph: RBAC_GRAPH },
-            {
-                subject: sub,
-                predicate: resourceTypeIRI,
-                object: literal(args.resourceType, XSD_STRING),
-                graph: RBAC_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: rbacCreatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: RBAC_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: rbacUpdatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: RBAC_GRAPH,
-            },
-        ];
-        if (args.tenantId) {
-            quads.push({
-                subject: sub,
-                predicate: isInTenantIRI,
-                object: iriFor("tenant", args.tenantId),
-                graph: RBAC_GRAPH,
-            });
-        }
-        if (args.parentIri) {
-            quads.push({
-                subject: sub,
-                predicate: hasParentIRI,
-                object: new IRI(args.parentIri),
-                graph: RBAC_GRAPH,
-            });
-        }
-
-        await this._store.insertMany(ctx, quads);
-
-        return {
-            id,
-            iri: sub.value,
+        const rec = await this._es.create(ctx, ResourceNodeSchema, {
             resourceType: args.resourceType,
-            parentIri: args.parentIri ?? null,
-            tenantId: args.tenantId ?? null,
-            createdAt: now,
-            updatedAt: now,
-        };
+            ...(args.tenantId ? { isInTenant: iriFor("tenant", args.tenantId).value } : {}),
+            ...(args.parentIri ? { hasParent: args.parentIri } : {}),
+        });
+        return toResource(rec);
     }
 
     /** @insecure @nochecks */
     async findById(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: IdArgs,
     ): Promise<ResourceNodeEntity | null> {
-        const sub = iriFor("resource", args.id);
-        const quads = await this._store.find(ctx, { subject: sub, graph: RBAC_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
+        const rec = await this._es.findById(ctx, ResourceNodeSchema, args.id);
+        return rec ? toResource(rec) : null;
     }
 
     /** @insecure @nochecks */
     async findByIri(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: IriStrArgs,
     ): Promise<ResourceNodeEntity | null> {
-        const quads = await this._store.find(ctx, {
-            subject: new IRI(args.iriStr),
-            graph: RBAC_GRAPH,
-        });
-        return quads.length === 0 ? null : this._fromQuads(idFrom(args.iriStr), quads);
+        return this.findById(ctx, sec, { id: idFrom(args.iriStr) });
     }
 
-    /** @insecure @nochecks Set the parent of a resource (replaces existing parentResource edge). */
-    async setParent(ctx: ServerContext, _sec: SecurityContext, args: SetParentArgs): Promise<void> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            await this._store.delete(ctx, {
-                subject: new IRI(args.resourceIri),
-                predicate: hasParentIRI,
-                graph: RBAC_GRAPH,
-            });
-            await this._store.insert(ctx, {
-                subject: new IRI(args.resourceIri),
-                predicate: hasParentIRI,
-                object: new IRI(args.parentIri),
-                graph: RBAC_GRAPH,
-            });
+    /** @insecure @nochecks Set the parent of a resource (replaces the existing hasParent edge). */
+    async setParent(ctx: ServerContext, sec: SecurityContext, args: SetParentArgs): Promise<void> {
+        await this._es.update(ctx, ResourceNodeSchema, idFrom(args.resourceIri), {
+            hasParent: args.parentIri,
         });
     }
+}
 
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-    ): ResourceNodeEntity {
-        const getLit = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? literalValue(q.object) : undefined;
-        };
-        const getIri = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? iriValue(q.object) : undefined;
-        };
-
-        const resourceType = getLit(resourceTypeIRI);
-        if (resourceType == null) {
-            throw new Error(`ResourceNodeRepository: missing resourceType for id "${id}"`);
-        }
-        const createdAtStr = getLit(rbacCreatedAtIRI);
-        if (createdAtStr == null) {
-            throw new Error(`ResourceNodeRepository: missing createdAt for id "${id}"`);
-        }
-
-        const tenantIri = getIri(isInTenantIRI);
-        return {
-            id,
-            iri: iriFor("resource", id).value,
-            resourceType,
-            parentIri: getIri(hasParentIRI) ?? null,
-            tenantId: tenantIri ? idFrom(tenantIri) : null,
-            createdAt: new Date(createdAtStr),
-            updatedAt: new Date(getLit(rbacUpdatedAtIRI) ?? createdAtStr),
-        };
-    }
+function toResource(rec: EntityRecord): ResourceNodeEntity {
+    return {
+        id: rec.id,
+        iri: rec.iri,
+        resourceType: rec.props.resourceType as string,
+        hasParent: edgeRefOf(rec, "hasParent"),
+        isInTenant: edgeRefOf(rec, "isInTenant"),
+    };
 }

@@ -41,6 +41,8 @@ export interface GenConfig {
     entitiesImport?: string;
     /** Absolute named-graph IRI to pin every generated schema to (global-backbone ontologies like RBAC). */
     schemaGraphIri?: string;
+    /** Per-class IRI path-segment overrides for generated schemas (class local name → segment). */
+    idSegments?: Record<string, string>;
     /**
      * Import path for the `IRI` class.  Defaults to `'@system/core'`.
      * Override to `'../semantics/IRI.js'` when generating types inside @system/core itself.
@@ -137,6 +139,7 @@ export async function generateFromConfig(configPath: string): Promise<void> {
             entitiesImport: config.entitiesImport,
             iriImport: config.iriImport,
             graphIri: config.schemaGraphIri,
+            idSegments: config.idSegments,
             schemaImports,
         });
         const schemasPath = path.resolve(dir, config.schemasOut);

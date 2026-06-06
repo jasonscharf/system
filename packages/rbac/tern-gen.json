@@ -1,10 +1,16 @@
 {
     "bases": [],
     "extensions": ["../core/ontology/rbac.ttl"],
-    "shapes": [],
+    "shapes": ["../core/ontology/rbac.shacl.ttl"],
     "localNamespace": "http://tern.dev/ns/rbac/",
     "iriImport": "@jasonscharf/core",
     "entitiesImport": "@jasonscharf/entities",
     "schemaGraphIri": "http://tern.dev/ns/rbac/graph",
+    "idSegments": {
+        "UserGroup": "group",
+        "ServiceAccount": "sa",
+        "PolicyGrant": "grant",
+        "ResourceNode": "resource"
+    },
     "schemasOut": "./src/schemas.generated.ts"
 }

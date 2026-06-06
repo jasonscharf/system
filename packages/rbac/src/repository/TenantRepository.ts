@@ -44,7 +44,7 @@ export class TenantRepository {
     /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: Pick<TenantEntity, "tenantName">,
     ): Promise<TenantEntity> {
         const rec = await this._es.create(ctx, TenantSchema, {
@@ -57,7 +57,7 @@ export class TenantRepository {
     /** @insecure @nochecks */
     async findById(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: IdArgs,
     ): Promise<TenantEntity | null> {
         const rec = await this._es.findById(ctx, TenantSchema, args.id);
@@ -74,7 +74,7 @@ export class TenantRepository {
     }
 
     /** @insecure @nochecks */
-    async listAll(ctx: ServerContext, _sec: SecurityContext): Promise<TenantEntity[]> {
+    async listAll(ctx: ServerContext, sec: SecurityContext): Promise<TenantEntity[]> {
         const recs = await EntityQuery.from(this._store, TenantSchema).all(ctx);
         return recs.map(toTenant);
     }

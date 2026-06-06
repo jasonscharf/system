@@ -31,6 +31,7 @@ export type { FilterOp } from "./FilterOp.js";
 export { TernAggregate } from "./TernAggregate.js";
 export {
     entityIri,
+    entityIriFor,
     fromLiteral,
     idFromIri,
     invertPropertyMap,

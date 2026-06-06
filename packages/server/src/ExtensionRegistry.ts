@@ -61,14 +61,16 @@ export class ExtensionRegistry {
 
     async record(ctx: ServerContext, name: string, version: string): Promise<void> {
         const iri = _extIri(name);
-        await this._store.deleteBySubjectPredicates(ctx, iri, [
-            PRED_VERSION,
-            PRED_INSTALLED_AT,
-        ]);
+        await this._store.deleteBySubjectPredicates(ctx, iri, [PRED_VERSION, PRED_INSTALLED_AT]);
         await this._store.insertMany(ctx, [
             { subject: iri, predicate: RDF_TYPE, object: EXT_TYPE, graph: DEFAULT_GRAPH },
             { subject: iri, predicate: PRED_NAME, object: toLiteral(name), graph: DEFAULT_GRAPH },
-            { subject: iri, predicate: PRED_VERSION, object: toLiteral(version), graph: DEFAULT_GRAPH },
+            {
+                subject: iri,
+                predicate: PRED_VERSION,
+                object: toLiteral(version),
+                graph: DEFAULT_GRAPH,
+            },
             {
                 subject: iri,
                 predicate: PRED_INSTALLED_AT,

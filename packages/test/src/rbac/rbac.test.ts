@@ -131,7 +131,9 @@ for (const provider of providers) {
 
         describe("migration 004 bootstrap", () => {
             it("superadmin role has wildcard permission", async () => {
-                const allowed = await rbac.can(ctx, secFor(ALICE), { permission: "anything.atAll" });
+                const allowed = await rbac.can(ctx, secFor(ALICE), {
+                    permission: "anything.atAll",
+                });
                 // ALICE is not in superusers yet, so denied
                 expect(allowed).toBe(false);
             });
@@ -162,7 +164,7 @@ for (const provider of providers) {
                     tenantId: acme.id,
                 });
                 expect(admins.groupName).toBe("Admins");
-                expect(admins.tenantId).toBe(acme.id);
+                expect(admins.isInTenant?.id).toBe(acme.id);
             });
 
             it("adds a member to a group", async () => {
@@ -194,8 +196,14 @@ for (const provider of providers) {
         describe("UserGroup CRUD", () => {
             it("findByName returns the group", async () => {
                 const acme = await rbac.createTenant(ctx, systemSec, { name: "Acme Corp" });
-                await rbac.createUserGroup(ctx, systemSec, { groupName: "Engineering", tenantId: acme.id });
-                const found = await rbac.findUserGroupByName(ctx, systemSec, { name: "Engineering", tenantId: acme.id });
+                await rbac.createUserGroup(ctx, systemSec, {
+                    groupName: "Engineering",
+                    tenantId: acme.id,
+                });
+                const found = await rbac.findUserGroupByName(ctx, systemSec, {
+                    name: "Engineering",
+                    tenantId: acme.id,
+                });
                 expect(found?.groupName).toBe("Engineering");
             });
 
@@ -207,7 +215,10 @@ for (const provider of providers) {
             it("listUserGroups returns all groups for a tenant", async () => {
                 const acme = await rbac.createTenant(ctx, systemSec, { name: "Acme Corp" });
                 await rbac.createUserGroup(ctx, systemSec, { groupName: "Eng", tenantId: acme.id });
-                await rbac.createUserGroup(ctx, systemSec, { groupName: "Design", tenantId: acme.id });
+                await rbac.createUserGroup(ctx, systemSec, {
+                    groupName: "Design",
+                    tenantId: acme.id,
+                });
                 const groups = await rbac.listUserGroups(ctx, systemSec, { tenantId: acme.id });
                 expect(groups.map((g) => g.groupName)).toEqual(
                     expect.arrayContaining(["Eng", "Design"]),
@@ -220,9 +231,12 @@ for (const provider of providers) {
                     groupName: "OldName",
                     tenantId: acme.id,
                 });
-                const updated = await rbac.updateUserGroup(ctx, systemSec, { id: group.id, patch: {
-                    groupName: "NewName",
-                } });
+                const updated = await rbac.updateUserGroup(ctx, systemSec, {
+                    id: group.id,
+                    patch: {
+                        groupName: "NewName",
+                    },
+                });
                 expect(updated?.groupName).toBe("NewName");
             });
 
@@ -252,12 +266,20 @@ for (const provider of providers) {
         describe("RbacInspector", () => {
             it("listEffectivePermissions delegates to AccessChecker", async () => {
                 const perm = await rbac.createPermission(ctx, systemSec, { key: "report.view" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Reporter", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: perm.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Reporter",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: perm.iri,
+                });
                 await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: role.iri });
 
                 const inspector = rbac.inspector();
-                const perms = await inspector.listEffectivePermissions(ctx, systemSec, { principalIri: ALICE });
+                const perms = await inspector.listEffectivePermissions(ctx, systemSec, {
+                    principalIri: ALICE,
+                });
                 expect(perms.has("report.view")).toBe(true);
             });
 
@@ -267,7 +289,10 @@ for (const provider of providers) {
                     roleName: "BillingViewer",
                     tenantId: null,
                 });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: perm.iri });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: perm.iri,
+                });
                 await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: role.iri });
 
                 const inspector = rbac.inspector();
@@ -284,9 +309,18 @@ for (const provider of providers) {
 
             it("explain shows membership chain when permission comes via a group", async () => {
                 const perm = await rbac.createPermission(ctx, systemSec, { key: "deploy.run" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Deployer", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: perm.iri });
-                const group = await rbac.createUserGroup(ctx, systemSec, { groupName: "Ops", tenantId: null });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Deployer",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: perm.iri,
+                });
+                const group = await rbac.createUserGroup(ctx, systemSec, {
+                    groupName: "Ops",
+                    tenantId: null,
+                });
                 await rbac.addMember(ctx, systemSec, { groupIri: group.iri, memberIri: ALICE });
                 await rbac.grant(ctx, systemSec, { principalIri: group.iri, roleIri: role.iri });
 
@@ -301,10 +335,22 @@ for (const provider of providers) {
 
             it("explain shows roleInheritanceChain when permission is inherited", async () => {
                 const read = await rbac.createPermission(ctx, systemSec, { key: "doc.read" });
-                const viewer = await rbac.createRole(ctx, systemSec, { roleName: "Viewer", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: viewer.iri, permissionIri: read.iri });
-                const editor = await rbac.createRole(ctx, systemSec, { roleName: "Editor", tenantId: null });
-                await rbac.addRoleInheritance(ctx, systemSec, { childRoleIri: editor.iri, parentRoleIri: viewer.iri });
+                const viewer = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Viewer",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: viewer.iri,
+                    permissionIri: read.iri,
+                });
+                const editor = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Editor",
+                    tenantId: null,
+                });
+                await rbac.addRoleInheritance(ctx, systemSec, {
+                    childRoleIri: editor.iri,
+                    parentRoleIri: viewer.iri,
+                });
                 await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: editor.iri });
 
                 const inspector = rbac.inspector();
@@ -323,9 +369,16 @@ for (const provider of providers) {
                     roleName: "BillingOwner",
                     tenantId: null,
                 });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: perm.iri });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: perm.iri,
+                });
                 await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: role.iri });
-                await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: role.iri, isDenial: true });
+                await rbac.grant(ctx, systemSec, {
+                    principalIri: ALICE,
+                    roleIri: role.iri,
+                    isDenial: true,
+                });
 
                 const inspector = rbac.inspector();
                 const result = await inspector.explain(ctx, systemSec, {
@@ -347,13 +400,21 @@ for (const provider of providers) {
             });
 
             it("listGroupMemberships returns direct groups", async () => {
-                const g1 = await rbac.createUserGroup(ctx, systemSec, { groupName: "G1", tenantId: null });
-                const g2 = await rbac.createUserGroup(ctx, systemSec, { groupName: "G2", tenantId: null });
+                const g1 = await rbac.createUserGroup(ctx, systemSec, {
+                    groupName: "G1",
+                    tenantId: null,
+                });
+                const g2 = await rbac.createUserGroup(ctx, systemSec, {
+                    groupName: "G2",
+                    tenantId: null,
+                });
                 await rbac.addMember(ctx, systemSec, { groupIri: g1.iri, memberIri: ALICE });
                 await rbac.addMember(ctx, systemSec, { groupIri: g2.iri, memberIri: ALICE });
 
                 const inspector = rbac.inspector();
-                const groups = await inspector.listGroupMemberships(ctx, systemSec, { principalIri: ALICE });
+                const groups = await inspector.listGroupMemberships(ctx, systemSec, {
+                    principalIri: ALICE,
+                });
                 const names = groups.map((g) => g.groupName);
                 expect(names).toContain("G1");
                 expect(names).toContain("G2");
@@ -368,12 +429,20 @@ for (const provider of providers) {
                     groupName: "Child",
                     tenantId: null,
                 });
-                await rbac.addMember(ctx, systemSec, { groupIri: parent.iri, memberIri: child.iri }); // child is member of parent
+                await rbac.addMember(ctx, systemSec, {
+                    groupIri: parent.iri,
+                    memberIri: child.iri,
+                }); // child is member of parent
                 await rbac.addMember(ctx, systemSec, { groupIri: child.iri, memberIri: ALICE }); // ALICE is member of child
 
                 const inspector = rbac.inspector();
-                const direct = await inspector.listGroupMemberships(ctx, systemSec, { principalIri: ALICE });
-                const transitive = await inspector.listGroupMemberships(ctx, systemSec, { principalIri: ALICE, transitive: true });
+                const direct = await inspector.listGroupMemberships(ctx, systemSec, {
+                    principalIri: ALICE,
+                });
+                const transitive = await inspector.listGroupMemberships(ctx, systemSec, {
+                    principalIri: ALICE,
+                    transitive: true,
+                });
                 expect(direct.map((g) => g.groupName)).toContain("Child");
                 expect(direct.map((g) => g.groupName)).not.toContain("Parent");
                 expect(transitive.map((g) => g.groupName)).toContain("Child");
@@ -389,7 +458,9 @@ for (const provider of providers) {
                 await rbac.addMember(ctx, systemSec, { groupIri: group.iri, memberIri: BOB });
 
                 const inspector = rbac.inspector();
-                const members = await inspector.listGroupMembers(ctx, systemSec, { groupIri: group.iri });
+                const members = await inspector.listGroupMembers(ctx, systemSec, {
+                    groupIri: group.iri,
+                });
                 expect(members).toContain(ALICE);
                 expect(members).toContain(BOB);
             });
@@ -407,8 +478,13 @@ for (const provider of providers) {
                 await rbac.addMember(ctx, systemSec, { groupIri: inner.iri, memberIri: ALICE });
 
                 const inspector = rbac.inspector();
-                const direct = await inspector.listGroupMembers(ctx, systemSec, { groupIri: outer.iri });
-                const transitive = await inspector.listGroupMembers(ctx, systemSec, { groupIri: outer.iri, transitive: true });
+                const direct = await inspector.listGroupMembers(ctx, systemSec, {
+                    groupIri: outer.iri,
+                });
+                const transitive = await inspector.listGroupMembers(ctx, systemSec, {
+                    groupIri: outer.iri,
+                    transitive: true,
+                });
                 expect(direct).toContain(inner.iri);
                 expect(direct).not.toContain(ALICE);
                 expect(transitive).toContain(ALICE);
@@ -416,12 +492,17 @@ for (const provider of providers) {
 
             it("listGroupsWithMembers returns groups with their member lists", async () => {
                 const acme = await rbac.createTenant(ctx, systemSec, { name: "Acme Corp" });
-                const g = await rbac.createUserGroup(ctx, systemSec, { groupName: "Devs", tenantId: acme.id });
+                const g = await rbac.createUserGroup(ctx, systemSec, {
+                    groupName: "Devs",
+                    tenantId: acme.id,
+                });
                 await rbac.addMember(ctx, systemSec, { groupIri: g.iri, memberIri: ALICE });
                 await rbac.addMember(ctx, systemSec, { groupIri: g.iri, memberIri: BOB });
 
                 const inspector = rbac.inspector();
-                const result = await inspector.listGroupsWithMembers(ctx, systemSec, { tenantId: acme.id });
+                const result = await inspector.listGroupsWithMembers(ctx, systemSec, {
+                    tenantId: acme.id,
+                });
                 const devs = result.find((r) => r.groupName === "Devs");
                 expect(devs?.members).toContain(ALICE);
                 expect(devs?.members).toContain(BOB);
@@ -438,7 +519,10 @@ for (const provider of providers) {
                     roleName: "Viewer",
                     tenantId: acme.id,
                 });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: viewer.iri, permissionIri: read.iri });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: viewer.iri,
+                    permissionIri: read.iri,
+                });
 
                 await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: viewer.iri });
 
@@ -452,15 +536,24 @@ for (const provider of providers) {
 
             it("removing a permission from a role immediately revokes it", async () => {
                 const read = await rbac.createPermission(ctx, systemSec, { key: "project.read" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Viewer", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: read.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Viewer",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: read.iri,
+                });
                 await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: role.iri });
 
                 expect(await rbac.can(ctx, secFor(ALICE), { permission: "project.read" })).toBe(
                     true,
                 );
 
-                await rbac.removePermissionFromRole(ctx, systemSec, { roleIri: role.iri, permissionIri: read.iri });
+                await rbac.removePermissionFromRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: read.iri,
+                });
                 expect(await rbac.can(ctx, secFor(ALICE), { permission: "project.read" })).toBe(
                     false,
                 );
@@ -474,12 +567,27 @@ for (const provider of providers) {
                 const read = await rbac.createPermission(ctx, systemSec, { key: "project.read" });
                 const write = await rbac.createPermission(ctx, systemSec, { key: "project.write" });
 
-                const viewer = await rbac.createRole(ctx, systemSec, { roleName: "Viewer", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: viewer.iri, permissionIri: read.iri });
+                const viewer = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Viewer",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: viewer.iri,
+                    permissionIri: read.iri,
+                });
 
-                const editor = await rbac.createRole(ctx, systemSec, { roleName: "Editor", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: editor.iri, permissionIri: write.iri });
-                await rbac.addRoleInheritance(ctx, systemSec, { childRoleIri: editor.iri, parentRoleIri: viewer.iri }); // editor inherits viewer
+                const editor = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Editor",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: editor.iri,
+                    permissionIri: write.iri,
+                });
+                await rbac.addRoleInheritance(ctx, systemSec, {
+                    childRoleIri: editor.iri,
+                    parentRoleIri: viewer.iri,
+                }); // editor inherits viewer
 
                 await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: editor.iri });
 
@@ -496,16 +604,40 @@ for (const provider of providers) {
                 const write = await rbac.createPermission(ctx, systemSec, { key: "project.write" });
                 const admin = await rbac.createPermission(ctx, systemSec, { key: "project.admin" });
 
-                const viewer = await rbac.createRole(ctx, systemSec, { roleName: "Viewer", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: viewer.iri, permissionIri: read.iri });
+                const viewer = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Viewer",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: viewer.iri,
+                    permissionIri: read.iri,
+                });
 
-                const editor = await rbac.createRole(ctx, systemSec, { roleName: "Editor", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: editor.iri, permissionIri: write.iri });
-                await rbac.addRoleInheritance(ctx, systemSec, { childRoleIri: editor.iri, parentRoleIri: viewer.iri });
+                const editor = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Editor",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: editor.iri,
+                    permissionIri: write.iri,
+                });
+                await rbac.addRoleInheritance(ctx, systemSec, {
+                    childRoleIri: editor.iri,
+                    parentRoleIri: viewer.iri,
+                });
 
-                const owner = await rbac.createRole(ctx, systemSec, { roleName: "Owner", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: owner.iri, permissionIri: admin.iri });
-                await rbac.addRoleInheritance(ctx, systemSec, { childRoleIri: owner.iri, parentRoleIri: editor.iri });
+                const owner = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Owner",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: owner.iri,
+                    permissionIri: admin.iri,
+                });
+                await rbac.addRoleInheritance(ctx, systemSec, {
+                    childRoleIri: owner.iri,
+                    parentRoleIri: editor.iri,
+                });
 
                 await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: owner.iri });
 
@@ -527,20 +659,28 @@ for (const provider of providers) {
                 const permA = await rbac.createPermission(ctx, systemSec, { key: "a.action" });
                 const permB = await rbac.createPermission(ctx, systemSec, { key: "b.action" });
 
-                const roleA = await rbac.createRole(ctx, systemSec, { roleName: "RoleA", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: roleA.iri, permissionIri: permA.iri });
+                const roleA = await rbac.createRole(ctx, systemSec, {
+                    roleName: "RoleA",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: roleA.iri,
+                    permissionIri: permA.iri,
+                });
 
-                const roleB = await rbac.createRole(ctx, systemSec, { roleName: "RoleB", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: roleB.iri, permissionIri: permB.iri });
+                const roleB = await rbac.createRole(ctx, systemSec, {
+                    roleName: "RoleB",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: roleB.iri,
+                    permissionIri: permB.iri,
+                });
 
                 await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: roleA.iri });
 
-                expect(await rbac.can(ctx, secFor(ALICE), { permission: "a.action" })).toBe(
-                    true,
-                );
-                expect(await rbac.can(ctx, secFor(ALICE), { permission: "b.action" })).toBe(
-                    false,
-                );
+                expect(await rbac.can(ctx, secFor(ALICE), { permission: "a.action" })).toBe(true);
+                expect(await rbac.can(ctx, secFor(ALICE), { permission: "b.action" })).toBe(false);
             });
         });
 
@@ -549,8 +689,14 @@ for (const provider of providers) {
         describe("group-based access", () => {
             it("user inherits role via group membership", async () => {
                 const read = await rbac.createPermission(ctx, systemSec, { key: "project.read" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Viewer", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: read.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Viewer",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: read.iri,
+                });
 
                 const group = await rbac.createUserGroup(ctx, systemSec, {
                     groupName: "Staff",
@@ -570,8 +716,14 @@ for (const provider of providers) {
 
             it("nested groups: user in subgroup gains parent-group permissions", async () => {
                 const manage = await rbac.createPermission(ctx, systemSec, { key: "user.manage" });
-                const adminRole = await rbac.createRole(ctx, systemSec, { roleName: "Admin", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: adminRole.iri, permissionIri: manage.iri });
+                const adminRole = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Admin",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: adminRole.iri,
+                    permissionIri: manage.iri,
+                });
 
                 const admins = await rbac.createUserGroup(ctx, systemSec, {
                     groupName: "Admins",
@@ -583,11 +735,20 @@ for (const provider of providers) {
                 });
 
                 // superAdmins is a member of admins (nested group)
-                await rbac.addMember(ctx, systemSec, { groupIri: admins.iri, memberIri: superAdmins.iri });
-                await rbac.grant(ctx, systemSec, { principalIri: admins.iri, roleIri: adminRole.iri });
+                await rbac.addMember(ctx, systemSec, {
+                    groupIri: admins.iri,
+                    memberIri: superAdmins.iri,
+                });
+                await rbac.grant(ctx, systemSec, {
+                    principalIri: admins.iri,
+                    roleIri: adminRole.iri,
+                });
 
                 // Alice is in superAdmins
-                await rbac.addMember(ctx, systemSec, { groupIri: superAdmins.iri, memberIri: ALICE });
+                await rbac.addMember(ctx, systemSec, {
+                    groupIri: superAdmins.iri,
+                    memberIri: ALICE,
+                });
 
                 // Alice should inherit via: ALICE → superAdmins → admins → Admin role → user.manage
                 expect(await rbac.can(ctx, secFor(ALICE), { permission: "user.manage" })).toBe(
@@ -597,8 +758,14 @@ for (const provider of providers) {
 
             it("revoking group membership removes inherited permissions", async () => {
                 const read = await rbac.createPermission(ctx, systemSec, { key: "project.read" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Viewer", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: read.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Viewer",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: read.iri,
+                });
                 const group = await rbac.createUserGroup(ctx, systemSec, {
                     groupName: "Staff",
                     tenantId: null,
@@ -622,8 +789,14 @@ for (const provider of providers) {
         describe("explicit denials", () => {
             it("denial blocks an otherwise-allowed permission", async () => {
                 const read = await rbac.createPermission(ctx, systemSec, { key: "billing.read" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Viewer", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: read.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Viewer",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: read.iri,
+                });
                 const group = await rbac.createUserGroup(ctx, systemSec, {
                     groupName: "Staff",
                     tenantId: null,
@@ -645,8 +818,14 @@ for (const provider of providers) {
 
             it("denial does not affect other principals in the same group", async () => {
                 const read = await rbac.createPermission(ctx, systemSec, { key: "billing.read" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Viewer", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: read.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Viewer",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: read.iri,
+                });
                 const group = await rbac.createUserGroup(ctx, systemSec, {
                     groupName: "Staff",
                     tenantId: null,
@@ -656,14 +835,16 @@ for (const provider of providers) {
                 await rbac.grant(ctx, systemSec, { principalIri: group.iri, roleIri: role.iri });
 
                 // Deny only Alice
-                await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: role.iri, isDenial: true });
+                await rbac.grant(ctx, systemSec, {
+                    principalIri: ALICE,
+                    roleIri: role.iri,
+                    isDenial: true,
+                });
 
                 expect(await rbac.can(ctx, secFor(ALICE), { permission: "billing.read" })).toBe(
                     false,
                 );
-                expect(await rbac.can(ctx, secFor(BOB), { permission: "billing.read" })).toBe(
-                    true,
-                );
+                expect(await rbac.can(ctx, secFor(BOB), { permission: "billing.read" })).toBe(true);
             });
         });
 
@@ -672,8 +853,14 @@ for (const provider of providers) {
         describe("temporary grants", () => {
             it("grant with future expiry is honoured", async () => {
                 const perm = await rbac.createPermission(ctx, systemSec, { key: "temp.access" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "TempRole", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: perm.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "TempRole",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: perm.iri,
+                });
 
                 const expiresAt = new Date(Date.now() + 60_000); // 1 minute from now
                 await rbac.grant(ctx, systemSec, {
@@ -689,8 +876,14 @@ for (const provider of providers) {
 
             it("grant with past expiry is not honoured", async () => {
                 const perm = await rbac.createPermission(ctx, systemSec, { key: "temp.access" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "TempRole", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: perm.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "TempRole",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: perm.iri,
+                });
 
                 const expired = new Date(Date.now() - 1); // already in the past
                 await rbac.grant(ctx, systemSec, {
@@ -706,9 +899,18 @@ for (const provider of providers) {
 
             it("revoking a grant immediately removes access", async () => {
                 const perm = await rbac.createPermission(ctx, systemSec, { key: "project.write" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Editor", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: perm.iri });
-                const g = await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: role.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Editor",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: perm.iri,
+                });
+                const g = await rbac.grant(ctx, systemSec, {
+                    principalIri: ALICE,
+                    roleIri: role.iri,
+                });
 
                 expect(await rbac.can(ctx, secFor(ALICE), { permission: "project.write" })).toBe(
                     true,
@@ -726,23 +928,44 @@ for (const provider of providers) {
         describe("resource-scoped grants", () => {
             it("system-wide grant (no scope) allows access on any resource", async () => {
                 const read = await rbac.createPermission(ctx, systemSec, { key: "project.read" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Reader", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: read.iri });
-                const project = await rbac.createResource(ctx, systemSec, { resourceType: "project" });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Reader",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: read.iri,
+                });
+                const project = await rbac.createResource(ctx, systemSec, {
+                    resourceType: "project",
+                });
 
                 await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: role.iri });
 
                 expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "project.read", scope: project.iri }),
+                    await rbac.can(ctx, secFor(ALICE), {
+                        permission: "project.read",
+                        scope: project.iri,
+                    }),
                 ).toBe(true);
             });
 
             it("resource-scoped grant only allows access on that resource", async () => {
                 const read = await rbac.createPermission(ctx, systemSec, { key: "project.read" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Reader", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: read.iri });
-                const projectA = await rbac.createResource(ctx, systemSec, { resourceType: "project" });
-                const projectB = await rbac.createResource(ctx, systemSec, { resourceType: "project" });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Reader",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: read.iri,
+                });
+                const projectA = await rbac.createResource(ctx, systemSec, {
+                    resourceType: "project",
+                });
+                const projectB = await rbac.createResource(ctx, systemSec, {
+                    resourceType: "project",
+                });
 
                 await rbac.grant(ctx, systemSec, {
                     principalIri: ALICE,
@@ -751,10 +974,16 @@ for (const provider of providers) {
                 });
 
                 expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "project.read", scope: projectA.iri }),
+                    await rbac.can(ctx, secFor(ALICE), {
+                        permission: "project.read",
+                        scope: projectA.iri,
+                    }),
                 ).toBe(true);
                 expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "project.read", scope: projectB.iri }),
+                    await rbac.can(ctx, secFor(ALICE), {
+                        permission: "project.read",
+                        scope: projectB.iri,
+                    }),
                 ).toBe(false);
                 expect(await rbac.can(ctx, secFor(ALICE), { permission: "project.read" })).toBe(
                     false,
@@ -763,10 +992,18 @@ for (const provider of providers) {
 
             it("grant on parent resource applies to child (scope chain)", async () => {
                 const read = await rbac.createPermission(ctx, systemSec, { key: "file.read" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Reader", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: read.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Reader",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: read.iri,
+                });
 
-                const project = await rbac.createResource(ctx, systemSec, { resourceType: "project" });
+                const project = await rbac.createResource(ctx, systemSec, {
+                    resourceType: "project",
+                });
                 const folder = await rbac.createResource(ctx, systemSec, {
                     resourceType: "folder",
                     parentIri: project.iri,
@@ -785,23 +1022,42 @@ for (const provider of providers) {
 
                 // Should propagate down through folder → file
                 expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "file.read", scope: file.iri }),
+                    await rbac.can(ctx, secFor(ALICE), {
+                        permission: "file.read",
+                        scope: file.iri,
+                    }),
                 ).toBe(true);
                 expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "file.read", scope: folder.iri }),
+                    await rbac.can(ctx, secFor(ALICE), {
+                        permission: "file.read",
+                        scope: folder.iri,
+                    }),
                 ).toBe(true);
                 expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "file.read", scope: project.iri }),
+                    await rbac.can(ctx, secFor(ALICE), {
+                        permission: "file.read",
+                        scope: project.iri,
+                    }),
                 ).toBe(true);
             });
 
             it("grant on sibling resource does not grant access to another sibling", async () => {
                 const read = await rbac.createPermission(ctx, systemSec, { key: "file.read" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Reader", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: read.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Reader",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: read.iri,
+                });
 
-                const folderA = await rbac.createResource(ctx, systemSec, { resourceType: "folder" });
-                const folderB = await rbac.createResource(ctx, systemSec, { resourceType: "folder" });
+                const folderA = await rbac.createResource(ctx, systemSec, {
+                    resourceType: "folder",
+                });
+                const folderB = await rbac.createResource(ctx, systemSec, {
+                    resourceType: "folder",
+                });
 
                 await rbac.grant(ctx, systemSec, {
                     principalIri: ALICE,
@@ -810,10 +1066,16 @@ for (const provider of providers) {
                 });
 
                 expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "file.read", scope: folderA.iri }),
+                    await rbac.can(ctx, secFor(ALICE), {
+                        permission: "file.read",
+                        scope: folderA.iri,
+                    }),
                 ).toBe(true);
                 expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "file.read", scope: folderB.iri }),
+                    await rbac.can(ctx, secFor(ALICE), {
+                        permission: "file.read",
+                        scope: folderB.iri,
+                    }),
                 ).toBe(false);
             });
 
@@ -825,13 +1087,19 @@ for (const provider of providers) {
                     roleName: "Viewer",
                     tenantId: null,
                 });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: viewerRole.iri, permissionIri: read.iri });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: viewerRole.iri,
+                    permissionIri: read.iri,
+                });
 
                 const editorRole = await rbac.createRole(ctx, systemSec, {
                     roleName: "Editor",
                     tenantId: null,
                 });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: editorRole.iri, permissionIri: write.iri });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: editorRole.iri,
+                    permissionIri: write.iri,
+                });
 
                 const resource = await rbac.createResource(ctx, systemSec, { resourceType: "doc" });
 
@@ -843,7 +1111,9 @@ for (const provider of providers) {
                     scopeIri: resource.iri,
                 });
 
-                const perms = await rbac.resolvePermissions(ctx, secFor(ALICE), { scope: resource.iri });
+                const perms = await rbac.resolvePermissions(ctx, secFor(ALICE), {
+                    scope: resource.iri,
+                });
                 expect(perms.has("doc.read")).toBe(true);
                 expect(perms.has("doc.write")).toBe(true);
                 expect(perms.has("doc.delete")).toBe(false);
@@ -854,17 +1124,20 @@ for (const provider of providers) {
 
         describe("superusers (wildcard)", () => {
             it("member of superusers group can do anything", async () => {
-                await rbac.addMember(ctx, systemSec, { groupIri: SYS_SUPERUSERS_IRI, memberIri: ALICE });
+                await rbac.addMember(ctx, systemSec, {
+                    groupIri: SYS_SUPERUSERS_IRI,
+                    memberIri: ALICE,
+                });
 
-                expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "any.permission" }),
-                ).toBe(true);
-                expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "billing.delete" }),
-                ).toBe(true);
-                expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "system.destroy" }),
-                ).toBe(true);
+                expect(await rbac.can(ctx, secFor(ALICE), { permission: "any.permission" })).toBe(
+                    true,
+                );
+                expect(await rbac.can(ctx, secFor(ALICE), { permission: "billing.delete" })).toBe(
+                    true,
+                );
+                expect(await rbac.can(ctx, secFor(ALICE), { permission: "system.destroy" })).toBe(
+                    true,
+                );
             });
 
             it("non-superuser does not get wildcard", async () => {
@@ -874,7 +1147,10 @@ for (const provider of providers) {
             });
 
             it("wildcard via resolvePermissions contains '*'", async () => {
-                await rbac.addMember(ctx, systemSec, { groupIri: SYS_SUPERUSERS_IRI, memberIri: ALICE });
+                await rbac.addMember(ctx, systemSec, {
+                    groupIri: SYS_SUPERUSERS_IRI,
+                    memberIri: ALICE,
+                });
                 const perms = await rbac.resolvePermissions(ctx, secFor(ALICE), {});
                 expect(perms.has("*")).toBe(true);
             });
@@ -886,8 +1162,14 @@ for (const provider of providers) {
             it("principal with actsFor can impersonate target and use their permissions", async () => {
                 // Alice is the admin; agent service account will impersonate her
                 const manage = await rbac.createPermission(ctx, systemSec, { key: "user.manage" });
-                const adminRole = await rbac.createRole(ctx, systemSec, { roleName: "Admin", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: adminRole.iri, permissionIri: manage.iri });
+                const adminRole = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Admin",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: adminRole.iri,
+                    permissionIri: manage.iri,
+                });
                 await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: adminRole.iri });
 
                 const agent = await rbac.createServiceAccount(ctx, systemSec, {
@@ -898,18 +1180,26 @@ for (const provider of providers) {
                 await rbac.allowImpersonation(ctx, systemSec, { fromIri: agent.iri, toIri: ALICE });
 
                 // Agent has no permissions itself, but can act as Alice
+                expect(await rbac.can(ctx, secFor(agent.iri), { permission: "user.manage" })).toBe(
+                    false,
+                );
                 expect(
-                    await rbac.can(ctx, secFor(agent.iri), { permission: "user.manage" }),
-                ).toBe(false);
-                expect(
-                    await rbac.can(ctx, secActingAs(agent.iri, ALICE), { permission: "user.manage" }),
+                    await rbac.can(ctx, secActingAs(agent.iri, ALICE), {
+                        permission: "user.manage",
+                    }),
                 ).toBe(true);
             });
 
             it("principal without actsFor cannot impersonate", async () => {
                 const manage = await rbac.createPermission(ctx, systemSec, { key: "user.manage" });
-                const adminRole = await rbac.createRole(ctx, systemSec, { roleName: "Admin", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: adminRole.iri, permissionIri: manage.iri });
+                const adminRole = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Admin",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: adminRole.iri,
+                    permissionIri: manage.iri,
+                });
                 await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: adminRole.iri });
 
                 // BOB has no actsFor Alice
@@ -924,7 +1214,10 @@ for (const provider of providers) {
                     roleName: "SecretReader",
                     tenantId: null,
                 });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: perm.iri });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: perm.iri,
+                });
                 await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: role.iri });
 
                 const agent = await rbac.createServiceAccount(ctx, systemSec, {
@@ -934,12 +1227,19 @@ for (const provider of providers) {
                 });
                 await rbac.allowImpersonation(ctx, systemSec, { fromIri: agent.iri, toIri: ALICE });
                 expect(
-                    await rbac.can(ctx, secActingAs(agent.iri, ALICE), { permission: "secret.read" }),
+                    await rbac.can(ctx, secActingAs(agent.iri, ALICE), {
+                        permission: "secret.read",
+                    }),
                 ).toBe(true);
 
-                await rbac.revokeImpersonation(ctx, systemSec, { fromIri: agent.iri, toIri: ALICE });
+                await rbac.revokeImpersonation(ctx, systemSec, {
+                    fromIri: agent.iri,
+                    toIri: ALICE,
+                });
                 expect(
-                    await rbac.can(ctx, secActingAs(agent.iri, ALICE), { permission: "secret.read" }),
+                    await rbac.can(ctx, secActingAs(agent.iri, ALICE), {
+                        permission: "secret.read",
+                    }),
                 ).toBe(false);
             });
         });
@@ -949,8 +1249,14 @@ for (const provider of providers) {
         describe("service accounts", () => {
             it("service account can be granted a role directly", async () => {
                 const read = await rbac.createPermission(ctx, systemSec, { key: "api.read" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "APIReader", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: read.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "APIReader",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: read.iri,
+                });
 
                 const sa = await rbac.createServiceAccount(ctx, systemSec, {
                     serviceAccountName: "data-sync",
@@ -959,15 +1265,19 @@ for (const provider of providers) {
                 });
                 await rbac.grant(ctx, systemSec, { principalIri: sa.iri, roleIri: role.iri });
 
-                expect(await rbac.can(ctx, secFor(sa.iri), { permission: "api.read" })).toBe(
-                    true,
-                );
+                expect(await rbac.can(ctx, secFor(sa.iri), { permission: "api.read" })).toBe(true);
             });
 
             it("service account can be a member of a group", async () => {
                 const write = await rbac.createPermission(ctx, systemSec, { key: "data.write" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "DataWriter", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: write.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "DataWriter",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: write.iri,
+                });
                 const group = await rbac.createUserGroup(ctx, systemSec, {
                     groupName: "Writers",
                     tenantId: null,
@@ -992,8 +1302,14 @@ for (const provider of providers) {
         describe("tenant isolation", () => {
             it("grant scoped to tenant A does not apply in tenant B", async () => {
                 const read = await rbac.createPermission(ctx, systemSec, { key: "project.read" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Reader", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: read.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Reader",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: read.iri,
+                });
 
                 const acme = await rbac.createTenant(ctx, systemSec, { name: "Acme Corp" });
                 const globex = await rbac.createTenant(ctx, systemSec, { name: "Globex Corp" });
@@ -1015,17 +1331,29 @@ for (const provider of providers) {
                 });
 
                 expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "project.read", scope: acmeProject.iri }),
+                    await rbac.can(ctx, secFor(ALICE), {
+                        permission: "project.read",
+                        scope: acmeProject.iri,
+                    }),
                 ).toBe(true);
                 expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "project.read", scope: globexProject.iri }),
+                    await rbac.can(ctx, secFor(ALICE), {
+                        permission: "project.read",
+                        scope: globexProject.iri,
+                    }),
                 ).toBe(false);
             });
 
             it("Dave (Globex user) cannot access Acme resources", async () => {
                 const read = await rbac.createPermission(ctx, systemSec, { key: "project.read" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Reader", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: read.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Reader",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: read.iri,
+                });
 
                 const acme = await rbac.createTenant(ctx, systemSec, { name: "Acme Corp" });
                 const acmeProject = await rbac.createResource(ctx, systemSec, {
@@ -1041,7 +1369,10 @@ for (const provider of providers) {
                 });
 
                 expect(
-                    await rbac.can(ctx, secFor(DAVE), { permission: "project.read", scope: acmeProject.iri }),
+                    await rbac.can(ctx, secFor(DAVE), {
+                        permission: "project.read",
+                        scope: acmeProject.iri,
+                    }),
                 ).toBe(false);
             });
         });
@@ -1053,9 +1384,9 @@ for (const provider of providers) {
                 const perm = await rbac.createPermission(ctx, systemSec, { key: "special.action" });
                 await rbac.grant(ctx, systemSec, { principalIri: ALICE, permissionIri: perm.iri });
 
-                expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "special.action" }),
-                ).toBe(true);
+                expect(await rbac.can(ctx, secFor(ALICE), { permission: "special.action" })).toBe(
+                    true,
+                );
             });
         });
 
@@ -1064,10 +1395,19 @@ for (const provider of providers) {
         describe("delegation chain", () => {
             it("delegatedFrom tracks the originating grant", async () => {
                 const perm = await rbac.createPermission(ctx, systemSec, { key: "resource.edit" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Editor", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: perm.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Editor",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: perm.iri,
+                });
 
-                const source = await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: role.iri });
+                const source = await rbac.grant(ctx, systemSec, {
+                    principalIri: ALICE,
+                    roleIri: role.iri,
+                });
                 const delegated = await rbac.grant(ctx, systemSec, {
                     principalIri: BOB,
                     roleIri: role.iri,
@@ -1075,8 +1415,8 @@ for (const provider of providers) {
                     delegatedFromIri: source.iri,
                 });
 
-                expect(delegated.delegatedFromIri).toBe(source.iri);
-                expect(delegated.grantedByIri).toBe(ALICE);
+                expect(delegated.delegatedFrom?.iri).toBe(source.iri);
+                expect(delegated.grantedBy?.iri).toBe(ALICE);
                 expect(await rbac.can(ctx, secFor(BOB), { permission: "resource.edit" })).toBe(
                     true,
                 );
@@ -1088,8 +1428,14 @@ for (const provider of providers) {
         describe("RbacService façade", () => {
             it("assert() resolves when principal is allowed", async () => {
                 const perm = await rbac.createPermission(ctx, systemSec, { key: "docs.read" });
-                const role = await rbac.createRole(ctx, systemSec, { roleName: "Viewer", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: role.iri, permissionIri: perm.iri });
+                const role = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Viewer",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: perm.iri,
+                });
                 await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: role.iri });
 
                 await expect(
@@ -1104,7 +1450,8 @@ for (const provider of providers) {
             });
 
             it("assert() error message names the principal and permission", async () => {
-                const err = await rbac.assert(ctx, secFor(BOB), { permission: "billing.write" })
+                const err = await rbac
+                    .assert(ctx, secFor(BOB), { permission: "billing.write" })
                     .catch((e: Error) => e);
                 expect((err as Error).message).toContain("billing.write");
                 expect((err as Error).message).toContain(BOB);
@@ -1126,9 +1473,17 @@ for (const provider of providers) {
                 const roles = new RoleRepository(store);
                 const checker = new AccessChecker(store, grants);
 
-                const perm = await permissions.create(ctx, systemSec, { permissionKey: "raw.check" });
-                const role = await roles.create(ctx, systemSec, { roleName: "Raw", tenantId: null });
-                await roles.addPermission(ctx, systemSec, { roleIri: role.iri, permissionIri: perm.iri });
+                const perm = await permissions.create(ctx, systemSec, {
+                    permissionKey: "raw.check",
+                });
+                const role = await roles.create(ctx, systemSec, {
+                    roleName: "Raw",
+                    tenantId: null,
+                });
+                await roles.addPermission(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: perm.iri,
+                });
                 await grants.create(ctx, systemSec, { principalIri: ALICE, roleIri: role.iri });
 
                 const result = await checker.check(ctx, {
@@ -1144,29 +1499,58 @@ for (const provider of providers) {
         describe("full scenario: Acme project collaboration", () => {
             it("complete multi-user, multi-role, scoped access scenario", async () => {
                 // ── Permissions ───────────────────────────────────────────────
-                const projRead = await rbac.createPermission(ctx, systemSec, { key: "project.read" });
-                const projWrite = await rbac.createPermission(ctx, systemSec, { key: "project.write" });
-                const projDelete = await rbac.createPermission(ctx, systemSec, { key: "project.delete" });
-                const userManage = await rbac.createPermission(ctx, systemSec, { key: "user.manage" });
+                const projRead = await rbac.createPermission(ctx, systemSec, {
+                    key: "project.read",
+                });
+                const projWrite = await rbac.createPermission(ctx, systemSec, {
+                    key: "project.write",
+                });
+                const projDelete = await rbac.createPermission(ctx, systemSec, {
+                    key: "project.delete",
+                });
+                const userManage = await rbac.createPermission(ctx, systemSec, {
+                    key: "user.manage",
+                });
 
                 // ── Roles (with inheritance) ───────────────────────────────────
                 const viewerRole = await rbac.createRole(ctx, systemSec, {
                     roleName: "Viewer",
                     tenantId: null,
                 });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: viewerRole.iri, permissionIri: projRead.iri });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: viewerRole.iri,
+                    permissionIri: projRead.iri,
+                });
 
                 const editorRole = await rbac.createRole(ctx, systemSec, {
                     roleName: "Editor",
                     tenantId: null,
                 });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: editorRole.iri, permissionIri: projWrite.iri });
-                await rbac.addRoleInheritance(ctx, systemSec, { childRoleIri: editorRole.iri, parentRoleIri: viewerRole.iri });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: editorRole.iri,
+                    permissionIri: projWrite.iri,
+                });
+                await rbac.addRoleInheritance(ctx, systemSec, {
+                    childRoleIri: editorRole.iri,
+                    parentRoleIri: viewerRole.iri,
+                });
 
-                const ownerRole = await rbac.createRole(ctx, systemSec, { roleName: "Owner", tenantId: null });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: ownerRole.iri, permissionIri: projDelete.iri });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: ownerRole.iri, permissionIri: userManage.iri });
-                await rbac.addRoleInheritance(ctx, systemSec, { childRoleIri: ownerRole.iri, parentRoleIri: editorRole.iri });
+                const ownerRole = await rbac.createRole(ctx, systemSec, {
+                    roleName: "Owner",
+                    tenantId: null,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: ownerRole.iri,
+                    permissionIri: projDelete.iri,
+                });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: ownerRole.iri,
+                    permissionIri: userManage.iri,
+                });
+                await rbac.addRoleInheritance(ctx, systemSec, {
+                    childRoleIri: ownerRole.iri,
+                    parentRoleIri: editorRole.iri,
+                });
 
                 // ── Groups ────────────────────────────────────────────────────
                 const acme = await rbac.createTenant(ctx, systemSec, { name: "Acme Corp" });
@@ -1184,9 +1568,18 @@ for (const provider of providers) {
                 });
 
                 // ── Grant roles to groups ─────────────────────────────────────
-                await rbac.grant(ctx, systemSec, { principalIri: owners.iri, roleIri: ownerRole.iri });
-                await rbac.grant(ctx, systemSec, { principalIri: editors.iri, roleIri: editorRole.iri });
-                await rbac.grant(ctx, systemSec, { principalIri: viewers.iri, roleIri: viewerRole.iri });
+                await rbac.grant(ctx, systemSec, {
+                    principalIri: owners.iri,
+                    roleIri: ownerRole.iri,
+                });
+                await rbac.grant(ctx, systemSec, {
+                    principalIri: editors.iri,
+                    roleIri: editorRole.iri,
+                });
+                await rbac.grant(ctx, systemSec, {
+                    principalIri: viewers.iri,
+                    roleIri: viewerRole.iri,
+                });
 
                 // ── Assign principals to groups ───────────────────────────────
                 await rbac.addMember(ctx, systemSec, { groupIri: owners.iri, memberIri: ALICE });
@@ -1212,34 +1605,30 @@ for (const provider of providers) {
                 expect(await rbac.can(ctx, secFor(ALICE), { permission: "project.write" })).toBe(
                     true,
                 );
-                expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "project.delete" }),
-                ).toBe(true);
+                expect(await rbac.can(ctx, secFor(ALICE), { permission: "project.delete" })).toBe(
+                    true,
+                );
                 expect(await rbac.can(ctx, secFor(ALICE), { permission: "user.manage" })).toBe(
                     true,
                 );
 
                 // Bob (editor) can read and write but not delete
-                expect(await rbac.can(ctx, secFor(BOB), { permission: "project.read" })).toBe(
-                    true,
-                );
+                expect(await rbac.can(ctx, secFor(BOB), { permission: "project.read" })).toBe(true);
                 expect(await rbac.can(ctx, secFor(BOB), { permission: "project.write" })).toBe(
                     true,
                 );
                 expect(await rbac.can(ctx, secFor(BOB), { permission: "project.delete" })).toBe(
                     false,
                 );
-                expect(await rbac.can(ctx, secFor(BOB), { permission: "user.manage" })).toBe(
-                    false,
-                );
+                expect(await rbac.can(ctx, secFor(BOB), { permission: "user.manage" })).toBe(false);
 
                 // Charlie (viewer) can only read
-                expect(
-                    await rbac.can(ctx, secFor(CHARLIE), { permission: "project.read" }),
-                ).toBe(true);
-                expect(
-                    await rbac.can(ctx, secFor(CHARLIE), { permission: "project.write" }),
-                ).toBe(false);
+                expect(await rbac.can(ctx, secFor(CHARLIE), { permission: "project.read" })).toBe(
+                    true,
+                );
+                expect(await rbac.can(ctx, secFor(CHARLIE), { permission: "project.write" })).toBe(
+                    false,
+                );
 
                 // Dave (different tenant) can do nothing
                 expect(await rbac.can(ctx, secFor(DAVE), { permission: "project.read" })).toBe(
@@ -1253,26 +1642,37 @@ for (const provider of providers) {
                     scopeIri: project.iri,
                 });
                 expect(
-                    await rbac.can(ctx, secFor(ALICE), { permission: "project.read", scope: subfolder.iri }),
+                    await rbac.can(ctx, secFor(ALICE), {
+                        permission: "project.read",
+                        scope: subfolder.iri,
+                    }),
                 ).toBe(true);
 
                 // Charlie is denied billing even though unrelated role gave it
-                const billingRead = await rbac.createPermission(ctx, systemSec, { key: "billing.read" });
+                const billingRead = await rbac.createPermission(ctx, systemSec, {
+                    key: "billing.read",
+                });
                 const billingRole = await rbac.createRole(ctx, systemSec, {
                     roleName: "BillingViewer",
                     tenantId: null,
                 });
-                await rbac.addPermissionToRole(ctx, systemSec, { roleIri: billingRole.iri, permissionIri: billingRead.iri });
-                await rbac.grant(ctx, systemSec, { principalIri: viewers.iri, roleIri: billingRole.iri });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: billingRole.iri,
+                    permissionIri: billingRead.iri,
+                });
+                await rbac.grant(ctx, systemSec, {
+                    principalIri: viewers.iri,
+                    roleIri: billingRole.iri,
+                });
                 await rbac.grant(ctx, systemSec, {
                     principalIri: CHARLIE,
                     roleIri: billingRole.iri,
                     isDenial: true,
                 });
 
-                expect(
-                    await rbac.can(ctx, secFor(CHARLIE), { permission: "billing.read" }),
-                ).toBe(false);
+                expect(await rbac.can(ctx, secFor(CHARLIE), { permission: "billing.read" })).toBe(
+                    false,
+                );
                 expect(await rbac.can(ctx, secFor(BOB), { permission: "billing.read" })).toBe(
                     false,
                 ); // not in viewers
@@ -1286,11 +1686,14 @@ for (const provider of providers) {
                     grantExpiresAt: tempExpiry,
                 });
                 expect(
-                    await rbac.can(ctx, secFor(CHARLIE), { permission: "project.write", scope: project.iri }),
+                    await rbac.can(ctx, secFor(CHARLIE), {
+                        permission: "project.write",
+                        scope: project.iri,
+                    }),
                 ).toBe(true);
-                expect(
-                    await rbac.can(ctx, secFor(CHARLIE), { permission: "project.write" }),
-                ).toBe(false); // no scope = denied
+                expect(await rbac.can(ctx, secFor(CHARLIE), { permission: "project.write" })).toBe(
+                    false,
+                ); // no scope = denied
             });
         });
     });

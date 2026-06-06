@@ -148,7 +148,7 @@ export class RbacInspector {
             const membershipChain = await this._membershipChain(
                 ctx,
                 opts.principal,
-                grant.principalIri,
+                grant.hasPrincipal?.iri ?? "",
             );
             const path = await this._buildGrantPath(ctx, grant, membershipChain, opts.permission);
             if (path == null) {
@@ -360,21 +360,23 @@ export class RbacInspector {
         membershipChain: string[],
         queriedPermission: string,
     ): Promise<GrantPath | null> {
+        const roleIri = grant.hasRole?.iri ?? null;
+        const permissionIri = grant.hasPermission?.iri ?? null;
         const base: Omit<GrantPath, "roleInheritanceChain" | "permissionIri"> = {
             grantIri: grant.iri,
-            grantedToPrincipalIri: grant.principalIri,
+            grantedToPrincipalIri: grant.hasPrincipal?.iri ?? "",
             membershipChain,
-            roleIri: grant.roleIri,
-            roleName: grant.roleIri ? await this._roleName(ctx, grant.roleIri) : null,
-            scopeIri: grant.scopeIri,
+            roleIri,
+            roleName: roleIri ? await this._roleName(ctx, roleIri) : null,
+            scopeIri: grant.hasScope?.iri ?? null,
             isDenial: grant.isDenial,
             expiresAt: grant.grantExpiresAt,
         };
 
-        if (grant.roleIri) {
+        if (roleIri) {
             const { found, chain } = await this._findPermissionInRole(
                 ctx,
-                grant.roleIri,
+                roleIri,
                 queriedPermission,
                 new Set(),
             );
@@ -384,12 +386,12 @@ export class RbacInspector {
             return { ...base, roleInheritanceChain: chain, permissionIri: null };
         }
 
-        if (grant.permissionIri) {
-            const key = await this._permissionKey(ctx, grant.permissionIri);
+        if (permissionIri) {
+            const key = await this._permissionKey(ctx, permissionIri);
             if (key !== queriedPermission && key !== "*") {
                 return null;
             }
-            return { ...base, roleInheritanceChain: [], permissionIri: grant.permissionIri };
+            return { ...base, roleInheritanceChain: [], permissionIri };
         }
 
         return null;

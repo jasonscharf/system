@@ -155,9 +155,9 @@ export class AccessChecker {
         ctx: ServerContext,
         grants: PolicyGrantEntity[],
     ): Promise<Set<string>> {
-        const roleIris = grants.map((g) => g.roleIri).filter((x): x is string => x != null);
+        const roleIris = grants.map((g) => g.hasRole?.iri).filter((x): x is string => x != null);
         const permIris = new Set<string>(
-            grants.map((g) => g.permissionIri).filter((x): x is string => x != null),
+            grants.map((g) => g.hasPermission?.iri).filter((x): x is string => x != null),
         );
 
         // 1. inheritsFrom closure over all granted roles (includes the roles themselves).

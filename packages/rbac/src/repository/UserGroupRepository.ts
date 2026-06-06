@@ -1,19 +1,16 @@
-import {
-    groupNameIRI,
-    IRI,
-    isInTenantIRI,
-    isMemberOfIRI,
-    isSystemUserGroupIRI,
-    literal,
-    rbacCreatedAtIRI,
-    rbacUpdatedAtIRI,
-    UserGroupIRI,
-} from "@jasonscharf/core";
+import { IRI, isMemberOfIRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import { RBAC_GRAPH, RDF_TYPE, XSD_BOOLEAN, XSD_DATETIME, XSD_STRING } from "../constants.js";
+import type { EntityRecord } from "@jasonscharf/entities";
+import {
+    EntityQuery,
+    EntityStore,
+    type SecurityContext,
+    type ServerContext,
+} from "@jasonscharf/server";
+import { RBAC_GRAPH } from "../constants.js";
+import { UserGroupSchema } from "../schemas.generated.js";
 import type { UserGroupEntity } from "../types.js";
-import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
+import { edgeRefOf, idFrom, iriFor } from "./util.js";
 
 export interface IdArgs {
     id: string;
@@ -56,9 +53,11 @@ export interface PrincipalIriArgs {
 
 export class UserGroupRepository {
     private readonly _store: TripleStore;
+    private readonly _es: EntityStore;
 
     constructor(store: TripleStore) {
         this._store = store;
+        this._es = new EntityStore(store);
     }
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -66,111 +65,49 @@ export class UserGroupRepository {
     /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        _sec: SecurityContext,
-        args: Pick<UserGroupEntity, "groupName" | "tenantId">,
+        sec: SecurityContext,
+        args: { groupName: string; tenantId?: string | null },
     ): Promise<UserGroupEntity> {
-        const id = newId();
-        const now = new Date();
-        const sub = iriFor("group", id);
-
-        const quads = [
-            { subject: sub, predicate: RDF_TYPE, object: UserGroupIRI, graph: RBAC_GRAPH },
-            {
-                subject: sub,
-                predicate: groupNameIRI,
-                object: literal(args.groupName, XSD_STRING),
-                graph: RBAC_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: isSystemUserGroupIRI,
-                object: literal("false", XSD_BOOLEAN),
-                graph: RBAC_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: rbacCreatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: RBAC_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: rbacUpdatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: RBAC_GRAPH,
-            },
-        ];
-        if (args.tenantId) {
-            quads.push({
-                subject: sub,
-                predicate: isInTenantIRI,
-                object: iriFor("tenant", args.tenantId),
-                graph: RBAC_GRAPH,
-            });
-        }
-
-        await this._store.insertMany(ctx, quads);
-        return {
-            id,
-            iri: sub.value,
+        const rec = await this._es.create(ctx, UserGroupSchema, {
             groupName: args.groupName,
             isSystemGroup: false,
-            tenantId: args.tenantId ?? null,
-            createdAt: now,
-            updatedAt: now,
-        };
+            ...(args.tenantId ? { isInTenant: iriFor("tenant", args.tenantId).value } : {}),
+        });
+        return toGroup(rec);
     }
 
     /** @insecure @nochecks */
     async findById(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: IdArgs,
     ): Promise<UserGroupEntity | null> {
-        const sub = iriFor("group", args.id);
-        const quads = await this._store.find(ctx, { subject: sub, graph: RBAC_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
+        const rec = await this._es.findById(ctx, UserGroupSchema, args.id);
+        return rec ? toGroup(rec) : null;
     }
 
     /** @insecure @nochecks */
     async findByIri(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: IriStrArgs,
     ): Promise<UserGroupEntity | null> {
-        const quads = await this._store.find(ctx, {
-            subject: new IRI(args.iriStr),
-            graph: RBAC_GRAPH,
-        });
-        return quads.length === 0 ? null : this._fromQuads(idFrom(args.iriStr), quads);
+        return this.findById(ctx, sec, { id: idFrom(args.iriStr) });
     }
 
     /** @insecure @nochecks Find a group by its human-readable name, optionally scoped to a tenant. */
     async findByName(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: FindByNameArgs,
     ): Promise<UserGroupEntity | null> {
-        const nameQuads = await this._store.find(ctx, {
-            predicate: groupNameIRI,
-            object: literal(args.name, XSD_STRING),
-            graph: RBAC_GRAPH,
-        });
-        for (const nq of nameQuads) {
-            const sub = nq.subject as IRI;
-            const typeQ = await this._store.find(ctx, {
-                subject: sub,
-                predicate: RDF_TYPE,
-                object: UserGroupIRI,
-                graph: RBAC_GRAPH,
-            });
-            if (typeQ.length === 0) {
-                continue;
-            }
-            const quads = await this._store.find(ctx, { subject: sub, graph: RBAC_GRAPH });
-            const entity = this._fromQuads(idFrom(sub.value), quads);
-            if (args.tenantId === undefined || entity.tenantId === args.tenantId) {
-                return entity;
+        const recs = await EntityQuery.from(this._store, UserGroupSchema)
+            .where("groupName", "=", args.name)
+            .all(ctx);
+        for (const rec of recs) {
+            const group = toGroup(rec);
+            if (args.tenantId === undefined || group.isInTenant?.id === args.tenantId) {
+                return group;
             }
         }
         return null;
@@ -185,54 +122,20 @@ export class UserGroupRepository {
         if (args.tenantId !== undefined) {
             return this.listForTenant(ctx, sec, { tenantId: args.tenantId });
         }
-        const typeQuads = await this._store.find(ctx, {
-            predicate: RDF_TYPE,
-            object: UserGroupIRI,
-            graph: RBAC_GRAPH,
-        });
-        if (typeQuads.length === 0) {
-            return [];
-        }
-        const subjects = typeQuads.map((tq) => tq.subject as IRI);
-        const bySubject = await this._store.findForSubjects(ctx, subjects, RBAC_GRAPH);
-        const results: UserGroupEntity[] = [];
-        for (const [iriStr, quads] of bySubject) {
-            if (quads.length > 0) {
-                results.push(this._fromQuads(idFrom(iriStr), quads));
-            }
-        }
-        return results;
+        const recs = await EntityQuery.from(this._store, UserGroupSchema).all(ctx);
+        return recs.map(toGroup);
     }
 
     /** @insecure @nochecks */
     async listForTenant(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: TenantIdArgs,
     ): Promise<UserGroupEntity[]> {
-        const tenantNode = iriFor("tenant", args.tenantId);
-        const tenantEdges = await this._store.find(ctx, {
-            predicate: isInTenantIRI,
-            object: tenantNode,
-            graph: RBAC_GRAPH,
-        });
-        if (tenantEdges.length === 0) {
-            return [];
-        }
-        const subjects = tenantEdges.map((te) => te.subject as IRI);
-        const bySubject = await this._store.findForSubjects(ctx, subjects, RBAC_GRAPH);
-        const results: UserGroupEntity[] = [];
-        for (const [iriStr, quads] of bySubject) {
-            const isGroup = quads.some(
-                (q) =>
-                    (q.predicate as IRI).value === RDF_TYPE.value &&
-                    (q.object as IRI).value === UserGroupIRI.value,
-            );
-            if (isGroup) {
-                results.push(this._fromQuads(idFrom(iriStr), quads));
-            }
-        }
-        return results;
+        const recs = await EntityQuery.from(this._store, UserGroupSchema)
+            .connectedTo("isInTenant", args.tenantId)
+            .all(ctx);
+        return recs.map(toGroup);
     }
 
     /** @insecure @nochecks */
@@ -241,62 +144,38 @@ export class UserGroupRepository {
         sec: SecurityContext,
         args: UpdateGroupArgs,
     ): Promise<UserGroupEntity | null> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const existing = await this.findById(ctx, sec, { id: args.id });
+        return this._store.withTransaction(ctx, async (txCtx) => {
+            const existing = await this.findById(txCtx, sec, { id: args.id });
             if (!existing) {
                 return null;
             }
-            const sub = iriFor("group", args.id);
-            const now = new Date();
-
             if (args.patch.groupName !== undefined) {
-                await this._store.delete(ctx, {
-                    subject: sub,
-                    predicate: groupNameIRI,
-                    graph: RBAC_GRAPH,
-                });
-                await this._store.insert(ctx, {
-                    subject: sub,
-                    predicate: groupNameIRI,
-                    object: literal(args.patch.groupName, XSD_STRING),
-                    graph: RBAC_GRAPH,
+                await this._es.update(txCtx, UserGroupSchema, args.id, {
+                    groupName: args.patch.groupName,
                 });
             }
-            await this._store.delete(ctx, {
-                subject: sub,
-                predicate: rbacUpdatedAtIRI,
-                graph: RBAC_GRAPH,
-            });
-            await this._store.insert(ctx, {
-                subject: sub,
-                predicate: rbacUpdatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: RBAC_GRAPH,
-            });
-
-            return this.findById(ctx, sec, { id: args.id });
+            return this.findById(txCtx, sec, { id: args.id });
         });
     }
 
     /** @insecure @nochecks Removes the group and all its membership/grant edges. */
-    async delete(ctx: ServerContext, _sec: SecurityContext, args: IdArgs): Promise<void> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const sub = iriFor("group", args.id);
-            await this._store.delete(ctx, { subject: sub, graph: RBAC_GRAPH });
-            await this._store.delete(ctx, {
+    async delete(ctx: ServerContext, sec: SecurityContext, args: IdArgs): Promise<void> {
+        return this._store.withTransaction(ctx, async (txCtx) => {
+            await this._es.delete(txCtx, UserGroupSchema, args.id);
+            await this._store.delete(txCtx, {
                 predicate: isMemberOfIRI,
-                object: sub,
+                object: iriFor("group", args.id),
                 graph: RBAC_GRAPH,
             });
         });
     }
 
-    // ── Membership ────────────────────────────────────────────────────────────
+    // ── Membership (raw edges on arbitrary principal IRIs) ──────────────────────
 
     /** @insecure @nochecks Add a member to a group. The member may be any principal IRI. */
     async addMember(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: GroupMemberArgs,
     ): Promise<void> {
         await this._store.insert(ctx, {
@@ -310,7 +189,7 @@ export class UserGroupRepository {
     /** @insecure @nochecks Remove a member from a group. */
     async removeMember(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: GroupMemberArgs,
     ): Promise<void> {
         await this._store.delete(ctx, {
@@ -324,7 +203,7 @@ export class UserGroupRepository {
     /** @insecure @nochecks List IRIs of all direct members of a group. */
     async listMembers(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: GroupIriArgs,
     ): Promise<string[]> {
         const quads = await this._store.find(ctx, {
@@ -338,7 +217,7 @@ export class UserGroupRepository {
     /** @insecure @nochecks List the group IRIs that a principal directly belongs to. */
     async listGroupsForPrincipal(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: PrincipalIriArgs,
     ): Promise<string[]> {
         const quads = await this._store.find(ctx, {
@@ -346,42 +225,16 @@ export class UserGroupRepository {
             predicate: isMemberOfIRI,
             graph: RBAC_GRAPH,
         });
-        return quads.map((q) => iriValue(q.object)).filter((v): v is string => v != null);
+        return quads.map((q) => (q.object as IRI).value).filter((v): v is string => v != null);
     }
+}
 
-    // ── Private ───────────────────────────────────────────────────────────────
-
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-    ): UserGroupEntity {
-        const getLit = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? literalValue(q.object) : undefined;
-        };
-        const getIri = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? iriValue(q.object) : undefined;
-        };
-
-        const groupName = getLit(groupNameIRI);
-        if (groupName == null) {
-            throw new Error(`UserGroupRepository: missing groupName for id "${id}"`);
-        }
-        const createdAtStr = getLit(rbacCreatedAtIRI);
-        if (createdAtStr == null) {
-            throw new Error(`UserGroupRepository: missing createdAt for id "${id}"`);
-        }
-
-        const tenantIri = getIri(isInTenantIRI);
-        return {
-            id,
-            iri: iriFor("group", id).value,
-            groupName,
-            isSystemGroup: getLit(isSystemUserGroupIRI) === "true",
-            tenantId: tenantIri ? idFrom(tenantIri) : null,
-            createdAt: new Date(createdAtStr),
-            updatedAt: new Date(getLit(rbacUpdatedAtIRI) ?? createdAtStr),
-        };
-    }
+function toGroup(rec: EntityRecord): UserGroupEntity {
+    return {
+        id: rec.id,
+        iri: rec.iri,
+        groupName: rec.props.groupName as string,
+        isSystemGroup: (rec.props.isSystemGroup as boolean) ?? false,
+        isInTenant: edgeRefOf(rec, "isInTenant"),
+    };
 }

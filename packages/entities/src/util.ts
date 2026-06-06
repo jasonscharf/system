@@ -12,6 +12,18 @@ export function entityIri(ns: string, typeLocalName: string, id: string): IRI {
     return new IRI(`${ns}${typeLocalName.toLowerCase()}/${id}`);
 }
 
+/**
+ * Build an entity IRI from a schema, honouring its idSegment override.
+ * Defaults to the lowercased local name of the type IRI.
+ */
+export function entityIriFor(
+    schema: { ns: string; idSegment?: string; typeIRI: IRI },
+    id: string,
+): IRI {
+    const segment = schema.idSegment ?? localName(schema.typeIRI.value).toLowerCase();
+    return new IRI(`${schema.ns}${segment}/${id}`);
+}
+
 /** Derive the local name (last path/fragment segment) from an IRI string. */
 export function localName(iri: string): string {
     const hash = iri.lastIndexOf("#");

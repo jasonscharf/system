@@ -14,6 +14,12 @@ export type DefaultValue<T> = T | (() => T);
 export class EntitySchema<Props extends Record<string, unknown> = Record<string, unknown>> {
     readonly typeIRI: IRI;
     readonly ns: string;
+    /**
+     * Path segment used when minting entity IRIs (`{ns}{idSegment}/{id}`).
+     * Defaults to the lowercased local name of typeIRI.  Override when the
+     * stored convention differs (e.g. UserGroup → "group", PolicyGrant → "grant").
+     */
+    readonly idSegment?: string;
     readonly properties: { readonly [K in keyof Props]: IRI };
     /**
      * Topological relationships — edges whose object is another entity's IRI.
@@ -41,6 +47,7 @@ export class EntitySchema<Props extends Record<string, unknown> = Record<string,
     constructor(opts: {
         typeIRI: IRI;
         ns: string;
+        idSegment?: string;
         properties: { readonly [K in keyof Props]: IRI };
         edges?: Readonly<Record<string, EdgeDef>>;
         defaults?: { readonly [K in keyof Props]?: DefaultValue<Props[K]> };
@@ -50,6 +57,7 @@ export class EntitySchema<Props extends Record<string, unknown> = Record<string,
     }) {
         this.typeIRI = opts.typeIRI;
         this.ns = opts.ns;
+        this.idSegment = opts.idSegment;
         this.properties = opts.properties;
         this.edges = opts.edges;
         this.defaults = opts.defaults;

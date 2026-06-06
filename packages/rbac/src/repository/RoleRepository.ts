@@ -1,20 +1,11 @@
-import {
-    IRI,
-    inheritsFromIRI,
-    isInTenantIRI,
-    isSystemRoleIRI,
-    literal,
-    RoleIRI,
-    rbacCreatedAtIRI,
-    rbacGrantsIRI,
-    rbacUpdatedAtIRI,
-    roleNameIRI,
-} from "@jasonscharf/core";
+import { IRI, inheritsFromIRI, rbacGrantsIRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import { RBAC_GRAPH, RDF_TYPE, XSD_BOOLEAN, XSD_DATETIME, XSD_STRING } from "../constants.js";
+import type { EntityRecord } from "@jasonscharf/entities";
+import { EntityStore, type SecurityContext, type ServerContext } from "@jasonscharf/server";
+import { RBAC_GRAPH } from "../constants.js";
+import { RoleSchema } from "../schemas.generated.js";
 import type { RoleEntity } from "../types.js";
-import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
+import { edgeRefOf, idFrom, iriFor, iriValue } from "./util.js";
 
 export interface IdArgs {
     id: string;
@@ -40,97 +31,50 @@ export interface RoleInheritanceArgs {
 
 export class RoleRepository {
     private readonly _store: TripleStore;
+    private readonly _es: EntityStore;
 
     constructor(store: TripleStore) {
         this._store = store;
+        this._es = new EntityStore(store);
     }
 
     /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        _sec: SecurityContext,
-        args: Pick<RoleEntity, "roleName" | "tenantId">,
+        sec: SecurityContext,
+        args: { roleName: string; tenantId?: string | null },
     ): Promise<RoleEntity> {
-        const id = newId();
-        const now = new Date();
-        const sub = iriFor("role", id);
-
-        const quads = [
-            { subject: sub, predicate: RDF_TYPE, object: RoleIRI, graph: RBAC_GRAPH },
-            {
-                subject: sub,
-                predicate: roleNameIRI,
-                object: literal(args.roleName, XSD_STRING),
-                graph: RBAC_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: isSystemRoleIRI,
-                object: literal("false", XSD_BOOLEAN),
-                graph: RBAC_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: rbacCreatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: RBAC_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: rbacUpdatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: RBAC_GRAPH,
-            },
-        ];
-        if (args.tenantId) {
-            quads.push({
-                subject: sub,
-                predicate: isInTenantIRI,
-                object: iriFor("tenant", args.tenantId),
-                graph: RBAC_GRAPH,
-            });
-        }
-
-        await this._store.insertMany(ctx, quads);
-        return {
-            id,
-            iri: sub.value,
+        const rec = await this._es.create(ctx, RoleSchema, {
             roleName: args.roleName,
             isSystemRole: false,
-            tenantId: args.tenantId ?? null,
-            createdAt: now,
-            updatedAt: now,
-        };
+            ...(args.tenantId ? { isInTenant: iriFor("tenant", args.tenantId).value } : {}),
+        });
+        return toRole(rec);
     }
 
     /** @insecure @nochecks */
     async findById(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: IdArgs,
     ): Promise<RoleEntity | null> {
-        const sub = iriFor("role", args.id);
-        const quads = await this._store.find(ctx, { subject: sub, graph: RBAC_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
+        const rec = await this._es.findById(ctx, RoleSchema, args.id);
+        return rec ? toRole(rec) : null;
     }
 
     /** @insecure @nochecks */
     async findByIri(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: IriStrArgs,
     ): Promise<RoleEntity | null> {
-        const quads = await this._store.find(ctx, {
-            subject: new IRI(args.iriStr),
-            graph: RBAC_GRAPH,
-        });
-        return quads.length === 0 ? null : this._fromQuads(idFrom(args.iriStr), quads);
+        return this.findById(ctx, sec, { id: idFrom(args.iriStr) });
     }
 
     /** @insecure @nochecks Grant a permission to a role (rbac:grants edge). */
     async addPermission(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: RolePermissionArgs,
     ): Promise<void> {
         await this._store.insert(ctx, {
@@ -144,7 +88,7 @@ export class RoleRepository {
     /** @insecure @nochecks Remove a permission from a role. */
     async removePermission(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: RolePermissionArgs,
     ): Promise<void> {
         await this._store.delete(ctx, {
@@ -158,7 +102,7 @@ export class RoleRepository {
     /** @insecure @nochecks List permission IRIs directly granted by this role (does not include inherited). */
     async listPermissions(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: RoleIriArgs,
     ): Promise<string[]> {
         const quads = await this._store.find(ctx, {
@@ -172,7 +116,7 @@ export class RoleRepository {
     /** @insecure @nochecks Add an inheritance relationship: roleIri inherits all permissions from parentRoleIri. */
     async addInheritance(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: RoleInheritanceArgs,
     ): Promise<void> {
         await this._store.insert(ctx, {
@@ -186,7 +130,7 @@ export class RoleRepository {
     /** @insecure @nochecks Remove an inheritance relationship. */
     async removeInheritance(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: RoleInheritanceArgs,
     ): Promise<void> {
         await this._store.delete(ctx, {
@@ -200,7 +144,7 @@ export class RoleRepository {
     /** @insecure @nochecks List parent role IRIs that this role directly inherits from. */
     async listParentRoles(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: RoleIriArgs,
     ): Promise<string[]> {
         const quads = await this._store.find(ctx, {
@@ -210,35 +154,14 @@ export class RoleRepository {
         });
         return quads.map((q) => iriValue(q.object)).filter((v): v is string => v != null);
     }
+}
 
-    private _fromQuads(id: string, quads: Awaited<ReturnType<TripleStore["find"]>>): RoleEntity {
-        const getLit = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? literalValue(q.object) : undefined;
-        };
-        const getIri = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? iriValue(q.object) : undefined;
-        };
-
-        const roleName = getLit(roleNameIRI);
-        if (roleName == null) {
-            throw new Error(`RoleRepository: missing roleName for id "${id}"`);
-        }
-        const createdAtStr = getLit(rbacCreatedAtIRI);
-        if (createdAtStr == null) {
-            throw new Error(`RoleRepository: missing createdAt for id "${id}"`);
-        }
-
-        const tenantIri = getIri(isInTenantIRI);
-        return {
-            id,
-            iri: iriFor("role", id).value,
-            roleName,
-            isSystemRole: getLit(isSystemRoleIRI) === "true",
-            tenantId: tenantIri ? idFrom(tenantIri) : null,
-            createdAt: new Date(createdAtStr),
-            updatedAt: new Date(getLit(rbacUpdatedAtIRI) ?? createdAtStr),
-        };
-    }
+function toRole(rec: EntityRecord): RoleEntity {
+    return {
+        id: rec.id,
+        iri: rec.iri,
+        roleName: rec.props.roleName as string,
+        isSystemRole: (rec.props.isSystemRole as boolean) ?? false,
+        isInTenant: edgeRefOf(rec, "isInTenant"),
+    };
 }

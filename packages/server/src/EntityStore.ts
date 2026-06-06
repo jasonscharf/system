@@ -10,11 +10,10 @@ import type {
 } from "@jasonscharf/entities";
 import {
     EntityValidationError,
-    entityIri,
+    entityIriFor,
     fromLiteral,
     idFromIri,
     invertPropertyMap,
-    localName,
     propertyMapFor,
     RDF_TYPE,
     toLiteral,
@@ -82,7 +81,7 @@ export class EntityStore {
         this._validate(schema, withDefs);
 
         const id = _newId();
-        const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+        const ent = entityIriFor(schema, id);
         const edgeTargets = resolveEdgeTargets(schema, data);
 
         return this._withTrx(ctx, async (txCtx) => {
@@ -113,7 +112,7 @@ export class EntityStore {
         id: string,
     ): Promise<EntityRecord<Props> | null> {
         return this._withTrx(ctx, async (txCtx) => {
-            const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+            const ent = entityIriFor(schema, id);
             const graph = this._filterGraph(txCtx, schema);
             const typeQ = await this._store.find(txCtx, {
                 subject: ent,
@@ -137,7 +136,7 @@ export class EntityStore {
     ): Promise<void> {
         this._validate(schema, patch);
 
-        const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+        const ent = entityIriFor(schema, id);
         const patchEntries = Object.entries(patch).filter(
             ([propName]) => !!(schema.properties as Record<string, IRI>)[propName],
         );
@@ -187,7 +186,7 @@ export class EntityStore {
     // ── Delete ────────────────────────────────────────────────────────────────
 
     async delete(ctx: ServerContext, schema: EntitySchema, id: string): Promise<void> {
-        const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+        const ent = entityIriFor(schema, id);
         return this._withTrx(ctx, async (txCtx) => {
             await this._store.delete(txCtx, {
                 subject: ent,
@@ -214,7 +213,7 @@ export class EntityStore {
         if (!def) {
             throw new Error(`EntityStore.addEdge: schema has no edge "${edgeName}"`);
         }
-        const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+        const ent = entityIriFor(schema, id);
         const targetIri = edgeTargetIri(target, def.target?.());
         return this._withTrx(ctx, async (txCtx) => {
             await this._store.insert(txCtx, {
@@ -238,7 +237,7 @@ export class EntityStore {
         if (!def) {
             throw new Error(`EntityStore.removeEdge: schema has no edge "${edgeName}"`);
         }
-        const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+        const ent = entityIriFor(schema, id);
         const targetIri = edgeTargetIri(target, def.target?.());
         return this._withTrx(ctx, async (txCtx) => {
             const n = await this._store.delete(txCtx, {
@@ -264,7 +263,7 @@ export class EntityStore {
             if (!propIri) {
                 return [];
             }
-            const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+            const ent = entityIriFor(schema, id);
             const quads = await this._store.findOrdered(txCtx, {
                 subject: ent,
                 predicate: propIri,
@@ -286,7 +285,7 @@ export class EntityStore {
             throw new Error(`Property '${prop}' not found in schema`);
         }
 
-        const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+        const ent = entityIriFor(schema, id);
 
         return this._withTrx(ctx, async (txCtx) => {
             const graph = this._insertGraph(txCtx, schema);
@@ -321,7 +320,7 @@ export class EntityStore {
             return false;
         }
 
-        const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+        const ent = entityIriFor(schema, id);
 
         let deleted = false;
         await this._withTrx(ctx, async (txCtx) => {
@@ -373,7 +372,7 @@ export class EntityStore {
             throw new Error(`Property '${prop}' not found in schema`);
         }
 
-        const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+        const ent = entityIriFor(schema, id);
 
         return this._withTrx(ctx, async (txCtx) => {
             const filterGraph = this._filterGraph(txCtx, schema);
@@ -429,7 +428,7 @@ export class EntityStore {
             throw new Error(`Property '${prop}' not found in schema`);
         }
 
-        const ent = entityIri(schema.ns, localName(schema.typeIRI.value), id);
+        const ent = entityIriFor(schema, id);
         const currentRefs = (await this.collectionGet(ctx, schema, id, prop)).map(String);
 
         return this._withTrx(ctx, async (txCtx) => {
@@ -808,7 +807,7 @@ export function edgeTargetIri(value: EdgeInput, targetSchema?: EntitySchema): st
             `edgeTargetIri: "${str}" is a bare id but the edge is polymorphic (no target schema); pass a full IRI or a record`,
         );
     }
-    return entityIri(targetSchema.ns, localName(targetSchema.typeIRI.value), str).value;
+    return entityIriFor(targetSchema, str).value;
 }
 
 /** Builds the IRI-object quads for a set of resolved edges. */

@@ -25,6 +25,8 @@ export interface SchemaGenConfig {
      * tenant-scoped.
      */
     graphIri?: string;
+    /** Per-class IRI path-segment overrides (class local name → segment), e.g. { UserGroup: "group" }. */
+    idSegments?: Record<string, string>;
     /**
      * Maps an external (base-ontology) class IRI → the EntitySchema to import for
      * it.  Used when an edge targets a class owned by another package.
@@ -116,6 +118,10 @@ function renderClass(
     lines.push(`export const ${schemaConstName(cls.iri)}: EntitySchema = new EntitySchema({`);
     lines.push(`    typeIRI: new IRI("${cls.iri}"),`);
     lines.push(`    ns: "${config.localNamespace}",`);
+    const segment = config.idSegments?.[localName(cls.iri)];
+    if (segment) {
+        lines.push(`    idSegment: "${segment}",`);
+    }
     if (config.graphIri) {
         lines.push(`    graphIri: new IRI("${config.graphIri}"),`);
     }

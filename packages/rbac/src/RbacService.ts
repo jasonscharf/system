@@ -220,7 +220,7 @@ export class RbacService {
     async createUserGroup(
         ctx: ServerContext,
         sec: SecurityContext,
-        args: Pick<UserGroupEntity, "groupName" | "tenantId">,
+        args: { groupName: string; tenantId?: string | null },
     ): Promise<UserGroupEntity> {
         return this._groups.create(ctx, sec, args);
     }
@@ -299,7 +299,7 @@ export class RbacService {
     async createRole(
         ctx: ServerContext,
         sec: SecurityContext,
-        args: Pick<RoleEntity, "roleName" | "tenantId">,
+        args: { roleName: string; tenantId?: string | null },
     ): Promise<RoleEntity> {
         return this._roles.create(ctx, sec, args);
     }
@@ -406,7 +406,7 @@ export class RbacService {
     async createServiceAccount(
         ctx: ServerContext,
         sec: SecurityContext,
-        args: Pick<ServiceAccountEntity, "serviceAccountName" | "serviceAccountToken" | "tenantId">,
+        args: { serviceAccountName: string; serviceAccountToken: string; tenantId?: string | null },
     ): Promise<ServiceAccountEntity> {
         return this._serviceAccounts.create(ctx, sec, args);
     }

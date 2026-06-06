@@ -1,3 +1,5 @@
+import type { EdgeRef } from "@jasonscharf/entities";
+
 export interface TenantEntity {
     id: string;
     iri: string;
@@ -10,9 +12,8 @@ export interface UserGroupEntity {
     iri: string;
     groupName: string;
     isSystemGroup: boolean;
-    tenantId: string | null;
-    createdAt: Date;
-    updatedAt: Date;
+    /** Tenant this group belongs to — a topological edge, not a tenantId scalar. */
+    isInTenant: EdgeRef | null;
 }
 
 export interface ServiceAccountEntity {
@@ -21,9 +22,7 @@ export interface ServiceAccountEntity {
     serviceAccountName: string;
     serviceAccountToken: string;
     isActive: boolean;
-    tenantId: string | null;
-    createdAt: Date;
-    updatedAt: Date;
+    isInTenant: EdgeRef | null;
 }
 
 export interface RoleEntity {
@@ -31,9 +30,7 @@ export interface RoleEntity {
     iri: string;
     roleName: string;
     isSystemRole: boolean;
-    tenantId: string | null;
-    createdAt: Date;
-    updatedAt: Date;
+    isInTenant: EdgeRef | null;
 }
 
 export interface PermissionEntity {
@@ -44,35 +41,31 @@ export interface PermissionEntity {
 
 /**
  * An explicit principal → role/permission binding, optionally scoped to a
- * resource or tenant and optionally time-bounded.
+ * resource or tenant and optionally time-bounded. Every relationship is a
+ * topological edge (hasRole, hasScope, …), never a `fooId` "foreign key" scalar.
  *
- * Either roleIri or permissionIri is set, never both.
- * scopeIri absent = system-wide grant.
- * delegatedFromIri present = grant was created via delegation.
+ * Either hasRole or hasPermission is set, never both.
+ * hasScope absent = system-wide grant.  delegatedFrom present = via delegation.
  */
 export interface PolicyGrantEntity {
     id: string;
     iri: string;
-    principalIri: string;
-    roleIri: string | null;
-    permissionIri: string | null;
-    scopeIri: string | null;
-    grantedByIri: string | null;
-    delegatedFromIri: string | null;
+    hasPrincipal: EdgeRef | null;
+    hasRole: EdgeRef | null;
+    hasPermission: EdgeRef | null;
+    hasScope: EdgeRef | null;
+    grantedBy: EdgeRef | null;
+    delegatedFrom: EdgeRef | null;
     grantExpiresAt: Date | null;
     isDenial: boolean;
-    createdAt: Date;
-    updatedAt: Date;
 }
 
 export interface ResourceNodeEntity {
     id: string;
     iri: string;
     resourceType: string;
-    parentIri: string | null;
-    tenantId: string | null;
-    createdAt: Date;
-    updatedAt: Date;
+    hasParent: EdgeRef | null;
+    isInTenant: EdgeRef | null;
 }
 
 /** Internal full check options used by AccessChecker. */

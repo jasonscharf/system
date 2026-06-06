@@ -1,19 +1,9 @@
-import {
-    IRI,
-    isInTenantIRI,
-    literal,
-    rbacCreatedAtIRI,
-    rbacIsActiveIRI,
-    rbacUpdatedAtIRI,
-    ServiceAccountIRI,
-    serviceAccountNameIRI,
-    serviceAccountTokenIRI,
-} from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import { RBAC_GRAPH, RDF_TYPE, XSD_BOOLEAN, XSD_DATETIME, XSD_STRING } from "../constants.js";
+import type { EntityRecord } from "@jasonscharf/entities";
+import { EntityStore, type SecurityContext, type ServerContext } from "@jasonscharf/server";
+import { ServiceAccountSchema } from "../schemas.generated.js";
 import type { ServiceAccountEntity } from "../types.js";
-import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
+import { edgeRefOf, idFrom, iriFor } from "./util.js";
 
 export interface IdArgs {
     id: string;
@@ -24,163 +14,59 @@ export interface IriStrArgs {
 }
 
 export class ServiceAccountRepository {
-    private readonly _store: TripleStore;
+    private readonly _es: EntityStore;
 
     constructor(store: TripleStore) {
-        this._store = store;
+        this._es = new EntityStore(store);
     }
 
     /** @insecure @nochecks */
     async create(
         ctx: ServerContext,
-        _sec: SecurityContext,
-        args: Pick<ServiceAccountEntity, "serviceAccountName" | "serviceAccountToken" | "tenantId">,
+        sec: SecurityContext,
+        args: { serviceAccountName: string; serviceAccountToken: string; tenantId?: string | null },
     ): Promise<ServiceAccountEntity> {
-        const id = newId();
-        const now = new Date();
-        const sub = iriFor("sa", id);
-
-        const quads = [
-            { subject: sub, predicate: RDF_TYPE, object: ServiceAccountIRI, graph: RBAC_GRAPH },
-            {
-                subject: sub,
-                predicate: serviceAccountNameIRI,
-                object: literal(args.serviceAccountName, XSD_STRING),
-                graph: RBAC_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: serviceAccountTokenIRI,
-                object: literal(args.serviceAccountToken, XSD_STRING),
-                graph: RBAC_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: rbacIsActiveIRI,
-                object: literal("true", XSD_BOOLEAN),
-                graph: RBAC_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: rbacCreatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: RBAC_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: rbacUpdatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: RBAC_GRAPH,
-            },
-        ];
-        if (args.tenantId) {
-            quads.push({
-                subject: sub,
-                predicate: isInTenantIRI,
-                object: iriFor("tenant", args.tenantId),
-                graph: RBAC_GRAPH,
-            });
-        }
-
-        await this._store.insertMany(ctx, quads);
-        return {
-            id,
-            iri: sub.value,
+        const rec = await this._es.create(ctx, ServiceAccountSchema, {
             serviceAccountName: args.serviceAccountName,
             serviceAccountToken: args.serviceAccountToken,
             isActive: true,
-            tenantId: args.tenantId ?? null,
-            createdAt: now,
-            updatedAt: now,
-        };
+            ...(args.tenantId ? { isInTenant: iriFor("tenant", args.tenantId).value } : {}),
+        });
+        return toServiceAccount(rec);
     }
 
     /** @insecure @nochecks */
     async findById(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: IdArgs,
     ): Promise<ServiceAccountEntity | null> {
-        const sub = iriFor("sa", args.id);
-        const quads = await this._store.find(ctx, { subject: sub, graph: RBAC_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
+        const rec = await this._es.findById(ctx, ServiceAccountSchema, args.id);
+        return rec ? toServiceAccount(rec) : null;
     }
 
     /** @insecure @nochecks */
     async findByIri(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: IriStrArgs,
     ): Promise<ServiceAccountEntity | null> {
-        const quads = await this._store.find(ctx, {
-            subject: new IRI(args.iriStr),
-            graph: RBAC_GRAPH,
-        });
-        return quads.length === 0 ? null : this._fromQuads(idFrom(args.iriStr), quads);
+        return this.findById(ctx, sec, { id: idFrom(args.iriStr) });
     }
 
     /** @insecure @nochecks */
-    async deactivate(ctx: ServerContext, _sec: SecurityContext, args: IdArgs): Promise<void> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const sub = iriFor("sa", args.id);
-            await this._store.delete(ctx, {
-                subject: sub,
-                predicate: rbacIsActiveIRI,
-                graph: RBAC_GRAPH,
-            });
-            await this._store.insert(ctx, {
-                subject: sub,
-                predicate: rbacIsActiveIRI,
-                object: literal("false", XSD_BOOLEAN),
-                graph: RBAC_GRAPH,
-            });
-            const now = new Date();
-            await this._store.delete(ctx, {
-                subject: sub,
-                predicate: rbacUpdatedAtIRI,
-                graph: RBAC_GRAPH,
-            });
-            await this._store.insert(ctx, {
-                subject: sub,
-                predicate: rbacUpdatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: RBAC_GRAPH,
-            });
-        });
+    async deactivate(ctx: ServerContext, sec: SecurityContext, args: IdArgs): Promise<void> {
+        await this._es.update(ctx, ServiceAccountSchema, args.id, { isActive: false });
     }
+}
 
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-    ): ServiceAccountEntity {
-        const getLit = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? literalValue(q.object) : undefined;
-        };
-        const getIri = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? iriValue(q.object) : undefined;
-        };
-
-        const serviceAccountName = getLit(serviceAccountNameIRI);
-        if (serviceAccountName == null) {
-            throw new Error(`ServiceAccountRepository: missing serviceAccountName for id "${id}"`);
-        }
-        const createdAtStr = getLit(rbacCreatedAtIRI);
-        if (createdAtStr == null) {
-            throw new Error(`ServiceAccountRepository: missing createdAt for id "${id}"`);
-        }
-
-        const tenantIri = getIri(isInTenantIRI);
-        return {
-            id,
-            iri: iriFor("sa", id).value,
-            serviceAccountName,
-            serviceAccountToken: getLit(serviceAccountTokenIRI) ?? "",
-            isActive: getLit(rbacIsActiveIRI) !== "false",
-            tenantId: tenantIri ? idFrom(tenantIri) : null,
-            createdAt: new Date(createdAtStr),
-            updatedAt: new Date(getLit(rbacUpdatedAtIRI) ?? createdAtStr),
-        };
-    }
+function toServiceAccount(rec: EntityRecord): ServiceAccountEntity {
+    return {
+        id: rec.id,
+        iri: rec.iri,
+        serviceAccountName: rec.props.serviceAccountName as string,
+        serviceAccountToken: (rec.props.serviceAccountToken as string) ?? "",
+        isActive: (rec.props.isActive as boolean) ?? false,
+        isInTenant: edgeRefOf(rec, "isInTenant"),
+    };
 }

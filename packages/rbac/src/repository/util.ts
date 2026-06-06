@@ -1,6 +1,13 @@
 import { randomBytes } from "node:crypto";
 import { IRI } from "@jasonscharf/core";
+import type { EdgeRef, EntityRecord } from "@jasonscharf/entities";
 import { RBAC_NS } from "../constants.js";
+
+/** Extract a single-valued ("one") edge handle from a record, or null. */
+export function edgeRefOf(rec: EntityRecord, name: string): EdgeRef | null {
+    const h = rec.edges?.[name];
+    return h && "iri" in h ? (h as EdgeRef) : null;
+}
 
 export type RbacEntityType =
     | "tenant"

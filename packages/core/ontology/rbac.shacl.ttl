@@ -1,0 +1,34 @@
+# RBAC SHACL shapes — constrain edge cardinality.
+# Single-valued relationships get sh:maxCount 1 so the codegen emits them as
+# cardinality "one" (an EdgeRef) rather than "many" (an EdgeSet).
+# Role.inheritsFrom and Role.grants are intentionally many.
+
+@prefix sh:     <http://www.w3.org/ns/shacl#> .
+@prefix rbac:   <http://tern.dev/ns/rbac/> .
+@prefix shapes: <http://tern.dev/ns/rbac/shapes/> .
+
+shapes:UserGroupShape a sh:NodeShape ;
+    sh:targetClass rbac:UserGroup ;
+    sh:property [ sh:path rbac:isInTenant ; sh:maxCount 1 ] .
+
+shapes:ServiceAccountShape a sh:NodeShape ;
+    sh:targetClass rbac:ServiceAccount ;
+    sh:property [ sh:path rbac:isInTenant ; sh:maxCount 1 ] .
+
+shapes:RoleShape a sh:NodeShape ;
+    sh:targetClass rbac:Role ;
+    sh:property [ sh:path rbac:isInTenant ; sh:maxCount 1 ] .
+
+shapes:ResourceNodeShape a sh:NodeShape ;
+    sh:targetClass rbac:ResourceNode ;
+    sh:property [ sh:path rbac:hasParent ; sh:maxCount 1 ] ;
+    sh:property [ sh:path rbac:isInTenant ; sh:maxCount 1 ] .
+
+shapes:PolicyGrantShape a sh:NodeShape ;
+    sh:targetClass rbac:PolicyGrant ;
+    sh:property [ sh:path rbac:hasPrincipal ; sh:maxCount 1 ] ;
+    sh:property [ sh:path rbac:hasRole ; sh:maxCount 1 ] ;
+    sh:property [ sh:path rbac:hasPermission ; sh:maxCount 1 ] ;
+    sh:property [ sh:path rbac:hasScope ; sh:maxCount 1 ] ;
+    sh:property [ sh:path rbac:grantedBy ; sh:maxCount 1 ] ;
+    sh:property [ sh:path rbac:delegatedFrom ; sh:maxCount 1 ] .

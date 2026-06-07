@@ -115,12 +115,6 @@ for (const db of providers) {
             expect(rec.iri).toContain(rec.id);
         });
 
-        it("applies createdAt / updatedAt defaults automatically", async () => {
-            const rec = await es.create(ctx, UserSchema, { email: "bob@example.com" });
-            expect(rec.props.createdAt).toBeInstanceOf(Date);
-            expect(rec.props.updatedAt).toBeInstanceOf(Date);
-        });
-
         it("surfaces DB-managed createdAt / updatedAt on the record (create + findById)", async () => {
             const created = await es.create(ctx, UserSchema, { email: "ts@example.com" });
             const createdAt = created.createdAt;
@@ -194,13 +188,13 @@ for (const db of providers) {
             expect(rec.props.score).toBe(99);
         });
 
-        it("factory defaults produce independent values per entity", async () => {
+        it("DB-managed createdAt is monotonic across entities", async () => {
             const rec1 = await es.create(ctx, UserSchema, { email: "h1@example.com" });
             await new Promise((r) => setTimeout(r, 5));
             const rec2 = await es.create(ctx, UserSchema, { email: "h2@example.com" });
 
-            const t1 = rec1.props.createdAt as Date;
-            const t2 = rec2.props.createdAt as Date;
+            const t1 = rec1.createdAt as Date;
+            const t2 = rec2.createdAt as Date;
             expect(t1.getTime()).toBeLessThanOrEqual(t2.getTime());
         });
     });

@@ -29,9 +29,7 @@ import {
     PolicyGrantIRI,
     permissionKeyIRI,
     RoleIRI,
-    rbacCreatedAtIRI,
     rbacGrantsIRI,
-    rbacUpdatedAtIRI,
     roleNameIRI,
     TenantIRI,
     tenantNameIRI,
@@ -48,20 +46,15 @@ import {
     SYS_TENANT_IRI,
     SYS_WILDCARD_PERM_IRI,
     XSD_BOOLEAN,
-    XSD_DATETIME,
     XSD_STRING,
 } from "./constants.js";
 
 export async function seedSystemData(ctx: ServerContext, store: TripleStore): Promise<void> {
-    const now = new Date().toISOString();
-
     const t = new IRI(SYS_TENANT_IRI);
     const g = new IRI(SYS_SUPERUSERS_IRI);
     const r = new IRI(SYS_SUPERADMIN_IRI);
     const p = new IRI(SYS_WILDCARD_PERM_IRI);
     const gr = new IRI(SYS_GRANT_IRI);
-
-    const nowLit = literal(now, XSD_DATETIME);
 
     await store.insertMany(ctx, [
         // System Tenant
@@ -78,8 +71,6 @@ export async function seedSystemData(ctx: ServerContext, store: TripleStore): Pr
             object: literal("true", XSD_BOOLEAN),
             graph: RBAC_GRAPH,
         },
-        { subject: t, predicate: rbacCreatedAtIRI, object: nowLit, graph: RBAC_GRAPH },
-        { subject: t, predicate: rbacUpdatedAtIRI, object: nowLit, graph: RBAC_GRAPH },
 
         // Superusers Group
         { subject: g, predicate: RDF_TYPE, object: UserGroupIRI, graph: RBAC_GRAPH },
@@ -95,8 +86,6 @@ export async function seedSystemData(ctx: ServerContext, store: TripleStore): Pr
             object: literal("true", XSD_BOOLEAN),
             graph: RBAC_GRAPH,
         },
-        { subject: g, predicate: rbacCreatedAtIRI, object: nowLit, graph: RBAC_GRAPH },
-        { subject: g, predicate: rbacUpdatedAtIRI, object: nowLit, graph: RBAC_GRAPH },
 
         // Superadmin Role
         { subject: r, predicate: RDF_TYPE, object: RoleIRI, graph: RBAC_GRAPH },
@@ -112,8 +101,6 @@ export async function seedSystemData(ctx: ServerContext, store: TripleStore): Pr
             object: literal("true", XSD_BOOLEAN),
             graph: RBAC_GRAPH,
         },
-        { subject: r, predicate: rbacCreatedAtIRI, object: nowLit, graph: RBAC_GRAPH },
-        { subject: r, predicate: rbacUpdatedAtIRI, object: nowLit, graph: RBAC_GRAPH },
 
         // Wildcard Permission
         { subject: p, predicate: RDF_TYPE, object: PermissionIRI, graph: RBAC_GRAPH },
@@ -123,7 +110,6 @@ export async function seedSystemData(ctx: ServerContext, store: TripleStore): Pr
             object: literal("*", XSD_STRING),
             graph: RBAC_GRAPH,
         },
-        { subject: p, predicate: rbacCreatedAtIRI, object: nowLit, graph: RBAC_GRAPH },
 
         // Superadmin grants wildcard
         { subject: r, predicate: rbacGrantsIRI, object: p, graph: RBAC_GRAPH },
@@ -138,7 +124,5 @@ export async function seedSystemData(ctx: ServerContext, store: TripleStore): Pr
             object: literal("false", XSD_BOOLEAN),
             graph: RBAC_GRAPH,
         },
-        { subject: gr, predicate: rbacCreatedAtIRI, object: nowLit, graph: RBAC_GRAPH },
-        { subject: gr, predicate: rbacUpdatedAtIRI, object: nowLit, graph: RBAC_GRAPH },
     ]);
 }

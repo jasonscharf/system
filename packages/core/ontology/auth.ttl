@@ -152,16 +152,6 @@ auth:authRedirectUrl a owl:DatatypeProperty ;
 
 # ── Shared properties (multiple domains) ─────────────────────────────────────
 
-auth:createdAt a owl:DatatypeProperty ;
-    rdfs:domain auth:User, auth:UserIdentity, auth:UserSession, auth:UserDevice, auth:LoginAttempt ;
-    rdfs:range  xsd:dateTime ;
-    rdfs:comment "Creation timestamp." .
-
-auth:updatedAt a owl:DatatypeProperty ;
-    rdfs:domain auth:User, auth:UserIdentity, auth:LoginAttempt ;
-    rdfs:range  xsd:dateTime ;
-    rdfs:comment "Last-updated timestamp." .
-
 # ── Object properties ─────────────────────────────────────────────────────────
 
 auth:identityOf a owl:ObjectProperty ;

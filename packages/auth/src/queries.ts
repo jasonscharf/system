@@ -76,8 +76,9 @@ export async function findUserWithRecentActivity(
 
     const sessions = await EntityQuery.from(es.store, UserSessionSchema)
         .where("sessionUser", "=", user.iri)
-        .orderBy("createdAt", "desc")
         .all(ctx);
+    // createdAt is a DB-managed record timestamp (not a triple), so order in memory.
+    sessions.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
 
     const session = sessions[0] ?? null;
 

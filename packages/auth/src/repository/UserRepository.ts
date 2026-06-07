@@ -1,16 +1,14 @@
 import {
     avatarUrlIRI,
-    createdAtIRI,
     displayNameIRI,
     emailIRI,
     type IRI,
     literal,
     UserIRI,
-    updatedAtIRI,
 } from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
+import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import { AUTH_GRAPH, RDF_TYPE, XSD_DATETIME, XSD_STRING } from "../constants.js";
+import { AUTH_GRAPH, RDF_TYPE, XSD_STRING } from "../constants.js";
 import type { UserEntity } from "../types.js";
 import { idFrom, iriFor, newId } from "./util.js";
 
@@ -45,52 +43,48 @@ export class UserRepository {
         args: Pick<UserEntity, "email" | "displayName" | "avatarUrl">,
     ): Promise<UserEntity> {
         const id = newId();
-        const now = new Date();
         const sub = iriFor("user", id);
 
-        await this._store.insertMany(ctx, [
-            { subject: sub, predicate: RDF_TYPE, object: UserIRI, graph: AUTH_GRAPH },
-            {
-                subject: sub,
-                predicate: emailIRI,
-                object: literal(args.email, XSD_STRING),
-                graph: AUTH_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: createdAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: AUTH_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: updatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: AUTH_GRAPH,
-            },
-            ...(args.displayName
-                ? [
-                      {
-                          subject: sub,
-                          predicate: displayNameIRI,
-                          object: literal(args.displayName, XSD_STRING),
-                          graph: AUTH_GRAPH,
-                      },
-                  ]
-                : []),
-            ...(args.avatarUrl
-                ? [
-                      {
-                          subject: sub,
-                          predicate: avatarUrlIRI,
-                          object: literal(args.avatarUrl, XSD_STRING),
-                          graph: AUTH_GRAPH,
-                      },
-                  ]
-                : []),
-        ]);
+        return this._store.withTransaction(ctx, async (ctx) => {
+            await this._store.insertMany(ctx, [
+                { subject: sub, predicate: RDF_TYPE, object: UserIRI, graph: AUTH_GRAPH },
+                {
+                    subject: sub,
+                    predicate: emailIRI,
+                    object: literal(args.email, XSD_STRING),
+                    graph: AUTH_GRAPH,
+                },
+                ...(args.displayName
+                    ? [
+                          {
+                              subject: sub,
+                              predicate: displayNameIRI,
+                              object: literal(args.displayName, XSD_STRING),
+                              graph: AUTH_GRAPH,
+                          },
+                      ]
+                    : []),
+                ...(args.avatarUrl
+                    ? [
+                          {
+                              subject: sub,
+                              predicate: avatarUrlIRI,
+                              object: literal(args.avatarUrl, XSD_STRING),
+                              graph: AUTH_GRAPH,
+                          },
+                      ]
+                    : []),
+            ]);
 
-        return { id, iri: sub.value, ...args, createdAt: now, updatedAt: now };
+            const ts = await this._timestamps(ctx, sub);
+            return {
+                id,
+                iri: sub.value,
+                ...args,
+                createdAt: ts.createdAt,
+                updatedAt: ts.updatedAt,
+            };
+        });
     }
 
     /** @insecure @nochecks */
@@ -101,7 +95,10 @@ export class UserRepository {
     ): Promise<UserEntity | null> {
         const sub = iriFor("user", args.id);
         const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
+        if (quads.length === 0) {
+            return null;
+        }
+        return this._fromQuads(args.id, quads, await this._timestamps(ctx, sub));
     }
 
     /** @insecure @nochecks */
@@ -123,6 +120,7 @@ export class UserRepository {
         return this._fromQuads(
             id,
             await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH }),
+            await this._timestamps(ctx, sub),
         );
     }
 
@@ -139,7 +137,6 @@ export class UserRepository {
             }
 
             const sub = iriFor("user", args.id);
-            const now = new Date();
 
             if (args.patch.email !== undefined) {
                 await this._store.delete(ctx, {
@@ -180,18 +177,6 @@ export class UserRepository {
                     graph: AUTH_GRAPH,
                 });
             }
-            await this._store.delete(ctx, {
-                subject: sub,
-                predicate: updatedAtIRI,
-                graph: AUTH_GRAPH,
-            });
-            await this._store.insert(ctx, {
-                subject: sub,
-                predicate: updatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: AUTH_GRAPH,
-            });
-
             return this.findById(ctx, sec, { id: args.id });
         });
     }
@@ -201,7 +186,18 @@ export class UserRepository {
         await this._store.delete(ctx, { subject: iriFor("user", args.id), graph: AUTH_GRAPH });
     }
 
-    private _fromQuads(id: string, quads: Awaited<ReturnType<TripleStore["find"]>>): UserEntity {
+    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
+    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
+        const ts = (await this._store.entityTimestamps(ctx, [sub], AUTH_GRAPH)).get(sub.value);
+        const now = new Date();
+        return ts ?? { createdAt: now, updatedAt: now };
+    }
+
+    private _fromQuads(
+        id: string,
+        quads: Awaited<ReturnType<TripleStore["find"]>>,
+        ts: EntityTimestamps,
+    ): UserEntity {
         const get = (pred: IRI): string | undefined => {
             const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
             return q ? String((q.object as { value: string }).value) : undefined;
@@ -211,22 +207,14 @@ export class UserRepository {
         if (email == null) {
             throw new Error(`UserRepository: missing emailIRI for user id "${id}"`);
         }
-        const createdAtStr = get(createdAtIRI);
-        if (createdAtStr == null) {
-            throw new Error(`UserRepository: missing createdAtIRI for user id "${id}"`);
-        }
-        const updatedAtStr = get(updatedAtIRI);
-        if (updatedAtStr == null) {
-            throw new Error(`UserRepository: missing updatedAtIRI for user id "${id}"`);
-        }
         return {
             id,
             iri: iriFor("user", id).value,
             email,
             displayName: get(displayNameIRI),
             avatarUrl: get(avatarUrlIRI),
-            createdAt: new Date(createdAtStr),
-            updatedAt: new Date(updatedAtStr),
+            createdAt: ts.createdAt,
+            updatedAt: ts.updatedAt,
         };
     }
 }

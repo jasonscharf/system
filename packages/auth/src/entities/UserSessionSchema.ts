@@ -1,6 +1,5 @@
 import { randomBytes } from "node:crypto";
 import {
-    createdAtIRI,
     expiresAtIRI,
     ipAddressIRI,
     isActiveIRI,
@@ -20,13 +19,11 @@ export const UserSessionSchema = new EntitySchema({
         expiresAt: expiresAtIRI,
         isActive: isActiveIRI,
         ipAddress: ipAddressIRI,
-        createdAt: createdAtIRI,
         sessionUser: sessionUserIRI,
         sessionDevice: sessionDeviceIRI,
     },
     defaults: {
         sessionToken: () => randomBytes(32).toString("hex"),
-        createdAt: () => new Date(),
         isActive: true,
     },
 });

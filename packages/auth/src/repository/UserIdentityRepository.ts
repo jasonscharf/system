@@ -1,6 +1,5 @@
 import {
     accessTokenIRI,
-    createdAtIRI,
     type IRI,
     identityOfIRI,
     literal,
@@ -10,9 +9,8 @@ import {
     refreshTokenIRI,
     tokenExpiresAtIRI,
     UserIdentityIRI,
-    updatedAtIRI,
 } from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
+import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import { AUTH_GRAPH, RDF_TYPE, XSD_DATETIME, XSD_STRING } from "../constants.js";
 import type { OAuthProvider, UserIdentityEntity } from "../types.js";
@@ -46,7 +44,6 @@ export class UserIdentityRepository {
         args: Omit<UserIdentityEntity, "id" | "iri" | "createdAt" | "updatedAt">,
     ): Promise<UserIdentityEntity> {
         const id = newId();
-        const now = new Date();
         const sub = iriFor("identity", id);
         const userIri = iriFor("user", args.userId);
 
@@ -77,18 +74,6 @@ export class UserIdentityRepository {
                 graph: AUTH_GRAPH,
             },
             { subject: sub, predicate: identityOfIRI, object: userIri, graph: AUTH_GRAPH },
-            {
-                subject: sub,
-                predicate: createdAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: AUTH_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: updatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: AUTH_GRAPH,
-            },
             ...(args.refreshToken
                 ? [
                       {
@@ -111,8 +96,17 @@ export class UserIdentityRepository {
                 : []),
         ];
 
-        await this._store.insertMany(ctx, quads);
-        return { id, iri: sub.value, ...args, createdAt: now, updatedAt: now };
+        return this._store.withTransaction(ctx, async (ctx) => {
+            await this._store.insertMany(ctx, quads);
+            const ts = await this._timestamps(ctx, sub);
+            return {
+                id,
+                iri: sub.value,
+                ...args,
+                createdAt: ts.createdAt,
+                updatedAt: ts.updatedAt,
+            };
+        });
     }
 
     /** @insecure @nochecks */
@@ -130,7 +124,11 @@ export class UserIdentityRepository {
         for (const q of byProvider) {
             const sub = q.subject as IRI;
             const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-            const entity = this._fromQuads(idFrom(sub.value), quads);
+            const entity = this._fromQuads(
+                idFrom(sub.value),
+                quads,
+                await this._timestamps(ctx, sub),
+            );
             if (entity.providerUserId === args.providerUserId) {
                 return entity;
             }
@@ -150,12 +148,14 @@ export class UserIdentityRepository {
             object: userIri,
             graph: AUTH_GRAPH,
         });
+        const subs = byUser.map((q) => q.subject as IRI);
+        const tsBySubject = await this._store.entityTimestamps(ctx, subs, AUTH_GRAPH);
         const results: UserIdentityEntity[] = [];
 
-        for (const q of byUser) {
-            const sub = q.subject as IRI;
+        for (const sub of subs) {
             const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-            results.push(this._fromQuads(idFrom(sub.value), quads));
+            const ts = tsBySubject.get(sub.value) ?? this._now();
+            results.push(this._fromQuads(idFrom(sub.value), quads, ts));
         }
         return results;
     }
@@ -168,7 +168,6 @@ export class UserIdentityRepository {
     ): Promise<void> {
         return this._store.withTransaction(ctx, async (ctx) => {
             const sub = iriFor("identity", args.id);
-            const now = new Date();
 
             await this._store.delete(ctx, {
                 subject: sub,
@@ -183,11 +182,6 @@ export class UserIdentityRepository {
             await this._store.delete(ctx, {
                 subject: sub,
                 predicate: tokenExpiresAtIRI,
-                graph: AUTH_GRAPH,
-            });
-            await this._store.delete(ctx, {
-                subject: sub,
-                predicate: updatedAtIRI,
                 graph: AUTH_GRAPH,
             });
 
@@ -213,18 +207,26 @@ export class UserIdentityRepository {
                     graph: AUTH_GRAPH,
                 });
             }
-            await this._store.insert(ctx, {
-                subject: sub,
-                predicate: updatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: AUTH_GRAPH,
-            });
         });
+    }
+
+    private _now(): EntityTimestamps {
+        const now = new Date();
+        return { createdAt: now, updatedAt: now };
+    }
+
+    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
+    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
+        return (
+            (await this._store.entityTimestamps(ctx, [sub], AUTH_GRAPH)).get(sub.value) ??
+            this._now()
+        );
     }
 
     private _fromQuads(
         id: string,
         quads: Awaited<ReturnType<TripleStore["find"]>>,
+        ts: EntityTimestamps,
     ): UserIdentityEntity {
         const get = (pred: IRI): string | undefined => {
             const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
@@ -266,14 +268,6 @@ export class UserIdentityRepository {
             );
         }
         const tokenExpiresAtStr = get(tokenExpiresAtIRI);
-        const createdAtStr = get(createdAtIRI);
-        if (createdAtStr == null) {
-            throw new Error(`UserIdentityRepository: missing createdAtIRI for identity id "${id}"`);
-        }
-        const updatedAtStr = get(updatedAtIRI);
-        if (updatedAtStr == null) {
-            throw new Error(`UserIdentityRepository: missing updatedAtIRI for identity id "${id}"`);
-        }
 
         return {
             id,
@@ -285,8 +279,8 @@ export class UserIdentityRepository {
             refreshToken: get(refreshTokenIRI),
             tokenExpiresAt: tokenExpiresAtStr ? new Date(tokenExpiresAtStr) : undefined,
             userId,
-            createdAt: new Date(createdAtStr),
-            updatedAt: new Date(updatedAtStr),
+            createdAt: ts.createdAt,
+            updatedAt: ts.updatedAt,
         };
     }
 }

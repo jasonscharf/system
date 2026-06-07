@@ -26,8 +26,6 @@ export const permissionKeyIRI = new IRI("urn:sys:core:rbac:permissionKey");
 export const isDenialIRI = new IRI("urn:sys:core:rbac:isDenial");
 export const grantExpiresAtIRI = new IRI("urn:sys:core:rbac:grantExpiresAt");
 export const resourceTypeIRI = new IRI("urn:sys:core:rbac:resourceType");
-export const rbacCreatedAtIRI = new IRI("urn:sys:core:rbac:createdAt");
-export const rbacUpdatedAtIRI = new IRI("urn:sys:core:rbac:updatedAt");
 export const isMemberOfIRI = new IRI("urn:sys:core:rbac:isMemberOf");
 export const isInTenantIRI = new IRI("urn:sys:core:rbac:isInTenant");
 export const inheritsFromIRI = new IRI("urn:sys:core:rbac:inheritsFrom");
@@ -47,16 +45,12 @@ export const actsForIRI = new IRI("urn:sys:core:rbac:actsFor");
 export interface Tenant {
     tenantName?: string;
     isSystemTenant?: boolean;
-    createdAt?: Date;
-    updatedAt?: Date;
 }
 
 /** Named collection of principals (users, service accounts, or nested groups). */
 export interface UserGroup {
     groupName?: string;
     isSystemGroup?: boolean;
-    createdAt?: Date;
-    updatedAt?: Date;
     isInTenant?: Tenant[];
 }
 
@@ -65,8 +59,6 @@ export interface ServiceAccount {
     serviceAccountName?: string;
     serviceAccountToken?: string;
     isActive?: boolean;
-    createdAt?: Date;
-    updatedAt?: Date;
     isInTenant?: Tenant[];
 }
 
@@ -74,8 +66,6 @@ export interface ServiceAccount {
 export interface Role {
     roleName?: string;
     isSystemRole?: boolean;
-    createdAt?: Date;
-    updatedAt?: Date;
     isInTenant?: Tenant[];
     inheritsFrom?: Role[];
 }
@@ -83,15 +73,12 @@ export interface Role {
 /** Atomic capability. */
 export interface Permission {
     permissionKey?: string;
-    createdAt?: Date;
 }
 
 /** Explicit principal → role/permission binding within a scope. */
 export interface PolicyGrant {
     isDenial?: boolean;
     grantExpiresAt?: Date;
-    createdAt?: Date;
-    updatedAt?: Date;
     hasPrincipal?: unknown[];
     hasRole?: Role[];
     hasPermission?: Permission[];
@@ -103,8 +90,6 @@ export interface PolicyGrant {
 /** Resource that participates in the hierarchy. */
 export interface ResourceNode {
     resourceType?: string;
-    createdAt?: Date;
-    updatedAt?: Date;
     hasParent?: ResourceNode[];
     isInTenant?: Tenant[];
 }

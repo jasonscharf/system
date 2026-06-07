@@ -111,14 +111,6 @@ rbac:resourceType   a owl:DatatypeProperty ;
 
 # ── Shared timestamps ─────────────────────────────────────────────────────────
 
-rbac:createdAt      a owl:DatatypeProperty ;
-    rdfs:range xsd:dateTime ;
-    rdfs:comment "Creation timestamp." .
-
-rbac:updatedAt      a owl:DatatypeProperty ;
-    rdfs:range xsd:dateTime ;
-    rdfs:comment "Last-updated timestamp." .
-
 # ── Object properties ─────────────────────────────────────────────────────────
 
 rbac:isMemberOf       a owl:ObjectProperty ;

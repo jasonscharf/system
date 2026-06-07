@@ -34,16 +34,6 @@ tenancy:tenantName a owl:DatatypeProperty ;
     rdfs:range xsd:string ;
     rdfs:comment "Display name of the tenant organisation." .
 
-tenancy:tenantCreatedAt a owl:DatatypeProperty ;
-    rdfs:domain tenancy:Tenant ;
-    rdfs:range xsd:dateTime ;
-    rdfs:comment "Timestamp when this tenant was created." .
-
-tenancy:tenantUpdatedAt a owl:DatatypeProperty ;
-    rdfs:domain tenancy:Tenant ;
-    rdfs:range xsd:dateTime ;
-    rdfs:comment "Timestamp when this tenant was last updated." .
-
 # tenantUser stores an auth:User IRI as an anyURI literal (one triple per member).
 tenancy:tenantUser a owl:DatatypeProperty ;
     rdfs:domain tenancy:Tenant ;
@@ -56,16 +46,6 @@ tenancy:orgName a owl:DatatypeProperty ;
     rdfs:domain tenancy:Organization ;
     rdfs:range xsd:string ;
     rdfs:comment "Display name of the organization (user-renameable)." .
-
-tenancy:orgCreatedAt a owl:DatatypeProperty ;
-    rdfs:domain tenancy:Organization ;
-    rdfs:range xsd:dateTime ;
-    rdfs:comment "Timestamp when the organization was created." .
-
-tenancy:orgUpdatedAt a owl:DatatypeProperty ;
-    rdfs:domain tenancy:Organization ;
-    rdfs:range xsd:dateTime ;
-    rdfs:comment "Timestamp when the organization was last updated." .
 
 # orgTenant stores the IRI of the backing Tenant as an anyURI literal.
 tenancy:orgTenant a owl:DatatypeProperty ;
@@ -101,16 +81,6 @@ tenancy:domainUrl a owl:DatatypeProperty ;
     rdfs:domain tenancy:Domain ;
     rdfs:range xsd:anyURI ;
     rdfs:comment "The canonical URL of the domain." .
-
-tenancy:domainCreatedAt a owl:DatatypeProperty ;
-    rdfs:domain tenancy:Domain ;
-    rdfs:range xsd:dateTime ;
-    rdfs:comment "Timestamp when this domain was registered." .
-
-tenancy:domainUpdatedAt a owl:DatatypeProperty ;
-    rdfs:domain tenancy:Domain ;
-    rdfs:range xsd:dateTime ;
-    rdfs:comment "Timestamp when this domain was last updated." .
 
 tenancy:domainTenant a owl:ObjectProperty ;
     rdfs:domain tenancy:Domain ;

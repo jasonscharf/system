@@ -5,7 +5,7 @@ import { EntityQuery } from "../../EntityQuery.js";
 import { EntityStore } from "../../EntityStore.js";
 import type { SecurityContext } from "../../SecurityContext.js";
 import type { ServerContext } from "../../ServerContext.js";
-import { RBAC_GRAPH } from "../constants.js";
+import { tenantGraph, tenantGraphForInsert } from "../../tenancy.js";
 import { UserGroupSchema } from "../schemas.generated.js";
 import type { UserGroupEntity } from "../types.js";
 import { edgeRefOf, idFrom, iriFor } from "./util.js";
@@ -163,7 +163,7 @@ export class UserGroupRepository {
             await this._store.delete(txCtx, {
                 predicate: isMemberOfIRI,
                 object: iriFor("group", args.id),
-                graph: RBAC_GRAPH,
+                graph: tenantGraph(ctx),
             });
         });
     }
@@ -180,7 +180,7 @@ export class UserGroupRepository {
             subject: new IRI(args.memberIri),
             predicate: isMemberOfIRI,
             object: new IRI(args.groupIri),
-            graph: RBAC_GRAPH,
+            graph: tenantGraphForInsert(ctx),
         });
     }
 
@@ -194,7 +194,7 @@ export class UserGroupRepository {
             subject: new IRI(args.memberIri),
             predicate: isMemberOfIRI,
             object: new IRI(args.groupIri),
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
     }
 
@@ -207,7 +207,7 @@ export class UserGroupRepository {
         const quads = await this._store.find(ctx, {
             predicate: isMemberOfIRI,
             object: new IRI(args.groupIri),
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
         return quads.map((q) => (q.subject as IRI).value);
     }
@@ -221,7 +221,7 @@ export class UserGroupRepository {
         const quads = await this._store.find(ctx, {
             subject: new IRI(args.principalIri),
             predicate: isMemberOfIRI,
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
         return quads.map((q) => (q.object as IRI).value).filter((v): v is string => v != null);
     }

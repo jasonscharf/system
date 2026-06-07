@@ -70,6 +70,13 @@ export interface CheckOptions {
     /** IRI of the resource or tenant to scope the check to. Absent = system-wide. */
     scope?: string;
     /**
+     * Precomputed scope chain (resource + ancestors). When provided it is used
+     * verbatim and `scope` resolution is skipped — this is how a grant scope can be
+     * matched against the *entity topology* (resource→…→tenant resolved over the
+     * domain edges) instead of the parallel rbac:parentResource tree.
+     */
+    scopeChain?: string[];
+    /**
      * When set, the caller is requesting to act as this principal (impersonation).
      * The check verifies principal --actsFor--> actingAs and then evaluates as actingAs.
      */
@@ -82,4 +89,6 @@ export interface RbacCheckArgs {
     permission: string;
     /** IRI of the resource or tenant to scope the check to. Absent = system-wide. */
     scope?: string;
+    /** Precomputed scope chain over the entity topology (resource + ancestors → tenant). */
+    scopeChain?: string[];
 }

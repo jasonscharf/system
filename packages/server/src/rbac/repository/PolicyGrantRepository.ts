@@ -5,7 +5,7 @@ import { EntityQuery } from "../../EntityQuery.js";
 import { EntityStore } from "../../EntityStore.js";
 import type { SecurityContext } from "../../SecurityContext.js";
 import type { ServerContext } from "../../ServerContext.js";
-import { RBAC_GRAPH } from "../constants.js";
+import { tenantGraph } from "../../tenancy.js";
 import { PolicyGrantSchema } from "../schemas.generated.js";
 import type { PolicyGrantEntity } from "../types.js";
 import { edgeRefOf } from "./util.js";
@@ -60,7 +60,7 @@ export class PolicyGrantRepository {
 
     /** @insecure @nochecks Soft-delete a grant by IRI (revokes the assignment). */
     async revoke(ctx: ServerContext, sec: SecurityContext, args: GrantIriArgs): Promise<void> {
-        await this._store.delete(ctx, { subject: new IRI(args.grantIri), graph: RBAC_GRAPH });
+        await this._store.delete(ctx, { subject: new IRI(args.grantIri), graph: tenantGraph(ctx) });
     }
 
     /**

@@ -4,7 +4,7 @@ import type { EntityRecord } from "@jasonscharf/entities";
 import { EntityStore } from "../../EntityStore.js";
 import type { SecurityContext } from "../../SecurityContext.js";
 import type { ServerContext } from "../../ServerContext.js";
-import { RBAC_GRAPH } from "../constants.js";
+import { tenantGraph, tenantGraphForInsert } from "../../tenancy.js";
 import { RoleSchema } from "../schemas.generated.js";
 import type { RoleEntity } from "../types.js";
 import { edgeRefOf, idFrom, iriFor, iriValue } from "./util.js";
@@ -83,7 +83,7 @@ export class RoleRepository {
             subject: new IRI(args.roleIri),
             predicate: rbacGrantsIRI,
             object: new IRI(args.permissionIri),
-            graph: RBAC_GRAPH,
+            graph: tenantGraphForInsert(ctx),
         });
     }
 
@@ -97,7 +97,7 @@ export class RoleRepository {
             subject: new IRI(args.roleIri),
             predicate: rbacGrantsIRI,
             object: new IRI(args.permissionIri),
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
     }
 
@@ -110,7 +110,7 @@ export class RoleRepository {
         const quads = await this._store.find(ctx, {
             subject: new IRI(args.roleIri),
             predicate: rbacGrantsIRI,
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
         return quads.map((q) => iriValue(q.object)).filter((v): v is string => v != null);
     }
@@ -125,7 +125,7 @@ export class RoleRepository {
             subject: new IRI(args.roleIri),
             predicate: inheritsFromIRI,
             object: new IRI(args.parentRoleIri),
-            graph: RBAC_GRAPH,
+            graph: tenantGraphForInsert(ctx),
         });
     }
 
@@ -139,7 +139,7 @@ export class RoleRepository {
             subject: new IRI(args.roleIri),
             predicate: inheritsFromIRI,
             object: new IRI(args.parentRoleIri),
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
     }
 
@@ -152,7 +152,7 @@ export class RoleRepository {
         const quads = await this._store.find(ctx, {
             subject: new IRI(args.roleIri),
             predicate: inheritsFromIRI,
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
         return quads.map((q) => iriValue(q.object)).filter((v): v is string => v != null);
     }

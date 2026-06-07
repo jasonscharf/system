@@ -11,7 +11,7 @@ import type { TripleStore } from "@jasonscharf/data";
 import { type SecurityContext, systemSec } from "../SecurityContext.js";
 import type { ServerContext } from "../ServerContext.js";
 import type { AccessChecker } from "./AccessChecker.js";
-import { RBAC_GRAPH } from "./constants.js";
+import { tenantGraph } from "../tenancy.js";
 import type { PolicyGrantRepository } from "./repository/PolicyGrantRepository.js";
 import type { UserGroupRepository } from "./repository/UserGroupRepository.js";
 import { iriValue, literalValue } from "./repository/util.js";
@@ -281,7 +281,7 @@ export class RbacInspector {
             const quads = await this._store.find(ctx, {
                 subject: new IRI(current),
                 predicate: isMemberOfIRI,
-                graph: RBAC_GRAPH,
+                graph: tenantGraph(ctx),
             });
             for (const q of quads) {
                 const groupIri = iriValue(q.object);
@@ -304,7 +304,7 @@ export class RbacInspector {
             const parentQuads = await this._store.find(ctx, {
                 subject: new IRI(current),
                 predicate: { value: "urn:sys:core:rbac:parentResource" } as IRI,
-                graph: RBAC_GRAPH,
+                graph: tenantGraph(ctx),
             });
             current = parentQuads.length > 0 ? (iriValue(parentQuads[0].object) ?? null) : null;
         }
@@ -331,7 +331,7 @@ export class RbacInspector {
             const quads = await this._store.find(ctx, {
                 subject: new IRI(current),
                 predicate: isMemberOfIRI,
-                graph: RBAC_GRAPH,
+                graph: tenantGraph(ctx),
             });
             for (const q of quads) {
                 const g = iriValue(q.object);
@@ -412,7 +412,7 @@ export class RbacInspector {
         const grantQuads = await this._store.find(ctx, {
             subject: new IRI(roleIri),
             predicate: rbacGrantsIRI,
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
         for (const q of grantQuads) {
             const permIri = iriValue(q.object);
@@ -428,7 +428,7 @@ export class RbacInspector {
         const inheritQuads = await this._store.find(ctx, {
             subject: new IRI(roleIri),
             predicate: inheritsFromIRI,
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
         for (const q of inheritQuads) {
             const parentIri = iriValue(q.object);
@@ -456,7 +456,7 @@ export class RbacInspector {
         const quads = await this._store.find(ctx, {
             subject: new IRI(permissionIri),
             predicate: permissionKeyIRI,
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
         return quads.length > 0 ? (literalValue(quads[0].object) ?? null) : null;
     }
@@ -465,7 +465,7 @@ export class RbacInspector {
         const quads = await this._store.find(ctx, {
             subject: new IRI(roleIri),
             predicate: roleNameIRI,
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
         return quads.length > 0 ? (literalValue(quads[0].object) ?? null) : null;
     }
@@ -474,7 +474,7 @@ export class RbacInspector {
         const quads = await this._store.find(ctx, {
             subject: new IRI(iri),
             predicate: groupNameIRI,
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
         return quads.length > 0;
     }

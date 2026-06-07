@@ -1,5 +1,4 @@
 import {
-    createdAtIRI,
     deviceNameIRI,
     devicePlatformIRI,
     deviceUserAgentIRI,
@@ -16,8 +15,6 @@ export const UserDeviceSchema = new EntitySchema({
         deviceName: deviceNameIRI,
         devicePlatform: devicePlatformIRI,
         deviceUserAgent: deviceUserAgentIRI,
-        createdAt: createdAtIRI,
         deviceUser: deviceUserIRI,
     },
-    defaults: { createdAt: () => new Date() },
 });

@@ -10,9 +10,7 @@ export interface User {
     /** URL of the user's avatar image. */
     avatarUrl?: string;
     /** Creation timestamp. */
-    createdAt?: Date;
     /** Last-updated timestamp. */
-    updatedAt?: Date;
 }
 
 export const UserIRI = new IRI("urn:sys:core:auth:User");
@@ -32,9 +30,7 @@ export interface UserIdentity {
     /** Expiry time of the current access token. */
     tokenExpiresAt?: Date;
     /** Creation timestamp. */
-    createdAt?: Date;
     /** Last-updated timestamp. */
-    updatedAt?: Date;
     /** Links an identity to its owning user. */
     identityOf?: User[];
 }
@@ -52,7 +48,6 @@ export interface UserSession {
     /** Client IP address at time of login. */
     ipAddress?: string;
     /** Creation timestamp. */
-    createdAt?: Date;
     /** The user this session belongs to. */
     sessionUser?: User;
     /** The device this session was created on. */
@@ -70,7 +65,6 @@ export interface UserDevice {
     /** Raw HTTP User-Agent string. */
     deviceUserAgent?: string;
     /** Creation timestamp. */
-    createdAt?: Date;
     /** The user who owns this device record. */
     deviceUser?: User[];
 }
@@ -102,9 +96,7 @@ export interface LoginAttempt {
     /** Post-login redirect URL requested at attempt time. */
     authRedirectUrl?: string;
     /** Creation timestamp. */
-    createdAt?: Date;
     /** Last-updated timestamp. */
-    updatedAt?: Date;
     /** The user resolved by a successful login attempt. */
     attemptUser?: User[];
 }
@@ -136,8 +128,6 @@ export const utmSourceIRI = new IRI("urn:sys:core:auth:utmSource");
 export const utmMediumIRI = new IRI("urn:sys:core:auth:utmMedium");
 export const utmCampaignIRI = new IRI("urn:sys:core:auth:utmCampaign");
 export const authRedirectUrlIRI = new IRI("urn:sys:core:auth:authRedirectUrl");
-export const createdAtIRI = new IRI("urn:sys:core:auth:createdAt");
-export const updatedAtIRI = new IRI("urn:sys:core:auth:updatedAt");
 export const identityOfIRI = new IRI("urn:sys:core:auth:identityOf");
 export const sessionUserIRI = new IRI("urn:sys:core:auth:sessionUser");
 export const sessionDeviceIRI = new IRI("urn:sys:core:auth:sessionDevice");

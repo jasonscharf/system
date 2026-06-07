@@ -2,7 +2,6 @@ import {
     attemptUserIRI,
     authRedirectUrlIRI,
     claimIRI,
-    createdAtIRI,
     errorCodeIRI,
     type IRI,
     ipAddressIRI,
@@ -11,13 +10,12 @@ import {
     nonceIRI,
     providerIRI,
     statusIRI,
-    updatedAtIRI,
     userAgentIRI,
     utmCampaignIRI,
     utmMediumIRI,
     utmSourceIRI,
 } from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
+import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import { AUTH_GRAPH, RDF_TYPE, XSD_ANY_URI, XSD_DATETIME, XSD_STRING } from "../constants.js";
 import type { LoginAttemptEntity, LoginAttemptStatus, OAuthProvider } from "../types.js";
@@ -60,9 +58,7 @@ export class LoginAttemptRepository {
         args: CreateLoginAttemptArgs,
     ): Promise<LoginAttemptEntity> {
         const id = newId();
-        const now = new Date();
         const sub = iriFor("loginattempt", id);
-        const iso = now.toISOString();
 
         const str = (predicate: IRI, value: string) => ({
             subject: sub,
@@ -71,57 +67,48 @@ export class LoginAttemptRepository {
             graph: AUTH_GRAPH,
         });
 
-        await this._store.insertMany(ctx, [
-            { subject: sub, predicate: RDF_TYPE, object: LoginAttemptIRI, graph: AUTH_GRAPH },
-            str(providerIRI, args.provider),
-            str(statusIRI, "pending"),
-            str(nonceIRI, args.nonce),
-            {
-                subject: sub,
-                predicate: createdAtIRI,
-                object: literal(iso, XSD_DATETIME),
-                graph: AUTH_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: updatedAtIRI,
-                object: literal(iso, XSD_DATETIME),
-                graph: AUTH_GRAPH,
-            },
-            ...(args.ipAddress ? [str(ipAddressIRI, args.ipAddress)] : []),
-            ...(args.userAgent ? [str(userAgentIRI, args.userAgent)] : []),
-            ...(args.claim ? [str(claimIRI, args.claim)] : []),
-            ...(args.utmSource ? [str(utmSourceIRI, args.utmSource)] : []),
-            ...(args.utmMedium ? [str(utmMediumIRI, args.utmMedium)] : []),
-            ...(args.utmCampaign ? [str(utmCampaignIRI, args.utmCampaign)] : []),
-            ...(args.authRedirectUrl
-                ? [
-                      {
-                          subject: sub,
-                          predicate: authRedirectUrlIRI,
-                          object: literal(args.authRedirectUrl, XSD_ANY_URI),
-                          graph: AUTH_GRAPH,
-                      },
-                  ]
-                : []),
-        ]);
+        return this._store.withTransaction(ctx, async (ctx) => {
+            await this._store.insertMany(ctx, [
+                { subject: sub, predicate: RDF_TYPE, object: LoginAttemptIRI, graph: AUTH_GRAPH },
+                str(providerIRI, args.provider),
+                str(statusIRI, "pending"),
+                str(nonceIRI, args.nonce),
+                ...(args.ipAddress ? [str(ipAddressIRI, args.ipAddress)] : []),
+                ...(args.userAgent ? [str(userAgentIRI, args.userAgent)] : []),
+                ...(args.claim ? [str(claimIRI, args.claim)] : []),
+                ...(args.utmSource ? [str(utmSourceIRI, args.utmSource)] : []),
+                ...(args.utmMedium ? [str(utmMediumIRI, args.utmMedium)] : []),
+                ...(args.utmCampaign ? [str(utmCampaignIRI, args.utmCampaign)] : []),
+                ...(args.authRedirectUrl
+                    ? [
+                          {
+                              subject: sub,
+                              predicate: authRedirectUrlIRI,
+                              object: literal(args.authRedirectUrl, XSD_ANY_URI),
+                              graph: AUTH_GRAPH,
+                          },
+                      ]
+                    : []),
+            ]);
 
-        return {
-            id,
-            iri: sub.value,
-            provider: args.provider,
-            status: "pending",
-            nonce: args.nonce,
-            ipAddress: args.ipAddress,
-            userAgent: args.userAgent,
-            claim: args.claim,
-            utmSource: args.utmSource,
-            utmMedium: args.utmMedium,
-            utmCampaign: args.utmCampaign,
-            authRedirectUrl: args.authRedirectUrl,
-            createdAt: now,
-            updatedAt: now,
-        };
+            const ts = await this._timestamps(ctx, sub);
+            return {
+                id,
+                iri: sub.value,
+                provider: args.provider,
+                status: "pending",
+                nonce: args.nonce,
+                ipAddress: args.ipAddress,
+                userAgent: args.userAgent,
+                claim: args.claim,
+                utmSource: args.utmSource,
+                utmMedium: args.utmMedium,
+                utmCampaign: args.utmCampaign,
+                authRedirectUrl: args.authRedirectUrl,
+                createdAt: ts.createdAt,
+                updatedAt: ts.updatedAt,
+            };
+        });
     }
 
     /** @insecure @nochecks */
@@ -140,7 +127,7 @@ export class LoginAttemptRepository {
         }
         const sub = matches[0].subject as IRI;
         const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-        return this._fromQuads(idFrom(sub.value), quads);
+        return this._fromQuads(idFrom(sub.value), quads, await this._timestamps(ctx, sub));
     }
 
     /** @insecure @nochecks */
@@ -150,7 +137,6 @@ export class LoginAttemptRepository {
         args: UpdateStatusArgs,
     ): Promise<void> {
         const sub = iriFor("loginattempt", args.id);
-        const now = new Date();
 
         await this._store.withTransaction(ctx, async (ctx) => {
             await this._replace(ctx, sub, statusIRI, literal(args.status, XSD_STRING));
@@ -160,7 +146,6 @@ export class LoginAttemptRepository {
             if (args.errorCode) {
                 await this._replace(ctx, sub, errorCodeIRI, literal(args.errorCode, XSD_STRING));
             }
-            await this._replace(ctx, sub, updatedAtIRI, literal(now.toISOString(), XSD_DATETIME));
         });
     }
 
@@ -174,9 +159,23 @@ export class LoginAttemptRepository {
         await this._store.insert(ctx, { subject, predicate, object, graph: AUTH_GRAPH });
     }
 
+    private _now(): EntityTimestamps {
+        const now = new Date();
+        return { createdAt: now, updatedAt: now };
+    }
+
+    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
+    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
+        return (
+            (await this._store.entityTimestamps(ctx, [sub], AUTH_GRAPH)).get(sub.value) ??
+            this._now()
+        );
+    }
+
     private _fromQuads(
         id: string,
         quads: Awaited<ReturnType<TripleStore["find"]>>,
+        ts: EntityTimestamps,
     ): LoginAttemptEntity {
         const get = (pred: IRI): string | undefined => {
             const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
@@ -190,14 +189,6 @@ export class LoginAttemptRepository {
         const nonce = get(nonceIRI);
         if (nonce == null) {
             throw new Error(`LoginAttemptRepository: missing nonceIRI for attempt id "${id}"`);
-        }
-        const createdAtStr = get(createdAtIRI);
-        if (createdAtStr == null) {
-            throw new Error(`LoginAttemptRepository: missing createdAtIRI for attempt id "${id}"`);
-        }
-        const updatedAtStr = get(updatedAtIRI);
-        if (updatedAtStr == null) {
-            throw new Error(`LoginAttemptRepository: missing updatedAtIRI for attempt id "${id}"`);
         }
         const attemptUserIri = getIri(attemptUserIRI);
 
@@ -216,8 +207,8 @@ export class LoginAttemptRepository {
             utmMedium: get(utmMediumIRI),
             utmCampaign: get(utmCampaignIRI),
             authRedirectUrl: get(authRedirectUrlIRI),
-            createdAt: new Date(createdAtStr),
-            updatedAt: new Date(updatedAtStr),
+            createdAt: ts.createdAt,
+            updatedAt: ts.updatedAt,
         };
     }
 }

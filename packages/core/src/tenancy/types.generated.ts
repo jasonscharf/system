@@ -34,13 +34,9 @@ export interface Domain {
 export const DomainIRI = new IRI(`${TENANCY_NS}Domain`);
 
 export const tenantNameIRI = new IRI(`${TENANCY_NS}tenantName`);
-export const tenantCreatedAtIRI = new IRI(`${TENANCY_NS}tenantCreatedAt`);
-export const tenantUpdatedAtIRI = new IRI(`${TENANCY_NS}tenantUpdatedAt`);
 export const tenantUserIRI = new IRI(`${TENANCY_NS}tenantUser`);
 
 export const orgNameIRI = new IRI(`${TENANCY_NS}orgName`);
-export const orgCreatedAtIRI = new IRI(`${TENANCY_NS}orgCreatedAt`);
-export const orgUpdatedAtIRI = new IRI(`${TENANCY_NS}orgUpdatedAt`);
 export const orgTenantIRI = new IRI(`${TENANCY_NS}orgTenant`);
 export const orgUserIRI = new IRI(`${TENANCY_NS}orgUser`);
 export const orgOwnerIRI = new IRI(`${TENANCY_NS}orgOwner`);

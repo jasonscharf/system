@@ -1,11 +1,4 @@
-import {
-    avatarUrlIRI,
-    createdAtIRI,
-    displayNameIRI,
-    emailIRI,
-    UserIRI,
-    updatedAtIRI,
-} from "@jasonscharf/core";
+import { avatarUrlIRI, displayNameIRI, emailIRI, UserIRI } from "@jasonscharf/core";
 import { EntitySchema } from "@jasonscharf/entities";
 import { AUTH_NS } from "../constants.js";
 
@@ -16,11 +9,5 @@ export const UserSchema = new EntitySchema({
         email: emailIRI,
         displayName: displayNameIRI,
         avatarUrl: avatarUrlIRI,
-        createdAt: createdAtIRI,
-        updatedAt: updatedAtIRI,
-    },
-    defaults: {
-        createdAt: () => new Date(),
-        updatedAt: () => new Date(),
     },
 });

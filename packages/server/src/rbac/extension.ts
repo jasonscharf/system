@@ -20,13 +20,13 @@
 import type { ExtensionInstallContext, InstalledExtension, TernExtension } from "@jasonscharf/app";
 import type { TripleStore } from "@jasonscharf/data";
 import { buildServerContext } from "../ServerContext.js";
+import { TenantRepository } from "../tenancy/TenantRepository.js";
 import { RbacService } from "./RbacService.js";
 import { PermissionRepository } from "./repository/PermissionRepository.js";
 import { PolicyGrantRepository } from "./repository/PolicyGrantRepository.js";
 import { ResourceNodeRepository } from "./repository/ResourceNodeRepository.js";
 import { RoleRepository } from "./repository/RoleRepository.js";
 import { ServiceAccountRepository } from "./repository/ServiceAccountRepository.js";
-import { TenantRepository } from "./repository/TenantRepository.js";
 import { UserGroupRepository } from "./repository/UserGroupRepository.js";
 import { seedSystemData } from "./seed.js";
 

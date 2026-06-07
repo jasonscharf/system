@@ -17,4 +17,17 @@ export interface EntityRecord<Props extends Record<string, unknown> = Record<str
      * Present only when the schema declares edges.
      */
     edges?: Record<string, EdgeHandle>;
+    /**
+     * DB-managed creation time, derived from the entity's edge rows' created_at
+     * columns (set by triggers), not stored as a triple.  Populated on records
+     * returned by create/findById/hydrateMany/EntityQuery; absent on records
+     * assembled by hand.
+     */
+    createdAt?: Date;
+    /**
+     * DB-managed last-modification time, derived from the entity's edge rows'
+     * updated_at columns (set by triggers), not stored as a triple.  Populated
+     * alongside `createdAt`.
+     */
+    updatedAt?: Date;
 }

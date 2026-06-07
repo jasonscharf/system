@@ -20,8 +20,8 @@ import type { ShaclNodeShape } from "@jasonscharf/gen";
 import { buildServerContext, EntityStore, EntityValidationError } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assertEmptyStore } from "../assertEmptyStore.js";
 import { fromLiteral, invertPropertyMap, propertyMapFor } from "../../../entities/src/util.js";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 
 // ── Provider matrix ───────────────────────────────────────────────────────────
 
@@ -63,7 +63,14 @@ function makeTestSchema() {
     return new EntitySchema({
         typeIRI: new IRI("http://test.dev/Item"),
         ns: "http://test.dev/",
-        properties: { name: nameIRI, email: emailIRI, score: scoreIRI, active: activeIRI, tags: tagIRI, rank: rankIRI },
+        properties: {
+            name: nameIRI,
+            email: emailIRI,
+            score: scoreIRI,
+            active: activeIRI,
+            tags: tagIRI,
+            rank: rankIRI,
+        },
         defaults: { score: 0, active: true },
     });
 }
@@ -112,6 +119,19 @@ for (const db of providers) {
             const rec = await es.create(ctx, UserSchema, { email: "bob@example.com" });
             expect(rec.props.createdAt).toBeInstanceOf(Date);
             expect(rec.props.updatedAt).toBeInstanceOf(Date);
+        });
+
+        it("surfaces DB-managed createdAt / updatedAt on the record (create + findById)", async () => {
+            const created = await es.create(ctx, UserSchema, { email: "ts@example.com" });
+            const createdAt = created.createdAt;
+            const updatedAt = created.updatedAt;
+            expect(createdAt).toBeInstanceOf(Date);
+            expect(updatedAt).toBeInstanceOf(Date);
+            expect(updatedAt?.getTime() ?? 0).toBeGreaterThanOrEqual(createdAt?.getTime() ?? 0);
+
+            const found = await es.findById(ctx, UserSchema, created.id);
+            expect(found?.createdAt).toBeInstanceOf(Date);
+            expect(found?.updatedAt).toBeInstanceOf(Date);
         });
 
         it("findById returns the entity with correct props", async () => {
@@ -205,7 +225,8 @@ for (const db of providers) {
         });
 
         it("finds entity by exact email match", async () => {
-            const results = await ctx.entities(schema)
+            const results = await ctx
+                .entities(schema)
                 .where("email", "=", "beta@example.com")
                 .all(ctx);
             expect(results).toHaveLength(1);
@@ -213,23 +234,23 @@ for (const db of providers) {
         });
 
         it("returns empty array when filter matches nothing", async () => {
-            const results = await ctx.entities(schema)
+            const results = await ctx
+                .entities(schema)
                 .where("email", "=", "nobody@example.com")
                 .all(ctx);
             expect(results).toHaveLength(0);
         });
 
         it("count() reflects filter", async () => {
-            const n = await ctx.entities(schema)
+            const n = await ctx
+                .entities(schema)
                 .where("email", "=", "alpha@example.com")
                 .count(ctx);
             expect(n).toBe(1);
         });
 
         it("first() returns one or null", async () => {
-            const found = await ctx.entities(schema)
-                .where("name", "=", "Gamma")
-                .first(ctx);
+            const found = await ctx.entities(schema).where("name", "=", "Gamma").first(ctx);
             expect(found).not.toBeNull();
             expect(found?.props.name).toBe("Gamma");
         });
@@ -254,15 +275,28 @@ for (const db of providers) {
             ctx = await setup(db);
             ({ es } = ctx);
             schema = makeTestSchema();
-            await es.create(ctx, schema, { name: "Alice", email: "a@example.com", score: 10, active: true, rank: 1 });
-            await es.create(ctx, schema, { name: "Bob", email: "b@example.com", score: 20, active: false, rank: 2 });
+            await es.create(ctx, schema, {
+                name: "Alice",
+                email: "a@example.com",
+                score: 10,
+                active: true,
+                rank: 1,
+            });
+            await es.create(ctx, schema, {
+                name: "Bob",
+                email: "b@example.com",
+                score: 20,
+                active: false,
+                rank: 2,
+            });
         });
         afterEach(async () => {
             await teardown(ctx);
         });
 
         it("intersects two equality filters", async () => {
-            const results = await ctx.entities(schema)
+            const results = await ctx
+                .entities(schema)
                 .where("name", "=", "Alice")
                 .where("active", "=", true)
                 .all(ctx);
@@ -271,7 +305,8 @@ for (const db of providers) {
         });
 
         it("returns empty when filters exclude all entities", async () => {
-            const results = await ctx.entities(schema)
+            const results = await ctx
+                .entities(schema)
                 .where("name", "=", "Alice")
                 .where("active", "=", false) // Alice is active:true
                 .all(ctx);
@@ -304,7 +339,8 @@ for (const db of providers) {
         });
 
         it("narrows to exactly one entity with 3 coincident conditions", async () => {
-            const results = await ctx.entities(schema)
+            const results = await ctx
+                .entities(schema)
                 .where("name", "=", "P3")
                 .where("score", "=", 30)
                 .where("active", "=", true)
@@ -314,7 +350,8 @@ for (const db of providers) {
         });
 
         it("excludes entities that fail any of the three conditions", async () => {
-            const results = await ctx.entities(schema)
+            const results = await ctx
+                .entities(schema)
                 .where("score", "=", 20) // only P2
                 .where("active", "=", true) // P2 is inactive
                 .where("rank", "=", 2)
@@ -362,7 +399,8 @@ for (const db of providers) {
 
         it("orderBy combined with filter", async () => {
             await es.create(ctx, schema, { name: "Dave", score: 10 });
-            const results = await ctx.entities(schema)
+            const results = await ctx
+                .entities(schema)
                 .where("score", "=", 10)
                 .orderBy("name", "asc")
                 .all(ctx);
@@ -379,9 +417,7 @@ for (const db of providers) {
 
         it("orderBy: bv==null when one record has no value for the sort prop", async () => {
             await es.create(ctx, schema, { name: "HasEmail", email: "z@test.com", score: 99 });
-            const results = await ctx.entities(schema)
-                .orderBy("email", "asc")
-                .all(ctx);
+            const results = await ctx.entities(schema).orderBy("email", "asc").all(ctx);
             expect(results.length).toBeGreaterThanOrEqual(4);
             const emails = results.map((r) => r.props.email);
             expect(emails[emails.length - 1]).toBe("z@test.com");
@@ -554,13 +590,20 @@ describe("EntityStore — defensive throw paths", () => {
 
     it("collectionSet throws when prop not in schema", async () => {
         await expect(
-            es.collectionSet(buildServerContext(es.store), schema, itemId, "nonExistentProp", ["x"]),
+            es.collectionSet(buildServerContext(es.store), schema, itemId, "nonExistentProp", [
+                "x",
+            ]),
         ).rejects.toThrow();
     });
 
     it("createCollectionView throws when prop not in schema", async () => {
         await expect(
-            es.createCollectionView(buildServerContext(es.store), schema, itemId, "nonExistentProp"),
+            es.createCollectionView(
+                buildServerContext(es.store),
+                schema,
+                itemId,
+                "nonExistentProp",
+            ),
         ).rejects.toThrow();
     });
 
@@ -599,7 +642,12 @@ describe("EntityStore — collectionGet/Remove with unknown prop returns early",
     });
 
     it("collectionGet returns [] when prop is not in the schema", async () => {
-        const result = await es.collectionGet(buildServerContext(es.store), schema, itemId, "unknownProp");
+        const result = await es.collectionGet(
+            buildServerContext(es.store),
+            schema,
+            itemId,
+            "unknownProp",
+        );
         expect(result).toEqual([]);
     });
 
@@ -657,7 +705,9 @@ describe("EntityStore._validate — schema with shape", () => {
         const knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
         const store = new TripleStore(knex);
         const es = new EntityStore(store);
-        const rec = await es.create(buildServerContext(es.store), schemaWithShape, { name: "ValidName" });
+        const rec = await es.create(buildServerContext(es.store), schemaWithShape, {
+            name: "ValidName",
+        });
         expect(rec.id).toBeTruthy();
         await knex.destroy();
     });
@@ -666,9 +716,9 @@ describe("EntityStore._validate — schema with shape", () => {
         const knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
         const store = new TripleStore(knex);
         const es = new EntityStore(store);
-        await expect(es.create(buildServerContext(es.store), schemaWithShape, {})).rejects.toBeInstanceOf(
-            EntityValidationError,
-        );
+        await expect(
+            es.create(buildServerContext(es.store), schemaWithShape, {}),
+        ).rejects.toBeInstanceOf(EntityValidationError);
         await knex.destroy();
     });
 });
@@ -776,14 +826,16 @@ for (const db of providers) {
         });
 
         it("_applyEqFilter: unknown prop skips filtering (returns all)", async () => {
-            const results = await ctx.entities(schema)
+            const results = await ctx
+                .entities(schema)
                 .where("nonexistentProp", "=", "anything")
                 .all(ctx);
             expect(results.length).toBe(3);
         });
 
         it("_matchFilter default branch: unknown operator returns false", async () => {
-            const results = await ctx.entities(schema)
+            const results = await ctx
+                .entities(schema)
                 .where("score", "BOGUS" as unknown as "=" | "!=" | "<" | "<=" | ">" | ">=", 10)
                 .all(ctx);
             expect(results.length).toBe(0);
@@ -792,7 +844,8 @@ for (const db of providers) {
         it("_matchFilter: non-eq filter on undefined prop compares against undefined", async () => {
             // email is not set on any entity in beforeEach (no default for email).
             // != filter: undefined !== "x" is true, so all records pass.
-            const results = await ctx.entities(schema)
+            const results = await ctx
+                .entities(schema)
                 .where("email", "!=", "nobody@example.com")
                 .all(ctx);
             expect(results.length).toBe(3);

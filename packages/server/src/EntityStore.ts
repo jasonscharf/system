@@ -1,5 +1,5 @@
 import { DEFAULT_GRAPH, type DefaultGraph, type IRI, type Quad } from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
+import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
 import type {
     EdgeDef,
     EdgeHandle,
@@ -99,6 +99,13 @@ export class EntityStore {
             const edges = this._buildEdgeHandles(schema, edgeTargetMap(schema, edgeTargets));
             if (edges) {
                 record.edges = edges;
+            }
+            const ts = (
+                await this._store.entityTimestamps(txCtx, [ent], this._filterGraph(txCtx, schema))
+            ).get(ent.value);
+            if (ts) {
+                record.createdAt = ts.createdAt;
+                record.updatedAt = ts.updatedAt;
             }
             return record;
         });
@@ -456,8 +463,15 @@ export class EntityStore {
             // Single round-trip for all subjects — no per-IRI N+1.
             const subjects = iris.map((iri) => ({ value: iri }) as IRI);
             const bySubject = await this._store.findForSubjects(txCtx, subjects, graph);
+            const tsBySubject = await this._store.entityTimestamps(txCtx, subjects, graph);
             return iris.map((iri) =>
-                this._recordFromQuads(schema, idFromIri(iri), iri, bySubject.get(iri) ?? []),
+                this._recordFromQuads(
+                    schema,
+                    idFromIri(iri),
+                    iri,
+                    bySubject.get(iri) ?? [],
+                    tsBySubject.get(iri),
+                ),
             );
         });
     }
@@ -539,7 +553,8 @@ export class EntityStore {
     ): Promise<EntityRecord<Props>> {
         const entNode = { value: entIri } as IRI;
         const quads = await this._store.find(ctx, { subject: entNode, graph });
-        return this._recordFromQuads(schema, id, entIri, quads);
+        const ts = await this._store.entityTimestamps(ctx, [entNode], graph);
+        return this._recordFromQuads(schema, id, entIri, quads, ts.get(entIri));
     }
 
     /** Builds an EntityRecord from a subject's quads — pure, no DB access. */
@@ -548,6 +563,7 @@ export class EntityStore {
         id: string,
         entIri: string,
         quads: Quad[],
+        timestamps?: EntityTimestamps,
     ): EntityRecord<Props> {
         const iriToName = invertPropertyMap(schema.properties as Record<string, IRI>);
         const edgePredToName = outEdgePredMap(schema);
@@ -590,6 +606,10 @@ export class EntityStore {
         const edges = this._buildEdgeHandles(schema, edgeTargets);
         if (edges) {
             record.edges = edges;
+        }
+        if (timestamps) {
+            record.createdAt = timestamps.createdAt;
+            record.updatedAt = timestamps.updatedAt;
         }
         return record;
     }

@@ -127,6 +127,14 @@ export interface QuadPattern {
     graph?: IRI | null;
 }
 
+/** DB-managed creation/modification timestamps for an entity (a subject IRI). */
+export interface EntityTimestamps {
+    /** Earliest created_at across the subject's live edges (anchored by rdf:type). */
+    createdAt: Date;
+    /** Latest updated_at across the subject's live edges (newest write). */
+    updatedAt: Date;
+}
+
 /** A quad annotated with its temporal metadata (returned by findHistory). */
 export interface QuadHistory extends Quad {
     /** When this edge was first asserted. */
@@ -720,6 +728,86 @@ export class TripleStore {
                 predicate: predicateNode as IRI,
                 object: objectNode as RdfTerm,
                 graph,
+            });
+        }
+        return result;
+    }
+
+    /**
+     * Derives each subject's entity-level timestamps from the DB-managed
+     * created_at / updated_at columns on its edge rows, aggregated per subject:
+     *   createdAt = MIN(created_at), updatedAt = MAX(updated_at)
+     * over the subject's non-deleted edges.  The rdf:type edge (never rewritten
+     * by update) anchors createdAt; any property/edge write bumps updatedAt.
+     *
+     * Batched into one grouped query.  Subjects with no live edges are absent
+     * from the returned map.
+     */
+    async entityTimestamps(
+        ctx: ServerContext,
+        subjects: readonly (IRI | BlankNode)[],
+        graph?: IRI | null,
+    ): Promise<Map<string, EntityTimestamps>> {
+        return this.withTransaction(ctx, (ctx) => this._entityTimestamps(ctx, subjects, graph));
+    }
+
+    private async _entityTimestamps(
+        ctx: ServerContext,
+        subjects: readonly (IRI | BlankNode)[],
+        graph?: IRI | null,
+    ): Promise<Map<string, EntityTimestamps>> {
+        if (subjects.length === 0) {
+            return new Map();
+        }
+
+        const pairs = await Promise.all(
+            subjects.map(async (s) => [s, await this._nodeId(ctx, s as RdfTerm)] as const),
+        );
+        const validPairs = pairs.filter((p): p is [IRI | BlankNode, number] => p[1] !== null);
+        if (validPairs.length === 0) {
+            return new Map();
+        }
+
+        const idToSubject = new Map(validPairs.map(([term, id]) => [id, term]));
+        const graphId =
+            graph !== undefined
+                ? graph === null
+                    ? null
+                    : await this._nodeId(ctx, graph)
+                : undefined;
+        // A graph that was requested but never interned matches nothing.
+        if (graphId === null && graph != null) {
+            return new Map();
+        }
+
+        let q = this._db(ctx)(T.edges)
+            .whereIn(
+                C.subject,
+                validPairs.map(([, id]) => id),
+            )
+            .where(C.isDeleted, false);
+        if (graphId !== undefined && graphId !== null) {
+            q = q.where(C.graph, graphId);
+        }
+        const rows = await q
+            .groupBy(C.subject)
+            .select<{ subject: number; created_at: string; updated_at: string }[]>(
+                C.subject,
+                this._db(ctx).raw(`MIN(${C.createdAt}) as ${C.createdAt}`),
+                this._db(ctx).raw(`MAX(${C.updatedAt}) as ${C.updatedAt}`),
+            );
+
+        const result = new Map<string, EntityTimestamps>();
+        for (const row of rows) {
+            const subjTerm = idToSubject.get(row.subject);
+            /* v8 ignore next 3 -- subject ids come straight from idToSubject */
+            if (subjTerm == null) {
+                continue;
+            }
+            const key = isIRI(subjTerm) ? subjTerm.value : `_:${(subjTerm as BlankNode).id}`;
+            result.set(key, {
+                createdAt: new Date(row.created_at),
+                updatedAt: new Date(row.updated_at),
             });
         }
         return result;

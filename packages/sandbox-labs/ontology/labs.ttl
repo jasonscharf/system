@@ -55,11 +55,6 @@ labs:isActive a owl:DatatypeProperty ;
     rdfs:range  xsd:boolean ;
     rdfs:comment "Whether this project is currently active." .
 
-labs:projectCreatedAt a owl:DatatypeProperty ;
-    rdfs:domain labs:Project ;
-    rdfs:range  xsd:dateTime ;
-    rdfs:comment "Project creation timestamp." .
-
 # ── Property group: Project relationships ─────────────────────────────────────
 # Object properties cross namespace boundaries — range is auth:User.
 # The codegen resolves auth:User → TypeScript type 'User' and imports it from

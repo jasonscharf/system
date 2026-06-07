@@ -1,5 +1,5 @@
 import { IRI, literal } from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
+import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import {
     authorIRI,
@@ -7,12 +7,9 @@ import {
     contentIRI,
     contentTypeIRI,
     conversationRefIRI,
-    convosCreatedAtIRI,
-    convosUpdatedAtIRI,
     DraftClassIRI,
     RDF_TYPE,
     replyToIRI,
-    XSD_DATETIME,
     XSD_STRING,
 } from "../constants.js";
 import type { ContentType, DraftEntity } from "../types.js";
@@ -52,71 +49,61 @@ export class DraftRepository {
         },
     ): Promise<DraftEntity> {
         const id = newId();
-        const now = new Date();
         const sub = iriFor("draft", id);
 
-        const quads = [
-            { subject: sub, predicate: RDF_TYPE, object: DraftClassIRI, graph: CONVOS_GRAPH },
-            {
-                subject: sub,
-                predicate: conversationRefIRI,
-                object: iriFor("conversation", args.conversationId),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: authorIRI,
-                object: new IRI(args.authorId),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: contentIRI,
-                object: literal(args.content, XSD_STRING),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: contentTypeIRI,
-                object: literal(args.contentType, XSD_STRING),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: convosCreatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: convosUpdatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: CONVOS_GRAPH,
-            },
-        ];
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const quads = [
+                { subject: sub, predicate: RDF_TYPE, object: DraftClassIRI, graph: CONVOS_GRAPH },
+                {
+                    subject: sub,
+                    predicate: conversationRefIRI,
+                    object: iriFor("conversation", args.conversationId),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: sub,
+                    predicate: authorIRI,
+                    object: new IRI(args.authorId),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: sub,
+                    predicate: contentIRI,
+                    object: literal(args.content, XSD_STRING),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: sub,
+                    predicate: contentTypeIRI,
+                    object: literal(args.contentType, XSD_STRING),
+                    graph: CONVOS_GRAPH,
+                },
+            ];
 
-        if (args.replyToId) {
-            quads.push({
-                subject: sub,
-                predicate: replyToIRI,
-                object: iriFor("message", args.replyToId),
-                graph: CONVOS_GRAPH,
-            });
-        }
+            if (args.replyToId) {
+                quads.push({
+                    subject: sub,
+                    predicate: replyToIRI,
+                    object: iriFor("message", args.replyToId),
+                    graph: CONVOS_GRAPH,
+                });
+            }
 
-        await this._store.insertMany(ctx, quads);
+            await this._store.insertMany(ctx, quads);
 
-        return {
-            id,
-            iri: sub.value,
-            conversationId: args.conversationId,
-            authorId: args.authorId,
-            replyToId: args.replyToId ?? null,
-            content: args.content,
-            contentType: args.contentType,
-            createdAt: now,
-            updatedAt: now,
-        };
+            const ts = await this._timestamps(ctx, sub);
+            return {
+                id,
+                iri: sub.value,
+                conversationId: args.conversationId,
+                authorId: args.authorId,
+                replyToId: args.replyToId ?? null,
+                content: args.content,
+                contentType: args.contentType,
+                createdAt: ts.createdAt,
+                updatedAt: ts.updatedAt,
+            };
+        });
     }
 
     /** @insecure @nochecks */
@@ -127,7 +114,9 @@ export class DraftRepository {
     ): Promise<DraftEntity | null> {
         const sub = iriFor("draft", args.id);
         const quads = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
+        return quads.length === 0
+            ? null
+            : this._fromQuads(args.id, quads, await this._timestamps(ctx, sub));
     }
 
     /** @insecure @nochecks */
@@ -155,7 +144,9 @@ export class DraftRepository {
                 graph: CONVOS_GRAPH,
             });
             if (all.length > 0) {
-                drafts.push(this._fromQuads(draftId, all));
+                drafts.push(
+                    this._fromQuads(draftId, all, await this._timestamps(ctx, q.subject as IRI)),
+                );
             }
         }
 
@@ -185,7 +176,6 @@ export class DraftRepository {
             }
 
             const sub = iriFor("draft", args.id);
-            const now = new Date();
 
             await this._store.delete(ctx, {
                 subject: sub,
@@ -199,18 +189,6 @@ export class DraftRepository {
                 graph: CONVOS_GRAPH,
             });
 
-            await this._store.delete(ctx, {
-                subject: sub,
-                predicate: convosUpdatedAtIRI,
-                graph: CONVOS_GRAPH,
-            });
-            await this._store.insert(ctx, {
-                subject: sub,
-                predicate: convosUpdatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: CONVOS_GRAPH,
-            });
-
             return this.findById(ctx, sec, { id: args.id });
         });
     }
@@ -220,7 +198,24 @@ export class DraftRepository {
         await this._store.delete(ctx, { subject: iriFor("draft", args.id), graph: CONVOS_GRAPH });
     }
 
-    private _fromQuads(id: string, quads: Awaited<ReturnType<TripleStore["find"]>>): DraftEntity {
+    private _now(): EntityTimestamps {
+        const now = new Date();
+        return { createdAt: now, updatedAt: now };
+    }
+
+    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
+    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
+        return (
+            (await this._store.entityTimestamps(ctx, [sub], CONVOS_GRAPH)).get(sub.value) ??
+            this._now()
+        );
+    }
+
+    private _fromQuads(
+        id: string,
+        quads: Awaited<ReturnType<TripleStore["find"]>>,
+        ts: EntityTimestamps,
+    ): DraftEntity {
         const getLit = (pred: IRI): string | undefined => {
             const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
             return q ? literalValue(q.object) : undefined;
@@ -240,14 +235,6 @@ export class DraftRepository {
         }
         const content = getLit(contentIRI) ?? "";
         const contentType = getLit(contentTypeIRI) ?? "text/markdown";
-        const createdAtStr = getLit(convosCreatedAtIRI);
-        if (createdAtStr == null) {
-            throw new Error(`DraftRepository: missing createdAt for id "${id}"`);
-        }
-        const updatedAtStr = getLit(convosUpdatedAtIRI);
-        if (updatedAtStr == null) {
-            throw new Error(`DraftRepository: missing updatedAt for id "${id}"`);
-        }
 
         const replyToIriVal = getIri(replyToIRI);
 
@@ -259,8 +246,8 @@ export class DraftRepository {
             replyToId: replyToIriVal ? idFrom(replyToIriVal) : null,
             content,
             contentType: contentType as ContentType,
-            createdAt: new Date(createdAtStr),
-            updatedAt: new Date(updatedAtStr),
+            createdAt: ts.createdAt,
+            updatedAt: ts.updatedAt,
         };
     }
 }

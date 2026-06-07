@@ -1,9 +1,8 @@
 import { IRI, literal } from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
+import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import {
     CONVOS_GRAPH,
-    convosCreatedAtIRI,
     grantedAtIRI,
     InboxClassIRI,
     InboxMembershipClassIRI,
@@ -61,45 +60,41 @@ export class InboxRepository {
         args: Pick<InboxEntity, "subjectIri" | "name" | "createdBy">,
     ): Promise<InboxEntity> {
         const id = newId();
-        const now = new Date();
         const sub = iriFor("inbox", id);
 
-        await this._store.insertMany(ctx, [
-            { subject: sub, predicate: RDF_TYPE, object: InboxClassIRI, graph: CONVOS_GRAPH },
-            {
-                subject: sub,
-                predicate: subjectIriIRI,
-                object: literal(args.subjectIri, XSD_STRING),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: inboxNameIRI,
-                object: literal(args.name, XSD_STRING),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: inboxCreatedByIRI,
-                object: new IRI(args.createdBy),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: convosCreatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: CONVOS_GRAPH,
-            },
-        ]);
+        return this._store.withTransaction(ctx, async (ctx) => {
+            await this._store.insertMany(ctx, [
+                { subject: sub, predicate: RDF_TYPE, object: InboxClassIRI, graph: CONVOS_GRAPH },
+                {
+                    subject: sub,
+                    predicate: subjectIriIRI,
+                    object: literal(args.subjectIri, XSD_STRING),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: sub,
+                    predicate: inboxNameIRI,
+                    object: literal(args.name, XSD_STRING),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: sub,
+                    predicate: inboxCreatedByIRI,
+                    object: new IRI(args.createdBy),
+                    graph: CONVOS_GRAPH,
+                },
+            ]);
 
-        return {
-            id,
-            iri: sub.value,
-            subjectIri: args.subjectIri,
-            name: args.name,
-            createdBy: args.createdBy,
-            createdAt: now,
-        };
+            const ts = await this._timestamps(ctx, sub);
+            return {
+                id,
+                iri: sub.value,
+                subjectIri: args.subjectIri,
+                name: args.name,
+                createdBy: args.createdBy,
+                createdAt: ts.createdAt,
+            };
+        });
     }
 
     /** @insecure @nochecks */
@@ -110,7 +105,9 @@ export class InboxRepository {
     ): Promise<InboxEntity | null> {
         const sub = iriFor("inbox", args.id);
         const quads = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
+        return quads.length === 0
+            ? null
+            : this._fromQuads(args.id, quads, await this._timestamps(ctx, sub));
     }
 
     /** @insecure @nochecks */
@@ -141,11 +138,14 @@ export class InboxRepository {
         }
 
         const bySubject = await this._store.findForSubjects(ctx, subjects, CONVOS_GRAPH);
+        const tsBySubject = await this._store.entityTimestamps(ctx, subjects, CONVOS_GRAPH);
         const inboxes: InboxEntity[] = [];
 
         for (const [subjIri, all] of bySubject) {
             if (all.length > 0) {
-                inboxes.push(this._fromQuads(idFrom(subjIri), all));
+                inboxes.push(
+                    this._fromQuads(idFrom(subjIri), all, tsBySubject.get(subjIri) ?? this._now()),
+                );
             }
         }
 
@@ -297,7 +297,24 @@ export class InboxRepository {
         return memberships;
     }
 
-    private _fromQuads(id: string, quads: Awaited<ReturnType<TripleStore["find"]>>): InboxEntity {
+    private _now(): EntityTimestamps {
+        const now = new Date();
+        return { createdAt: now, updatedAt: now };
+    }
+
+    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
+    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
+        return (
+            (await this._store.entityTimestamps(ctx, [sub], CONVOS_GRAPH)).get(sub.value) ??
+            this._now()
+        );
+    }
+
+    private _fromQuads(
+        id: string,
+        quads: Awaited<ReturnType<TripleStore["find"]>>,
+        ts: EntityTimestamps,
+    ): InboxEntity {
         const getLit = (pred: IRI): string | undefined => {
             const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
             return q ? literalValue(q.object) : undefined;
@@ -319,10 +336,6 @@ export class InboxRepository {
         if (createdByIri == null) {
             throw new Error(`InboxRepository: missing createdBy for id "${id}"`);
         }
-        const createdAtStr = getLit(convosCreatedAtIRI);
-        if (createdAtStr == null) {
-            throw new Error(`InboxRepository: missing createdAt for id "${id}"`);
-        }
 
         return {
             id,
@@ -330,7 +343,7 @@ export class InboxRepository {
             subjectIri,
             name,
             createdBy: createdByIri,
-            createdAt: new Date(createdAtStr),
+            createdAt: ts.createdAt,
         };
     }
 

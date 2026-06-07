@@ -89,10 +89,4 @@ shapes:ProjectShape a sh:NodeShape ;
         sh:path     labs:isActive ;
         sh:maxCount 1 ;
         sh:datatype xsd:boolean
-    ] ;
-
-    sh:property [
-        sh:path     labs:projectCreatedAt ;
-        sh:maxCount 1 ;
-        sh:datatype xsd:dateTime
     ] .

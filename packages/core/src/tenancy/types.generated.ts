@@ -7,8 +7,6 @@ export const TENANCY_GRAPH = new IRI(`${TENANCY_NS}graph`);
 /** A customer organisation — the licensee of the platform. */
 export interface Tenant {
     tenantName?: string;
-    tenantCreatedAt?: Date;
-    tenantUpdatedAt?: Date;
 }
 
 export const TenantIRI = new IRI(`${TENANCY_NS}Tenant`);
@@ -16,8 +14,6 @@ export const TenantIRI = new IRI(`${TENANCY_NS}Tenant`);
 /** A user-facing named group that wraps a backing Tenant. */
 export interface Organization {
     orgName?: string;
-    orgCreatedAt?: Date;
-    orgUpdatedAt?: Date;
 }
 
 export const OrganizationIRI = new IRI(`${TENANCY_NS}Organization`);
@@ -27,8 +23,6 @@ export interface Domain {
     domainName?: string;
     domainDescription?: string;
     domainUrl?: string;
-    domainCreatedAt?: Date;
-    domainUpdatedAt?: Date;
 }
 
 export const DomainIRI = new IRI(`${TENANCY_NS}Domain`);
@@ -44,6 +38,4 @@ export const orgOwnerIRI = new IRI(`${TENANCY_NS}orgOwner`);
 export const domainNameIRI = new IRI(`${TENANCY_NS}domainName`);
 export const domainDescriptionIRI = new IRI(`${TENANCY_NS}domainDescription`);
 export const domainUrlIRI = new IRI(`${TENANCY_NS}domainUrl`);
-export const domainCreatedAtIRI = new IRI(`${TENANCY_NS}domainCreatedAt`);
-export const domainUpdatedAtIRI = new IRI(`${TENANCY_NS}domainUpdatedAt`);
 export const domainTenantIRI = new IRI(`${TENANCY_NS}domainTenant`);

@@ -24,8 +24,6 @@ export const ReadReceiptClassIRI = new IRI(`${CONVOS_NS}ReadReceipt`);
 
 // ── Shared predicates ─────────────────────────────────────────────────────────
 
-export const convosCreatedAtIRI = new IRI(`${CONVOS_NS}createdAt`);
-export const convosUpdatedAtIRI = new IRI(`${CONVOS_NS}updatedAt`);
 export const contentIRI = new IRI(`${CONVOS_NS}content`);
 export const contentTypeIRI = new IRI(`${CONVOS_NS}contentType`);
 export const roleIRI = new IRI(`${CONVOS_NS}role`);

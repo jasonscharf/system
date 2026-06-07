@@ -24,5 +24,4 @@ export const projectPropertyMap: Record<string, string> = {
     projectOwner: "urn:sys:ext:labs:projectOwner",
     projectMember: "urn:sys:ext:labs:projectMember",
     isActive: "urn:sys:ext:labs:isActive",
-    projectCreatedAt: "urn:sys:ext:labs:projectCreatedAt",
 };

@@ -1,5 +1,5 @@
 import { IRI, literal } from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
+import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import {
     authorIRI,
@@ -7,8 +7,6 @@ import {
     contentIRI,
     contentTypeIRI,
     conversationRefIRI,
-    convosCreatedAtIRI,
-    convosUpdatedAtIRI,
     editedAtIRI,
     editedByIRI,
     isDeletedIRI,
@@ -61,85 +59,75 @@ export class MessageRepository {
         },
     ): Promise<MessageEntity> {
         const id = newId();
-        const now = new Date();
         const sub = iriFor("message", id);
 
-        const quads = [
-            { subject: sub, predicate: RDF_TYPE, object: MessageClassIRI, graph: CONVOS_GRAPH },
-            {
-                subject: sub,
-                predicate: conversationRefIRI,
-                object: iriFor("conversation", args.conversationId),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: authorIRI,
-                object: new IRI(args.authorId),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: contentIRI,
-                object: literal(args.content, XSD_STRING),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: contentTypeIRI,
-                object: literal(args.contentType, XSD_STRING),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: isDeletedIRI,
-                object: literal("false", XSD_BOOLEAN),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: revisionCountIRI,
-                object: literal("0", XSD_INTEGER),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: convosCreatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: convosUpdatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: CONVOS_GRAPH,
-            },
-        ];
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const quads = [
+                { subject: sub, predicate: RDF_TYPE, object: MessageClassIRI, graph: CONVOS_GRAPH },
+                {
+                    subject: sub,
+                    predicate: conversationRefIRI,
+                    object: iriFor("conversation", args.conversationId),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: sub,
+                    predicate: authorIRI,
+                    object: new IRI(args.authorId),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: sub,
+                    predicate: contentIRI,
+                    object: literal(args.content, XSD_STRING),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: sub,
+                    predicate: contentTypeIRI,
+                    object: literal(args.contentType, XSD_STRING),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: sub,
+                    predicate: isDeletedIRI,
+                    object: literal("false", XSD_BOOLEAN),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: sub,
+                    predicate: revisionCountIRI,
+                    object: literal("0", XSD_INTEGER),
+                    graph: CONVOS_GRAPH,
+                },
+            ];
 
-        if (args.replyToId) {
-            quads.push({
-                subject: sub,
-                predicate: replyToIRI,
-                object: iriFor("message", args.replyToId),
-                graph: CONVOS_GRAPH,
-            });
-        }
+            if (args.replyToId) {
+                quads.push({
+                    subject: sub,
+                    predicate: replyToIRI,
+                    object: iriFor("message", args.replyToId),
+                    graph: CONVOS_GRAPH,
+                });
+            }
 
-        await this._store.insertMany(ctx, quads);
+            await this._store.insertMany(ctx, quads);
 
-        return {
-            id,
-            iri: sub.value,
-            conversationId: args.conversationId,
-            replyToId: args.replyToId ?? null,
-            authorId: args.authorId,
-            content: args.content,
-            contentType: args.contentType,
-            isDeleted: false,
-            revisionCount: 0,
-            createdAt: now,
-            updatedAt: now,
-        };
+            const ts = await this._timestamps(ctx, sub);
+            return {
+                id,
+                iri: sub.value,
+                conversationId: args.conversationId,
+                replyToId: args.replyToId ?? null,
+                authorId: args.authorId,
+                content: args.content,
+                contentType: args.contentType,
+                isDeleted: false,
+                revisionCount: 0,
+                createdAt: ts.createdAt,
+                updatedAt: ts.updatedAt,
+            };
+        });
     }
 
     /** @insecure @nochecks */
@@ -150,7 +138,9 @@ export class MessageRepository {
     ): Promise<MessageEntity | null> {
         const sub = iriFor("message", args.id);
         const quads = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
+        return quads.length === 0
+            ? null
+            : this._fromQuads(args.id, quads, await this._timestamps(ctx, sub));
     }
 
     /** @insecure @nochecks */
@@ -165,20 +155,19 @@ export class MessageRepository {
             graph: CONVOS_GRAPH,
         });
 
+        const subjects = quads
+            .map((q) => q.subject as IRI)
+            .filter((s) => s.value.includes(":message:"));
+        const tsBySubject = await this._store.entityTimestamps(ctx, subjects, CONVOS_GRAPH);
         const messages: MessageEntity[] = [];
 
-        for (const q of quads) {
-            const subjIri = (q.subject as IRI).value;
-            if (!subjIri.includes(":message:")) {
-                continue;
-            }
-            const msgId = idFrom(subjIri);
-            const all = await this._store.find(ctx, {
-                subject: q.subject as IRI,
-                graph: CONVOS_GRAPH,
-            });
+        for (const sub of subjects) {
+            const msgId = idFrom(sub.value);
+            const all = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
             if (all.length > 0) {
-                messages.push(this._fromQuads(msgId, all));
+                messages.push(
+                    this._fromQuads(msgId, all, tsBySubject.get(sub.value) ?? this._now()),
+                );
             }
         }
 
@@ -268,18 +257,6 @@ export class MessageRepository {
                 graph: CONVOS_GRAPH,
             });
 
-            await this._store.delete(ctx, {
-                subject: sub,
-                predicate: convosUpdatedAtIRI,
-                graph: CONVOS_GRAPH,
-            });
-            await this._store.insert(ctx, {
-                subject: sub,
-                predicate: convosUpdatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: CONVOS_GRAPH,
-            });
-
             const updated = await this.findById(ctx, sec, { id: args.id });
             if (!updated) {
                 throw new Error(`MessageRepository: message ${args.id} vanished after edit`);
@@ -313,7 +290,6 @@ export class MessageRepository {
             }
 
             const sub = iriFor("message", args.id);
-            const now = new Date();
 
             await this._store.delete(ctx, {
                 subject: sub,
@@ -324,18 +300,6 @@ export class MessageRepository {
                 subject: sub,
                 predicate: isDeletedIRI,
                 object: literal("true", XSD_BOOLEAN),
-                graph: CONVOS_GRAPH,
-            });
-
-            await this._store.delete(ctx, {
-                subject: sub,
-                predicate: convosUpdatedAtIRI,
-                graph: CONVOS_GRAPH,
-            });
-            await this._store.insert(ctx, {
-                subject: sub,
-                predicate: convosUpdatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
                 graph: CONVOS_GRAPH,
             });
 
@@ -372,7 +336,24 @@ export class MessageRepository {
         return revisions;
     }
 
-    private _fromQuads(id: string, quads: Awaited<ReturnType<TripleStore["find"]>>): MessageEntity {
+    private _now(): EntityTimestamps {
+        const now = new Date();
+        return { createdAt: now, updatedAt: now };
+    }
+
+    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
+    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
+        return (
+            (await this._store.entityTimestamps(ctx, [sub], CONVOS_GRAPH)).get(sub.value) ??
+            this._now()
+        );
+    }
+
+    private _fromQuads(
+        id: string,
+        quads: Awaited<ReturnType<TripleStore["find"]>>,
+        ts: EntityTimestamps,
+    ): MessageEntity {
         const getLit = (pred: IRI): string | undefined => {
             const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
             return q ? literalValue(q.object) : undefined;
@@ -398,14 +379,6 @@ export class MessageRepository {
         if (contentType == null) {
             throw new Error(`MessageRepository: missing contentType for id "${id}"`);
         }
-        const createdAtStr = getLit(convosCreatedAtIRI);
-        if (createdAtStr == null) {
-            throw new Error(`MessageRepository: missing createdAt for id "${id}"`);
-        }
-        const updatedAtStr = getLit(convosUpdatedAtIRI);
-        if (updatedAtStr == null) {
-            throw new Error(`MessageRepository: missing updatedAt for id "${id}"`);
-        }
 
         const replyToIriVal = getIri(replyToIRI);
         const isDeletedStr = getLit(isDeletedIRI) ?? "false";
@@ -421,8 +394,8 @@ export class MessageRepository {
             contentType: contentType as ContentType,
             isDeleted: isDeletedStr === "true",
             revisionCount: parseInt(revCountStr, 10),
-            createdAt: new Date(createdAtStr),
-            updatedAt: new Date(updatedAtStr),
+            createdAt: ts.createdAt,
+            updatedAt: ts.updatedAt,
         };
     }
 

@@ -61,19 +61,11 @@ const list: ShaclNodeShape[] = [
                 classConstraint: "urn:sys:core:auth:User",
                 message: "Every project must have exactly one owner.",
             },
-            {
-                path: "urn:sys:ext:labs:projectMember",
-                classConstraint: "urn:sys:core:auth:User",
-            },
+            { path: "urn:sys:ext:labs:projectMember", classConstraint: "urn:sys:core:auth:User" },
             {
                 path: "urn:sys:ext:labs:isActive",
                 maxCount: 1,
                 datatype: "http://www.w3.org/2001/XMLSchema#boolean",
-            },
-            {
-                path: "urn:sys:ext:labs:projectCreatedAt",
-                maxCount: 1,
-                datatype: "http://www.w3.org/2001/XMLSchema#dateTime",
             },
         ],
     },

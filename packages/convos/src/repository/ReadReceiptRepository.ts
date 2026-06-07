@@ -3,7 +3,6 @@ import type { TripleStore } from "@jasonscharf/data";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import {
     CONVOS_GRAPH,
-    convosCreatedAtIRI,
     lastReadAtIRI,
     lastReadMessageIRI,
     RDF_TYPE,
@@ -116,12 +115,6 @@ export class ReadReceiptRepository {
                 {
                     subject: sub,
                     predicate: lastReadAtIRI,
-                    object: literal(now.toISOString(), XSD_DATETIME),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: convosCreatedAtIRI,
                     object: literal(now.toISOString(), XSD_DATETIME),
                     graph: CONVOS_GRAPH,
                 },

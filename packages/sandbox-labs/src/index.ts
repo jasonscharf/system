@@ -15,7 +15,6 @@ export {
     isActiveIRI,
     lastActiveAtIRI,
     ProjectIRI,
-    projectCreatedAtIRI,
     projectMemberIRI,
     projectNameIRI,
     projectOwnerIRI,

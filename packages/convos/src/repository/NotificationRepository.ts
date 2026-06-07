@@ -1,9 +1,8 @@
 import { IRI, literal, type Quad } from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
+import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import {
     CONVOS_GRAPH,
-    convosCreatedAtIRI,
     isDismissedIRI,
     isReadIRI,
     NotificationClassIRI,
@@ -14,7 +13,6 @@ import {
     sourceIriIRI,
     templateKeyIRI,
     XSD_BOOLEAN,
-    XSD_DATETIME,
     XSD_STRING,
 } from "../constants.js";
 import type { NotificationEntity, NotificationType } from "../types.js";
@@ -67,89 +65,85 @@ export class NotificationRepository {
         args: CreateNotificationInput,
     ): Promise<NotificationEntity> {
         const id = newId();
-        const now = new Date();
         const sub = iriFor("notification", id);
 
-        const quads = [
-            {
-                subject: sub,
-                predicate: RDF_TYPE,
-                object: NotificationClassIRI,
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: notifUserIRI,
-                object: new IRI(args.userId),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: notifTypeIRI,
-                object: literal(args.notifType, XSD_STRING),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: isReadIRI,
-                object: literal("false", XSD_BOOLEAN),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: isDismissedIRI,
-                object: literal("false", XSD_BOOLEAN),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: convosCreatedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: CONVOS_GRAPH,
-            },
-        ];
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const quads = [
+                {
+                    subject: sub,
+                    predicate: RDF_TYPE,
+                    object: NotificationClassIRI,
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: sub,
+                    predicate: notifUserIRI,
+                    object: new IRI(args.userId),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: sub,
+                    predicate: notifTypeIRI,
+                    object: literal(args.notifType, XSD_STRING),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: sub,
+                    predicate: isReadIRI,
+                    object: literal("false", XSD_BOOLEAN),
+                    graph: CONVOS_GRAPH,
+                },
+                {
+                    subject: sub,
+                    predicate: isDismissedIRI,
+                    object: literal("false", XSD_BOOLEAN),
+                    graph: CONVOS_GRAPH,
+                },
+            ];
 
-        if (args.sourceIri) {
-            quads.push({
-                subject: sub,
-                predicate: sourceIriIRI,
-                object: literal(args.sourceIri, XSD_STRING),
-                graph: CONVOS_GRAPH,
-            });
-        }
+            if (args.sourceIri) {
+                quads.push({
+                    subject: sub,
+                    predicate: sourceIriIRI,
+                    object: literal(args.sourceIri, XSD_STRING),
+                    graph: CONVOS_GRAPH,
+                });
+            }
 
-        if (args.templateKey) {
-            quads.push({
-                subject: sub,
-                predicate: templateKeyIRI,
-                object: literal(args.templateKey, XSD_STRING),
-                graph: CONVOS_GRAPH,
-            });
-        }
+            if (args.templateKey) {
+                quads.push({
+                    subject: sub,
+                    predicate: templateKeyIRI,
+                    object: literal(args.templateKey, XSD_STRING),
+                    graph: CONVOS_GRAPH,
+                });
+            }
 
-        if (args.payload) {
-            quads.push({
-                subject: sub,
-                predicate: payloadIRI,
-                object: literal(JSON.stringify(args.payload), XSD_STRING),
-                graph: CONVOS_GRAPH,
-            });
-        }
+            if (args.payload) {
+                quads.push({
+                    subject: sub,
+                    predicate: payloadIRI,
+                    object: literal(JSON.stringify(args.payload), XSD_STRING),
+                    graph: CONVOS_GRAPH,
+                });
+            }
 
-        await this._store.insertMany(ctx, quads);
+            await this._store.insertMany(ctx, quads);
 
-        return {
-            id,
-            iri: sub.value,
-            userId: args.userId,
-            notifType: args.notifType,
-            sourceIri: args.sourceIri,
-            templateKey: args.templateKey,
-            payload: args.payload ? JSON.stringify(args.payload) : undefined,
-            isRead: false,
-            isDismissed: false,
-            createdAt: now,
-        };
+            const ts = await this._timestamps(ctx, sub);
+            return {
+                id,
+                iri: sub.value,
+                userId: args.userId,
+                notifType: args.notifType,
+                sourceIri: args.sourceIri,
+                templateKey: args.templateKey,
+                payload: args.payload ? JSON.stringify(args.payload) : undefined,
+                isRead: false,
+                isDismissed: false,
+                createdAt: ts.createdAt,
+            };
+        });
     }
 
     /** @insecure @nochecks */
@@ -160,7 +154,9 @@ export class NotificationRepository {
     ): Promise<NotificationEntity | null> {
         const sub = iriFor("notification", args.id);
         const quads = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
-        return quads.length === 0 ? null : this._fromQuads(args.id, quads);
+        return quads.length === 0
+            ? null
+            : this._fromQuads(args.id, quads, await this._timestamps(ctx, sub));
     }
 
     /** @insecure @nochecks */
@@ -181,13 +177,18 @@ export class NotificationRepository {
 
         const subjects = quads.map((q) => q.subject as IRI);
         const bySubject = await this._store.findForSubjects(ctx, subjects, CONVOS_GRAPH);
+        const tsBySubject = await this._store.entityTimestamps(ctx, subjects, CONVOS_GRAPH);
 
         const notifications: NotificationEntity[] = [];
         for (const [subjIri, all] of bySubject) {
             if (all.length === 0) {
                 continue;
             }
-            const n = this._fromQuads(idFrom(subjIri), all);
+            const n = this._fromQuads(
+                idFrom(subjIri),
+                all,
+                tsBySubject.get(subjIri) ?? this._now(),
+            );
             if (args.unreadOnly && n.isRead) {
                 continue;
             }
@@ -220,13 +221,18 @@ export class NotificationRepository {
 
         const subjects = quads.map((q) => q.subject as IRI);
         const bySubject = await this._store.findForSubjects(ctx, subjects, CONVOS_GRAPH);
+        const tsBySubject = await this._store.entityTimestamps(ctx, subjects, CONVOS_GRAPH);
 
         const results: NotificationEntity[] = [];
         for (const [subjIri, all] of bySubject) {
             if (all.length === 0) {
                 continue;
             }
-            const entity = this._fromQuads(idFrom(subjIri), all);
+            const entity = this._fromQuads(
+                idFrom(subjIri),
+                all,
+                tsBySubject.get(subjIri) ?? this._now(),
+            );
             if (entity.userId === args.userId) {
                 results.push(entity);
             }
@@ -284,64 +290,72 @@ export class NotificationRepository {
         _sec: SecurityContext,
         args: FanOutArgs,
     ): Promise<NotificationEntity[]> {
-        const now = new Date();
-        const created: NotificationEntity[] = [];
-        const allQuads: Quad[] = [];
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const pending: { sub: IRI; userId: string }[] = [];
+            const allQuads: Quad[] = [];
 
-        for (const userId of args.recipientIds) {
-            if (userId === args.excludeUserId) {
-                continue;
+            for (const userId of args.recipientIds) {
+                if (userId === args.excludeUserId) {
+                    continue;
+                }
+                const id = newId();
+                const sub = iriFor("notification", id);
+                pending.push({ sub, userId });
+
+                allQuads.push(
+                    {
+                        subject: sub,
+                        predicate: RDF_TYPE,
+                        object: NotificationClassIRI,
+                        graph: CONVOS_GRAPH,
+                    },
+                    {
+                        subject: sub,
+                        predicate: notifUserIRI,
+                        object: new IRI(userId),
+                        graph: CONVOS_GRAPH,
+                    },
+                    {
+                        subject: sub,
+                        predicate: notifTypeIRI,
+                        object: literal(args.notifType, XSD_STRING),
+                        graph: CONVOS_GRAPH,
+                    },
+                    {
+                        subject: sub,
+                        predicate: isReadIRI,
+                        object: literal("false", XSD_BOOLEAN),
+                        graph: CONVOS_GRAPH,
+                    },
+                    {
+                        subject: sub,
+                        predicate: isDismissedIRI,
+                        object: literal("false", XSD_BOOLEAN),
+                        graph: CONVOS_GRAPH,
+                    },
+                    {
+                        subject: sub,
+                        predicate: sourceIriIRI,
+                        object: literal(args.sourceIri, XSD_STRING),
+                        graph: CONVOS_GRAPH,
+                    },
+                );
             }
-            const id = newId();
-            const sub = iriFor("notification", id);
 
-            allQuads.push(
-                {
-                    subject: sub,
-                    predicate: RDF_TYPE,
-                    object: NotificationClassIRI,
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: notifUserIRI,
-                    object: new IRI(userId),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: notifTypeIRI,
-                    object: literal(args.notifType, XSD_STRING),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: isReadIRI,
-                    object: literal("false", XSD_BOOLEAN),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: isDismissedIRI,
-                    object: literal("false", XSD_BOOLEAN),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: convosCreatedAtIRI,
-                    object: literal(now.toISOString(), XSD_DATETIME),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: sourceIriIRI,
-                    object: literal(args.sourceIri, XSD_STRING),
-                    graph: CONVOS_GRAPH,
-                },
+            if (allQuads.length === 0) {
+                return [];
+            }
+
+            await this._store.insertMany(ctx, allQuads);
+
+            const tsBySubject = await this._store.entityTimestamps(
+                ctx,
+                pending.map((p) => p.sub),
+                CONVOS_GRAPH,
             );
 
-            created.push({
-                id,
+            return pending.map(({ sub, userId }) => ({
+                id: idFrom(sub.value),
                 iri: sub.value,
                 userId,
                 notifType: args.notifType,
@@ -350,15 +364,9 @@ export class NotificationRepository {
                 payload: undefined,
                 isRead: false,
                 isDismissed: false,
-                createdAt: now,
-            });
-        }
-
-        if (allQuads.length > 0) {
-            await this._store.insertMany(ctx, allQuads);
-        }
-
-        return created;
+                createdAt: (tsBySubject.get(sub.value) ?? this._now()).createdAt,
+            }));
+        });
     }
 
     private async _setBooleanFlag(
@@ -384,13 +392,27 @@ export class NotificationRepository {
             });
 
             const updated = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
-            return this._fromQuads(id, updated);
+            return this._fromQuads(id, updated, await this._timestamps(ctx, sub));
         });
+    }
+
+    private _now(): EntityTimestamps {
+        const now = new Date();
+        return { createdAt: now, updatedAt: now };
+    }
+
+    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
+    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
+        return (
+            (await this._store.entityTimestamps(ctx, [sub], CONVOS_GRAPH)).get(sub.value) ??
+            this._now()
+        );
     }
 
     private _fromQuads(
         id: string,
         quads: Awaited<ReturnType<TripleStore["find"]>>,
+        ts: EntityTimestamps,
     ): NotificationEntity {
         const getLit = (pred: IRI): string | undefined => {
             const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
@@ -409,10 +431,6 @@ export class NotificationRepository {
         if (notifType == null) {
             throw new Error(`NotificationRepository: missing notifType for id "${id}"`);
         }
-        const createdAtStr = getLit(convosCreatedAtIRI);
-        if (createdAtStr == null) {
-            throw new Error(`NotificationRepository: missing createdAt for id "${id}"`);
-        }
 
         const isReadStr = getLit(isReadIRI) ?? "false";
         const isDismissedStr = getLit(isDismissedIRI) ?? "false";
@@ -427,7 +445,7 @@ export class NotificationRepository {
             payload: getLit(payloadIRI),
             isRead: isReadStr === "true",
             isDismissed: isDismissedStr === "true",
-            createdAt: new Date(createdAtStr),
+            createdAt: ts.createdAt,
         };
     }
 }

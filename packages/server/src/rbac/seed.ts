@@ -38,7 +38,6 @@ import {
 import type { TripleStore } from "@jasonscharf/data";
 import type { ServerContext } from "../ServerContext.js";
 import {
-    RBAC_GRAPH,
     RDF_TYPE,
     SYS_GRANT_IRI,
     SYS_SUPERADMIN_IRI,
@@ -48,6 +47,7 @@ import {
     XSD_BOOLEAN,
     XSD_STRING,
 } from "./constants.js";
+import { tenantGraphForInsert } from "../tenancy.js";
 
 export async function seedSystemData(ctx: ServerContext, store: TripleStore): Promise<void> {
     const t = new IRI(SYS_TENANT_IRI);
@@ -58,71 +58,71 @@ export async function seedSystemData(ctx: ServerContext, store: TripleStore): Pr
 
     await store.insertMany(ctx, [
         // System Tenant
-        { subject: t, predicate: RDF_TYPE, object: TenantIRI, graph: RBAC_GRAPH },
+        { subject: t, predicate: RDF_TYPE, object: TenantIRI, graph: tenantGraphForInsert(ctx) },
         {
             subject: t,
             predicate: tenantNameIRI,
             object: literal("System", XSD_STRING),
-            graph: RBAC_GRAPH,
+            graph: tenantGraphForInsert(ctx),
         },
         {
             subject: t,
             predicate: isSystemTenantIRI,
             object: literal("true", XSD_BOOLEAN),
-            graph: RBAC_GRAPH,
+            graph: tenantGraphForInsert(ctx),
         },
 
         // Superusers Group
-        { subject: g, predicate: RDF_TYPE, object: UserGroupIRI, graph: RBAC_GRAPH },
+        { subject: g, predicate: RDF_TYPE, object: UserGroupIRI, graph: tenantGraphForInsert(ctx) },
         {
             subject: g,
             predicate: groupNameIRI,
             object: literal("Superusers", XSD_STRING),
-            graph: RBAC_GRAPH,
+            graph: tenantGraphForInsert(ctx),
         },
         {
             subject: g,
             predicate: isSystemUserGroupIRI,
             object: literal("true", XSD_BOOLEAN),
-            graph: RBAC_GRAPH,
+            graph: tenantGraphForInsert(ctx),
         },
 
         // Superadmin Role
-        { subject: r, predicate: RDF_TYPE, object: RoleIRI, graph: RBAC_GRAPH },
+        { subject: r, predicate: RDF_TYPE, object: RoleIRI, graph: tenantGraphForInsert(ctx) },
         {
             subject: r,
             predicate: roleNameIRI,
             object: literal("Superadmin", XSD_STRING),
-            graph: RBAC_GRAPH,
+            graph: tenantGraphForInsert(ctx),
         },
         {
             subject: r,
             predicate: isSystemRoleIRI,
             object: literal("true", XSD_BOOLEAN),
-            graph: RBAC_GRAPH,
+            graph: tenantGraphForInsert(ctx),
         },
 
         // Wildcard Permission
-        { subject: p, predicate: RDF_TYPE, object: PermissionIRI, graph: RBAC_GRAPH },
+        { subject: p, predicate: RDF_TYPE, object: PermissionIRI, graph: tenantGraphForInsert(ctx) },
         {
             subject: p,
             predicate: permissionKeyIRI,
             object: literal("*", XSD_STRING),
-            graph: RBAC_GRAPH,
+            graph: tenantGraphForInsert(ctx),
         },
 
         // Superadmin grants wildcard
-        { subject: r, predicate: rbacGrantsIRI, object: p, graph: RBAC_GRAPH },
+        { subject: r, predicate: rbacGrantsIRI, object: p, graph: tenantGraphForInsert(ctx) },
 
         // PolicyGrant: superusers → superadmin (no scope = system-wide)
-        { subject: gr, predicate: RDF_TYPE, object: PolicyGrantIRI, graph: RBAC_GRAPH },
-        { subject: gr, predicate: hasPrincipalIRI, object: g, graph: RBAC_GRAPH },
-        { subject: gr, predicate: hasRoleIRI, object: r, graph: RBAC_GRAPH },
+        { subject: gr, predicate: RDF_TYPE, object: PolicyGrantIRI, graph: tenantGraphForInsert(ctx) },
+        { subject: gr, predicate: hasPrincipalIRI, object: g, graph: tenantGraphForInsert(ctx) },
+        { subject: gr, predicate: hasRoleIRI, object: r, graph: tenantGraphForInsert(ctx) },
         {
             subject: gr,
             predicate: isDenialIRI,
             object: literal("false", XSD_BOOLEAN),
-            graph: RBAC_GRAPH,
+            graph: tenantGraphForInsert(ctx),
         },
     ]);
 }

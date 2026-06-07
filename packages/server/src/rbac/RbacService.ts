@@ -4,7 +4,7 @@ import type { SecurityContext } from "../SecurityContext.js";
 import type { ServerContext } from "../ServerContext.js";
 import type { TenantEntity, TenantRepository } from "../tenancy/index.js";
 import { AccessChecker } from "./AccessChecker.js";
-import { RBAC_GRAPH } from "./constants.js";
+import { tenantGraph, tenantGraphForInsert } from "../tenancy.js";
 import { RbacInspector } from "./RbacInspector.js";
 import type { PermissionRepository } from "./repository/PermissionRepository.js";
 import type {
@@ -143,6 +143,7 @@ export class RbacService {
             principal: sec.principalIri,
             permission: args.permission,
             scope: args.scope,
+            scopeChain: args.scopeChain,
             actingAs: sec.isImpersonating ? sec.actingAsIri : undefined,
         });
     }
@@ -382,7 +383,7 @@ export class RbacService {
             subject: new IRI(args.fromIri),
             predicate: actsForIRI,
             object: new IRI(args.toIri),
-            graph: RBAC_GRAPH,
+            graph: tenantGraphForInsert(ctx),
         });
     }
 
@@ -396,7 +397,7 @@ export class RbacService {
             subject: new IRI(args.fromIri),
             predicate: actsForIRI,
             object: new IRI(args.toIri),
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
     }
 

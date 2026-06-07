@@ -10,7 +10,8 @@ import {
 import type { TripleStore } from "@jasonscharf/data";
 import { systemSec } from "../SecurityContext.js";
 import type { ServerContext } from "../ServerContext.js";
-import { RBAC_GRAPH, WILDCARD_PERMISSION } from "./constants.js";
+import { tenantGraph } from "../tenancy.js";
+import { WILDCARD_PERMISSION } from "./constants.js";
 import type { PolicyGrantRepository } from "./repository/PolicyGrantRepository.js";
 import { iriValue, literalValue } from "./repository/util.js";
 import type { CheckOptions, PolicyGrantEntity } from "./types.js";
@@ -43,6 +44,14 @@ export class AccessChecker {
      * `actingAs`.
      */
     async check(ctx: ServerContext, opts: CheckOptions): Promise<boolean> {
+        // The internal system principal bypasses RBAC entirely — used by seeding,
+        // migrations, onboarding and background jobs. RBAC is per-tenant now, so there
+        // is no global wildcard grant to satisfy it; each tenant seeds its own
+        // superadmin (the founding user) for real callers.
+        if (opts.principal === systemSec.principalIri) {
+            return true;
+        }
+
         let effectivePrincipal = opts.principal;
 
         if (opts.actingAs) {
@@ -54,7 +63,11 @@ export class AccessChecker {
         }
 
         const principals = await this._resolvePrincipalSet(ctx, effectivePrincipal);
-        const scopeChain = opts.scope ? await this._resolveScopeChain(ctx, opts.scope) : [];
+        // A precomputed chain (e.g. resolved over the entity topology) wins; otherwise
+        // fall back to walking the rbac:parentResource tree from `scope`.
+        const scopeChain =
+            opts.scopeChain ??
+            (opts.scope ? await this._resolveScopeChain(ctx, opts.scope) : []);
 
         const grants = await this._grants.findForPrincipals(ctx, systemSec, {
             principalIris: Array.from(principals),
@@ -119,7 +132,7 @@ export class AccessChecker {
             roots: [new IRI(principalIri)],
             predicates: [isMemberOfIRI],
             direction: "out",
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
         const set = new Set(reached.map((i) => i.value));
         set.add(principalIri); // always include the caller, even with no membership edges
@@ -136,7 +149,7 @@ export class AccessChecker {
             roots: [new IRI(scopeIri)],
             predicates: [hasParentIRI],
             direction: "out",
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
         const chain = reached.map((i) => i.value);
         if (!chain.includes(scopeIri)) {
@@ -168,7 +181,7 @@ export class AccessChecker {
                 roots: roleIris.map((r) => new IRI(r)),
                 predicates: [inheritsFromIRI],
                 direction: "out",
-                graph: RBAC_GRAPH,
+                graph: tenantGraph(ctx),
             });
             for (const r of closure) {
                 allRoles.add(r.value);
@@ -180,7 +193,7 @@ export class AccessChecker {
             const bySubject = await this._store.findForSubjects(
                 ctx,
                 [...allRoles].map((r) => new IRI(r)),
-                RBAC_GRAPH,
+                tenantGraph(ctx),
             );
             for (const quads of bySubject.values()) {
                 for (const q of quads) {
@@ -210,7 +223,7 @@ export class AccessChecker {
         const bySubject = await this._store.findForSubjects(
             ctx,
             permissionIris.map((p) => new IRI(p)),
-            RBAC_GRAPH,
+            tenantGraph(ctx),
         );
         for (const quads of bySubject.values()) {
             for (const q of quads) {
@@ -231,7 +244,7 @@ export class AccessChecker {
             subject: new IRI(fromIri),
             predicate: actsForIRI,
             object: new IRI(toIri),
-            graph: RBAC_GRAPH,
+            graph: tenantGraph(ctx),
         });
         return quads.length > 0;
     }

@@ -7,7 +7,6 @@ import { EntitySchema } from "@jasonscharf/entities";
 export const TenantSchema: EntitySchema = new EntitySchema({
     typeIRI: new IRI("urn:sys:core:rbac:Tenant"),
     ns: "urn:sys:core:rbac:",
-    graphIri: new IRI("urn:sys:core:rbac:graph"),
     properties: {
         tenantName: new IRI("urn:sys:core:rbac:tenantName"),
         isSystemTenant: new IRI("urn:sys:core:rbac:isSystemTenant"),
@@ -19,7 +18,6 @@ export const UserGroupSchema: EntitySchema = new EntitySchema({
     typeIRI: new IRI("urn:sys:core:rbac:UserGroup"),
     ns: "urn:sys:core:rbac:",
     idSegment: "group",
-    graphIri: new IRI("urn:sys:core:rbac:graph"),
     properties: {
         groupName: new IRI("urn:sys:core:rbac:groupName"),
         isSystemGroup: new IRI("urn:sys:core:rbac:isSystemGroup"),
@@ -39,7 +37,6 @@ export const ServiceAccountSchema: EntitySchema = new EntitySchema({
     typeIRI: new IRI("urn:sys:core:rbac:ServiceAccount"),
     ns: "urn:sys:core:rbac:",
     idSegment: "sa",
-    graphIri: new IRI("urn:sys:core:rbac:graph"),
     properties: {
         serviceAccountName: new IRI("urn:sys:core:rbac:serviceAccountName"),
         serviceAccountToken: new IRI("urn:sys:core:rbac:serviceAccountToken"),
@@ -59,7 +56,6 @@ export const ServiceAccountSchema: EntitySchema = new EntitySchema({
 export const RoleSchema: EntitySchema = new EntitySchema({
     typeIRI: new IRI("urn:sys:core:rbac:Role"),
     ns: "urn:sys:core:rbac:",
-    graphIri: new IRI("urn:sys:core:rbac:graph"),
     properties: {
         roleName: new IRI("urn:sys:core:rbac:roleName"),
         isSystemRole: new IRI("urn:sys:core:rbac:isSystemRole"),
@@ -90,7 +86,6 @@ export const RoleSchema: EntitySchema = new EntitySchema({
 export const PermissionSchema: EntitySchema = new EntitySchema({
     typeIRI: new IRI("urn:sys:core:rbac:Permission"),
     ns: "urn:sys:core:rbac:",
-    graphIri: new IRI("urn:sys:core:rbac:graph"),
     properties: {
         permissionKey: new IRI("urn:sys:core:rbac:permissionKey"),
     },
@@ -101,7 +96,6 @@ export const PolicyGrantSchema: EntitySchema = new EntitySchema({
     typeIRI: new IRI("urn:sys:core:rbac:PolicyGrant"),
     ns: "urn:sys:core:rbac:",
     idSegment: "grant",
-    graphIri: new IRI("urn:sys:core:rbac:graph"),
     properties: {
         isDenial: new IRI("urn:sys:core:rbac:isDenial"),
         grantExpiresAt: new IRI("urn:sys:core:rbac:grantExpiresAt"),
@@ -148,7 +142,6 @@ export const ResourceNodeSchema: EntitySchema = new EntitySchema({
     typeIRI: new IRI("urn:sys:core:rbac:ResourceNode"),
     ns: "urn:sys:core:rbac:",
     idSegment: "resource",
-    graphIri: new IRI("urn:sys:core:rbac:graph"),
     properties: {
         resourceType: new IRI("urn:sys:core:rbac:resourceType"),
     },

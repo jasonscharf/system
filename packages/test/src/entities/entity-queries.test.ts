@@ -34,6 +34,7 @@ import { createDataContext, TripleStore } from "@jasonscharf/data";
 import { buildServerContext, EntityStore } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 
 // ── DB provider matrix ────────────────────────────────────────────────────────
 
@@ -76,6 +77,7 @@ async function setup(db: DbProvider) {
 
 async function teardown(ctx: Awaited<ReturnType<typeof setup>>) {
     await ctx.trx.rollback();
+    await assertEmptyStore(ctx.knex);
     await ctx.knex.destroy();
 }
 

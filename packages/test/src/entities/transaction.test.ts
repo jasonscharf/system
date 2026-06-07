@@ -85,6 +85,9 @@ for (const db of providers) {
             env = await setup(db);
         });
         afterEach(async () => {
+            for (const t of ["tern_edges", "tern_nodes", "tern_names", "tern_namespaces"]) {
+                await env.knex(t).del();
+            }
             await teardown(env);
         });
 
@@ -225,6 +228,9 @@ for (const db of providers) {
             env = await setup(db);
         });
         afterEach(async () => {
+            for (const t of ["tern_edges", "tern_nodes", "tern_names", "tern_namespaces"]) {
+                await env.knex(t).del();
+            }
             await teardown(env);
         });
 

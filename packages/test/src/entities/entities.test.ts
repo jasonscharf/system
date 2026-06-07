@@ -20,6 +20,7 @@ import type { ShaclNodeShape } from "@jasonscharf/gen";
 import { buildServerContext, EntityStore, EntityValidationError } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { assertEmptyStore } from "../assertEmptyStore.js";
 import { fromLiteral, invertPropertyMap, propertyMapFor } from "../../../entities/src/util.js";
 
 // ── Provider matrix ───────────────────────────────────────────────────────────
@@ -79,6 +80,7 @@ async function setup(db: DbProvider) {
 
 async function teardown(ctx: Awaited<ReturnType<typeof setup>>) {
     await ctx.trx.rollback();
+    await assertEmptyStore(ctx.knex);
     await ctx.knex.destroy();
 }
 

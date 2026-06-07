@@ -71,6 +71,8 @@ function parseLiteralJson(raw: LiteralJson | string | null): LiteralJson | null 
 
 // ── Term helpers ──────────────────────────────────────────────────────────────
 
+const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
+
 function makeIRI(iriStr: string): IRI {
     return { value: iriStr } as IRI;
 }
@@ -175,6 +177,32 @@ export interface ReachOptions {
     maxDepth?: number;
     /** Include the root IRIs in the result.  Defaults to true. */
     includeRoots?: boolean;
+}
+
+/** One hop in a rooted traversal: follow `predicate` out (current→next) or in (next→current). */
+export interface TraverseHop {
+    predicate: IRI;
+    direction: "out" | "in";
+}
+
+/**
+ * A rooted graph traversal: the path that every domain query must walk from the
+ * tenant root down to its leaf. Compiles to a single chain of inner joins on
+ * tern_edges (one per hop), scoped to `graph` and live edges, so a result is
+ * returned only if the full root→leaf path exists. There is no flat
+ * "find nodes of type X" — reachability from the root is the query.
+ */
+export interface RootedTraverseOpts {
+    /** The node the path must start from (e.g. the caller's tenant). */
+    root: IRI;
+    /** Ordered hops from the root to the leaf. Empty ⇒ the leaf is the root. */
+    hops: readonly TraverseHop[];
+    /** Graph scope: a named graph IRI, null for the default graph, undefined for any graph. */
+    graph?: IRI | null;
+    /** Optional rdf:type constraint on the leaf node. */
+    leafType?: IRI;
+    /** Optional leaf property-equality constraints (leaf --predicate--> object). */
+    leafEq?: readonly { predicate: IRI; object: IRI | Literal }[];
 }
 
 export interface StoreStats {
@@ -918,6 +946,124 @@ export class TripleStore {
             }
         }
         return result;
+    }
+
+    /**
+     * Walks a fixed path from `opts.root` to a leaf, following `opts.hops` as a
+     * chain of inner joins on tern_edges. Returns the leaf IRIs reachable via the
+     * full path — the rooted-traversal primitive the query layer is built on.
+     * Every join is scoped to `opts.graph` and live edges, so a leaf is returned
+     * only when the entire root→leaf path exists in that graph.
+     */
+    async rootedTraverse(ctx: ServerContext, opts: RootedTraverseOpts): Promise<IRI[]> {
+        return this.withTransaction(ctx, (ctx) => this._rootedTraverse(ctx, opts));
+    }
+
+    private async _rootedTraverse(ctx: ServerContext, opts: RootedTraverseOpts): Promise<IRI[]> {
+        const rootId = await this._nodeId(ctx, opts.root as RdfTerm);
+        if (rootId === null) {
+            return [];
+        }
+
+        // Resolve the graph scope to a node id once; reused on every join.
+        let graphId: number | null | undefined;
+        if (opts.graph === undefined) {
+            graphId = undefined;
+        } else if (opts.graph === null) {
+            graphId = null;
+        } else {
+            graphId = await this._nodeId(ctx, opts.graph as RdfTerm);
+            if (graphId === null) {
+                return [];
+            }
+        }
+        const falseLit = this._isPg() ? "false" : "0";
+        const scope = (alias: string): string => {
+            const g =
+                graphId === undefined
+                    ? "1 = 1"
+                    : graphId === null
+                      ? `${alias}.${C.graph} IS NULL`
+                      : `${alias}.${C.graph} = ${graphId}`;
+            return `${g} AND ${alias}.${C.isDeleted} = ${falseLit}`;
+        };
+
+        // Resolve every predicate up front; an unknown predicate means no path.
+        const hopPredIds: number[] = [];
+        for (const hop of opts.hops) {
+            const pid = await this._nodeId(ctx, hop.predicate as RdfTerm);
+            if (pid === null) {
+                return [];
+            }
+            hopPredIds.push(pid);
+        }
+
+        // Build the hop chain. e0 is anchored at the root; each hop's leaf feeds
+        // the next hop's anchor. `leafExpr` is the SQL expression for the leaf id.
+        const wheres: string[] = [];
+        const joins: string[] = [];
+        let leafExpr: string;
+        let base: string;
+        if (opts.hops.length === 0) {
+            base = "(SELECT 1) base";
+            leafExpr = String(rootId);
+        } else {
+            const h0 = opts.hops[0] as TraverseHop;
+            const from0 = h0.direction === "out" ? C.subject : C.object;
+            const to0 = h0.direction === "out" ? C.object : C.subject;
+            base = `${T.edges} e0`;
+            wheres.push(`e0.${from0} = ${rootId}`);
+            wheres.push(`e0.${C.predicate} = ${hopPredIds[0]}`);
+            wheres.push(scope("e0"));
+            leafExpr = `e0.${to0}`;
+            for (let i = 1; i < opts.hops.length; i++) {
+                const h = opts.hops[i] as TraverseHop;
+                const from = h.direction === "out" ? C.subject : C.object;
+                const to = h.direction === "out" ? C.object : C.subject;
+                const a = `e${i}`;
+                joins.push(
+                    `JOIN ${T.edges} ${a} ON ${a}.${from} = ${leafExpr} AND ` +
+                        `${a}.${C.predicate} = ${hopPredIds[i]} AND ${scope(a)}`,
+                );
+                leafExpr = `${a}.${to}`;
+            }
+        }
+
+        // Leaf constraints: rdf:type and property-equality, each an extra join.
+        let cIdx = 0;
+        if (opts.leafType) {
+            const rdfTypeId = await this._nodeId(ctx, makeIRI(RDF_TYPE) as RdfTerm);
+            const typeId = await this._nodeId(ctx, opts.leafType as RdfTerm);
+            if (rdfTypeId === null || typeId === null) {
+                return [];
+            }
+            const a = `c${cIdx++}`;
+            joins.push(
+                `JOIN ${T.edges} ${a} ON ${a}.${C.subject} = ${leafExpr} AND ` +
+                    `${a}.${C.predicate} = ${rdfTypeId} AND ${a}.${C.object} = ${typeId} AND ${scope(a)}`,
+            );
+        }
+        for (const eq of opts.leafEq ?? []) {
+            const pid = await this._nodeId(ctx, eq.predicate as RdfTerm);
+            const oid = await this._nodeId(ctx, eq.object as RdfTerm);
+            if (pid === null || oid === null) {
+                return [];
+            }
+            const a = `c${cIdx++}`;
+            joins.push(
+                `JOIN ${T.edges} ${a} ON ${a}.${C.subject} = ${leafExpr} AND ` +
+                    `${a}.${C.predicate} = ${pid} AND ${a}.${C.object} = ${oid} AND ${scope(a)}`,
+            );
+        }
+
+        const whereClause = wheres.length > 0 ? ` WHERE ${wheres.join(" AND ")}` : "";
+        const sql = `SELECT DISTINCT ${leafExpr} AS leaf FROM ${base} ${joins.join(" ")}${whereClause}`;
+        const raw = await this._db(ctx).raw(sql);
+        const rows = (Array.isArray(raw) ? raw : raw.rows) as Array<{ leaf: number }>;
+        return this._idsToIris(
+            ctx,
+            rows.map((r) => Number(r.leaf)),
+        );
     }
 
     /** True when the underlying Knex client is Postgres. */

@@ -781,7 +781,7 @@ describe("generateAugmentedTypes", () => {
             externalClasses,
             localNamespace: LOCAL_NS,
         });
-        expect(output).toContain("declare module '@system/auth'");
+        expect(output).toContain('declare module "@system/auth"');
         expect(output).toContain("score?:");
     });
 
@@ -792,7 +792,7 @@ describe("generateAugmentedTypes", () => {
             localNamespace: LOCAL_NS,
             iriImport: "../semantics/IRI.js",
         });
-        expect(output).toContain("from '../semantics/IRI.js'");
+        expect(output).toContain('from "../semantics/IRI.js"');
     });
 
     it("marks required fields when SHACL minCount >= 1", () => {
@@ -825,13 +825,34 @@ describe("generateAugmentedTypes", () => {
     });
 
     it("emits import for external type used as range", () => {
+        // A local class with an object property whose range is the external User class.
+        const rangeTriples: Triple[] = [
+            ...baseTriples,
+            t(`${LOCAL_NS}Project`, `${RDF}type`, `${OWL}Class`),
+            t(`${LOCAL_NS}owner`, `${RDF}type`, `${OWL}ObjectProperty`),
+            t(`${LOCAL_NS}owner`, `${RDFS}domain`, `${LOCAL_NS}Project`),
+            t(`${LOCAL_NS}owner`, `${RDFS}range`, `${BASE_NS}User`),
+        ];
+        const ontology = readOntology(rangeTriples);
+        const externalClasses = new Map([[`${BASE_NS}User`, "@jasonscharf/auth"]]);
+        const output = generateAugmentedTypes(ontology, emptyShapes, {
+            externalClasses,
+            localNamespace: LOCAL_NS,
+        });
+        expect(output).toContain('import type { User } from "@jasonscharf/auth"');
+    });
+
+    it("does not import external classes that are only augmented, never used as a range", () => {
+        // baseTriples/localTriples augment User (via `score`) but never use it as a range.
         const ontology = readOntology([...baseTriples, ...localTriples]);
         const externalClasses = new Map([[`${BASE_NS}User`, "@jasonscharf/auth"]]);
         const output = generateAugmentedTypes(ontology, emptyShapes, {
             externalClasses,
             localNamespace: LOCAL_NS,
         });
-        expect(output).toContain("import type { User } from '@jasonscharf/auth'");
+        expect(output).not.toContain("import type { User }");
+        // The augmentation block is still emitted (it does not require an import).
+        expect(output).toContain('declare module "@jasonscharf/auth"');
     });
 
     it("skips external classes that have no local-namespace properties", () => {
@@ -842,7 +863,7 @@ describe("generateAugmentedTypes", () => {
             localNamespace: LOCAL_NS,
         });
         // No local properties → no module augmentation block
-        expect(output).not.toContain("declare module '@system/auth'");
+        expect(output).not.toContain('declare module "@system/auth"');
     });
 });
 
@@ -992,11 +1013,23 @@ describe("generateFromConfig", () => {
             ntPath,
             `<http://base.example.org/User> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .\n`,
         );
+        // A local class that uses the base User as an object-property range, so the
+        // external import (and thus base.importPath) appears in the output.
+        const extPath = join(tmpDir, "ext.nt");
+        await writeFile(
+            extPath,
+            `${[
+                `<http://local.example.org/Project> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .`,
+                `<http://local.example.org/owner> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .`,
+                `<http://local.example.org/owner> <http://www.w3.org/2000/01/rdf-schema#domain> <http://local.example.org/Project> .`,
+                `<http://local.example.org/owner> <http://www.w3.org/2000/01/rdf-schema#range> <http://base.example.org/User> .`,
+            ].join("\n")}\n`,
+        );
         const config = {
             bases: [
                 { ontology: "base.nt", package: "@system/auth", importPath: "@system/auth/types" },
             ],
-            extensions: [],
+            extensions: ["ext.nt"],
             localNamespace: "http://local.example.org/",
             out: "out/types.ts",
         };

@@ -24,4 +24,6 @@ export type { EntityLookup, ServerContext } from "./ServerContext.js";
 export { buildServerContext } from "./ServerContext.js";
 // ── Superuser (membership of the system SYS_SUPERUSERS group) ────────────────
 export * from "./superuser/index.js";
+// ── Tenancy (Tenant and Organization entities) ──────────────────────────────
+export * from "./tenancy/index.js";
 export { tenantGraph, tenantGraphForInsert } from "./tenancy.js";

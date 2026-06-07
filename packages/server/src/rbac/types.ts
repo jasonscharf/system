@@ -1,12 +1,5 @@
 import type { EdgeRef } from "@jasonscharf/entities";
 
-export interface TenantEntity {
-    id: string;
-    iri: string;
-    tenantName: string;
-    isSystemTenant: boolean;
-}
-
 export interface UserGroupEntity {
     id: string;
     iri: string;

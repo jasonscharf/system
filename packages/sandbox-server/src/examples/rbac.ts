@@ -84,7 +84,7 @@ section("1. Tenants");
 const acme = await rbac.createTenant(ctx, systemSec, { name: "Acme Corp" });
 await rbac.createTenant(ctx, systemSec, { name: "Globex Corp" });
 
-console.log(`  Created tenant: ${acme.tenantName} (${acme.id})`);
+console.log(`  Created tenant: ${acme.name} (${acme.id})`);
 console.log("  Created tenant: Globex Corp (dave's tenant — no Acme grants)");
 
 // ── 2. Permissions ────────────────────────────────────────────────────────────

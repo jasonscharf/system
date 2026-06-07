@@ -22,7 +22,6 @@ export type { CreateResourceInput } from "./repository/ResourceNodeRepository.js
 export { ResourceNodeRepository } from "./repository/ResourceNodeRepository.js";
 export { RoleRepository } from "./repository/RoleRepository.js";
 export { ServiceAccountRepository } from "./repository/ServiceAccountRepository.js";
-export { TenantRepository } from "./repository/TenantRepository.js";
 export { UserGroupRepository } from "./repository/UserGroupRepository.js";
 // ── Seed ──────────────────────────────────────────────────────────────────────
 export * from "./seed.js";

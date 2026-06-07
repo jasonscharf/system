@@ -186,6 +186,25 @@ export class TenantRepository {
 		await this._store.delete(ctx, { subject: iriFor("tenant", args.id), graph: TENANCY_GRAPH });
 	}
 
+	async listAll(ctx: ServerContext, _sec: SecurityContext): Promise<TenantEntity[]> {
+		const quads = await this._store.find(ctx, { predicate: RDF_TYPE, object: TenantIRI, graph: TENANCY_GRAPH });
+		const tenantsBySubject = new Map<string, typeof quads>();
+		for (const quad of quads) {
+			const subjectKey = (quad.subject as IRI).value;
+			const existing = tenantsBySubject.get(subjectKey) ?? [];
+			existing.push(quad);
+			tenantsBySubject.set(subjectKey, existing);
+		}
+
+		const tenants: TenantEntity[] = [];
+		for (const [subjectKey, subjectQuads] of tenantsBySubject) {
+			const id = idFrom(subjectKey);
+			const allQuads = subjectQuads.concat(await this._store.find(ctx, { subject: { value: subjectKey } as IRI, graph: TENANCY_GRAPH }));
+			tenants.push(this._fromQuads(id, allQuads));
+		}
+		return tenants;
+	}
+
 	private _fromQuads(
 		id: string,
 		quads: ReturnType<TripleStore["find"]> extends Promise<infer T> ? T : never,

@@ -151,8 +151,7 @@ for (const provider of providers) {
         describe("tenants and groups", () => {
             it("creates a tenant", async () => {
                 const acme = await rbac.createTenant(ctx, systemSec, { name: "Acme Corp" });
-                expect(acme.tenantName).toBe("Acme Corp");
-                expect(acme.isSystemTenant).toBe(false);
+                expect(acme.name).toBe("Acme Corp");
                 expect(acme.id).toBeTruthy();
             });
 

@@ -2,6 +2,7 @@ import { actsForIRI, IRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import type { SecurityContext } from "../SecurityContext.js";
 import type { ServerContext } from "../ServerContext.js";
+import type { TenantEntity, TenantRepository } from "../tenancy/index.js";
 import { AccessChecker } from "./AccessChecker.js";
 import { RBAC_GRAPH } from "./constants.js";
 import { RbacInspector } from "./RbacInspector.js";
@@ -16,7 +17,6 @@ import type {
 } from "./repository/ResourceNodeRepository.js";
 import type { RoleRepository } from "./repository/RoleRepository.js";
 import type { ServiceAccountRepository } from "./repository/ServiceAccountRepository.js";
-import type { TenantRepository } from "./repository/TenantRepository.js";
 import type { UserGroupRepository } from "./repository/UserGroupRepository.js";
 import type {
     PermissionEntity,
@@ -25,7 +25,6 @@ import type {
     ResourceNodeEntity,
     RoleEntity,
     ServiceAccountEntity,
-    TenantEntity,
     UserGroupEntity,
 } from "./types.js";
 
@@ -178,7 +177,7 @@ export class RbacService {
         sec: SecurityContext,
         args: CreateTenantArgs,
     ): Promise<TenantEntity> {
-        return this._tenants.create(ctx, sec, { tenantName: args.name });
+        return this._tenants.create(ctx, sec, { name: args.name });
     }
 
     /** @insecure @nochecks */

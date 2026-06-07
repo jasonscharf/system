@@ -27,6 +27,10 @@ export interface Domain {
 
 export const DomainIRI = new IRI(`${TENANCY_NS}Domain`);
 
+// Outward-from-root topology edges (object-property: object is the target IRI node).
+export const hasOrgIRI = new IRI(`${TENANCY_NS}hasOrg`);
+export const hasMemberIRI = new IRI(`${TENANCY_NS}hasMember`);
+
 export const tenantNameIRI = new IRI(`${TENANCY_NS}tenantName`);
 export const tenantUserIRI = new IRI(`${TENANCY_NS}tenantUser`);
 

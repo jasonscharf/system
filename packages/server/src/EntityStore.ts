@@ -76,11 +76,11 @@ export class EntityStore {
         ctx: ServerContext,
         schema: EntitySchema<Props>,
         data: EntityInput<Props>,
+        id: string = _newId(),
     ): Promise<EntityRecord<Props>> {
         const withDefs = this._applyDefaults(schema, data);
         this._validate(schema, withDefs);
 
-        const id = _newId();
         const ent = entityIriFor(schema, id);
         const edgeTargets = resolveEdgeTargets(schema, data);
 

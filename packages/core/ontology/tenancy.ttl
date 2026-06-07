@@ -27,6 +27,22 @@ tenancy:Organization a owl:Class ;
 tenancy:Domain a owl:Class ;
     rdfs:comment "A registered domain (e.g. example.com) belonging to a Tenant." .
 
+# ── Topology: outward-from-root edges (Tenant → Org → User) ───────────────────
+# Real object-property edges (object is the target entity's IRI node, never an
+# anyURI literal) so the graph can be traversed root→leaf with SQL joins. Every
+# domain query walks this path from the tenant root; nothing is reachable that is
+# not attached under the tenant.
+
+tenancy:hasOrg a owl:ObjectProperty ;
+    rdfs:domain tenancy:Tenant ;
+    rdfs:range tenancy:Organization ;
+    rdfs:comment "Outward edge: a Tenant contains an Organization (root→down)." .
+
+tenancy:hasMember a owl:ObjectProperty ;
+    rdfs:domain tenancy:Organization ;
+    rdfs:range <urn:sys:core:auth:User> ;
+    rdfs:comment "Outward edge: an Organization contains a member User (org→user)." .
+
 # ── Tenant properties ─────────────────────────────────────────────────────────
 
 tenancy:tenantName a owl:DatatypeProperty ;

@@ -4,10 +4,18 @@ import type { EntityRecord, EntitySchema } from "@jasonscharf/entities";
 import type { Knex } from "knex";
 import { EntityQuery } from "./EntityQuery.js";
 import { EntityStore } from "./EntityStore.js";
+import { GraphQuery } from "./GraphQuery.js";
+import type { SecurityContext } from "./SecurityContext.js";
 
 export type EntityLookup = <Props extends Record<string, unknown>>(
     schema: EntitySchema<Props>,
 ) => EntityQuery<Props>;
+
+/**
+ * The one way to query domain objects: a rooted graph traversal anchored at the
+ * caller's tenant. Usage: `ctx.graph(sec).out('org').out('member').all(UserSchema)`.
+ */
+export type GraphLookup = (sec: SecurityContext) => GraphQuery;
 
 /**
  * Batched edge traversal: load the entities across `edgeName` for many source
@@ -38,10 +46,17 @@ export interface ServerContext extends ApplicationContext {
     /** The underlying quad store for this context. */
     store: TripleStore;
     /**
-     * Typed entity query builder.
+     * Typed entity query builder (flat, un-rooted — being superseded by `graph`).
      * Usage: ctx.entities(MySchema).where('field', '=', value).first(ctx)
+     * @deprecated Use `ctx.graph(sec)` — every domain query must traverse from the
+     * tenant root, which this builder does not enforce.
      */
     entities: EntityLookup;
+    /**
+     * The one rooted-traversal query entry point.
+     * Usage: ctx.graph(sec).out('org').out('member').where('email','=',e).all(UserSchema)
+     */
+    graph: GraphLookup;
     /**
      * Batched edge traversal across many records (no N+1).
      * Usage: const byId = await ctx.related(experiments, ExperimentSchema, 'domain')
@@ -62,6 +77,7 @@ export function buildServerContext(
         ...base,
         store,
         entities: (schema) => new EntityQuery(store, schema),
+        graph: (sec) => new GraphQuery(ctx, sec),
         related: (sources, schema, edgeName) =>
             new EntityStore(store).related(ctx, sources, schema, edgeName),
     };

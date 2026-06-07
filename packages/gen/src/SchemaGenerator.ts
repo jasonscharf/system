@@ -17,7 +17,7 @@ export interface SchemaGenConfig {
     localNamespace: string;
     /** Import path for EntitySchema.  Defaults to `@jasonscharf/entities`. */
     entitiesImport?: string;
-    /** Import path for the IRI class.  Defaults to `@system/core`. */
+    /** Import path for the IRI class.  Defaults to `@jasonscharf/core`. */
     iriImport?: string;
     /**
      * Absolute named-graph IRI to pin every generated schema to (graphIri).
@@ -165,7 +165,7 @@ export function generateSchemas(
     config: SchemaGenConfig,
 ): string {
     const entitiesPkg = config.entitiesImport ?? "@jasonscharf/entities";
-    const iriPkg = config.iriImport ?? "@system/core";
+    const iriPkg = config.iriImport ?? "@jasonscharf/core";
 
     const localClasses = [...ontology.classes.values()].filter((cls) =>
         cls.iri.startsWith(config.localNamespace),

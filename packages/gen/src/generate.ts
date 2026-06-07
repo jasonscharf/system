@@ -1,4 +1,6 @@
+import { spawnSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import type { Triple } from "@jasonscharf/core";
 import { generateTypes, parseNTriples, readOntology } from "./index.js";
@@ -44,10 +46,47 @@ export interface GenConfig {
     /** Per-class IRI path-segment overrides for generated schemas (class local name → segment). */
     idSegments?: Record<string, string>;
     /**
-     * Import path for the `IRI` class.  Defaults to `'@system/core'`.
-     * Override to `'../semantics/IRI.js'` when generating types inside @system/core itself.
+     * Import path for the `IRI` class.  Defaults to `"@jasonscharf/core"`.
+     * Override to `"../semantics/IRI.js"` when generating types inside @jasonscharf/core itself.
      */
     iriImport?: string;
+}
+
+// ── Output formatting ─────────────────────────────────────────────────────────
+// Generated files are committed to source control, so they must match the repo's
+// formatting conventions (quote style, import order, line width).  Rather than
+// teach every generator biome's exact output, we run biome over each written file.
+// Codegen is the source of truth; the formatter just normalises its emission.
+
+const _require = createRequire(import.meta.url);
+let _biomeBin: string | null | undefined;
+
+function biomeBin(): string | null {
+    if (_biomeBin === undefined) {
+        try {
+            _biomeBin = _require.resolve("@biomejs/biome/bin/biome");
+        } catch {
+            // biome not installed (e.g. standalone tern-codegen usage) — skip formatting.
+            _biomeBin = null;
+        }
+    }
+    return _biomeBin;
+}
+
+/**
+ * Formats a freshly written generated file with biome (format + organize imports),
+ * so codegen output matches the surrounding codebase.  No-op when biome is absent.
+ */
+function formatGenerated(filePath: string): void {
+    const bin = biomeBin();
+    if (bin === null) {
+        return;
+    }
+    // Formatter + assists (organize imports) only.  The linter stays off so biome never
+    // rewrites the generated shape (e.g. collapsing an empty `interface` into a `type`).
+    spawnSync(process.execPath, [bin, "check", "--write", "--linter-enabled=false", filePath], {
+        stdio: "ignore",
+    });
 }
 
 function parserFor(filePath: string) {
@@ -122,6 +161,7 @@ export async function generateFromConfig(configPath: string): Promise<void> {
         const outPath = path.resolve(dir, config.out);
         await mkdir(path.dirname(outPath), { recursive: true });
         await writeFile(outPath, typesSource, "utf-8");
+        formatGenerated(outPath);
         console.log(`[gen] merged types → ${path.relative(process.cwd(), outPath)}`);
     }
 
@@ -130,6 +170,7 @@ export async function generateFromConfig(configPath: string): Promise<void> {
         const shapesPath = path.resolve(dir, config.shapesOut);
         await mkdir(path.dirname(shapesPath), { recursive: true });
         await writeFile(shapesPath, shapesSource, "utf-8");
+        formatGenerated(shapesPath);
         console.log(`[gen] shapes descriptor → ${path.relative(process.cwd(), shapesPath)}`);
     }
 
@@ -145,6 +186,7 @@ export async function generateFromConfig(configPath: string): Promise<void> {
         const schemasPath = path.resolve(dir, config.schemasOut);
         await mkdir(path.dirname(schemasPath), { recursive: true });
         await writeFile(schemasPath, schemasSource, "utf-8");
+        formatGenerated(schemasPath);
         console.log(`[gen] entity schemas → ${path.relative(process.cwd(), schemasPath)}`);
     }
 }
@@ -160,5 +202,6 @@ export async function generate(inputPath: string): Promise<void> {
 
     const outPath = inputPath.replace(/\.(nt|n3|ttl|rdf)$/, ".generated.ts");
     await writeFile(outPath, source, "utf-8");
+    formatGenerated(outPath);
     console.log(`[gen] ${path.basename(inputPath)} → ${path.basename(outPath)}`);
 }

@@ -51,7 +51,7 @@ function renderClass(cls: OntologyClass): string {
 }
 
 function renderIRIConstant(iri: string, name: string): string {
-    return `export const ${iriConstName(name)} = new IRI('${iri}');`;
+    return `export const ${iriConstName(name)} = new IRI("${iri}");`;
 }
 
 // ── SHACL-aware property renderer ────────────────────────────────────────────
@@ -62,8 +62,8 @@ export interface AugmentedGenConfig {
     /** IRI prefix that identifies all local (extension) classes and properties. */
     localNamespace: string;
     /**
-     * Import path for the IRI class.  Defaults to `'@system/core'`.
-     * Override when generating types inside @system/core itself.
+     * Import path for the IRI class.  Defaults to `"@jasonscharf/core"`.
+     * Override when generating types inside @jasonscharf/core itself.
      */
     iriImport?: string;
 }
@@ -98,10 +98,33 @@ function renderPropertyAugmented(
 }
 
 /**
+ * Collects the external type names that the generated output actually references —
+ * i.e. object-property ranges on local classes, plus local-namespace augmentation
+ * properties added to external classes.  Used to import only what is used.
+ */
+function collectReferencedTypeNames(ontology: Ontology, localNamespace: string): Set<string> {
+    const names = new Set<string>();
+    for (const cls of ontology.classes.values()) {
+        const isLocal = cls.iri.startsWith(localNamespace);
+        for (const prop of cls.properties) {
+            if (prop.kind !== "object") {
+                continue;
+            }
+            // External classes are only augmented with local-namespace properties.
+            if (!isLocal && !prop.iri.startsWith(localNamespace)) {
+                continue;
+            }
+            names.add(xsdToTs(prop.range));
+        }
+    }
+    return names;
+}
+
+/**
  * Generates a TypeScript source file from a merged (base + extension) ontology.
  *
  * Local classes  → exported interfaces with SHACL-constrained required/array fields.
- * External classes → TypeScript module augmentation blocks (`declare module '...'`)
+ * External classes → TypeScript module augmentation blocks (`declare module "..."`)
  *                    containing only properties whose IRI is in the local namespace.
  *
  * This is the codegen entry-point for downstream repos extending core entities.
@@ -113,27 +136,33 @@ export function generateAugmentedTypes(
 ): string {
     const { externalClasses, localNamespace } = config;
 
-    const iriPkg = config.iriImport ?? "@system/core";
+    const iriPkg = config.iriImport ?? "@jasonscharf/core";
 
-    const lines: string[] = [
-        `// auto-generated — do not edit by hand`,
-        `import { IRI } from '${iriPkg}';`,
-    ];
+    // Only import external classes that the generated output actually references as
+    // object-property ranges — not every class defined in a base ontology.
+    const referenced = collectReferencedTypeNames(ontology, localNamespace);
 
     // Collect imports from external packages (types used as property ranges)
     const importsByPkg = new Map<string, Set<string>>();
     for (const cls of ontology.classes.values()) {
         const pkg = externalClasses.get(cls.iri);
-        if (pkg) {
+        if (pkg && referenced.has(cls.name)) {
             if (!importsByPkg.has(pkg)) {
                 importsByPkg.set(pkg, new Set());
             }
             importsByPkg.get(pkg)?.add(cls.name);
         }
     }
-    for (const [pkg, names] of importsByPkg) {
-        lines.push(`import type { ${[...names].sort().join(", ")} } from '${pkg}';`);
+
+    const lines: string[] = [`// auto-generated — do not edit by hand`, ""];
+    // Type-only imports first (matches biome organize-imports), then the IRI value import.
+    for (const pkg of [...importsByPkg.keys()].sort()) {
+        const names = importsByPkg.get(pkg);
+        if (names) {
+            lines.push(`import type { ${[...names].sort().join(", ")} } from "${pkg}";`);
+        }
     }
+    lines.push(`import { IRI } from "${iriPkg}";`);
     lines.push("");
 
     // ── Local classes → exported interfaces ──────────────────────────────────
@@ -151,7 +180,7 @@ export function generateAugmentedTypes(
         }
         lines.push(`}`);
         lines.push("");
-        lines.push(`export const ${cls.name}IRI = new IRI('${cls.iri}');`);
+        lines.push(`export const ${cls.name}IRI = new IRI("${cls.iri}");`);
         lines.push("");
     }
 
@@ -171,7 +200,7 @@ export function generateAugmentedTypes(
             continue;
         }
 
-        lines.push(`declare module '${pkg}' {`);
+        lines.push(`declare module "${pkg}" {`);
         lines.push(`    interface ${cls.name} {`);
         for (const prop of extProps) {
             lines.push(renderPropertyAugmented(prop, cls.iri, shapes, "        "));
@@ -186,7 +215,7 @@ export function generateAugmentedTypes(
         p.iri.startsWith(localNamespace),
     );
     for (const prop of localProps) {
-        lines.push(`export const ${iriConstName(prop.name)} = new IRI('${prop.iri}');`);
+        lines.push(`export const ${iriConstName(prop.name)} = new IRI("${prop.iri}");`);
     }
 
     return `${lines.join("\n")}\n`;
@@ -194,7 +223,7 @@ export function generateAugmentedTypes(
 
 /**
  * Generates a TypeScript source file from an ontology.
- * The file is self-contained and can be imported anywhere @system/core is available.
+ * The file is self-contained and can be imported anywhere @jasonscharf/core is available.
  */
 export function generateTypes(ontology: Ontology, sourceFile: string): string {
     const lines: string[] = [

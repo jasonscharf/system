@@ -8,6 +8,7 @@ import {
     tenantNameIRI,
 } from "@jasonscharf/core/tenancy";
 import { EntitySchema } from "@jasonscharf/entities";
+import { registerTopology } from "../topology.js";
 
 /**
  * The tenancy topology, modelled as an outward-from-root DAG so every domain
@@ -27,7 +28,7 @@ export const OrgSchema = new EntitySchema({
     idSegment: "org",
     properties: { name: orgNameIRI },
     edges: {
-        member: { predicate: hasMemberIRI, cardinality: "many", direction: "out" },
+        member: { predicate: hasMemberIRI, cardinality: "many", direction: "out", containment: true },
     },
 });
 
@@ -42,6 +43,10 @@ export const TenantSchema = new EntitySchema({
             target: () => OrgSchema,
             cardinality: "many",
             direction: "out",
+            containment: true,
         },
     },
 });
+
+// Register the tenant→org→member containment edges so scope chains resolve over them.
+registerTopology(TenantSchema, OrgSchema);

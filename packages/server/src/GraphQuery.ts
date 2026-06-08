@@ -2,11 +2,21 @@ import type { IRI } from "@jasonscharf/core";
 import type { TraverseHop, TripleStore } from "@jasonscharf/data";
 import type { EntityRecord, EntitySchema, FilterOp } from "@jasonscharf/entities";
 import { entityIriFor, toLiteral } from "@jasonscharf/entities";
-import { EntityStore } from "./EntityStore.js";
+import { type EntityInput, EntityStore } from "./EntityStore.js";
+import { AccessChecker } from "./rbac/AccessChecker.js";
+import { PolicyGrantRepository } from "./rbac/repository/PolicyGrantRepository.js";
 import type { SecurityContext } from "./SecurityContext.js";
 import type { ServerContext } from "./ServerContext.js";
 import { TenantSchema } from "./tenancy/schemas.js";
 import { tenantGraph } from "./tenancy.js";
+import { scopeChainFor } from "./topology.js";
+
+/** A parent to attach a newly created entity under, so it is reachable by construction. */
+export interface AttachUnder {
+    schema: EntitySchema;
+    id: string;
+    edge: string;
+}
 
 interface Where {
     prop: string;
@@ -30,18 +40,21 @@ interface Where {
  */
 export class GraphQuery {
     private readonly _ctx: ServerContext;
+    private readonly _sec: SecurityContext;
     private readonly _store: TripleStore;
     private readonly _root: IRI | null;
     private readonly _graph: IRI | null;
     private _current?: EntitySchema;
+    private _checker?: AccessChecker;
     private readonly _hops: TraverseHop[] = [];
     private readonly _wheres: Where[] = [];
     private _order?: { prop: string; dir: "asc" | "desc" };
     private _limit?: number;
     private _offset?: number;
 
-    constructor(ctx: ServerContext, _sec: SecurityContext) {
+    constructor(ctx: ServerContext, sec: SecurityContext) {
         this._ctx = ctx;
+        this._sec = sec;
         this._store = ctx.store;
         // Root every query at the caller's tenant. No tenant on ctx ⇒ no domain
         // data is reachable (root stays null and terminals return empty).
@@ -157,6 +170,79 @@ export class GraphQuery {
         leafSchema: EntitySchema<Props>,
     ): Promise<number> {
         return (await this.ids(leafSchema)).length;
+    }
+
+    // ── Secure mutations ──────────────────────────────────────────────────────
+    // A privileged write cannot be issued without `requires`: the permission is
+    // asserted against the entity's scope chain (resolved over the containment
+    // topology) before the write happens. The secure path IS the only path.
+
+    /**
+     * Create `data` and attach it under a parent so it is reachable by construction.
+     * Authorizes `opts.requires` against the parent's scope chain (or the tenant root
+     * when no parent is given).
+     */
+    async create<Props extends Record<string, unknown>>(
+        schema: EntitySchema<Props>,
+        data: EntityInput<Props>,
+        opts: { requires: string; under?: AttachUnder },
+    ): Promise<EntityRecord<Props>> {
+        const anchor = opts.under
+            ? entityIriFor(opts.under.schema, opts.under.id).value
+            : (this._root?.value ?? "");
+        await this._assert(opts.requires, anchor);
+        const es = new EntityStore(this._store);
+        const rec = await es.create<Props>(this._ctx, schema, data);
+        if (opts.under) {
+            await es.addEdge(this._ctx, opts.under.schema, opts.under.id, opts.under.edge, rec.iri);
+        }
+        return rec;
+    }
+
+    /** Update an entity after asserting `opts.requires` over its scope chain. */
+    async update<Props extends Record<string, unknown>>(
+        schema: EntitySchema<Props>,
+        id: string,
+        patch: EntityInput<Props>,
+        opts: { requires: string },
+    ): Promise<void> {
+        await this._assert(opts.requires, entityIriFor(schema, id).value);
+        await new EntityStore(this._store).update(this._ctx, schema, id, patch);
+    }
+
+    /** Delete an entity after asserting `opts.requires` over its scope chain. */
+    async delete(
+        schema: EntitySchema,
+        id: string,
+        opts: { requires: string },
+    ): Promise<void> {
+        await this._assert(opts.requires, entityIriFor(schema, id).value);
+        await new EntityStore(this._store).delete(this._ctx, schema, id);
+    }
+
+    private _accessChecker(): AccessChecker {
+        if (!this._checker) {
+            this._checker = new AccessChecker(this._store, new PolicyGrantRepository(this._store));
+        }
+        return this._checker;
+    }
+
+    /** Assert `permission` for the caller over `entityIri`'s containment scope chain. */
+    private async _assert(permission: string, entityIri: string): Promise<void> {
+        const principal = this._sec.principalIri;
+        if (principal === null) {
+            throw new Error(`Access denied: anonymous lacks "${permission}".`);
+        }
+        const scopeChain = await scopeChainFor(this._ctx, entityIri);
+        const allowed = await this._accessChecker().check(this._ctx, {
+            principal,
+            permission,
+            scopeChain,
+            actingAs: this._sec.isImpersonating ? this._sec.actingAsIri : undefined,
+        });
+        if (!allowed) {
+            throw new Error(`Access denied: "${principal}" lacks "${permission}".`);
+        }
     }
 }
 

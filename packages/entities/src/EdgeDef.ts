@@ -35,4 +35,13 @@ export interface EdgeDef {
     cardinality?: EdgeCardinality;
     /** Edge orientation relative to this entity.  Defaults to "out". */
     direction?: EdgeDirection;
+    /**
+     * Marks this as a containment edge (parent --contains--> child) in the
+     * tenant-rooted DAG. Containment edges define both the query path (down) and
+     * the **authorization scope chain** (up): a grant scoped to an ancestor covers
+     * everything reachable beneath it. Only containment edges are walked when
+     * resolving a resource's scope chain, so a back-reference (e.g. author) must
+     * NOT be marked containment.
+     */
+    containment?: boolean;
 }

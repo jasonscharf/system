@@ -150,4 +150,100 @@ describe("generateSchemas", () => {
         );
         expect(src).not.toContain("target: () =>");
     });
+
+    it("emits a containment edge and a registerTopology footer for a contains-marked property", async () => {
+        const ontology = readOntology(
+            await triples(`${PREFIXES}
+            @prefix sys: <urn:sys:core:> .
+            lib:Forum a owl:Class .
+            lib:Post a owl:Class .
+            lib:hasPost a owl:ObjectProperty ;
+                rdfs:subPropertyOf sys:contains ;
+                rdfs:domain lib:Forum ; rdfs:range lib:Post .
+        `),
+        );
+        const src = generateSchemas(
+            ontology,
+            { nodeShapes: new Map(), byTargetClass: new Map() },
+            {
+                localNamespace: "http://ex.org/lib/",
+            },
+        );
+
+        // The contains-marked object property becomes a containment edge.
+        expect(src).toContain(
+            'hasPost: { predicate: new IRI("http://ex.org/lib/hasPost"), target: () => PostSchema, cardinality: "many", direction: "out", containment: true }',
+        );
+        // The footer wires it into the topology.
+        expect(src).toContain('import { registerTopology } from "@jasonscharf/server";');
+        expect(src).toContain("registerTopology(ForumSchema);");
+        // Post has no containment edge, so it is not registered.
+        expect(src).not.toContain("registerTopology(ForumSchema, PostSchema)");
+    });
+
+    it("does not emit containment or a topology footer when no property is contains-marked", async () => {
+        const ontology = readOntology(
+            await triples(`${PREFIXES}
+            lib:Forum a owl:Class .
+            lib:Post a owl:Class .
+            lib:hasPost a owl:ObjectProperty ; rdfs:domain lib:Forum ; rdfs:range lib:Post .
+        `),
+        );
+        const src = generateSchemas(
+            ontology,
+            { nodeShapes: new Map(), byTargetClass: new Map() },
+            {
+                localNamespace: "http://ex.org/lib/",
+            },
+        );
+        expect(src).not.toContain("containment: true");
+        expect(src).not.toContain("registerTopology");
+    });
+
+    it("generates an augmented view schema for an external class that gains a local edge", async () => {
+        // hasExperiment attaches a containment edge onto an external (base) class,
+        // tenancy:Domain — the generator emits a DomainSchema view carrying the
+        // class's own data props plus that edge (referencing the local
+        // ExperimentSchema by thunk), but NOT the base object prop domainTenant.
+        const ontology = readOntology(
+            await triples(`${PREFIXES}
+            @prefix sys: <urn:sys:core:> .
+            @prefix tenancy: <urn:sys:core:tenancy:> .
+            tenancy:Domain a owl:Class .
+            tenancy:Tenant a owl:Class .
+            tenancy:domainName a owl:DatatypeProperty ; rdfs:domain tenancy:Domain ; rdfs:range xsd:string .
+            tenancy:domainTenant a owl:ObjectProperty ; rdfs:domain tenancy:Domain ; rdfs:range tenancy:Tenant .
+            lib:Experiment a owl:Class .
+            lib:hasExperiment a owl:ObjectProperty ;
+                rdfs:subPropertyOf sys:contains ;
+                rdfs:domain tenancy:Domain ; rdfs:range lib:Experiment .
+        `),
+        );
+        const src = generateSchemas(
+            ontology,
+            { nodeShapes: new Map(), byTargetClass: new Map() },
+            {
+                localNamespace: "http://ex.org/lib/",
+                idSegments: { Domain: "domain" },
+            },
+        );
+
+        // A DomainSchema view is emitted with the external class's own namespace…
+        expect(src).toContain("export const DomainSchema: EntitySchema = new EntitySchema({");
+        expect(src).toContain('typeIRI: new IRI("urn:sys:core:tenancy:Domain")');
+        expect(src).toContain('ns: "urn:sys:core:tenancy:"');
+        expect(src).toContain('idSegment: "domain"');
+        // …carrying the class's own data property…
+        expect(src).toContain('domainName: new IRI("urn:sys:core:tenancy:domainName")');
+        // …and the locally-declared containment edge…
+        expect(src).toContain(
+            'hasExperiment: { predicate: new IRI("http://ex.org/lib/hasExperiment"), target: () => ExperimentSchema, cardinality: "many", direction: "out", containment: true }',
+        );
+        // …but not the base object property (its edge belongs to Domain's canonical schema).
+        const domainBlock = src.slice(src.indexOf("DomainSchema"), src.indexOf("ExperimentSchema"));
+        expect(domainBlock).not.toContain("domainTenant");
+        // The view's edge target is generated here, so it is a thunk, not an import.
+        expect(src).not.toContain("import { ExperimentSchema }");
+        expect(src).toContain("registerTopology(DomainSchema);");
+    });
 });

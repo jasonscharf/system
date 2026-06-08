@@ -37,6 +37,11 @@ export async function createDataContext(config: DataConfig): Promise<Knex> {
             client: "better-sqlite3",
             connection: { filename: config.filename },
             useNullAsDefault: true,
+            // A single connection: a ':memory:' database is private to its
+            // connection, so a multi-connection pool would scatter writes and
+            // reads across separate empty databases. One connection also matches
+            // better-sqlite3's synchronous, single-writer model.
+            pool: { min: 1, max: 1 },
         });
     } else {
         knex = Knex({

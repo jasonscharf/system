@@ -9,6 +9,7 @@ const RDFS_DOMAIN = new IRI("http://www.w3.org/2000/01/rdf-schema#domain");
 const RDFS_RANGE = new IRI("http://www.w3.org/2000/01/rdf-schema#range");
 const RDFS_LABEL = new IRI("http://www.w3.org/2000/01/rdf-schema#label");
 const RDFS_COMMENT = new IRI("http://www.w3.org/2000/01/rdf-schema#comment");
+const RDFS_SUBPROPERTYOF = new IRI("http://www.w3.org/2000/01/rdf-schema#subPropertyOf");
 
 export interface OntologyProperty {
     iri: string;
@@ -16,6 +17,12 @@ export interface OntologyProperty {
     range: string | null;
     comment: string | null;
     kind: "data" | "object";
+    /**
+     * IRIs of the super-properties declared via `rdfs:subPropertyOf`.  The
+     * SchemaGenerator reads these to decide containment: an edge whose super
+     * chain includes the well-known `contains` marker is a containment edge.
+     */
+    superProperties: string[];
 }
 
 export interface OntologyClass {
@@ -88,6 +95,7 @@ export function readOntology(triples: Triple[]): Ontology {
                     range: null,
                     comment: null,
                     kind: objIRI.equals(OWL_DATATYPE_PROP) ? "data" : "object",
+                    superProperties: [],
                 });
             }
         }
@@ -134,6 +142,14 @@ export function readOntology(triples: Triple[]): Ontology {
             const rangeIRI = asIRI(object);
             if (prop && rangeIRI) {
                 prop.range = rangeIRI.value;
+            }
+        }
+
+        if (predicate.equals(RDFS_SUBPROPERTYOF)) {
+            const prop = properties.get(subjectIRI);
+            const superIRI = asIRI(object);
+            if (prop && superIRI && !prop.superProperties.includes(superIRI.value)) {
+                prop.superProperties.push(superIRI.value);
             }
         }
     }

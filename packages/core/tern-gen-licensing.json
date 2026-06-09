@@ -1,0 +1,8 @@
+{
+    "bases": [],
+    "extensions": ["./ontology/licensing.ttl"],
+    "shapes": ["./ontology/licensing.shacl.ttl"],
+    "localNamespace": "urn:sys:core:licensing:",
+    "iriImport": "../semantics/IRI.js",
+    "out": "./src/licensing/types.generated.ts"
+}

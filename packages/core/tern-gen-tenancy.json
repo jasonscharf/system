@@ -1,0 +1,8 @@
+{
+    "bases": [],
+    "extensions": ["./ontology/tenancy.ttl"],
+    "shapes": [],
+    "localNamespace": "urn:sys:core:tenancy:",
+    "iriImport": "../semantics/IRI.js",
+    "out": "./src/tenancy/types.generated.ts"
+}

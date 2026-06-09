@@ -1,4 +1,5 @@
 // auto-generated — do not edit by hand
+
 import { IRI } from "../semantics/IRI.js";
 
 /** A Tern platform user. */
@@ -9,8 +10,6 @@ export interface User {
     displayName?: string;
     /** URL of the user's avatar image. */
     avatarUrl?: string;
-    /** Creation timestamp. */
-    /** Last-updated timestamp. */
 }
 
 export const UserIRI = new IRI("urn:sys:core:auth:User");
@@ -29,8 +28,6 @@ export interface UserIdentity {
     refreshToken?: string;
     /** Expiry time of the current access token. */
     tokenExpiresAt?: Date;
-    /** Creation timestamp. */
-    /** Last-updated timestamp. */
     /** Links an identity to its owning user. */
     identityOf?: User[];
 }
@@ -47,7 +44,6 @@ export interface UserSession {
     isActive?: boolean;
     /** Client IP address at time of login. */
     ipAddress?: string;
-    /** Creation timestamp. */
     /** The user this session belongs to. */
     sessionUser?: User;
     /** The device this session was created on. */
@@ -64,7 +60,6 @@ export interface UserDevice {
     devicePlatform?: string;
     /** Raw HTTP User-Agent string. */
     deviceUserAgent?: string;
-    /** Creation timestamp. */
     /** The user who owns this device record. */
     deviceUser?: User[];
 }
@@ -95,8 +90,6 @@ export interface LoginAttempt {
     utmCampaign?: string;
     /** Post-login redirect URL requested at attempt time. */
     authRedirectUrl?: string;
-    /** Creation timestamp. */
-    /** Last-updated timestamp. */
     /** The user resolved by a successful login attempt. */
     attemptUser?: User[];
 }

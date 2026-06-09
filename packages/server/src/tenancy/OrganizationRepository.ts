@@ -41,6 +41,7 @@ export interface RenameOrgArgs {
     name: string;
 }
 
+// NOTE: Queries a special "tenancy graph"
 export class OrganizationRepository {
     constructor(private readonly _store: TripleStore) {}
 

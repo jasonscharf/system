@@ -124,6 +124,14 @@ export class UserIdentityRepository {
         for (const q of byProvider) {
             const sub = q.subject as IRI;
             const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
+            const isIdentity = quads.some(
+                (quad) =>
+                    (quad.predicate as IRI).value === RDF_TYPE.value &&
+                    (quad.object as IRI).value === UserIdentityIRI.value,
+            );
+            if (!isIdentity) {
+                continue;
+            }
             const entity = this._fromQuads(
                 idFrom(sub.value),
                 quads,

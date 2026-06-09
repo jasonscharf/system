@@ -44,7 +44,6 @@ const PACKAGES = [
     "entities",
     "flow",
     "gen",
-    "rbac",
     "server",
     "vaults",
 ];

@@ -117,17 +117,19 @@ export class LoginAttemptRepository {
         _sec: SecurityContext,
         args: NonceArgs,
     ): Promise<LoginAttemptEntity | null> {
-        const matches = await this._store.find(ctx, {
-            predicate: nonceIRI,
-            object: literal(args.nonce, XSD_STRING),
-            graph: AUTH_GRAPH,
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const matches = await this._store.find(ctx, {
+                predicate: nonceIRI,
+                object: literal(args.nonce, XSD_STRING),
+                graph: AUTH_GRAPH,
+            });
+            if (matches.length === 0) {
+                return null;
+            }
+            const sub = matches[0].subject as IRI;
+            const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
+            return this._fromQuads(idFrom(sub.value), quads, await this._timestamps(ctx, sub));
         });
-        if (matches.length === 0) {
-            return null;
-        }
-        const sub = matches[0].subject as IRI;
-        const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-        return this._fromQuads(idFrom(sub.value), quads, await this._timestamps(ctx, sub));
     }
 
     /** @insecure @nochecks */

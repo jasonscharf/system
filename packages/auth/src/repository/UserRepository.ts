@@ -93,12 +93,14 @@ export class UserRepository {
         _sec: SecurityContext,
         args: IdArgs,
     ): Promise<UserEntity | null> {
-        const sub = iriFor("user", args.id);
-        const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-        if (quads.length === 0) {
-            return null;
-        }
-        return this._fromQuads(args.id, quads, await this._timestamps(ctx, sub));
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const sub = iriFor("user", args.id);
+            const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
+            if (quads.length === 0) {
+                return null;
+            }
+            return this._fromQuads(args.id, quads, await this._timestamps(ctx, sub));
+        });
     }
 
     /** @insecure @nochecks */
@@ -107,21 +109,23 @@ export class UserRepository {
         _sec: SecurityContext,
         args: EmailArgs,
     ): Promise<UserEntity | null> {
-        const quads = await this._store.find(ctx, {
-            predicate: emailIRI,
-            object: literal(args.email, XSD_STRING),
-            graph: AUTH_GRAPH,
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const quads = await this._store.find(ctx, {
+                predicate: emailIRI,
+                object: literal(args.email, XSD_STRING),
+                graph: AUTH_GRAPH,
+            });
+            if (quads.length === 0) {
+                return null;
+            }
+            const sub = quads[0].subject as IRI;
+            const id = idFrom(sub.value);
+            return this._fromQuads(
+                id,
+                await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH }),
+                await this._timestamps(ctx, sub),
+            );
         });
-        if (quads.length === 0) {
-            return null;
-        }
-        const sub = quads[0].subject as IRI;
-        const id = idFrom(sub.value);
-        return this._fromQuads(
-            id,
-            await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH }),
-            await this._timestamps(ctx, sub),
-        );
     }
 
     /** @insecure @nochecks */

@@ -98,39 +98,47 @@ export class OrganizationRepository {
         _sec: SecurityContext,
         args: OrgIdArgs,
     ): Promise<OrganizationEntity | null> {
-        const sub = iriFor("org", args.id);
-        const quads = await this._store.find(ctx, { subject: sub, graph: TENANCY_GRAPH });
-        if (quads.length === 0) {
-            return null;
-        }
-        return this._fromQuads(args.id, quads, await this._timestamps(ctx, sub));
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const sub = iriFor("org", args.id);
+            const quads = await this._store.find(ctx, { subject: sub, graph: TENANCY_GRAPH });
+            if (quads.length === 0) {
+                return null;
+            }
+            return this._fromQuads(args.id, quads, await this._timestamps(ctx, sub));
+        });
     }
 
     async addUser(ctx: ServerContext, _sec: SecurityContext, args: OrgUserArgs): Promise<void> {
-        await this._store.insert(ctx, {
-            subject: iriFor("org", args.orgId),
-            predicate: orgUserIRI,
-            object: literal(args.userIri, XSD_ANY_URI),
-            graph: TENANCY_GRAPH,
+        return this._store.withTransaction(ctx, async (ctx) => {
+            await this._store.insert(ctx, {
+                subject: iriFor("org", args.orgId),
+                predicate: orgUserIRI,
+                object: literal(args.userIri, XSD_ANY_URI),
+                graph: TENANCY_GRAPH,
+            });
         });
     }
 
     async removeUser(ctx: ServerContext, _sec: SecurityContext, args: OrgUserArgs): Promise<void> {
-        await this._store.delete(ctx, {
-            subject: iriFor("org", args.orgId),
-            predicate: orgUserIRI,
-            object: literal(args.userIri, XSD_ANY_URI),
-            graph: TENANCY_GRAPH,
+        return this._store.withTransaction(ctx, async (ctx) => {
+            await this._store.delete(ctx, {
+                subject: iriFor("org", args.orgId),
+                predicate: orgUserIRI,
+                object: literal(args.userIri, XSD_ANY_URI),
+                graph: TENANCY_GRAPH,
+            });
         });
     }
 
     async findUsers(ctx: ServerContext, _sec: SecurityContext, args: OrgIdArgs): Promise<string[]> {
-        const quads = await this._store.find(ctx, {
-            subject: iriFor("org", args.id),
-            predicate: orgUserIRI,
-            graph: TENANCY_GRAPH,
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const quads = await this._store.find(ctx, {
+                subject: iriFor("org", args.id),
+                predicate: orgUserIRI,
+                graph: TENANCY_GRAPH,
+            });
+            return quads.map((q) => String((q.object as { value: string }).value));
         });
-        return quads.map((q) => String((q.object as { value: string }).value));
     }
 
     async findByUserIri(
@@ -138,37 +146,41 @@ export class OrganizationRepository {
         _sec: SecurityContext,
         args: OrgIriArgs,
     ): Promise<OrganizationEntity[]> {
-        const quads = await this._store.find(ctx, {
-            predicate: orgUserIRI,
-            object: literal(args.userIri, XSD_ANY_URI),
-            graph: TENANCY_GRAPH,
-        });
-        const entities: OrganizationEntity[] = [];
-        for (const q of quads) {
-            const id = idFrom((q.subject as IRI).value);
-            const entity = await this.findById(ctx, _sec, { id });
-            if (entity) {
-                entities.push(entity);
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const quads = await this._store.find(ctx, {
+                predicate: orgUserIRI,
+                object: literal(args.userIri, XSD_ANY_URI),
+                graph: TENANCY_GRAPH,
+            });
+            const entities: OrganizationEntity[] = [];
+            for (const q of quads) {
+                const id = idFrom((q.subject as IRI).value);
+                const entity = await this.findById(ctx, _sec, { id });
+                if (entity) {
+                    entities.push(entity);
+                }
             }
-        }
-        return entities;
+            return entities;
+        });
     }
 
     async listAll(ctx: ServerContext, _sec: SecurityContext): Promise<OrganizationEntity[]> {
-        const quads = await this._store.find(ctx, {
-            predicate: RDF_TYPE,
-            object: OrganizationIRI,
-            graph: TENANCY_GRAPH,
-        });
-        const entities: OrganizationEntity[] = [];
-        for (const q of quads) {
-            const id = idFrom((q.subject as IRI).value);
-            const entity = await this.findById(ctx, _sec, { id });
-            if (entity) {
-                entities.push(entity);
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const quads = await this._store.find(ctx, {
+                predicate: RDF_TYPE,
+                object: OrganizationIRI,
+                graph: TENANCY_GRAPH,
+            });
+            const entities: OrganizationEntity[] = [];
+            for (const q of quads) {
+                const id = idFrom((q.subject as IRI).value);
+                const entity = await this.findById(ctx, _sec, { id });
+                if (entity) {
+                    entities.push(entity);
+                }
             }
-        }
-        return entities;
+            return entities;
+        });
     }
 
     async findByTenant(
@@ -176,20 +188,22 @@ export class OrganizationRepository {
         _sec: SecurityContext,
         args: OrgTenantArgs,
     ): Promise<OrganizationEntity[]> {
-        const quads = await this._store.find(ctx, {
-            predicate: orgTenantIRI,
-            object: new IRI(args.tenantIri),
-            graph: TENANCY_GRAPH,
-        });
-        const entities: OrganizationEntity[] = [];
-        for (const q of quads) {
-            const id = idFrom((q.subject as IRI).value);
-            const entity = await this.findById(ctx, _sec, { id });
-            if (entity) {
-                entities.push(entity);
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const quads = await this._store.find(ctx, {
+                predicate: orgTenantIRI,
+                object: new IRI(args.tenantIri),
+                graph: TENANCY_GRAPH,
+            });
+            const entities: OrganizationEntity[] = [];
+            for (const q of quads) {
+                const id = idFrom((q.subject as IRI).value);
+                const entity = await this.findById(ctx, _sec, { id });
+                if (entity) {
+                    entities.push(entity);
+                }
             }
-        }
-        return entities;
+            return entities;
+        });
     }
 
     async update(

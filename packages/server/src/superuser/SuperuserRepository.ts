@@ -1,11 +1,10 @@
-import { IRI, literal } from "@jasonscharf/core";
+import { literal } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import type { SecurityContext } from "../SecurityContext.js";
 import type { ServerContext } from "../ServerContext.js";
 import {
 	RDF_TYPE,
 	SUPERUSER_GRAPH,
-	SUPERUSER_NS,
 	SUPERUSERS_NODE,
 	SuperuserIRI,
 	XSD_ANY_URI,
@@ -35,57 +34,65 @@ export class SuperuserRepository {
 		_sec: SecurityContext,
 		args: SuperuserArgs,
 	): Promise<boolean> {
-		const quads = await this._store.find(ctx, {
-			subject: SUPERUSERS_NODE,
-			predicate: superuserUserIRI,
-			object: literal(args.userIri, XSD_ANY_URI),
-			graph: SUPERUSER_GRAPH,
-		});
-		return quads.length > 0;
-	}
-
-	async grant(ctx: ServerContext, _sec: SecurityContext, args: SuperuserArgs): Promise<void> {
-		const already = await this.isSuperuser(ctx, _sec, args);
-		if (already) {
-			return;
-		}
-		await this._store.insertMany(ctx, [
-			{
-				subject: SUPERUSERS_NODE,
-				predicate: RDF_TYPE,
-				object: SuperuserIRI,
-				graph: SUPERUSER_GRAPH,
-			},
-			{
+		return this._store.withTransaction(ctx, async (ctx) => {
+			const quads = await this._store.find(ctx, {
 				subject: SUPERUSERS_NODE,
 				predicate: superuserUserIRI,
 				object: literal(args.userIri, XSD_ANY_URI),
 				graph: SUPERUSER_GRAPH,
-			},
-			{
-				subject: SUPERUSERS_NODE,
-				predicate: superuserGrantedAtIRI,
-				object: literal(new Date().toISOString(), XSD_DATETIME),
-				graph: SUPERUSER_GRAPH,
-			},
-		]);
+			});
+			return quads.length > 0;
+		});
+	}
+
+	async grant(ctx: ServerContext, _sec: SecurityContext, args: SuperuserArgs): Promise<void> {
+		return this._store.withTransaction(ctx, async (ctx) => {
+			const already = await this.isSuperuser(ctx, _sec, args);
+			if (already) {
+				return;
+			}
+			await this._store.insertMany(ctx, [
+				{
+					subject: SUPERUSERS_NODE,
+					predicate: RDF_TYPE,
+					object: SuperuserIRI,
+					graph: SUPERUSER_GRAPH,
+				},
+				{
+					subject: SUPERUSERS_NODE,
+					predicate: superuserUserIRI,
+					object: literal(args.userIri, XSD_ANY_URI),
+					graph: SUPERUSER_GRAPH,
+				},
+				{
+					subject: SUPERUSERS_NODE,
+					predicate: superuserGrantedAtIRI,
+					object: literal(new Date().toISOString(), XSD_DATETIME),
+					graph: SUPERUSER_GRAPH,
+				},
+			]);
+		});
 	}
 
 	async revoke(ctx: ServerContext, _sec: SecurityContext, args: SuperuserArgs): Promise<void> {
-		await this._store.delete(ctx, {
-			subject: SUPERUSERS_NODE,
-			predicate: superuserUserIRI,
-			object: literal(args.userIri, XSD_ANY_URI),
-			graph: SUPERUSER_GRAPH,
+		return this._store.withTransaction(ctx, async (ctx) => {
+			await this._store.delete(ctx, {
+				subject: SUPERUSERS_NODE,
+				predicate: superuserUserIRI,
+				object: literal(args.userIri, XSD_ANY_URI),
+				graph: SUPERUSER_GRAPH,
+			});
 		});
 	}
 
 	async list(ctx: ServerContext, _sec: SecurityContext): Promise<string[]> {
-		const quads = await this._store.find(ctx, {
-			subject: SUPERUSERS_NODE,
-			predicate: superuserUserIRI,
-			graph: SUPERUSER_GRAPH,
+		return this._store.withTransaction(ctx, async (ctx) => {
+			const quads = await this._store.find(ctx, {
+				subject: SUPERUSERS_NODE,
+				predicate: superuserUserIRI,
+				graph: SUPERUSER_GRAPH,
+			});
+			return quads.map((q) => String((q.object as { value: string }).value));
 		});
-		return quads.map((q) => String((q.object as { value: string }).value));
 	}
 }

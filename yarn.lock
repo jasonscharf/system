@@ -1212,6 +1212,8 @@ __metadata:
     koa: "npm:^3.1.1"
     koa-bodyparser: "npm:^4.4.1"
     koa-router: "npm:^14.0.0"
+  bin:
+    tern-api: ./dist/server.js
   languageName: unknown
   linkType: soft
 

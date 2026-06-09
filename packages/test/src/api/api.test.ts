@@ -1,16 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { app } from "@jasonscharf/api";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-// Side-effect import — executes the module (covers packages/api/src/index.ts)
-import "@jasonscharf/api";
+let server: ReturnType<typeof app.listen>;
+let BASE: string;
 
-const PORT = Number(process.env.PORT ?? 3000);
-const BASE = `http://localhost:${PORT}`;
+beforeAll(
+    () =>
+        new Promise<void>((resolve) => {
+            server = app.listen(0, () => {
+                const addr = server.address() as { port: number };
+                BASE = `http://localhost:${addr.port}`;
+                resolve();
+            });
+        }),
+);
+
+afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
 
 describe("api", () => {
-    it("loads without error", () => {
-        // coverage provided by the top-level import
-    });
-
     it("GET / returns ok:true", async () => {
         const res = await fetch(`${BASE}/`);
         expect(res.status).toBe(200);

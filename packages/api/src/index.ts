@@ -1,9 +1,6 @@
 import { readFileSync } from "node:fs";
 import Koa from "koa";
 
-// TODO: Fromy env
-const PORT = Number(process.env.PORT ?? 3000);
-
 function loadVersion(): unknown {
     try {
         return JSON.parse(readFileSync(new URL("../version.json", import.meta.url), "utf8"));
@@ -14,7 +11,7 @@ function loadVersion(): unknown {
 
 const VERSION = loadVersion();
 
-const app = new Koa();
+export const app = new Koa();
 
 app.use(async (ctx) => {
     if (ctx.method !== "GET") {
@@ -30,8 +27,4 @@ app.use(async (ctx) => {
         ctx.status = 404;
         ctx.body = { error: "not found" };
     }
-});
-
-app.listen(PORT, () => {
-    console.log(`[api] HTTP → http://0.0.0.0:${PORT}`);
 });

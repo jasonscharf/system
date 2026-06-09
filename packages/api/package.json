@@ -10,6 +10,9 @@
     },
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
+    "bin": {
+        "tern-api": "./dist/server.js"
+    },
     "files": [
         "dist"
     ],
@@ -26,7 +29,7 @@
         "build": "yarn compile",
         "compile": "tsc -b",
         "clean": "rm -rf dist && rm tsconfig.tsbuildinfo",
-        "start": "node dist/index.js",
+        "start": "node dist/server.js",
         "typecheck": "tsc -p tsconfig.json --noEmit",
         "watch": "tsc -b -w"
     },

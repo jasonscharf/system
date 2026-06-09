@@ -40,7 +40,7 @@
     },
     "scripts": {
         "build": "yarn compile",
-        "gen": "tern-codegen",
+        "gen": "tern-codegen --config tern-gen.json && tern-codegen --config tern-gen-rbac.json && tern-codegen --config tern-gen-tenancy.json && tern-codegen --config tern-gen-licensing.json",
         "gen:watch": "tern-codegen --watch",
         "compile": "tsc -b",
         "clean": "rm -rf dist && rm tsconfig.tsbuildinfo",

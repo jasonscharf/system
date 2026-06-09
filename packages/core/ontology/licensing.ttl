@@ -57,6 +57,11 @@ lics:productDescription a owl:DatatypeProperty ;
     rdfs:range  xsd:string ;
     rdfs:comment "Human-readable description of the product." .
 
+lics:productSku a owl:DatatypeProperty ;
+    rdfs:domain lics:Product ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Stock-keeping unit identifier for billing and catalog integration." .
+
 # ── License properties ─────────────────────────────────────────────────────────
 # licenseOrg / licenseTenant removed: the Tenant → hasLicense outward edge encodes ownership.
 

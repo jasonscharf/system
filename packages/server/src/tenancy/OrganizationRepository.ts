@@ -133,6 +133,44 @@ export class OrganizationRepository {
         return quads.map((q) => String((q.object as { value: string }).value));
     }
 
+    async findByUserIri(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: OrgIriArgs,
+    ): Promise<OrganizationEntity[]> {
+        const quads = await this._store.find(ctx, {
+            predicate: orgUserIRI,
+            object: literal(args.userIri, XSD_ANY_URI),
+            graph: TENANCY_GRAPH,
+        });
+        const entities: OrganizationEntity[] = [];
+        for (const q of quads) {
+            const id = idFrom((q.subject as IRI).value);
+            const entity = await this.findById(ctx, _sec, { id });
+            if (entity) {
+                entities.push(entity);
+            }
+        }
+        return entities;
+    }
+
+    async listAll(ctx: ServerContext, _sec: SecurityContext): Promise<OrganizationEntity[]> {
+        const quads = await this._store.find(ctx, {
+            predicate: RDF_TYPE,
+            object: OrganizationIRI,
+            graph: TENANCY_GRAPH,
+        });
+        const entities: OrganizationEntity[] = [];
+        for (const q of quads) {
+            const id = idFrom((q.subject as IRI).value);
+            const entity = await this.findById(ctx, _sec, { id });
+            if (entity) {
+                entities.push(entity);
+            }
+        }
+        return entities;
+    }
+
     async findByTenant(
         ctx: ServerContext,
         _sec: SecurityContext,

@@ -455,9 +455,7 @@ describe("loader throw branches", () => {
             );
             const appYaml = "name: app\nextensions:\n  - ./noext.ttl\nhandlers: []";
             await writeFile(join(dir, "app.yaml"), appYaml);
-            await expect(loadAppConfig(join(dir, "app.yaml"))).rejects.toThrow(
-                "No ternapp:Extension",
-            );
+            await expect(loadAppConfig(join(dir, "app.yaml"))).rejects.toThrow("No Extension");
         } finally {
             await rm(dir, { recursive: true, force: true });
         }

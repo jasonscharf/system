@@ -1,5 +1,5 @@
 /**
- * Minimal Turtle parser for Tern extension config files.
+ * Minimal Turtle parser for System extension config files.
  *
  * Supported grammar subset:
  *   @prefix decl

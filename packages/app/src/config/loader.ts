@@ -79,7 +79,7 @@ function extensionConfigFromTurtle(turtle: string): ExtensionConfig {
     // Find the Extension subject
     const extSubject = triples.find((t) => t.p === NS.type && t.o === NS.ext)?.s;
     if (!extSubject) {
-        throw new Error("No ternapp:Extension found in Turtle config");
+        throw new Error("No Extension found in Turtle config");
     }
 
     // Index all triples by subject

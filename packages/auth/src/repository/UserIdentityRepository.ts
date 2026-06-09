@@ -115,33 +115,35 @@ export class UserIdentityRepository {
         _sec: SecurityContext,
         args: FindByProviderArgs,
     ): Promise<UserIdentityEntity | null> {
-        const byProvider = await this._store.find(ctx, {
-            predicate: providerIRI,
-            object: literal(args.provider, XSD_STRING),
-            graph: AUTH_GRAPH,
-        });
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const byProvider = await this._store.find(ctx, {
+                predicate: providerIRI,
+                object: literal(args.provider, XSD_STRING),
+                graph: AUTH_GRAPH,
+            });
 
-        for (const q of byProvider) {
-            const sub = q.subject as IRI;
-            const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-            const isIdentity = quads.some(
-                (quad) =>
-                    (quad.predicate as IRI).value === RDF_TYPE.value &&
-                    (quad.object as IRI).value === UserIdentityIRI.value,
-            );
-            if (!isIdentity) {
-                continue;
+            for (const q of byProvider) {
+                const sub = q.subject as IRI;
+                const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
+                const isIdentity = quads.some(
+                    (quad) =>
+                        (quad.predicate as IRI).value === RDF_TYPE.value &&
+                        (quad.object as IRI).value === UserIdentityIRI.value,
+                );
+                if (!isIdentity) {
+                    continue;
+                }
+                const entity = this._fromQuads(
+                    idFrom(sub.value),
+                    quads,
+                    await this._timestamps(ctx, sub),
+                );
+                if (entity.providerUserId === args.providerUserId) {
+                    return entity;
+                }
             }
-            const entity = this._fromQuads(
-                idFrom(sub.value),
-                quads,
-                await this._timestamps(ctx, sub),
-            );
-            if (entity.providerUserId === args.providerUserId) {
-                return entity;
-            }
-        }
-        return null;
+            return null;
+        });
     }
 
     /** @insecure @nochecks */
@@ -150,22 +152,24 @@ export class UserIdentityRepository {
         _sec: SecurityContext,
         args: UserIdArgs,
     ): Promise<UserIdentityEntity[]> {
-        const userIri = iriFor("user", args.userId);
-        const byUser = await this._store.find(ctx, {
-            predicate: identityOfIRI,
-            object: userIri,
-            graph: AUTH_GRAPH,
-        });
-        const subs = byUser.map((q) => q.subject as IRI);
-        const tsBySubject = await this._store.entityTimestamps(ctx, subs, AUTH_GRAPH);
-        const results: UserIdentityEntity[] = [];
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const userIri = iriFor("user", args.userId);
+            const byUser = await this._store.find(ctx, {
+                predicate: identityOfIRI,
+                object: userIri,
+                graph: AUTH_GRAPH,
+            });
+            const subs = byUser.map((q) => q.subject as IRI);
+            const tsBySubject = await this._store.entityTimestamps(ctx, subs, AUTH_GRAPH);
+            const results: UserIdentityEntity[] = [];
 
-        for (const sub of subs) {
-            const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-            const ts = tsBySubject.get(sub.value) ?? this._now();
-            results.push(this._fromQuads(idFrom(sub.value), quads, ts));
-        }
-        return results;
+            for (const sub of subs) {
+                const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
+                const ts = tsBySubject.get(sub.value) ?? this._now();
+                results.push(this._fromQuads(idFrom(sub.value), quads, ts));
+            }
+            return results;
+        });
     }
 
     /** @insecure @nochecks */

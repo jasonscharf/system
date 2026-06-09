@@ -113,18 +113,19 @@ export class UserSessionRepository {
         _sec: SecurityContext,
         args: TokenArgs,
     ): Promise<UserSessionEntity | null> {
-        const quads = await this._store.find(ctx, {
-            predicate: sessionTokenIRI,
-            object: literal(args.token, XSD_STRING),
-            graph: AUTH_GRAPH,
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const quads = await this._store.find(ctx, {
+                predicate: sessionTokenIRI,
+                object: literal(args.token, XSD_STRING),
+                graph: AUTH_GRAPH,
+            });
+            if (quads.length === 0) {
+                return null;
+            }
+            const sub = quads[0].subject as IRI;
+            const allQuads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
+            return this._fromQuads(idFrom(sub.value), allQuads, await this._timestamps(ctx, sub));
         });
-        if (quads.length === 0) {
-            return null;
-        }
-
-        const sub = quads[0].subject as IRI;
-        const allQuads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-        return this._fromQuads(idFrom(sub.value), allQuads, await this._timestamps(ctx, sub));
     }
 
     /** @insecure @nochecks */
@@ -133,22 +134,24 @@ export class UserSessionRepository {
         _sec: SecurityContext,
         args: UserIdArgs,
     ): Promise<UserSessionEntity[]> {
-        const userIri = iriFor("user", args.userId);
-        const byUser = await this._store.find(ctx, {
-            predicate: sessionUserIRI,
-            object: userIri,
-            graph: AUTH_GRAPH,
-        });
-        const subs = byUser.map((q) => q.subject as IRI);
-        const tsBySubject = await this._store.entityTimestamps(ctx, subs, AUTH_GRAPH);
-        const results: UserSessionEntity[] = [];
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const userIri = iriFor("user", args.userId);
+            const byUser = await this._store.find(ctx, {
+                predicate: sessionUserIRI,
+                object: userIri,
+                graph: AUTH_GRAPH,
+            });
+            const subs = byUser.map((q) => q.subject as IRI);
+            const tsBySubject = await this._store.entityTimestamps(ctx, subs, AUTH_GRAPH);
+            const results: UserSessionEntity[] = [];
 
-        for (const sub of subs) {
-            const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-            const ts = tsBySubject.get(sub.value) ?? this._now();
-            results.push(this._fromQuads(idFrom(sub.value), quads, ts));
-        }
-        return results;
+            for (const sub of subs) {
+                const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
+                const ts = tsBySubject.get(sub.value) ?? this._now();
+                results.push(this._fromQuads(idFrom(sub.value), quads, ts));
+            }
+            return results;
+        });
     }
 
     /** @insecure @nochecks */

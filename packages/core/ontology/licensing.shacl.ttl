@@ -1,0 +1,90 @@
+# Tern Licensing SHACL Shapes
+# Namespace: urn:sys:core:licensing:shapes/
+
+@prefix sh:    <http://www.w3.org/ns/shacl#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+@prefix lics:  <urn:sys:core:licensing:> .
+@prefix licss: <urn:sys:core:licensing:shapes/> .
+
+# ── Product ───────────────────────────────────────────────────────────────────
+
+licss:ProductShape a sh:NodeShape ;
+    sh:targetClass lics:Product ;
+    sh:property [
+        sh:path lics:productName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1
+    ] ;
+    sh:property [
+        sh:path lics:productSlug ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1
+    ] ;
+    sh:property [
+        sh:path lics:productDescription ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1
+    ] .
+
+# ── License ───────────────────────────────────────────────────────────────────
+
+licss:LicenseShape a sh:NodeShape ;
+    sh:targetClass lics:License ;
+    sh:property [
+        sh:path lics:licenseStatus ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1
+    ] ;
+    sh:property [
+        sh:path lics:licenseStartDate ;
+        sh:datatype xsd:dateTime ;
+        sh:maxCount 1
+    ] ;
+    sh:property [
+        sh:path lics:licenseEndDate ;
+        sh:datatype xsd:dateTime ;
+        sh:maxCount 1
+    ] ;
+    sh:property [
+        sh:path lics:licenseAutoRenew ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1
+    ] ;
+    sh:property [
+        sh:path lics:licensePaymentRef ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1
+    ] ;
+    sh:property [
+        sh:path lics:licensePaymentStatus ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1
+    ] ;
+    sh:property [
+        sh:path lics:hasEntitlement ;
+        sh:class lics:Entitlement
+    ] .
+
+# ── Entitlement ───────────────────────────────────────────────────────────────
+
+licss:EntitlementShape a sh:NodeShape ;
+    sh:targetClass lics:Entitlement ;
+    sh:property [
+        sh:path lics:entitlementProduct ;
+        sh:class lics:Product ;
+        sh:minCount 1 ;
+        sh:maxCount 1
+    ] ;
+    sh:property [
+        sh:path lics:entitlementSeatsLimit ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1
+    ] ;
+    sh:property [
+        sh:path lics:entitlementSessionsLimit ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1
+    ] .

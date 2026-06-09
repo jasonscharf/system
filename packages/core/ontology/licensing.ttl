@@ -1,0 +1,105 @@
+# Tern Licensing Ontology — Turtle format
+# Namespace: urn:sys:core:licensing:
+#
+# Platform-level licensing primitives: Product catalog, License agreements,
+# and per-product Entitlements.
+#
+# Graph topology (outward edges from root — no FK literals):
+#   Tenant      → tenancy:hasLicense      → License      (edge defined in tenancy.ttl)
+#   License     → lics:hasEntitlement     → Entitlement
+#   Entitlement → lics:entitlementProduct → Product
+
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:   <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+@prefix lics:  <urn:sys:core:licensing:> .
+
+# ── Classes ────────────────────────────────────────────────────────────────────
+
+lics:Product a owl:Class ;
+    rdfs:comment "A licensable product offered by the platform (e.g. analytics, optimization)." .
+
+lics:License a owl:Class ;
+    rdfs:comment "An agreement granting a Tenant the right to use one or more Products." .
+
+lics:Entitlement a owl:Class ;
+    rdfs:comment "Per-product limits and rights within a License." .
+
+# ── Topology ──────────────────────────────────────────────────────────────────
+# Outward edges (parent → child), enabling root-traversal queries without FK lookups.
+# Tenant → hasLicense is defined in tenancy.ttl to keep that file self-contained.
+
+lics:hasEntitlement a owl:ObjectProperty ;
+    rdfs:domain lics:License ;
+    rdfs:range  lics:Entitlement ;
+    rdfs:comment "Outward edge: a License holds an Entitlement (license→entitlement)." .
+
+lics:entitlementProduct a owl:ObjectProperty ;
+    rdfs:domain lics:Entitlement ;
+    rdfs:range  lics:Product ;
+    rdfs:comment "The Product covered by this Entitlement." .
+
+# ── Product properties ─────────────────────────────────────────────────────────
+
+lics:productName a owl:DatatypeProperty ;
+    rdfs:domain lics:Product ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Display name of the product." .
+
+lics:productSlug a owl:DatatypeProperty ;
+    rdfs:domain lics:Product ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "URL-safe unique identifier, e.g. 'labs'." .
+
+lics:productDescription a owl:DatatypeProperty ;
+    rdfs:domain lics:Product ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Human-readable description of the product." .
+
+# ── License properties ─────────────────────────────────────────────────────────
+# licenseOrg / licenseTenant removed: the Tenant → hasLicense outward edge encodes ownership.
+
+lics:licenseStatus a owl:DatatypeProperty ;
+    rdfs:domain lics:License ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "License status: active | trialing | expired | cancelled | suspended." .
+
+lics:licenseStartDate a owl:DatatypeProperty ;
+    rdfs:domain lics:License ;
+    rdfs:range  xsd:dateTime ;
+    rdfs:comment "Date the license becomes effective." .
+
+lics:licenseEndDate a owl:DatatypeProperty ;
+    rdfs:domain lics:License ;
+    rdfs:range  xsd:dateTime ;
+    rdfs:comment "Date the license expires." .
+
+lics:licenseAutoRenew a owl:DatatypeProperty ;
+    rdfs:domain lics:License ;
+    rdfs:range  xsd:boolean ;
+    rdfs:comment "Whether the license automatically renews before expiry." .
+
+lics:licensePaymentRef a owl:DatatypeProperty ;
+    rdfs:domain lics:License ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Provider-agnostic payment reference (subscription or order ID)." .
+
+lics:licensePaymentStatus a owl:DatatypeProperty ;
+    rdfs:domain lics:License ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Current payment status: paid | pending | failed | refunded." .
+
+# ── Entitlement properties ─────────────────────────────────────────────────────
+# entitlementLicense removed: use lics:hasEntitlement outward edge from License instead.
+# entitlementProduct is an ObjectProperty edge (see topology section above).
+
+lics:entitlementSeatsLimit a owl:DatatypeProperty ;
+    rdfs:domain lics:Entitlement ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Maximum number of seats (stored as string; absent = unlimited)." .
+
+lics:entitlementSessionsLimit a owl:DatatypeProperty ;
+    rdfs:domain lics:Entitlement ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Maximum monthly sessions (stored as string; absent = unlimited)." .

@@ -43,6 +43,11 @@ tenancy:hasMember a owl:ObjectProperty ;
     rdfs:range <urn:sys:core:auth:User> ;
     rdfs:comment "Outward edge: an Organization contains a member User (org→user)." .
 
+tenancy:hasLicense a owl:ObjectProperty ;
+    rdfs:domain tenancy:Tenant ;
+    rdfs:range <urn:sys:core:licensing:License> ;
+    rdfs:comment "Outward edge: a Tenant holds a License (root→down)." .
+
 # ── Tenant properties ─────────────────────────────────────────────────────────
 
 tenancy:tenantName a owl:DatatypeProperty ;

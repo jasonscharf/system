@@ -25,7 +25,7 @@ export {
 export type { EdgeCardinality, EdgeDef, EdgeDirection } from "./EdgeDef.js";
 export type { EdgeHandle, EdgeRef, EdgeSet } from "./EdgeHandle.js";
 export type { EntityRecord } from "./EntityRecord.js";
-export { type DefaultValue, EntitySchema } from "./EntitySchema.js";
+export { type DefaultValue, EntitySchema, type PropertyDef, propIri } from "./EntitySchema.js";
 export { EntityValidationError } from "./EntityValidationError.js";
 export type { FilterOp } from "./FilterOp.js";
 export { TernAggregate } from "./TernAggregate.js";

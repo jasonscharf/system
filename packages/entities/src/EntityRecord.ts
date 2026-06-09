@@ -30,4 +30,8 @@ export interface EntityRecord<Props extends Record<string, unknown> = Record<str
      * alongside `createdAt`.
      */
     updatedAt?: Date;
+    /** Schema version string (e.g. "2-a8bc4d6e") stamped at entity creation time. */
+    schemaVersion?: string;
+    /** Present when the entity's stored version differs from the current schema hash. */
+    drift?: { entityVersion: string; currentVersion: string };
 }

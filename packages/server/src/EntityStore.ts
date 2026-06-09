@@ -7,6 +7,7 @@ import type {
     EdgeSet,
     EntityRecord,
     EntitySchema,
+    PropertyDef,
 } from "@jasonscharf/entities";
 import {
     EntityValidationError,
@@ -14,6 +15,7 @@ import {
     fromLiteral,
     idFromIri,
     invertPropertyMap,
+    propIri,
     propertyMapFor,
     RDF_TYPE,
     toLiteral,
@@ -21,6 +23,12 @@ import {
 import { validate } from "@jasonscharf/gen";
 import type { CollectionViewOpts } from "./CollectionView.js";
 import { CollectionViewStore } from "./CollectionView.js";
+import {
+    type HydratedRecord,
+    SCHEMA_VERSION_PREDICATE,
+    SchemaRegistry,
+    type TraversalPlan,
+} from "./SchemaRegistry.js";
 import { buildServerContext, type ServerContext } from "./ServerContext.js";
 import { tenantGraph, tenantGraphForInsert } from "./tenancy.js";
 
@@ -29,7 +37,10 @@ import { tenantGraph, tenantGraphForInsert } from "./tenancy.js";
 export class EntityStore {
     private _cvsInstance: CollectionViewStore | null = null;
 
-    constructor(private readonly _store: TripleStore) {}
+    constructor(
+        private readonly _store: TripleStore,
+        private readonly _registry?: SchemaRegistry,
+    ) {}
 
     /** The underlying TripleStore — for raw quad access or EntityQuery builder. */
     get store(): TripleStore {
@@ -85,16 +96,31 @@ export class EntityStore {
         const edgeTargets = resolveEdgeTargets(schema, data);
 
         return this._withTrx(ctx, async (txCtx) => {
+            if (this._registry) {
+                await this._registry.ensureVersion(txCtx, schema);
+            }
+            const schemaVersion = this._registry?.currentVersion(schema);
             const graph = this._insertGraph(txCtx, schema);
-            await this._store.insertMany(txCtx, [
+            type InsertQuad = Parameters<TripleStore["insertMany"]>[1][number];
+            const quads: InsertQuad[] = [
                 { subject: ent, predicate: RDF_TYPE, object: schema.typeIRI, graph },
                 ...this._propQuads(ent, schema, withDefs, graph),
                 ...edgeQuads(ent, edgeTargets, graph),
-            ]);
+            ];
+            if (schemaVersion) {
+                quads.push({
+                    subject: ent,
+                    predicate: SCHEMA_VERSION_PREDICATE,
+                    object: toLiteral(schemaVersion),
+                    graph,
+                });
+            }
+            await this._store.insertMany(txCtx, quads);
             const record: EntityRecord<Props> = {
                 id,
                 iri: ent.value,
                 props: pickProps(schema, withDefs) as Props,
+                schemaVersion,
             };
             const edges = this._buildEdgeHandles(schema, edgeTargetMap(schema, edgeTargets));
             if (edges) {
@@ -144,17 +170,16 @@ export class EntityStore {
         this._validate(schema, patch);
 
         const ent = entityIriFor(schema, id);
-        const patchEntries = Object.entries(patch).filter(
-            ([propName]) => !!(schema.properties as Record<string, IRI>)[propName],
-        );
+        const props = schema.properties as Record<string, IRI | PropertyDef>;
+        const patchEntries = Object.entries(patch).filter(([propName]) => !!props[propName]);
         const edgeTargets = resolveEdgeTargets(schema, patch);
         const predIris = [
             ...patchEntries.map(([propName]) => {
-                const iri = (schema.properties as Record<string, IRI>)[propName];
-                if (iri == null) {
+                const p = props[propName];
+                if (p == null) {
                     throw new Error(`EntityStore.update: missing IRI for property "${propName}"`);
                 }
-                return iri;
+                return propIri(p);
             }),
             ...edgeTargets.map((e) => e.predicate),
         ];
@@ -169,15 +194,15 @@ export class EntityStore {
                 ...patchEntries
                     .filter(([, value]) => value !== undefined)
                     .map(([propName, value]) => {
-                        const propIri = (schema.properties as Record<string, IRI>)[propName];
-                        if (propIri == null) {
+                        const p = props[propName];
+                        if (p == null) {
                             throw new Error(
                                 `EntityStore.update: missing IRI for property "${propName}"`,
                             );
                         }
                         return {
                             subject: ent,
-                            predicate: propIri,
+                            predicate: propIri(p),
                             object: toLiteral(value),
                             graph: insertGraph,
                         };
@@ -266,14 +291,14 @@ export class EntityStore {
         prop: string,
     ): Promise<unknown[]> {
         return this._withTrx(ctx, async (txCtx) => {
-            const propIri = (schema.properties as Record<string, IRI>)[prop];
-            if (!propIri) {
+            const propDef = (schema.properties as Record<string, IRI | PropertyDef>)[prop];
+            if (!propDef) {
                 return [];
             }
             const ent = entityIriFor(schema, id);
             const quads = await this._store.findOrdered(txCtx, {
                 subject: ent,
-                predicate: propIri,
+                predicate: propIri(propDef),
                 graph: this._filterGraph(txCtx, schema),
             });
             return quads.map((q) => fromLiteral(q.object)).filter((v) => v !== undefined);
@@ -287,22 +312,22 @@ export class EntityStore {
         prop: string,
         ...values: unknown[]
     ): Promise<void> {
-        const propIri = (schema.properties as Record<string, IRI>)[prop];
-        if (!propIri) {
+        const propDef = (schema.properties as Record<string, IRI | PropertyDef>)[prop];
+        if (!propDef) {
             throw new Error(`Property '${prop}' not found in schema`);
         }
-
+        const predIri = propIri(propDef);
         const ent = entityIriFor(schema, id);
 
         return this._withTrx(ctx, async (txCtx) => {
             const graph = this._insertGraph(txCtx, schema);
-            const viewIris = await this._cvs().findViewsForSource(txCtx, ent.value, propIri.value);
+            const viewIris = await this._cvs().findViewsForSource(txCtx, ent.value, predIri.value);
 
             await this._store.insertMany(
                 txCtx,
                 values.map((v) => ({
                     subject: ent,
-                    predicate: propIri,
+                    predicate: predIri,
                     object: toLiteral(v),
                     graph,
                 })),
@@ -322,18 +347,18 @@ export class EntityStore {
         prop: string,
         value: unknown,
     ): Promise<boolean> {
-        const propIri = (schema.properties as Record<string, IRI>)[prop];
-        if (!propIri) {
+        const propDef = (schema.properties as Record<string, IRI | PropertyDef>)[prop];
+        if (!propDef) {
             return false;
         }
-
+        const predIri = propIri(propDef);
         const ent = entityIriFor(schema, id);
 
         let deleted = false;
         await this._withTrx(ctx, async (txCtx) => {
             const count = await this._store.delete(txCtx, {
                 subject: ent,
-                predicate: propIri,
+                predicate: predIri,
                 object: toLiteral(value),
                 graph: this._filterGraph(txCtx, schema),
             });
@@ -342,7 +367,7 @@ export class EntityStore {
                 const viewIris = await this._cvs().findViewsForSource(
                     txCtx,
                     ent.value,
-                    propIri.value,
+                    predIri.value,
                 );
                 for (const vIri of viewIris) {
                     await this._cvs().removeItem(txCtx, vIri, String(value));
@@ -376,11 +401,11 @@ export class EntityStore {
         prop: string,
         values: unknown[],
     ): Promise<void> {
-        const propIri = (schema.properties as Record<string, IRI>)[prop];
-        if (!propIri) {
+        const propDef = (schema.properties as Record<string, IRI | PropertyDef>)[prop];
+        if (!propDef) {
             throw new Error(`Property '${prop}' not found in schema`);
         }
-
+        const predIri = propIri(propDef);
         const ent = entityIriFor(schema, id);
 
         return this._withTrx(ctx, async (txCtx) => {
@@ -388,7 +413,7 @@ export class EntityStore {
             const insertGraph = this._insertGraph(txCtx, schema);
             await this._store.delete(txCtx, {
                 subject: ent,
-                predicate: propIri,
+                predicate: predIri,
                 graph: filterGraph,
             });
             if (values.length > 0) {
@@ -396,13 +421,13 @@ export class EntityStore {
                     txCtx,
                     values.map((v) => ({
                         subject: ent,
-                        predicate: propIri,
+                        predicate: predIri,
                         object: toLiteral(v),
                         graph: insertGraph,
                     })),
                 );
             }
-            const viewIris = await this._cvs().findViewsForSource(txCtx, ent.value, propIri.value);
+            const viewIris = await this._cvs().findViewsForSource(txCtx, ent.value, predIri.value);
             for (const vIri of viewIris) {
                 await this._cvs().sync(txCtx, vIri, values.map(String));
             }
@@ -434,16 +459,16 @@ export class EntityStore {
         prop: string,
         opts: CollectionViewOpts = {},
     ): Promise<string> {
-        const propIri = (schema.properties as Record<string, IRI>)[prop];
-        if (!propIri) {
+        const propDef = (schema.properties as Record<string, IRI | PropertyDef>)[prop];
+        if (!propDef) {
             throw new Error(`Property '${prop}' not found in schema`);
         }
-
+        const predIri = propIri(propDef);
         const ent = entityIriFor(schema, id);
 
         return this._withTrx(ctx, async (txCtx) => {
             const currentRefs = (await this.collectionGet(txCtx, schema, id, prop)).map(String);
-            return this._cvs().create(txCtx, ent.value, propIri.value, currentRefs, opts);
+            return this._cvs().create(txCtx, ent.value, predIri.value, currentRefs, opts);
         });
     }
 
@@ -535,6 +560,55 @@ export class EntityStore {
         return result;
     }
 
+    /**
+     * Executes a traversal plan against a set of root records, loading related
+     * entities in one batch per depth level.  Returns HydratedRecord[] with a
+     * `related` map keyed by edge name.  Absent edge targets are null.
+     */
+    async hydrateWithPlan<Props extends Record<string, unknown>>(
+        ctx: ServerContext,
+        records: EntityRecord<Props>[],
+        plan: TraversalPlan,
+    ): Promise<HydratedRecord<Props>[]> {
+        const result: HydratedRecord<Props>[] = records.map((r) => ({
+            ...r,
+            related: {} as Record<string, EntityRecord | null>,
+        }));
+
+        for (const step of plan.steps) {
+            const allIris = new Set<string>();
+            for (const r of result) {
+                const handle = r.edges?.[step.edgeName];
+                if (!handle) {
+                    continue;
+                }
+                const iris = "iris" in handle ? handle.iris : [handle.iri];
+                for (const iri of iris) {
+                    allIris.add(iri);
+                }
+            }
+
+            const loaded = await this.hydrateMany(ctx, step.targetSchema, [...allIris]);
+            const byIri = new Map(loaded.map((r) => [r.iri, r]));
+
+            for (const r of result) {
+                const handle = r.edges?.[step.edgeName];
+                if (step.cardinality === "one") {
+                    const iri = handle
+                        ? ("iri" in handle ? handle.iri : handle.iris[0])
+                        : undefined;
+                    r.related[step.edgeName] = iri ? (byIri.get(iri) ?? null) : null;
+                } else {
+                    const iris = handle && "iris" in handle ? handle.iris : [];
+                    const targets = iris.map((iri) => byIri.get(iri) ?? null).filter(Boolean) as EntityRecord[];
+                    r.related[step.edgeName] = targets.length > 0 ? (targets as unknown as EntityRecord) : null;
+                }
+            }
+        }
+
+        return result;
+    }
+
     // ── Private ───────────────────────────────────────────────────────────────
 
     private _cvs(): CollectionViewStore {
@@ -565,14 +639,19 @@ export class EntityStore {
         quads: Quad[],
         timestamps?: EntityTimestamps,
     ): EntityRecord<Props> {
-        const iriToName = invertPropertyMap(schema.properties as Record<string, IRI>);
+        const iriToName = invertPropertyMap(schema.properties);
         const edgePredToName = outEdgePredMap(schema);
 
         const raw: Record<string, unknown[]> = {};
         const edgeTargets: Record<string, string[]> = {};
+        let schemaVersion: string | undefined;
         for (const q of quads) {
             const predStr = (q.predicate as IRI).value;
             if (predStr === RDF_TYPE.value) {
+                continue;
+            }
+            if (predStr === SCHEMA_VERSION_PREDICATE.value) {
+                schemaVersion = String(fromLiteral(q.object));
                 continue;
             }
             const edgeName = edgePredToName.get(predStr);
@@ -602,7 +681,7 @@ export class EntityStore {
             props[k] = vals.length === 1 ? vals[0] : vals;
         }
 
-        const record: EntityRecord<Props> = { id, iri: entIri, props: props as Props };
+        const record: EntityRecord<Props> = { id, iri: entIri, props: props as Props, schemaVersion };
         const edges = this._buildEdgeHandles(schema, edgeTargets);
         if (edges) {
             record.edges = edges;
@@ -610,6 +689,12 @@ export class EntityStore {
         if (timestamps) {
             record.createdAt = timestamps.createdAt;
             record.updatedAt = timestamps.updatedAt;
+        }
+        if (schemaVersion !== undefined && this._registry) {
+            const current = this._registry.currentVersion(schema);
+            if (!current.startsWith("0-") && schemaVersion !== current) {
+                record.drift = { entityVersion: schemaVersion, currentVersion: current };
+            }
         }
         return record;
     }
@@ -678,16 +763,17 @@ export class EntityStore {
         graph: IRI | DefaultGraph = DEFAULT_GRAPH,
     ) {
         const results: Parameters<TripleStore["insert"]>[1][] = [];
-        for (const [propName, propIri] of Object.entries(schema.properties)) {
+        for (const [propName, propValue] of Object.entries(schema.properties as Record<string, IRI | PropertyDef>)) {
             const value = data[propName];
             if (value === undefined || value === null) {
                 continue;
             }
+            const predIri = propIri(propValue);
             if (Array.isArray(value)) {
                 for (const v of value) {
                     results.push({
                         subject: ent,
-                        predicate: propIri as IRI,
+                        predicate: predIri,
                         object: toLiteral(v),
                         graph,
                     });
@@ -695,7 +781,7 @@ export class EntityStore {
             } else {
                 results.push({
                     subject: ent,
-                    predicate: propIri as IRI,
+                    predicate: predIri,
                     object: toLiteral(value),
                     graph,
                 });
@@ -728,7 +814,7 @@ export class EntityStore {
         const result = validate(
             data,
             schema.shape,
-            propertyMapFor(schema.properties as Record<string, IRI>),
+            propertyMapFor(schema.properties),
         );
         if (!result.valid) {
             throw new EntityValidationError(result.violations);

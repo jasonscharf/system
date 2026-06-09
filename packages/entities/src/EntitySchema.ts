@@ -5,6 +5,16 @@ import type { EdgeDef } from "./EdgeDef.js";
 export type DefaultValue<T> = T | (() => T);
 
 /**
+ * Full property declaration including the predicate IRI and optional XSD range.
+ * The range IRI is included in the schema version hash, so changing it produces
+ * a new version.  Use a bare IRI for untyped properties (range absent from hash).
+ */
+export interface PropertyDef {
+    iri: IRI;
+    range?: IRI;
+}
+
+/**
  * Describes an entity type: its RDF class IRI, namespace, property→IRI map,
  * optional defaults, and optional SHACL shape for write-time validation.
  *
@@ -20,7 +30,12 @@ export class EntitySchema<Props extends Record<string, unknown> = Record<string,
      * stored convention differs (e.g. UserGroup → "group", PolicyGrant → "grant").
      */
     readonly idSegment?: string;
-    readonly properties: { readonly [K in keyof Props]: IRI };
+    /**
+     * Properties accept either a bare IRI (predicate only) or a PropertyDef
+     * { iri, range? } that also carries the XSD datatype.  Both forms are valid;
+     * the range is only used for schema versioning and snapshot storage.
+     */
+    readonly properties: { readonly [K in keyof Props]: IRI | PropertyDef };
     /**
      * Topological relationships — edges whose object is another entity's IRI.
      * These replace foreign-key scalars (`domainId`, `tenantId`, `parentIri`…):
@@ -48,7 +63,7 @@ export class EntitySchema<Props extends Record<string, unknown> = Record<string,
         typeIRI: IRI;
         ns: string;
         idSegment?: string;
-        properties: { readonly [K in keyof Props]: IRI };
+        properties: { readonly [K in keyof Props]: IRI | PropertyDef };
         edges?: Readonly<Record<string, EdgeDef>>;
         defaults?: { readonly [K in keyof Props]?: DefaultValue<Props[K]> };
         shape?: ShaclNodeShape;
@@ -65,4 +80,9 @@ export class EntitySchema<Props extends Record<string, unknown> = Record<string,
         this.graphIri = opts.graphIri;
         this.graph = opts.graph;
     }
+}
+
+/** Extract the predicate IRI from either a bare IRI or a PropertyDef. */
+export function propIri(prop: IRI | PropertyDef): IRI {
+    return "iri" in prop ? prop.iri : (prop as IRI);
 }

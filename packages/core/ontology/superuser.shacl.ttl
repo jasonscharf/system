@@ -1,0 +1,19 @@
+# Tern Superuser SHACL Shapes
+# Namespace: urn:sys:core:superuser:shapes/
+
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix su:  <urn:sys:core:superuser:> .
+@prefix sus: <urn:sys:core:superuser:shapes/> .
+
+sus:SuperuserShape a sh:NodeShape ;
+    sh:targetClass su:Superuser ;
+    sh:property [
+        sh:path su:user ;
+        sh:nodeKind sh:IRI
+    ] ;
+    sh:property [
+        sh:path su:grantedAt ;
+        sh:datatype xsd:dateTime ;
+        sh:maxCount 1
+    ] .

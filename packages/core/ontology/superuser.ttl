@@ -1,0 +1,33 @@
+# Tern Superuser Ontology — Turtle format
+# Namespace: urn:sys:core:superuser:
+#
+# Platform-level superuser membership.  A single Superuser node acts as a
+# membership set; each superuser is linked via a superuser:user edge (one
+# triple per member), keeping the membership scannable without a type-scan
+# across all users.
+
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix su:   <urn:sys:core:superuser:> .
+@prefix auth: <urn:sys:core:auth:> .
+
+# ── Class ─────────────────────────────────────────────────────────────────────
+
+su:Superuser a owl:Class ;
+    rdfs:comment "Singleton membership set node that tracks platform superusers." .
+
+# ── Object properties ─────────────────────────────────────────────────────────
+
+su:user a owl:ObjectProperty ;
+    rdfs:domain su:Superuser ;
+    rdfs:range  auth:User ;
+    rdfs:comment "A user who holds superuser privileges (one triple per superuser)." .
+
+# ── Data properties ───────────────────────────────────────────────────────────
+
+su:grantedAt a owl:DatatypeProperty ;
+    rdfs:domain su:Superuser ;
+    rdfs:range  xsd:dateTime ;
+    rdfs:comment "Timestamp when superuser access was most recently granted." .

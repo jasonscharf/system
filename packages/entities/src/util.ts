@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 import type { Literal } from "@jasonscharf/core";
 import { IRI, literal, makeUri } from "@jasonscharf/core";
 import { XSD_BOOLEAN, XSD_DATETIME, XSD_DECIMAL, XSD_INTEGER, XSD_STRING } from "./constants.js";
+import type { PropertyDef } from "./EntitySchema.js";
+import { propIri } from "./EntitySchema.js";
 
 export function newId(): string {
     return randomBytes(16).toString("hex");
@@ -92,11 +94,11 @@ export function fromLiteral(term: unknown): unknown {
 }
 
 /** Build a Record<propName, iriString> reverse-lookup from an EntitySchema.properties map. */
-export function invertPropertyMap(props: Record<string, IRI>): Map<string, string> {
-    return new Map(Object.entries(props).map(([name, iri]) => [iri.value, name]));
+export function invertPropertyMap(props: Record<string, IRI | PropertyDef>): Map<string, string> {
+    return new Map(Object.entries(props).map(([name, p]) => [propIri(p).value, name]));
 }
 
 /** Build the propertyMap format expected by validate(): propName → IRI string. */
-export function propertyMapFor(props: Record<string, IRI>): Record<string, string> {
-    return Object.fromEntries(Object.entries(props).map(([name, iri]) => [name, iri.value]));
+export function propertyMapFor(props: Record<string, IRI | PropertyDef>): Record<string, string> {
+    return Object.fromEntries(Object.entries(props).map(([name, p]) => [name, propIri(p).value]));
 }

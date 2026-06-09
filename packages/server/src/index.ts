@@ -11,6 +11,17 @@ export type { FilterOp } from "./EntityQuery.js";
 export { EntityQuery } from "./EntityQuery.js";
 export type { EdgeInput, EntityInput } from "./EntityStore.js";
 export { EntityStore } from "./EntityStore.js";
+export {
+    SCHEMA_VERSION_PREDICATE,
+    SchemaRegistry,
+    type EdgeDescriptor,
+    type HydratedRecord,
+    type PropertyDescriptor,
+    type TraversalPlan,
+    type TraversalStep,
+    type TypeSnapshot,
+    type TypeVersion,
+} from "./SchemaRegistry.js";
 export { EntityValidationError } from "./EntityValidationError.js";
 export { GraphQuery, type AttachUnder } from "./GraphQuery.js";
 export { registerTopology, containmentPredicates, scopeChainFor } from "./topology.js";

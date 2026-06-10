@@ -1,4 +1,4 @@
-import { makeUri, NS_ROOT } from "@jasonscharf/core";
+import { makeUri, NS_CORE } from "@jasonscharf/core";
 import type { Knex } from "knex";
 import { C, T } from "../schema.js";
 
@@ -17,7 +17,7 @@ import { C, T } from "../schema.js";
  * are predictable and importable as constants without a DB lookup.
  */
 
-const RBAC_NS = makeUri(NS_ROOT, "rbac");
+const RBAC_NS = makeUri(NS_CORE, "rbac");
 const RBAC_GRAPH_IRI = makeUri(RBAC_NS, "graph");
 const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 const XSD_STRING = "http://www.w3.org/2001/XMLSchema#string";

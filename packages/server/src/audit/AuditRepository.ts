@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { IRI, literal, type Quad } from "@jasonscharf/core";
+import { IRI, literal, makeUri, type Quad } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import type { SecurityContext } from "../SecurityContext.js";
 import type { ServerContext } from "../ServerContext.js";
@@ -65,7 +65,7 @@ export class AuditRepository {
         args: RecordAuditArgs,
     ): Promise<AuditEntry> {
         const id = randomBytes(16).toString("hex");
-        const subject = new IRI(`${AUDIT_NS}event:${id}`);
+        const subject = new IRI(makeUri(AUDIT_NS, "event", id));
         const at = new Date();
 
         const quads: Quad[] = [

@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { IRI } from "@jasonscharf/core";
+import { IRI, makeUri } from "@jasonscharf/core";
 import { CONVOS_NS } from "../constants.js";
 
 export type ConvosEntityType =
@@ -18,7 +18,7 @@ export function newId(): string {
 }
 
 export function iriFor(type: ConvosEntityType, id: string): IRI {
-    return new IRI(`${CONVOS_NS}${type}:${id}`);
+    return new IRI(makeUri(CONVOS_NS, type, id));
 }
 
 export function idFrom(iriStr: string): string {

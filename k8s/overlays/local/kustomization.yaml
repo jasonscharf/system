@@ -18,8 +18,8 @@ configMapGenerator:
   - name: server-config
     behavior: replace
     literals:
-      - TERN_DB_CLIENT=sqlite
-      - TERN_DB_PATH=/data/tern.db
+      - SYS_DB_CLIENT=sqlite
+      - SYS_DB_PATH=/data/tern.db
       - REDIS_URL=redis://redis:6379
       - AUTH_BASE_URL=http://localhost:8081
 

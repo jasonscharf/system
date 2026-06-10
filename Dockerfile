@@ -1,5 +1,5 @@
 #
-# Multi-stage Dockerfile for all Tern services.
+# Multi-stage Dockerfile for all services.
 #
 # Targets:
 #   base       — deps installed + all packages compiled (shared layer)

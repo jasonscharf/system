@@ -1,7 +1,7 @@
 /**
  * RBAC integration tests.
  *
- * Every suite runs against both SQLite (always) and Postgres (when TERN_PG_URL
+ * Every suite runs against both SQLite (always) and Postgres (when SYS_PG_URL
  * is set), each in a rolled-back transaction for clean isolation.
  *
  * Scenarios are drawn from a fictional B2B SaaS called "Tern Cloud" with two
@@ -45,8 +45,8 @@ const providers: DbProvider[] = [
     },
 ];
 
-if (process.env.TERN_PG_URL) {
-    const url = new URL(process.env.TERN_PG_URL);
+if (process.env.SYS_PG_URL) {
+    const url = new URL(process.env.SYS_PG_URL);
     providers.push({
         name: "Postgres",
         create: () =>
@@ -1699,15 +1699,32 @@ for (const provider of providers) {
 
 // ── Migration down() ──────────────────────────────────────────────────────────
 
-describe("migration 004 down()", () => {
-    it("soft-deletes all RBAC edges and leaves a clean slate for re-migration", async () => {
-        const { up, down } = await import("../../../data/src/migrations/004_rbac.js");
-        const knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
+describe("migration 001_init down()", () => {
+    it("drops all tables and data; up() restores a working system", async () => {
+        const { up, down } = await import("../../../data/src/migrations/001_init.js");
+
+        const { default: Knex } = await import("knex");
+        const knex = Knex({
+            client: "better-sqlite3",
+            connection: { filename: ":memory:" },
+            useNullAsDefault: true,
+            pool: { min: 1, max: 1 },
+        });
+
         await up(knex);
 
-        // After down() all RBAC edges are soft-deleted — the checker finds nothing
-        await down(knex);
+        // Verify tables exist before down()
+        await expect(knex("edges").count()).resolves.toBeDefined();
 
+        // down() drops all tables
+        await down(knex);
+        await expect(knex("edges").count()).rejects.toThrow();
+
+        // up() rebuilds everything from scratch
+        await expect(up(knex)).resolves.toBeUndefined();
+        await expect(knex("edges").count()).resolves.toBeDefined();
+
+        // RBAC is functional again after restore
         const store = new TripleStore(knex);
         const grants = new PolicyGrantRepository(store);
         const checker = new AccessChecker(store, grants);
@@ -1715,10 +1732,7 @@ describe("migration 004 down()", () => {
             principal: ALICE,
             permission: "anything",
         });
-        expect(allowed).toBe(false);
-
-        // Re-seeding after down() completes without error (idempotent restore)
-        await expect(up(knex)).resolves.toBeUndefined();
+        expect(allowed).toBe(false); // ALICE not in superusers — correctly denied
 
         await knex.destroy();
     });

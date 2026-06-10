@@ -19,7 +19,7 @@ import type { ISecretsProvider } from "./ISecretsProvider.js";
  * ─────
  *   // At application startup:
  *   const secrets = SecretsManager.fromEnvironment();
- *   const dbPass  = await secrets.getRequired('TERN_PG_PASSWORD');
+ *   const dbPass  = await secrets.getRequired('SYS_PG_PASSWORD');
  *
  *   // Or inject a specific provider (e.g. in tests):
  *   const secrets = new SecretsManager(new InMemorySecretsProvider({ FOO: 'bar' }));

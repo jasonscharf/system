@@ -1,7 +1,7 @@
 /**
  * Audit trail integration tests.
  *
- * Runs against SQLite (always) and Postgres (when TERN_PG_URL is set), each in
+ * Runs against SQLite (always) and Postgres (when SYS_PG_URL is set), each in
  * a rolled-back transaction for clean isolation.
  */
 
@@ -28,8 +28,8 @@ const providers: DbProvider[] = [
     },
 ];
 
-if (process.env.TERN_PG_URL) {
-    const url = new URL(process.env.TERN_PG_URL);
+if (process.env.SYS_PG_URL) {
+    const url = new URL(process.env.SYS_PG_URL);
     providers.push({
         name: "Postgres",
         create: () =>

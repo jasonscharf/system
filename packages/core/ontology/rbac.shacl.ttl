@@ -7,6 +7,10 @@
 @prefix rbac:   <urn:sys:core:rbac:> .
 @prefix shapes: <urn:sys:core:rbac:shapes:> .
 
+shapes:InstallShape a sh:NodeShape ;
+    sh:targetClass rbac:Install ;
+    sh:property [ sh:path rbac:hasTenant ; sh:minCount 0 ] .
+
 shapes:UserGroupShape a sh:NodeShape ;
     sh:targetClass rbac:UserGroup ;
     sh:property [ sh:path rbac:isInTenant ; sh:maxCount 1 ] .

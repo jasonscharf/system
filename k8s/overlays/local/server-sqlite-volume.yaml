@@ -1,5 +1,5 @@
 # Patch: add a persistent volume for SQLite data so it survives pod restarts.
-# Remove this patch entirely to use :memory: (TERN_DB_PATH from configMapGenerator).
+# Remove this patch entirely to use :memory: (SYS_DB_PATH from configMapGenerator).
 apiVersion: apps/v1
 kind: Deployment
 metadata:

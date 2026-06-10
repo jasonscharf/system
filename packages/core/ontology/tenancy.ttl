@@ -8,6 +8,7 @@
 #
 # Relationships:
 #   Organization → Tenant  via orgTenant
+#   Organization → Domain  via hasDomain
 #   Domain       → Tenant  via domainTenant
 
 @prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -42,6 +43,11 @@ tenancy:hasMember a owl:ObjectProperty ;
     rdfs:domain tenancy:Organization ;
     rdfs:range <urn:sys:core:auth:User> ;
     rdfs:comment "Outward edge: an Organization contains a member User (org→user)." .
+
+tenancy:hasDomain a owl:ObjectProperty ;
+    rdfs:domain tenancy:Organization ;
+    rdfs:range tenancy:Domain ;
+    rdfs:comment "Outward edge: an Organization owns a registered Domain (org→domain)." .
 
 tenancy:hasLicense a owl:ObjectProperty ;
     rdfs:domain tenancy:Tenant ;

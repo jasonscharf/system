@@ -5,7 +5,7 @@ import {
     inheritsFromIRI,
     isMemberOfIRI,
     permissionKeyIRI,
-    rbacGrantsIRI,
+    grantsIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import { systemSec } from "../SecurityContext.js";
@@ -197,7 +197,7 @@ export class AccessChecker {
             );
             for (const quads of bySubject.values()) {
                 for (const q of quads) {
-                    if ((q.predicate as IRI).value === rbacGrantsIRI.value) {
+                    if ((q.predicate as IRI).value === grantsIRI.value) {
                         const permIri = iriValue(q.object);
                         if (permIri) {
                             permIris.add(permIri);

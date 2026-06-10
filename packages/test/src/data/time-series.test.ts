@@ -16,7 +16,7 @@
  *   - stats() reports active edge count and total (including deleted)
  *   - Timestamps are in UTC with timezone
  *
- * All suites run against SQLite always and Postgres when TERN_PG_URL is set,
+ * All suites run against SQLite always and Postgres when SYS_PG_URL is set,
  * inside rolled-back transactions so the schema stays clean.
  */
 
@@ -69,8 +69,8 @@ const providers: DbProvider[] = [
     { name: "SQLite", create: () => createDataContext({ client: "sqlite", filename: ":memory:" }) },
 ];
 
-if (process.env.TERN_PG_URL) {
-    const url = new URL(process.env.TERN_PG_URL);
+if (process.env.SYS_PG_URL) {
+    const url = new URL(process.env.SYS_PG_URL);
     providers.push({
         name: "Postgres",
         create: () =>
@@ -93,7 +93,7 @@ function parseJson(v: unknown): Record<string, unknown> {
 // ── Direct table helpers (bypass TripleStore public API) ──────────────────────
 
 async function countEdges(knex: Knex, includeDeleted = false): Promise<number> {
-    let q = knex("tern_edges");
+    let q = knex("edges");
     if (!includeDeleted) {
         q = q.where("is_deleted", false);
     }
@@ -102,12 +102,12 @@ async function countEdges(knex: Knex, includeDeleted = false): Promise<number> {
 }
 
 async function countNodes(knex: Knex): Promise<number> {
-    const [row] = await knex("tern_nodes").count<[{ count: number }]>("id as count");
+    const [row] = await knex("nodes").count<[{ count: number }]>("id as count");
     return Number(row?.count);
 }
 
 async function _getEdgeRow(knex: Knex, id: number) {
-    return knex("tern_edges").where("id", id).first<{
+    return knex("edges").where("id", id).first<{
         is_deleted: boolean;
         deleted_at: string | null;
         created_at: string;
@@ -116,7 +116,7 @@ async function _getEdgeRow(knex: Knex, id: number) {
 }
 
 async function getLiteralNode(knex: Knex, value: string) {
-    return knex("tern_nodes").where({ kind: "literal", value }).first<{
+    return knex("nodes").where({ kind: "literal", value }).first<{
         id: number;
         value: string;
         datatype: string;
@@ -127,18 +127,13 @@ async function getLiteralNode(knex: Knex, value: string) {
 }
 
 async function getEdgeById(knex: Knex, subjectIri: string) {
-    // Find the internal node ID for the subject IRI, then find its edges
-    const name = await knex("tern_names").where("iri", subjectIri).first<{ id: number }>();
-    if (!name) {
-        return [];
-    }
-    const node = await knex("tern_nodes")
-        .where({ kind: "iri", name_id: name.id })
+    const node = await knex("nodes")
+        .where({ kind: "iri", iri: subjectIri })
         .first<{ id: number }>();
     if (!node) {
         return [];
     }
-    return knex("tern_edges").where("subject", node.id).select("*");
+    return knex("edges").where("subject", node.id).select("*");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -169,9 +164,8 @@ for (const db of providers) {
             await store.ensureNode(ctx, EX("foo"));
             const after = Date.now();
 
-            const row = await trx("tern_nodes")
-                .join("tern_names", "tern_nodes.name_id", "tern_names.id")
-                .where("tern_names.iri", "http://example.org/foo")
+            const row = await trx("nodes")
+                .where({ kind: "iri", iri: "http://example.org/foo" })
                 .first<{ created_at: string; updated_at: string }>();
 
             expect(row).toBeDefined();
@@ -190,8 +184,8 @@ for (const db of providers) {
 
         it("blank nodes have created_at", async () => {
             await store.ensureNode(ctx, blank("b1"));
-            const row = await trx("tern_nodes")
-                .where({ kind: "blank", blank: "b1" })
+            const row = await trx("nodes")
+                .where({ kind: "blank", blank_id: "b1" })
                 .first<{ created_at: string }>();
             expect(row?.created_at).toBeTruthy();
         });
@@ -356,6 +350,7 @@ for (const db of providers) {
         });
 
         it("insert is idempotent: duplicate active quad is not written twice", async () => {
+            const base = await countEdges(trx as unknown as Knex);
             await store.insert(ctx, {
                 subject: EX("s"),
                 predicate: TYPE,
@@ -368,7 +363,7 @@ for (const db of providers) {
                 object: EX("T"),
                 graph: GRAPH,
             });
-            expect(await countEdges(trx as unknown as Knex)).toBe(1);
+            expect(await countEdges(trx as unknown as Knex) - base).toBe(1);
         });
     });
 
@@ -445,6 +440,7 @@ for (const db of providers) {
         });
 
         it("stats().edges counts only active edges; edgesTotal includes deleted", async () => {
+            const base = await store.stats(ctx);
             await store.insert(ctx, {
                 subject: EX("s"),
                 predicate: TYPE,
@@ -460,8 +456,8 @@ for (const db of providers) {
             await store.delete(ctx, { subject: EX("s") });
 
             const s = await store.stats(ctx);
-            expect(s.edges).toBe(1); // only EX('u') is active
-            expect(s.edgesTotal).toBe(2); // both rows exist in the table
+            expect(s.edges - base.edges).toBe(1); // only EX('u') is active
+            expect(s.edgesTotal - base.edgesTotal).toBe(2); // both rows exist in the table
         });
 
         it("delete returns 0 when no active edge matches", async () => {
@@ -470,6 +466,7 @@ for (const db of providers) {
         });
 
         it("soft-deleting already-deleted edges does not double-count", async () => {
+            const base = await countEdges(trx as unknown as Knex, true);
             await store.insert(ctx, {
                 subject: EX("s"),
                 predicate: TYPE,
@@ -479,7 +476,7 @@ for (const db of providers) {
             await store.delete(ctx, { subject: EX("s") });
             const count2 = await store.delete(ctx, { subject: EX("s") });
             expect(count2).toBe(0); // already deleted, no active edges remain
-            expect(await countEdges(trx as unknown as Knex, true)).toBe(1); // still only one row total
+            expect(await countEdges(trx as unknown as Knex, true) - base).toBe(1); // still only one row total
         });
     });
 
@@ -602,7 +599,7 @@ for (const db of providers) {
             });
             await store.delete(ctx, { subject: EX("a") });
 
-            const history = await store.findHistory(ctx);
+            const history = await store.findHistory(ctx, { graph: GRAPH });
             expect(history).toHaveLength(2);
         });
     });
@@ -649,8 +646,8 @@ for (const db of providers) {
 
             await store.deleteSubjects(ctx, [EX("p1"), EX("p2")]);
 
-            const active = await store.find(ctx);
-            const history = await store.findHistory(ctx);
+            const active = await store.find(ctx, { graph: null });
+            const history = await store.findHistory(ctx, { graph: null });
 
             expect(active).toHaveLength(1); // only p3 survives
             expect(history).toHaveLength(3); // all rows still in DB
@@ -1113,11 +1110,8 @@ for (const db of providers) {
                 graph: DEFAULT_GRAPH,
             });
 
-            const name = await (trx as unknown as Knex)("tern_names")
-                .where("iri", "http://example.org/s")
-                .first<{ id: number }>();
-            const node = await (trx as unknown as Knex)("tern_nodes")
-                .where({ kind: "iri", name_id: name?.id })
+            const node = await (trx as unknown as Knex)("nodes")
+                .where({ kind: "iri", iri: "http://example.org/s" })
                 .first<{ created_at: string; updated_at: string }>();
 
             expect(node?.created_at).toBeTruthy();
@@ -1196,37 +1190,3 @@ for (const db of providers) {
     });
 }
 
-// ── Migration 002 down/up ─────────────────────────────────────────────────────
-
-describe("migration 002_time_series down()", () => {
-    it("rolls back all new columns cleanly", async () => {
-        const { up: up001 } = await import("../../../data/src/migrations/001_init.js");
-        const { up: up002, down: down002 } = await import(
-            "../../../data/src/migrations/002_time_series.js"
-        );
-
-        const { default: Knex } = await import("knex");
-        const knex = Knex({
-            client: "better-sqlite3",
-            connection: { filename: ":memory:" },
-            useNullAsDefault: true,
-        });
-
-        await up001(knex);
-        await up002(knex);
-
-        // Verify new columns exist
-        const colsAfterUp = await knex("tern_edges").columnInfo();
-        expect(colsAfterUp).toHaveProperty("is_deleted");
-        expect(colsAfterUp).toHaveProperty("created_at");
-
-        await down002(knex);
-
-        // Verify new columns are gone
-        const colsAfterDown = await knex("tern_edges").columnInfo();
-        expect(colsAfterDown).not.toHaveProperty("is_deleted");
-        expect(colsAfterDown).not.toHaveProperty("created_at");
-
-        await knex.destroy();
-    });
-});

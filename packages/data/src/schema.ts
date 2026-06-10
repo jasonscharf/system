@@ -1,28 +1,24 @@
 /** Table and column names — single source of truth for the triple store schema. */
 
 export const T = {
-    namespaces: "tern_namespaces",
-    names: "tern_names",
-    nodes: "tern_nodes",
-    edges: "tern_edges",
+    namespaces: "namespaces",
+    nodes: "nodes",
+    edges: "edges",
 } as const;
 
 export const C = {
     id: "id",
     // namespaces
     prefix: "prefix",
+    // namespaces + nodes (IRI kind)
     iri: "iri",
-    // names
-    namespaceId: "namespace_id",
-    localName: "local_name",
     // nodes
     kind: "kind",
-    nameId: "name_id",
-    blank: "blank",
+    blankId: "blank_id",
     value: "value",
     datatype: "datatype",
     lang: "lang",
-    valueJson: "value_json", // JSONB (Postgres) / JSON text (SQLite) for literal nodes
+    valueJson: "value_json",
     // edges
     subject: "subject",
     predicate: "predicate",
@@ -35,6 +31,9 @@ export const C = {
     isDeleted: "is_deleted",
     deletedAt: "deleted_at",
 } as const;
+
+/** Well-known IRI used as the graph node for quads in the RDF default graph. */
+export const DEFAULT_GRAPH_IRI = "urn:sys:graph:default";
 
 export type NodeKind = "iri" | "blank" | "literal";
 

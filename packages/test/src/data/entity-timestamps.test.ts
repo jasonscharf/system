@@ -11,7 +11,7 @@
  * structural correctness (presence, batching, graph scoping, soft-delete
  * exclusion, updatedAt >= createdAt) rather than relative ordering over time.
  *
- * Runs against SQLite (always) and Postgres (when TERN_PG_URL is set).
+ * Runs against SQLite (always) and Postgres (when SYS_PG_URL is set).
  */
 
 import type { IRI, Literal } from "@jasonscharf/core";
@@ -53,8 +53,8 @@ const providers: Provider[] = [
     },
 ];
 
-if (process.env.TERN_PG_URL) {
-    const url = new URL(process.env.TERN_PG_URL);
+if (process.env.SYS_PG_URL) {
+    const url = new URL(process.env.SYS_PG_URL);
     providers.push({
         name: "Postgres",
         create: () =>

@@ -1,7 +1,7 @@
 /**
  * Auth entity query integration tests — list queries and join traversal.
  *
- * All tests run against both SQLite and Postgres (when TERN_PG_URL is set),
+ * All tests run against both SQLite and Postgres (when SYS_PG_URL is set),
  * each suite inside a rolled-back transaction.
  *
  * Schemas under test:
@@ -47,8 +47,8 @@ const providers: DbProvider[] = [
     { name: "SQLite", create: () => createDataContext({ client: "sqlite", filename: ":memory:" }) },
 ];
 
-if (process.env.TERN_PG_URL) {
-    const url = new URL(process.env.TERN_PG_URL);
+if (process.env.SYS_PG_URL) {
+    const url = new URL(process.env.SYS_PG_URL);
     providers.push({
         name: "Postgres",
         create: () =>

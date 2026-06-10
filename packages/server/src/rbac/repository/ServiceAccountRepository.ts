@@ -31,7 +31,7 @@ export class ServiceAccountRepository {
         const rec = await this._es.create(ctx, ServiceAccountSchema, {
             serviceAccountName: args.serviceAccountName,
             serviceAccountToken: args.serviceAccountToken,
-            isActive: true,
+            serviceAccountIsActive: true,
             ...(args.tenantId ? { isInTenant: iriFor("tenant", args.tenantId).value } : {}),
         });
         return toServiceAccount(rec);
@@ -58,7 +58,7 @@ export class ServiceAccountRepository {
 
     /** @insecure @nochecks */
     async deactivate(ctx: ServerContext, sec: SecurityContext, args: IdArgs): Promise<void> {
-        await this._es.update(ctx, ServiceAccountSchema, args.id, { isActive: false });
+        await this._es.update(ctx, ServiceAccountSchema, args.id, { serviceAccountIsActive: false });
     }
 }
 
@@ -68,7 +68,7 @@ function toServiceAccount(rec: EntityRecord): ServiceAccountEntity {
         iri: rec.iri,
         serviceAccountName: rec.props.serviceAccountName as string,
         serviceAccountToken: (rec.props.serviceAccountToken as string) ?? "",
-        isActive: (rec.props.isActive as boolean) ?? false,
+        serviceAccountIsActive: (rec.props.serviceAccountIsActive as boolean) ?? false,
         isInTenant: edgeRefOf(rec, "isInTenant"),
     };
 }

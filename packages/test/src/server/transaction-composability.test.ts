@@ -33,8 +33,8 @@ const providers: DbProvider[] = [
     { name: "SQLite", create: () => createDataContext({ client: "sqlite", filename: ":memory:" }) },
 ];
 
-if (process.env.TERN_PG_URL) {
-    const url = new URL(process.env.TERN_PG_URL);
+if (process.env.SYS_PG_URL) {
+    const url = new URL(process.env.SYS_PG_URL);
     providers.push({
         name: "Postgres",
         create: () =>
@@ -86,7 +86,7 @@ for (const db of providers) {
             // Some tests here intentionally exercise the auto-commit path (no ambient
             // trx), so their writes commit. Clear the store before destroying the
             // connection so nothing leaks across the shared Postgres database.
-            for (const t of ["tern_edges", "tern_nodes", "tern_names", "tern_namespaces"]) {
+            for (const t of ["edges", "nodes", "namespaces"]) {
                 await env.knex(t).del();
             }
             await env.knex.destroy();

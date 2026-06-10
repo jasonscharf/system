@@ -2,7 +2,7 @@
  * Triple store integration tests.
  *
  * Per the project spec, every DB test runs against BOTH SQLite (always) and
- * Postgres (when TERN_PG_URL is set).  Each suite wraps its work in a
+ * Postgres (when SYS_PG_URL is set).  Each suite wraps its work in a
  * transaction that is rolled back after the suite so the schema stays clean.
  */
 
@@ -18,7 +18,7 @@ import { buildServerContext, type ServerContext } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { down as migration001Down } from "../../../data/src/migrations/001_init.js";
-import { assertEmptyStore } from "../assertEmptyStore.js";
+import { assertEmptyStore, assertStoreIntegrity } from "../assertEmptyStore.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -59,8 +59,8 @@ const providers: Provider[] = [
     },
 ];
 
-if (process.env.TERN_PG_URL) {
-    const url = new URL(process.env.TERN_PG_URL);
+if (process.env.SYS_PG_URL) {
+    const url = new URL(process.env.SYS_PG_URL);
     providers.push({
         name: "Postgres",
         create: () =>
@@ -92,6 +92,7 @@ for (const provider of providers) {
         });
 
         afterEach(async () => {
+            await assertStoreIntegrity(trx as unknown as Knex);
             await trx.rollback();
             await assertEmptyStore(knex);
             await knex.destroy();
@@ -107,19 +108,6 @@ for (const provider of providers) {
         it("returns the same id for a duplicate namespace", async () => {
             const a = await store.ensureNamespace(ctx, "ex", "http://example.org/");
             const b = await store.ensureNamespace(ctx, "ex", "http://example.org/");
-            expect(a).toBe(b);
-        });
-
-        // ── ensureName ────────────────────────────────────────────────────────
-
-        it("interns an IRI and returns its name id", async () => {
-            const id = await store.ensureName(ctx, "http://example.org/foo");
-            expect(id).toBeGreaterThan(0);
-        });
-
-        it("interns the same IRI idempotently", async () => {
-            const a = await store.ensureName(ctx, "http://example.org/foo");
-            const b = await store.ensureName(ctx, "http://example.org/foo");
             expect(a).toBe(b);
         });
 
@@ -183,7 +171,7 @@ for (const provider of providers) {
                 graph: GRAPH,
             });
 
-            const byType = await store.find(ctx, { predicate: RDF_TYPE });
+            const byType = await store.find(ctx, { predicate: RDF_TYPE, graph: GRAPH });
             expect(byType).toHaveLength(1);
             expect((byType[0].subject as IRI).value).toBe("http://example.org/a");
         });
@@ -250,7 +238,7 @@ for (const provider of providers) {
                 { subject: EX("c"), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH },
             ]);
 
-            const all = await store.find(ctx);
+            const all = await store.find(ctx, { graph: GRAPH });
             expect(all).toHaveLength(3);
         });
 
@@ -306,7 +294,7 @@ for (const provider of providers) {
                 { subject: EX("remove"), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH },
             ]);
             await store.delete(ctx, { subject: EX("remove") });
-            const all = await store.find(ctx);
+            const all = await store.find(ctx, { graph: GRAPH });
             expect(all).toHaveLength(1);
             expect((all[0].subject as IRI).value).toBe("http://example.org/keep");
         });
@@ -314,17 +302,18 @@ for (const provider of providers) {
         // ── stats ─────────────────────────────────────────────────────────────
 
         it("reports accurate stats after insertions", async () => {
+            const base = await store.stats(ctx);
             await store.insertMany(ctx, [
                 { subject: EX("a"), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH },
                 { subject: EX("b"), predicate: RDFS_LABEL, object: literal("B"), graph: GRAPH },
             ]);
             const s = await store.stats(ctx);
-            expect(s.edges).toBe(2);
-            expect(s.nodes).toBeGreaterThanOrEqual(4); // a, b, rdf:type, rdfs:label, owl:Thing, lit
-            expect(s.names).toBeGreaterThanOrEqual(3);
+            expect(s.edges - base.edges).toBe(2);
+            expect(s.nodes - base.nodes).toBeGreaterThanOrEqual(4);
         });
 
         it("stats reflect deletions", async () => {
+            const base = await store.stats(ctx);
             await store.insert(ctx, {
                 subject: EX("x"),
                 predicate: RDF_TYPE,
@@ -333,7 +322,7 @@ for (const provider of providers) {
             });
             await store.delete(ctx, { subject: EX("x") });
             const s = await store.stats(ctx);
-            expect(s.edges).toBe(0);
+            expect(s.edges - base.edges).toBe(0);
         });
 
         // ── delete by predicate / object / graph:null ─────────────────────────
@@ -343,9 +332,9 @@ for (const provider of providers) {
                 { subject: EX("a"), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH },
                 { subject: EX("b"), predicate: RDFS_LABEL, object: literal("B"), graph: GRAPH },
             ]);
-            const deleted = await store.delete(ctx, { predicate: RDF_TYPE });
+            const deleted = await store.delete(ctx, { predicate: RDF_TYPE, graph: GRAPH });
             expect(deleted).toBe(1);
-            expect(await store.find(ctx)).toHaveLength(1);
+            expect(await store.find(ctx, { graph: GRAPH })).toHaveLength(1);
         });
 
         it("deletes triples matching an object pattern", async () => {
@@ -385,20 +374,7 @@ describe("migration 001_init down()", () => {
         // Tables already created by createDataContext; run down() to drop them
         await migration001Down(knex);
         // After down(), the tables should be gone — querying should throw
-        await expect(knex("tern_edges").count()).rejects.toThrow();
-        await knex.destroy();
-    });
-});
-
-// ── migration 003_timestamps down() ──────────────────────────────────────────
-
-describe("migration 003_timestamps down()", () => {
-    it("drops SQLite triggers cleanly", async () => {
-        const knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
-        const { down: migration003Down } = await import(
-            "../../../data/src/migrations/003_timestamps.js"
-        );
-        await migration003Down(knex);
+        await expect(knex("edges").count()).rejects.toThrow();
         await knex.destroy();
     });
 });
@@ -585,7 +561,7 @@ describe("TripleStore: find/delete with non-existent nodes return early", () => 
 
                 // Manually NULL-out value_json to simulate a pre-migration (legacy) row
                 await store
-                    .knex("tern_nodes")
+                    .knex("nodes")
                     .update({ value_json: null })
                     .where({ kind: "literal" });
 

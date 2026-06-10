@@ -1,7 +1,7 @@
 /**
  * Entity system integration tests.
  *
- * Runs against both SQLite (always) and Postgres (when TERN_PG_URL is set),
+ * Runs against both SQLite (always) and Postgres (when SYS_PG_URL is set),
  * each suite inside a rolled-back transaction so the schema stays clean.
  *
  * Covers:
@@ -34,8 +34,8 @@ const providers: DbProvider[] = [
     { name: "SQLite", create: () => createDataContext({ client: "sqlite", filename: ":memory:" }) },
 ];
 
-if (process.env.TERN_PG_URL) {
-    const url = new URL(process.env.TERN_PG_URL);
+if (process.env.SYS_PG_URL) {
+    const url = new URL(process.env.SYS_PG_URL);
     providers.push({
         name: "Postgres",
         create: () =>

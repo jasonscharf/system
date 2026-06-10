@@ -1,6 +1,6 @@
 import { makeUri, NS_CORE } from "@jasonscharf/core";
 import type { Knex } from "knex";
-import { C, T } from "../schema.js";
+import { C, DEFAULT_GRAPH_IRI, T } from "../schema.js";
 
 /**
  * Bootstraps the RBAC graph with three system-level entities:
@@ -60,30 +60,16 @@ const P_GRANT_ROLE = makeUri(RBAC_NS, "hasRole");
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function internName(knex: Knex, iriStr: string): Promise<number> {
-    const existing = (await knex(T.names).where(C.iri, iriStr).select(C.id).first()) as
-        | { id: number }
-        | undefined;
-    if (existing) {
-        return existing.id;
-    }
-    const [row] = (await knex(T.names)
-        .insert({ [C.iri]: iriStr })
-        .returning(C.id)) as [{ id: number } | number];
-    return typeof row === "object" ? row.id : row;
-}
-
 async function internIRINode(knex: Knex, iriStr: string): Promise<number> {
-    const nameId = await internName(knex, iriStr);
     const existing = (await knex(T.nodes)
-        .where({ [C.kind]: "iri", [C.nameId]: nameId })
+        .where({ [C.kind]: "iri", [C.iri]: iriStr })
         .select(C.id)
         .first()) as { id: number } | undefined;
     if (existing) {
         return existing.id;
     }
     const [row] = (await knex(T.nodes)
-        .insert({ [C.kind]: "iri", [C.nameId]: nameId })
+        .insert({ [C.kind]: "iri", [C.iri]: iriStr })
         .returning(C.id)) as [{ id: number } | number];
     return typeof row === "object" ? row.id : row;
 }
@@ -143,6 +129,9 @@ export async function up(knex: Knex): Promise<void> {
 
     const graph = await internIRINode(knex, RBAC_GRAPH_IRI);
     const rdfType = await internIRINode(knex, RDF_TYPE);
+
+    // Ensure the well-known default graph node exists (required by edges schema)
+    await internIRINode(knex, DEFAULT_GRAPH_IRI);
 
     // Classes
     const clsTenant = await internIRINode(knex, CLS_TENANT);
@@ -217,15 +206,8 @@ export async function up(knex: Knex): Promise<void> {
 }
 
 export async function down(knex: Knex): Promise<void> {
-    // Soft-delete every edge in the RBAC named graph
-    const graphNameRow = (await knex(T.names).where(C.iri, RBAC_GRAPH_IRI).select(C.id).first()) as
-        | { id: number }
-        | undefined;
-    if (!graphNameRow) {
-        return;
-    }
     const graphNodeRow = (await knex(T.nodes)
-        .where({ [C.kind]: "iri", [C.nameId]: graphNameRow.id })
+        .where({ [C.kind]: "iri", [C.iri]: RBAC_GRAPH_IRI })
         .select(C.id)
         .first()) as { id: number } | undefined;
     if (!graphNodeRow) {

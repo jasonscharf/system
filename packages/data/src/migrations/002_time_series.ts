@@ -7,19 +7,19 @@ import { C, T } from "../schema.js";
  *
  * Changes applied:
  *
- *  tern_nodes
+ *  nodes
  *    - created_at  timestamptz  — when the node was first interned
  *    - updated_at  timestamptz  — last touched (nodes are immutable, updated when re-referenced)
  *    - value_json  jsonb        — for literal nodes: typed value { v, dt, lang? }
  *                                 Stored as JSONB in Postgres, JSON text in SQLite.
  *
- *  tern_edges
+ *  edges
  *    - created_at  timestamptz  — when the quad was asserted
  *    - updated_at  timestamptz  — last state change (including soft-delete)
  *    - is_deleted  boolean      — true when this version of the quad has been superseded
  *    - deleted_at  timestamptz  — when is_deleted was set (null while active)
  *
- * The UNIQUE constraint on tern_edges is dropped because with soft-deletion the
+ * The UNIQUE constraint on edges is dropped because with soft-deletion the
  * same (subject, predicate, object, graph) tuple can appear multiple times in
  * history.  Deduplication of active quads is enforced at the application level
  * (SELECT-before-INSERT in TripleStore.insert).
@@ -31,7 +31,7 @@ export async function up(knex: Knex): Promise<void> {
     const client = (knex.client as { config: { client: string } }).config.client;
     const isPg = client === "pg" || client === "postgresql";
 
-    // ── tern_nodes ────────────────────────────────────────────────────────────
+    // ── nodes ─────────────────────────────────────────────────────────────────
 
     const nodesHasCreatedAt = await knex.schema.hasColumn(T.nodes, C.createdAt);
     if (!nodesHasCreatedAt) {
@@ -51,7 +51,7 @@ export async function up(knex: Knex): Promise<void> {
         });
     }
 
-    // ── tern_edges ────────────────────────────────────────────────────────────
+    // ── edges ─────────────────────────────────────────────────────────────────
 
     const edgesHasCreatedAt = await knex.schema.hasColumn(T.edges, C.createdAt);
     if (!edgesHasCreatedAt) {
@@ -70,9 +70,9 @@ export async function up(knex: Knex): Promise<void> {
 
         // Index to make active-edge queries fast.
         await knex.schema.alterTable(T.edges, (t) => {
-            t.index([C.isDeleted, C.subject], "tern_edges_active_subject_idx");
-            t.index([C.isDeleted, C.predicate], "tern_edges_active_predicate_idx");
-            t.index([C.isDeleted, C.object], "tern_edges_active_object_idx");
+            t.index([C.isDeleted, C.subject], "edges_active_subject_idx");
+            t.index([C.isDeleted, C.predicate], "edges_active_predicate_idx");
+            t.index([C.isDeleted, C.object], "edges_active_object_idx");
         });
     }
 
@@ -105,9 +105,9 @@ export async function up(knex: Knex): Promise<void> {
 export async function down(knex: Knex): Promise<void> {
     // Restore the unique constraint before removing soft-delete columns.
     await knex.schema.alterTable(T.edges, (t) => {
-        t.dropIndex([C.isDeleted, C.subject], "tern_edges_active_subject_idx");
-        t.dropIndex([C.isDeleted, C.predicate], "tern_edges_active_predicate_idx");
-        t.dropIndex([C.isDeleted, C.object], "tern_edges_active_object_idx");
+        t.dropIndex([C.isDeleted, C.subject], "edges_active_subject_idx");
+        t.dropIndex([C.isDeleted, C.predicate], "edges_active_predicate_idx");
+        t.dropIndex([C.isDeleted, C.object], "edges_active_object_idx");
 
         t.unique([C.subject, C.predicate, C.object, C.graph]);
     });

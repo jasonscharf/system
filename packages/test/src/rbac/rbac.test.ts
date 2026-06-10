@@ -1,7 +1,7 @@
 /**
  * RBAC integration tests.
  *
- * Every suite runs against both SQLite (always) and Postgres (when TERN_PG_URL
+ * Every suite runs against both SQLite (always) and Postgres (when SYS_PG_URL
  * is set), each in a rolled-back transaction for clean isolation.
  *
  * Scenarios are drawn from a fictional B2B SaaS called "Tern Cloud" with two
@@ -45,8 +45,8 @@ const providers: DbProvider[] = [
     },
 ];
 
-if (process.env.TERN_PG_URL) {
-    const url = new URL(process.env.TERN_PG_URL);
+if (process.env.SYS_PG_URL) {
+    const url = new URL(process.env.SYS_PG_URL);
     providers.push({
         name: "Postgres",
         create: () =>

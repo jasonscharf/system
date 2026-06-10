@@ -115,7 +115,7 @@ describe("attachSqlLogging", () => {
 
     it("test logs a formatted line with bindings for a successful query", async () => {
         lines.length = 0;
-        await knex("tern_names").insert({ iri: "http://example.org/thing" });
+        await knex("nodes").insert({ kind: "iri", iri: "http://example.org/thing" });
 
         const insertLine = lines.find((l) => l.startsWith("[sql") && l.includes("insert"));
         expect(insertLine).toBeDefined();
@@ -150,7 +150,7 @@ describe("createDataContext SQL logging wiring", () => {
         process.env[SQL_LOG_FLAG] = "1";
         const knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
         // A single real query runs through the console sink without throwing.
-        await expect(knex("tern_names").select("*")).resolves.toBeDefined();
+        await expect(knex("nodes").select("*")).resolves.toBeDefined();
         await knex.destroy();
     });
 });

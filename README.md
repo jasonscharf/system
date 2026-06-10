@@ -86,7 +86,7 @@ yarn test:watch
 
 ### Postgres tests
 
-All database tests run against SQLite by default. To also run each suite against Postgres, set `TERN_PG_URL`:
+All database tests run against SQLite by default. To also run each suite against Postgres, set `SYS_PG_URL`:
 
 ```bash
 SYS_POSTGRES_URL=postgres://user:pass@localhost:5432/mydb yarn test

@@ -85,7 +85,7 @@ import {
     XSD_INTEGER,
     XSD_BOOLEAN,
     XSD_DATETIME,
-    TERN_CV_SOURCE,    // CollectionView constants
+    SYS_CV_SOURCE,    // CollectionView constants
 } from '@jasonscharf/entities';
 ```
 

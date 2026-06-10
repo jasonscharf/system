@@ -27,7 +27,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      TERN_REDIS_URL: redis://redis:6379
+      SYS_REDIS_URL: redis://redis:6379
     ports:
       - "9231:9231"
     volumes:
@@ -68,15 +68,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB:       tern
-      POSTGRES_USER:     tern
-      POSTGRES_PASSWORD: tern
+      POSTGRES_DB:       system
+      POSTGRES_USER:     sys
+      POSTGRES_PASSWORD: sys
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tern -d tern"]
+      test: ["CMD-SHELL", "pg_isready -U sys -d sys"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -95,10 +95,10 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      TERN_PG_HOST:     postgres
-      TERN_PG_DATABASE: tern
-      TERN_PG_USER:     tern
-      TERN_PG_PASSWORD: tern
+      SYS_PG_HOST:     postgres
+      SYS_PG_DATABASE: sys
+      SYS_PG_USER:     sys
+      SYS_PG_PASSWORD: sys
     ports:
       - "8080:8080"
       - "8081:8081"

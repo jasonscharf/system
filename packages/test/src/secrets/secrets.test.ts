@@ -188,7 +188,7 @@ describe("AzureKeyVaultProvider", () => {
         }
         const p = new TestableProvider("https://test.vault.azure.net/");
         expect(p.toVaultName("GOOGLE_CLIENT_SECRET")).toBe("google-client-secret");
-        expect(p.toVaultName("TERN_PG_PASSWORD")).toBe("tern-pg-password");
+        expect(p.toVaultName("SYS_PG_PASSWORD")).toBe("tern-pg-password");
         expect(p.toVaultName("REDIS_URL")).toBe("redis-url");
     });
 

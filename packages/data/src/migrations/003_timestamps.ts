@@ -15,7 +15,7 @@ const ISO = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
  *   created_at   — set to NOW() on INSERT; immutable thereafter (Postgres only).
  *   updated_at   — set to NOW() on INSERT; refreshed to NOW() on every UPDATE.
  *   deleted_at   — set to NOW() when is_deleted transitions false → true
- *                  (tern_edges only; nodes are never soft-deleted).
+ *                  (edges only; nodes are never soft-deleted).
  *
  * SQLite notes
  * ─────────────
@@ -33,8 +33,8 @@ const ISO = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
  *     extra round-trip is needed.
  *   • NOW() is constant within a transaction, ensuring both timestamps are
  *     identical when set in the same trigger invocation.
- *   • Two separate trigger functions keep tern_nodes (no deleted_at column)
- *     and tern_edges (has deleted_at) cleanly decoupled.
+ *   • Two separate trigger functions keep nodes (no deleted_at column)
+ *     and edges (has deleted_at) cleanly decoupled.
  */
 export async function up(knex: Knex): Promise<void> {
     const client = (knex.client as { config: { client: string } }).config.client;
@@ -44,7 +44,7 @@ export async function up(knex: Knex): Promise<void> {
         // ── Postgres ──────────────────────────────────────────────────────────
 
         await knex.raw(`
-            CREATE OR REPLACE FUNCTION tern_node_timestamps()
+            CREATE OR REPLACE FUNCTION node_timestamps()
             RETURNS TRIGGER LANGUAGE plpgsql AS $$
             BEGIN
                 IF TG_OP = 'INSERT' THEN
@@ -59,7 +59,7 @@ export async function up(knex: Knex): Promise<void> {
         `);
 
         await knex.raw(`
-            CREATE OR REPLACE FUNCTION tern_edge_timestamps()
+            CREATE OR REPLACE FUNCTION edge_timestamps()
             RETURNS TRIGGER LANGUAGE plpgsql AS $$
             BEGIN
                 IF TG_OP = 'INSERT' THEN
@@ -76,18 +76,18 @@ export async function up(knex: Knex): Promise<void> {
             END; $$;
         `);
 
-        await knex.raw(`DROP TRIGGER IF EXISTS tern_nodes_timestamps ON ${T.nodes}`);
+        await knex.raw(`DROP TRIGGER IF EXISTS nodes_timestamps ON ${T.nodes}`);
         await knex.raw(`
-            CREATE TRIGGER tern_nodes_timestamps
+            CREATE TRIGGER nodes_timestamps
             BEFORE INSERT OR UPDATE ON ${T.nodes}
-            FOR EACH ROW EXECUTE FUNCTION tern_node_timestamps();
+            FOR EACH ROW EXECUTE FUNCTION node_timestamps();
         `);
 
-        await knex.raw(`DROP TRIGGER IF EXISTS tern_edges_timestamps ON ${T.edges}`);
+        await knex.raw(`DROP TRIGGER IF EXISTS edges_timestamps ON ${T.edges}`);
         await knex.raw(`
-            CREATE TRIGGER tern_edges_timestamps
+            CREATE TRIGGER edges_timestamps
             BEFORE INSERT OR UPDATE ON ${T.edges}
-            FOR EACH ROW EXECUTE FUNCTION tern_edge_timestamps();
+            FOR EACH ROW EXECUTE FUNCTION edge_timestamps();
         `);
     } else {
         // ── SQLite ────────────────────────────────────────────────────────────
@@ -95,7 +95,7 @@ export async function up(knex: Knex): Promise<void> {
         // Nodes: set created_at and updated_at on INSERT.
         // (Nodes are immutable after creation so no UPDATE trigger is needed.)
         await knex.raw(`
-            CREATE TRIGGER IF NOT EXISTS tern_nodes_ts_insert
+            CREATE TRIGGER IF NOT EXISTS nodes_ts_insert
             AFTER INSERT ON ${T.nodes}
             BEGIN
                 UPDATE ${T.nodes}
@@ -107,7 +107,7 @@ export async function up(knex: Knex): Promise<void> {
 
         // Edges: set created_at and updated_at on INSERT.
         await knex.raw(`
-            CREATE TRIGGER IF NOT EXISTS tern_edges_ts_insert
+            CREATE TRIGGER IF NOT EXISTS edges_ts_insert
             AFTER INSERT ON ${T.edges}
             BEGIN
                 UPDATE ${T.edges}
@@ -123,7 +123,7 @@ export async function up(knex: Knex): Promise<void> {
         // is_deleted column, preventing recursive firing from the UPDATE
         // this trigger itself issues (which touches updated_at/deleted_at only).
         await knex.raw(`
-            CREATE TRIGGER IF NOT EXISTS tern_edges_ts_soft_delete
+            CREATE TRIGGER IF NOT EXISTS edges_ts_soft_delete
             AFTER UPDATE OF is_deleted ON ${T.edges}
             WHEN NEW.is_deleted = 1 AND OLD.is_deleted = 0
             BEGIN
@@ -141,13 +141,13 @@ export async function down(knex: Knex): Promise<void> {
     const isPg = client === "pg" || client === "postgresql";
 
     if (isPg) {
-        await knex.raw(`DROP TRIGGER IF EXISTS tern_nodes_timestamps ON ${T.nodes}`);
-        await knex.raw(`DROP TRIGGER IF EXISTS tern_edges_timestamps ON ${T.edges}`);
-        await knex.raw(`DROP FUNCTION IF EXISTS tern_node_timestamps()`);
-        await knex.raw(`DROP FUNCTION IF EXISTS tern_edge_timestamps()`);
+        await knex.raw(`DROP TRIGGER IF EXISTS nodes_timestamps ON ${T.nodes}`);
+        await knex.raw(`DROP TRIGGER IF EXISTS edges_timestamps ON ${T.edges}`);
+        await knex.raw(`DROP FUNCTION IF EXISTS node_timestamps()`);
+        await knex.raw(`DROP FUNCTION IF EXISTS edge_timestamps()`);
     } else {
-        await knex.raw("DROP TRIGGER IF EXISTS tern_nodes_ts_insert");
-        await knex.raw("DROP TRIGGER IF EXISTS tern_edges_ts_insert");
-        await knex.raw("DROP TRIGGER IF EXISTS tern_edges_ts_soft_delete");
+        await knex.raw("DROP TRIGGER IF EXISTS nodes_ts_insert");
+        await knex.raw("DROP TRIGGER IF EXISTS edges_ts_insert");
+        await knex.raw("DROP TRIGGER IF EXISTS edges_ts_soft_delete");
     }
 }

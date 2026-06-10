@@ -1,7 +1,7 @@
-import { DEFAULT_GRAPH, type DefaultGraph, IRI, makeUri, NS_ROOT } from "@jasonscharf/core";
+import { DEFAULT_GRAPH, type DefaultGraph, IRI, makeUri, NS_CORE } from "@jasonscharf/core";
 import type { ServerContext } from "./ServerContext.js";
 
-const TENANT_NS = makeUri(NS_ROOT, "tenant");
+const TENANT_NS = makeUri(NS_CORE, "tenant");
 
 /**
  * Returns the named graph IRI for this tenant, optionally scoped to a domain.

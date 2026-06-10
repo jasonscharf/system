@@ -22,7 +22,6 @@ const RBAC_GRAPH_IRI = makeUri(RBAC_NS, "graph");
 const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 const XSD_STRING = "http://www.w3.org/2001/XMLSchema#string";
 const XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
-const XSD_DATETIME = "http://www.w3.org/2001/XMLSchema#dateTime";
 
 // Stable system IDs — must match constants in @jasonscharf/server
 const SYS_TENANT_ID = "sys0000000000000000000000000001";
@@ -58,8 +57,6 @@ const P_IN_TENANT = makeUri(RBAC_NS, "isInTenant");
 const P_GRANTS = makeUri(RBAC_NS, "grants");
 const P_GRANT_PRINCIPAL = makeUri(RBAC_NS, "hasPrincipal");
 const P_GRANT_ROLE = makeUri(RBAC_NS, "hasRole");
-const P_CREATED_AT = makeUri(RBAC_NS, "createdAt");
-const P_UPDATED_AT = makeUri(RBAC_NS, "updatedAt");
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -128,8 +125,6 @@ export async function up(knex: Knex): Promise<void> {
         await knex(T.namespaces).insert({ [C.prefix]: "rbac", [C.iri]: RBAC_NS });
     }
 
-    const now = new Date().toISOString();
-
     // ── Intern all node IRIs ──────────────────────────────────────────────────
 
     const graph = await internIRINode(knex, RBAC_GRAPH_IRI);
@@ -158,8 +153,6 @@ export async function up(knex: Knex): Promise<void> {
     const pGrants = await internIRINode(knex, P_GRANTS);
     const pGrantPrincipal = await internIRINode(knex, P_GRANT_PRINCIPAL);
     const pGrantRole = await internIRINode(knex, P_GRANT_ROLE);
-    const pCreatedAt = await internIRINode(knex, P_CREATED_AT);
-    const pUpdatedAt = await internIRINode(knex, P_UPDATED_AT);
 
     // Entities
     const nSystemTenant = await internIRINode(knex, SYS_TENANT_IRI);
@@ -175,15 +168,12 @@ export async function up(knex: Knex): Promise<void> {
     const litSuperusersName = await internLiteralNode(knex, "Superusers", XSD_STRING);
     const litSuperadminName = await internLiteralNode(knex, "Superadmin", XSD_STRING);
     const litWildcardKey = await internLiteralNode(knex, "*", XSD_STRING);
-    const litNow = await internLiteralNode(knex, now, XSD_DATETIME);
 
     // ── System Tenant ─────────────────────────────────────────────────────────
 
     await assertEdge(knex, nSystemTenant, rdfType, clsTenant, graph);
     await assertEdge(knex, nSystemTenant, pTenantName, litSystemName, graph);
     await assertEdge(knex, nSystemTenant, pIsSystemTenant, litTrue, graph);
-    await assertEdge(knex, nSystemTenant, pCreatedAt, litNow, graph);
-    await assertEdge(knex, nSystemTenant, pUpdatedAt, litNow, graph);
 
     // ── Superusers Group ──────────────────────────────────────────────────────
 
@@ -191,8 +181,6 @@ export async function up(knex: Knex): Promise<void> {
     await assertEdge(knex, nSuperusers, pGroupName, litSuperusersName, graph);
     await assertEdge(knex, nSuperusers, pIsSystemGroup, litTrue, graph);
     await assertEdge(knex, nSuperusers, pInTenant, nSystemTenant, graph);
-    await assertEdge(knex, nSuperusers, pCreatedAt, litNow, graph);
-    await assertEdge(knex, nSuperusers, pUpdatedAt, litNow, graph);
 
     // ── Superadmin Role ───────────────────────────────────────────────────────
 
@@ -200,14 +188,11 @@ export async function up(knex: Knex): Promise<void> {
     await assertEdge(knex, nSuperadmin, pRoleName, litSuperadminName, graph);
     await assertEdge(knex, nSuperadmin, pIsSystemRole, litTrue, graph);
     await assertEdge(knex, nSuperadmin, pInTenant, nSystemTenant, graph);
-    await assertEdge(knex, nSuperadmin, pCreatedAt, litNow, graph);
-    await assertEdge(knex, nSuperadmin, pUpdatedAt, litNow, graph);
 
     // ── Wildcard Permission ───────────────────────────────────────────────────
 
     await assertEdge(knex, nWildcard, rdfType, clsPermission, graph);
     await assertEdge(knex, nWildcard, pPermissionKey, litWildcardKey, graph);
-    await assertEdge(knex, nWildcard, pCreatedAt, litNow, graph);
 
     // Superadmin grants the wildcard
     await assertEdge(knex, nSuperadmin, pGrants, nWildcard, graph);
@@ -218,8 +203,6 @@ export async function up(knex: Knex): Promise<void> {
     await assertEdge(knex, nGrant, pGrantPrincipal, nSuperusers, graph);
     await assertEdge(knex, nGrant, pGrantRole, nSuperadmin, graph);
     await assertEdge(knex, nGrant, pIsDenial, litFalse, graph);
-    await assertEdge(knex, nGrant, pCreatedAt, litNow, graph);
-    await assertEdge(knex, nGrant, pUpdatedAt, litNow, graph);
 }
 
 export async function down(knex: Knex): Promise<void> {

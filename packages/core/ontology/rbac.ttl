@@ -9,8 +9,11 @@
 
 # ── Classes ───────────────────────────────────────────────────────────────────
 
+rbac:Install        a owl:Class ;
+    rdfs:comment "A deployment of the platform (cloud-native, hybrid, or on-premise). Contains one or more Tenants." .
+
 rbac:Tenant         a owl:Class ;
-    rdfs:comment "Top-level isolation boundary. All groups, roles, and resources belong to a tenant." .
+    rdfs:comment "An isolation boundary scoped to a single Install. All groups, roles, and resources belong to a tenant." .
 
 rbac:UserGroup       a owl:Class ;
     rdfs:comment "A named collection of principals (users, service accounts, or nested groups)." .
@@ -29,6 +32,23 @@ rbac:PolicyGrant    a owl:Class ;
 
 rbac:ResourceNode   a owl:Class ;
     rdfs:comment "A resource that can serve as the scope for a policy grant and participate in the resource hierarchy." .
+
+# ── Install properties ───────────────────────────────────────────────────────
+
+rbac:installName    a owl:DatatypeProperty ;
+    rdfs:domain rbac:Install ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Human-readable install name." .
+
+rbac:isSystemInstall a owl:DatatypeProperty ;
+    rdfs:domain rbac:Install ;
+    rdfs:range  xsd:boolean ;
+    rdfs:comment "True for the single system-level Install; protects it from deletion." .
+
+rbac:installKind    a owl:DatatypeProperty ;
+    rdfs:domain rbac:Install ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Deployment kind: cloud, hybrid, or on-premise." .
 
 # ── Tenant properties ─────────────────────────────────────────────────────────
 
@@ -66,7 +86,7 @@ rbac:serviceAccountToken a owl:DatatypeProperty ;
     rdfs:range  xsd:string ;
     rdfs:comment "Opaque credential token; callers should store the hash, not the plaintext." .
 
-rbac:isActive       a owl:DatatypeProperty ;
+rbac:serviceAccountIsActive a owl:DatatypeProperty ;
     rdfs:domain rbac:ServiceAccount ;
     rdfs:range  xsd:boolean ;
     rdfs:comment "Whether the service account is currently enabled." .
@@ -112,6 +132,11 @@ rbac:resourceType   a owl:DatatypeProperty ;
 # ── Shared timestamps ─────────────────────────────────────────────────────────
 
 # ── Object properties ─────────────────────────────────────────────────────────
+
+rbac:hasTenant      a owl:ObjectProperty ;
+    rdfs:domain rbac:Install ;
+    rdfs:range  rbac:Tenant ;
+    rdfs:comment "Outward edge: an Install contains a Tenant (root→down)." .
 
 rbac:isMemberOf       a owl:ObjectProperty ;
     rdfs:comment "A principal or group is a direct member of a group. Transitive membership is resolved at query time." .

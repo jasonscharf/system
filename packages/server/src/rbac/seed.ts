@@ -2,14 +2,15 @@
  * Seeds the system-level RBAC entities into a TripleStore.
  *
  * Creates:
- *   - System root Tenant
+ *   - System Install (the platform deployment)
+ *   - System Tenant (scoped under the Install)
  *   - Superusers Group (add principals here for unrestricted access)
  *   - Superadmin Role with the wildcard "*" permission
  *   - A PolicyGrant binding superusers → superadmin
  *
  * Safe to call multiple times — all inserts are idempotent.
- * Designed to be called after the DB schema is set up (migrations 001–003) but
- * before any application code runs.  The database migration 004_rbac.ts calls
+ * Designed to be called after the DB schema is set up (migration 001_init) but
+ * before any application code runs.  The database migration 001_init.ts calls
  * the equivalent raw-SQL version; this function provides the same bootstrap
  * through the TripleStore API so tests and sandboxes can seed without needing
  * a direct Knex reference.
@@ -19,17 +20,21 @@ import {
     groupNameIRI,
     hasPrincipalIRI,
     hasRoleIRI,
+    hasTenantIRI,
     IRI,
+    InstallIRI,
+    installNameIRI,
     isDenialIRI,
+    isSystemInstallIRI,
     isSystemRoleIRI,
     isSystemTenantIRI,
-    isSystemUserGroupIRI,
+    isSystemGroupIRI,
     literal,
     PermissionIRI,
     PolicyGrantIRI,
     permissionKeyIRI,
     RoleIRI,
-    rbacGrantsIRI,
+    grantsIRI,
     roleNameIRI,
     TenantIRI,
     tenantNameIRI,
@@ -40,6 +45,7 @@ import type { ServerContext } from "../ServerContext.js";
 import {
     RDF_TYPE,
     SYS_GRANT_IRI,
+    SYS_INSTALL_IRI,
     SYS_SUPERADMIN_IRI,
     SYS_SUPERUSERS_IRI,
     SYS_TENANT_IRI,
@@ -50,6 +56,7 @@ import {
 import { tenantGraphForInsert } from "../tenancy.js";
 
 export async function seedSystemData(ctx: ServerContext, store: TripleStore): Promise<void> {
+    const i = new IRI(SYS_INSTALL_IRI);
     const t = new IRI(SYS_TENANT_IRI);
     const g = new IRI(SYS_SUPERUSERS_IRI);
     const r = new IRI(SYS_SUPERADMIN_IRI);
@@ -57,6 +64,23 @@ export async function seedSystemData(ctx: ServerContext, store: TripleStore): Pr
     const gr = new IRI(SYS_GRANT_IRI);
 
     await store.insertMany(ctx, [
+        // System Install
+        { subject: i, predicate: RDF_TYPE, object: InstallIRI, graph: tenantGraphForInsert(ctx) },
+        {
+            subject: i,
+            predicate: installNameIRI,
+            object: literal("System", XSD_STRING),
+            graph: tenantGraphForInsert(ctx),
+        },
+        {
+            subject: i,
+            predicate: isSystemInstallIRI,
+            object: literal("true", XSD_BOOLEAN),
+            graph: tenantGraphForInsert(ctx),
+        },
+        // Install → Tenant (outward containment edge)
+        { subject: i, predicate: hasTenantIRI, object: t, graph: tenantGraphForInsert(ctx) },
+
         // System Tenant
         { subject: t, predicate: RDF_TYPE, object: TenantIRI, graph: tenantGraphForInsert(ctx) },
         {
@@ -82,7 +106,7 @@ export async function seedSystemData(ctx: ServerContext, store: TripleStore): Pr
         },
         {
             subject: g,
-            predicate: isSystemUserGroupIRI,
+            predicate: isSystemGroupIRI,
             object: literal("true", XSD_BOOLEAN),
             graph: tenantGraphForInsert(ctx),
         },
@@ -112,7 +136,7 @@ export async function seedSystemData(ctx: ServerContext, store: TripleStore): Pr
         },
 
         // Superadmin grants wildcard
-        { subject: r, predicate: rbacGrantsIRI, object: p, graph: tenantGraphForInsert(ctx) },
+        { subject: r, predicate: grantsIRI, object: p, graph: tenantGraphForInsert(ctx) },
 
         // PolicyGrant: superusers → superadmin (no scope = system-wide)
         { subject: gr, predicate: RDF_TYPE, object: PolicyGrantIRI, graph: tenantGraphForInsert(ctx) },

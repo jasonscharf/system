@@ -1,4 +1,4 @@
-import { IRI, inheritsFromIRI, rbacGrantsIRI } from "@jasonscharf/core";
+import { IRI, inheritsFromIRI, grantsIRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import type { EntityRecord } from "@jasonscharf/entities";
 import { EntityStore } from "../../EntityStore.js";
@@ -81,7 +81,7 @@ export class RoleRepository {
     ): Promise<void> {
         await this._store.insert(ctx, {
             subject: new IRI(args.roleIri),
-            predicate: rbacGrantsIRI,
+            predicate: grantsIRI,
             object: new IRI(args.permissionIri),
             graph: tenantGraphForInsert(ctx),
         });
@@ -95,7 +95,7 @@ export class RoleRepository {
     ): Promise<void> {
         await this._store.delete(ctx, {
             subject: new IRI(args.roleIri),
-            predicate: rbacGrantsIRI,
+            predicate: grantsIRI,
             object: new IRI(args.permissionIri),
             graph: tenantGraph(ctx),
         });
@@ -109,7 +109,7 @@ export class RoleRepository {
     ): Promise<string[]> {
         const quads = await this._store.find(ctx, {
             subject: new IRI(args.roleIri),
-            predicate: rbacGrantsIRI,
+            predicate: grantsIRI,
             graph: tenantGraph(ctx),
         });
         return quads.map((q) => iriValue(q.object)).filter((v): v is string => v != null);

@@ -1,0 +1,14 @@
+{
+    "bases": [],
+    "extensions": ["../core/ontology/rbac.ttl"],
+    "shapes": ["../core/ontology/rbac.shacl.ttl"],
+    "localNamespace": "urn:sys:core:rbac:",
+    "idSegments": {
+        "Install": "install",
+        "UserGroup": "group",
+        "ServiceAccount": "sa",
+        "PolicyGrant": "grant",
+        "ResourceNode": "resource"
+    },
+    "schemasOut": "./src/rbac/schemas.generated.ts"
+}

@@ -13,7 +13,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { TernApp } from "@jasonscharf/app";
+import { SystemApp } from "@jasonscharf/app";
 import {
     AuthRouterComponent,
     GitHubProvider,
@@ -147,7 +147,7 @@ async function main(): Promise<void> {
     );
 
     // ── Application config + infrastructure extensions ───────────────────────
-    const ternApp = await TernApp.fromYAML(CONFIG, { context: { store } });
+    const ternApp = await SystemApp.fromYAML(CONFIG, { context: { store } });
     const rbacInstalled = await ternApp.use(rbacExtension);
     const convosInstalled = await ternApp.use(convosExtension);
     const rbac = getRbacService(rbacInstalled);

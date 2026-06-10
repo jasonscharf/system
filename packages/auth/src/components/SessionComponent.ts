@@ -1,3 +1,4 @@
+import { makeUri, NS_CORE } from "@jasonscharf/core";
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
 import { buildServerContext, systemSec } from "@jasonscharf/server";
 import type { UserRepository } from "../repository/UserRepository.js";
@@ -81,7 +82,7 @@ export class SessionComponent extends FlowComponent {
     private async _validate(req: ValidateRequest): Promise<void> {
         const ctx = buildServerContext(this._users.store);
         const sec = systemSec;
-        const key = `tern:session:${req.token}`;
+        const key = makeUri(NS_CORE, "session", req.token);
 
         // Fast path: Redis / memory store
         const cached = await this._store.get(key);
@@ -124,7 +125,7 @@ export class SessionComponent extends FlowComponent {
         const sec = systemSec;
         const [storeOk, dbOk] = await Promise.all([
             this._store
-                .del(`tern:session:${req.token}`)
+                .del(makeUri(NS_CORE, "session", req.token))
                 .then(() => true)
                 .catch(() => false),
             this._sessions.revoke(ctx, sec, { token: req.token }),

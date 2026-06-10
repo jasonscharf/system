@@ -1,17 +1,17 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { errResult, type TernRequest, type TernResult, type TernTypeRef } from "@jasonscharf/core";
+import { errResult, type SystemRequest, type SystemResult, type SystemTypeRef } from "@jasonscharf/core";
 import type { HandlerEntry } from "../config/types.js";
 import type { Dispatcher } from "../routing/Dispatcher.js";
 
 /**
  * The contract every handler function must satisfy.
  *
- * A handler receives the inbound TernRequest plus an opaque context object
+ * A handler receives the inbound SystemRequest plus an opaque context object
  * whose shape is defined by the host application (e.g. { connectionId, store }).
- * It must always return a TernResult — throw or reject only on unexpected errors.
+ * It must always return a SystemResult — throw or reject only on unexpected errors.
  */
-export type HandlerFn = (request: TernRequest, ctx: HandlerContext) => Promise<TernResult>;
+export type HandlerFn = (request: SystemRequest, ctx: HandlerContext) => Promise<SystemResult>;
 
 /** Host-application-specific context passed to every handler. */
 export interface HandlerContext {
@@ -28,7 +28,7 @@ interface LoadedEntry {
 }
 
 /**
- * Registry that maps TernTypeRef IRIs to one or more handler functions.
+ * Registry that maps SystemTypeRef IRIs to one or more handler functions.
  *
  * Handlers are loaded lazily from their configured modules the first time a
  * matching request arrives.  Multiple handlers for the same type are tried in
@@ -55,7 +55,7 @@ export class HandlerRegistry implements Dispatcher {
     }
 
     /** Register a single inline handler function (useful for tests and defaults). */
-    registerInline(typeRef: TernTypeRef, handler: HandlerFn, priority = 100): void {
+    registerInline(typeRef: SystemTypeRef, handler: HandlerFn, priority = 100): void {
         const typeIri = typeRef.iri;
         if (!this._entries.has(typeIri)) {
             this._entries.set(typeIri, []);
@@ -80,7 +80,7 @@ export class HandlerRegistry implements Dispatcher {
      * Dispatch a request to the highest-priority handler for its type IRI.
      * If no handler is registered, returns an error result.
      */
-    async dispatch(request: TernRequest, ctx: HandlerContext): Promise<TernResult> {
+    async dispatch(request: SystemRequest, ctx: HandlerContext): Promise<SystemResult> {
         const entries = this._entries.get(request.type.iri);
         if (!entries || entries.length === 0) {
             return errResult(

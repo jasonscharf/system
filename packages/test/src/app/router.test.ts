@@ -1,5 +1,5 @@
-import { TernRouter } from "@jasonscharf/app";
-import { errResult, okResult, query, TERN_TYPES } from "@jasonscharf/core";
+import { SystemRouter } from "@jasonscharf/app";
+import { errResult, okResult, query, SYSTEM_TYPES } from "@jasonscharf/core";
 import { FlowContext, HttpRouter, type ParsedHttpRequest } from "@jasonscharf/flow";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -35,55 +35,55 @@ async function drainResponses(router: HttpRouter, count = 1, timeoutMs = 200) {
     return results;
 }
 
-// ── TernRouter ────────────────────────────────────────────────────────────────
+// ── SystemRouter ────────────────────────────────────────────────────────────────
 
-describe("TernRouter", () => {
+describe("SystemRouter", () => {
     it("dispatches to a registered handler", async () => {
-        const router = new TernRouter();
-        router.handle(TERN_TYPES.ping, async (ctx) => {
+        const router = new SystemRouter();
+        router.handle(SYSTEM_TYPES.ping, async (ctx) => {
             ctx.result = okResult(ctx.request.id, ctx.request.type, { pong: true });
         });
 
-        const result = await router.dispatch(query(TERN_TYPES.ping), { connectionId: "c1" });
+        const result = await router.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c1" });
         expect(result.ok).toBe(true);
         expect((result.data as { pong: boolean }).pong).toBe(true);
     });
 
     it("returns an error result for an unregistered type", async () => {
-        const router = new TernRouter();
-        const result = await router.dispatch(query(TERN_TYPES.ping), { connectionId: "c1" });
+        const router = new SystemRouter();
+        const result = await router.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c1" });
         expect(result.ok).toBe(false);
         expect(result.error).toMatch(/No handler/);
     });
 
     it("runs global middleware before the route handler", async () => {
         const order: string[] = [];
-        const router = new TernRouter();
+        const router = new SystemRouter();
         router.use(async (_ctx, next) => {
             order.push("mw");
             await next();
         });
-        router.handle(TERN_TYPES.ping, async (ctx) => {
+        router.handle(SYSTEM_TYPES.ping, async (ctx) => {
             order.push("handler");
             ctx.result = okResult(ctx.request.id, ctx.request.type, null);
         });
 
-        await router.dispatch(query(TERN_TYPES.ping), { connectionId: "c1" });
+        await router.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c1" });
         expect(order).toEqual(["mw", "handler"]);
     });
 
     it("middleware can short-circuit the chain without calling next()", async () => {
         const handlerSpy = vi.fn();
-        const router = new TernRouter();
+        const router = new SystemRouter();
         router.use(async (ctx, _next) => {
             ctx.result = errResult(ctx.request.id, ctx.request.type, "blocked by middleware");
         });
-        router.handle(TERN_TYPES.ping, async (ctx) => {
+        router.handle(SYSTEM_TYPES.ping, async (ctx) => {
             handlerSpy();
             ctx.result = okResult(ctx.request.id, ctx.request.type, null);
         });
 
-        const result = await router.dispatch(query(TERN_TYPES.ping), { connectionId: "c1" });
+        const result = await router.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c1" });
         expect(result.ok).toBe(false);
         expect(result.error).toBe("blocked by middleware");
         expect(handlerSpy).not.toHaveBeenCalled();
@@ -91,24 +91,24 @@ describe("TernRouter", () => {
 
     it("middleware can wrap the handler (before + after pattern)", async () => {
         const log: string[] = [];
-        const router = new TernRouter();
+        const router = new SystemRouter();
         router.use(async (_ctx, next) => {
             log.push("before");
             await next();
             log.push("after");
         });
-        router.handle(TERN_TYPES.ping, async (ctx) => {
+        router.handle(SYSTEM_TYPES.ping, async (ctx) => {
             log.push("handler");
             ctx.result = okResult(ctx.request.id, ctx.request.type, null);
         });
 
-        await router.dispatch(query(TERN_TYPES.ping), { connectionId: "c1" });
+        await router.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c1" });
         expect(log).toEqual(["before", "handler", "after"]);
     });
 
     it("supports multiple middleware in sequence", async () => {
         const order: number[] = [];
-        const router = new TernRouter();
+        const router = new SystemRouter();
         router.use(async (_ctx, next) => {
             order.push(1);
             await next();
@@ -117,20 +117,20 @@ describe("TernRouter", () => {
             order.push(2);
             await next();
         });
-        router.handle(TERN_TYPES.ping, async (ctx) => {
+        router.handle(SYSTEM_TYPES.ping, async (ctx) => {
             order.push(3);
             ctx.result = okResult(ctx.request.id, ctx.request.type, null);
         });
 
-        await router.dispatch(query(TERN_TYPES.ping), { connectionId: "c1" });
+        await router.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c1" });
         expect(order).toEqual([1, 2, 3]);
     });
 
     it("multiple handlers on the same route are composed in order", async () => {
         const order: string[] = [];
-        const router = new TernRouter();
+        const router = new SystemRouter();
         router.handle(
-            TERN_TYPES.ping,
+            SYSTEM_TYPES.ping,
             async (_ctx, next) => {
                 order.push("a");
                 await next();
@@ -141,73 +141,73 @@ describe("TernRouter", () => {
             },
         );
 
-        await router.dispatch(query(TERN_TYPES.ping), { connectionId: "c1" });
+        await router.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c1" });
         expect(order).toEqual(["a", "b"]);
     });
 
     it("middleware can add properties to ctx (Koa-style)", async () => {
-        const router = new TernRouter();
+        const router = new SystemRouter();
         router.use(async (ctx, next) => {
             ctx.user = { id: 42 };
             await next();
         });
         let capturedUser: unknown;
-        router.handle(TERN_TYPES.ping, async (ctx) => {
+        router.handle(SYSTEM_TYPES.ping, async (ctx) => {
             capturedUser = ctx.user;
             ctx.result = okResult(ctx.request.id, ctx.request.type, null);
         });
 
-        await router.dispatch(query(TERN_TYPES.ping), { connectionId: "c1" });
+        await router.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c1" });
         expect((capturedUser as { id: number }).id).toBe(42);
     });
 
     it("mounts a sub-router and dispatches to its handlers", async () => {
-        const main = new TernRouter();
-        const sub = new TernRouter();
+        const main = new SystemRouter();
+        const sub = new SystemRouter();
 
-        sub.handle(TERN_TYPES.echo, async (ctx) => {
+        sub.handle(SYSTEM_TYPES.echo, async (ctx) => {
             ctx.result = okResult(ctx.request.id, ctx.request.type, "from sub");
         });
         main.mount(sub);
 
-        const result = await main.dispatch(query(TERN_TYPES.echo), { connectionId: "c1" });
+        const result = await main.dispatch(query(SYSTEM_TYPES.echo), { connectionId: "c1" });
         expect(result.ok).toBe(true);
         expect(result.data).toBe("from sub");
     });
 
     it("global middleware on main runs before sub-router handler", async () => {
         const order: string[] = [];
-        const main = new TernRouter();
-        const sub = new TernRouter();
+        const main = new SystemRouter();
+        const sub = new SystemRouter();
 
         main.use(async (_ctx, next) => {
             order.push("main-mw");
             await next();
         });
-        sub.handle(TERN_TYPES.echo, async (ctx) => {
+        sub.handle(SYSTEM_TYPES.echo, async (ctx) => {
             order.push("sub-handler");
             ctx.result = okResult(ctx.request.id, ctx.request.type, null);
         });
         main.mount(sub);
 
-        await main.dispatch(query(TERN_TYPES.echo), { connectionId: "c1" });
+        await main.dispatch(query(SYSTEM_TYPES.echo), { connectionId: "c1" });
         expect(order).toEqual(["main-mw", "sub-handler"]);
     });
 
     it("extra ctx fields from extras option are available in handlers", async () => {
-        const router = new TernRouter();
+        const router = new SystemRouter();
         let seen: unknown;
-        router.handle(TERN_TYPES.ping, async (ctx) => {
+        router.handle(SYSTEM_TYPES.ping, async (ctx) => {
             seen = ctx.store;
             ctx.result = okResult(ctx.request.id, ctx.request.type, null);
         });
 
-        await router.dispatch(query(TERN_TYPES.ping), { connectionId: "c1", store: "my-store" });
+        await router.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c1", store: "my-store" });
         expect(seen).toBe("my-store");
     });
 
     it("middleware error boundary catches handler throws", async () => {
-        const router = new TernRouter();
+        const router = new SystemRouter();
         router.use(async (ctx, next) => {
             try {
                 await next();
@@ -215,11 +215,11 @@ describe("TernRouter", () => {
                 ctx.result = errResult(ctx.request.id, ctx.request.type, "caught");
             }
         });
-        router.handle(TERN_TYPES.ping, async () => {
+        router.handle(SYSTEM_TYPES.ping, async () => {
             throw new Error("boom");
         });
 
-        const result = await router.dispatch(query(TERN_TYPES.ping), { connectionId: "c1" });
+        const result = await router.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c1" });
         expect(result.ok).toBe(false);
         expect(result.error).toBe("caught");
     });
@@ -435,7 +435,7 @@ describe("HttpRouter", () => {
     });
 });
 
-// ── Additional coverage: compose + TernRouter branches ───────────────────────
+// ── Additional coverage: compose + SystemRouter branches ───────────────────────
 
 import { compose, type Next } from "@jasonscharf/app";
 
@@ -457,30 +457,30 @@ describe("compose: defensive branches", () => {
     });
 });
 
-describe("TernRouter: finalNext !ctx.result false branch", () => {
+describe("SystemRouter: finalNext !ctx.result false branch", () => {
     it("middleware sets result and calls next — finalNext sees ctx.result already set", async () => {
-        const router = new TernRouter();
+        const router = new SystemRouter();
         router.use(async (ctx, next) => {
             ctx.result = okResult(ctx.request.id, ctx.request.type, "set by mw");
             await next(); // reaches finalNext with result already set → !ctx.result is false
         });
         // No explicit handler — finalNext runs but skips the errResult assignment
-        const r = await router.dispatch(query(TERN_TYPES.ping), { connectionId: "c" });
+        const r = await router.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c" });
         expect(r.ok).toBe(true);
         expect(r.data).toBe("set by mw");
     });
 });
 
-describe("TernRouter._findRoute: second mount matched (line 146 branch)", () => {
+describe("SystemRouter._findRoute: second mount matched (line 146 branch)", () => {
     it("falls through first empty mount and finds handler in second mount", async () => {
-        const router = new TernRouter();
-        const empty = new TernRouter(); // no handlers
-        const second = new TernRouter();
-        second.handle(TERN_TYPES.echo, async (ctx) => {
+        const router = new SystemRouter();
+        const empty = new SystemRouter(); // no handlers
+        const second = new SystemRouter();
+        second.handle(SYSTEM_TYPES.echo, async (ctx) => {
             ctx.result = okResult(ctx.request.id, ctx.request.type, "from-second");
         });
         router.mount(empty).mount(second);
-        const r = await router.dispatch(query(TERN_TYPES.echo), { connectionId: "c" });
+        const r = await router.dispatch(query(SYSTEM_TYPES.echo), { connectionId: "c" });
         expect(r.ok).toBe(true);
         expect(r.data).toBe("from-second");
     });

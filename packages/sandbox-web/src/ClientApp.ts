@@ -7,18 +7,18 @@
 
 import {
     command,
-    isTernResult,
+    isSystemResult,
     query,
-    TERN_TYPES,
-    type TernKind,
-    type TernResult,
-    type TernTypeRef,
+    SYSTEM_TYPES,
+    type SystemKind,
+    type SystemResult,
+    type SystemTypeRef,
 } from "@jasonscharf/core";
 import { FlowApp, WebSocketClient } from "@jasonscharf/flow";
 import type { StoreStats } from "./types.js";
 
 interface PendingRequest {
-    resolve: (result: TernResult) => void;
+    resolve: (result: SystemResult) => void;
     reject: (err: Error) => void;
 }
 
@@ -75,15 +75,15 @@ export class ClientApp {
     }
 
     async send(
-        typeRef: TernTypeRef,
+        typeRef: SystemTypeRef,
         payload?: unknown,
-        kind: TernKind = "query",
-    ): Promise<TernResult> {
+        kind: SystemKind = "query",
+    ): Promise<SystemResult> {
         if (!this._connected) {
             throw new Error("Not connected to server");
         }
         const msg = kind === "command" ? command(typeRef, payload) : query(typeRef, payload);
-        return new Promise<TernResult>((resolve, reject) => {
+        return new Promise<SystemResult>((resolve, reject) => {
             this._pending.set(msg.id, { resolve, reject });
             // Deliver to WebSocketClient.send (input port) then force a tick
             this._ws.send.put(JSON.stringify(msg));
@@ -120,7 +120,7 @@ export class ClientApp {
                 const raw = JSON.parse(
                     typeof data === "string" ? data : new TextDecoder().decode(data),
                 );
-                if (isTernResult(raw)) {
+                if (isSystemResult(raw)) {
                     this._onResult(raw);
                     changed = true;
                 }
@@ -134,7 +134,7 @@ export class ClientApp {
         }
     }
 
-    private _onResult(result: TernResult): void {
+    private _onResult(result: SystemResult): void {
         const pending = this._pending.get(result.correlationId);
         if (pending) {
             this._pending.delete(result.correlationId);
@@ -181,7 +181,7 @@ export class ShowcaseState {
 
     async ping(): Promise<void> {
         const t0 = Date.now();
-        const result = await this._app.send(TERN_TYPES.ping);
+        const result = await this._app.send(SYSTEM_TYPES.ping);
         if (result.ok) {
             this._snap = { ...this._snap, pingRtt: Date.now() - t0 };
             this._notify();
@@ -189,7 +189,7 @@ export class ShowcaseState {
     }
 
     async refreshStats(): Promise<void> {
-        const result = await this._app.send(TERN_TYPES.tripleStats);
+        const result = await this._app.send(SYSTEM_TYPES.tripleStats);
         if (result.ok && result.data) {
             this._snap = { ...this._snap, stats: result.data as StoreStats };
             this._notify();
@@ -200,7 +200,7 @@ export class ShowcaseState {
         this._snap = { ...this._snap, echoPending: true, echoResult: null };
         this._notify();
         try {
-            const result = await this._app.send(TERN_TYPES.echo, { message }, "command");
+            const result = await this._app.send(SYSTEM_TYPES.echo, { message }, "command");
             if (result.ok && result.data) {
                 this._snap = {
                     ...this._snap,

@@ -1,4 +1,4 @@
-import type { IRI } from "@jasonscharf/core";
+import { makeUri, NS_CORE, type IRI } from "@jasonscharf/core";
 import {
     Clock,
     createMessage,
@@ -230,9 +230,9 @@ class Merger<L, R> extends FlowComponent {
 
 describe("FlowMessage: typed message envelopes", () => {
     it("wraps a payload with id, timestamp, and optional type tag", () => {
-        const msg: FlowMessage<number> = createMessage(42, "tern:core.count");
+        const msg: FlowMessage<number> = createMessage(42, makeUri(NS_CORE, "count"));
         expect(msg.payload).toBe(42);
-        expect(msg.type).toBe("tern:core.count");
+        expect(msg.type).toBe(makeUri(NS_CORE, "count"));
         expect(msg.id).toBeInstanceOf(Uint8Array);
         expect(msg.id.length).toBe(16);
         expect(typeof msg.timestamp).toBe("number");

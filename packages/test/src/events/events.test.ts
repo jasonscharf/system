@@ -9,7 +9,7 @@
  * even across repeated runs.
  */
 
-import type { DomainEvent, IDomainEventBus } from "@jasonscharf/core";
+import { makeUri, NS_TEST, type DomainEvent, type IDomainEventBus } from "@jasonscharf/core";
 import { InMemoryEventBus, RedisStreamEventBus } from "@jasonscharf/events";
 import { Redis } from "ioredis";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -172,7 +172,7 @@ if (process.env.TERN_REDIS_URL) {
     // Each test gets its own stream prefix so re-runs never see stale messages.
     eventBusSuite("RedisStreamEventBus (contract)", () => {
         return new RedisStreamEventBus(redisUrl, {
-            streamPrefix: `tern:test:${uniqueId()}:`,
+            streamPrefix: `${makeUri(NS_TEST, uniqueId())}:`,
             // Short claim settings so tests don't take forever
             claimMinIdleMs: 500,
             claimIntervalMs: 100,
@@ -196,7 +196,7 @@ if (process.env.TERN_REDIS_URL) {
         }
 
         beforeEach(() => {
-            prefix = `tern:test:${uniqueId()}:`;
+            prefix = `${makeUri(NS_TEST, uniqueId())}:`;
             allBuses = [];
         });
 
@@ -350,7 +350,7 @@ if (process.env.TERN_REDIS_URL) {
         }
 
         beforeEach(() => {
-            prefix = `tern:test:${uniqueId()}:`;
+            prefix = `${makeUri(NS_TEST, uniqueId())}:`;
             allBuses = [];
         });
 

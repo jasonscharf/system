@@ -8,5 +8,5 @@ export * from "./registry/PayloadSchemaRegistry.js";
 export * from "./routing/compose.js";
 export * from "./routing/Dispatcher.js";
 export * from "./routing/payloadValidation.js";
-export * from "./routing/TernRouter.js";
-export * from "./TernApp.js";
+export * from "./routing/SystemRouter.js";
+export * from "./SystemApp.js";

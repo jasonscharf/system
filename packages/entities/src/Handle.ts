@@ -6,7 +6,7 @@
  * (`id@version`) so it can be used as a Map key, an object key, or logged.
  *
  * Convention:
- *   Platform groups use the `tern:` prefix  — e.g.  handle('tern:core')
+ *   Platform groups use the `urn:sys:` prefix  — e.g.  handle('urn:sys:core')
  *   Third-party groups use reverse-domain   — e.g.  handle('com.myapp.billing')
  */
 export interface EntityHandle {

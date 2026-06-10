@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { IRI } from "@jasonscharf/core";
+import { IRI, makeUri } from "@jasonscharf/core";
 import { AUTH_NS } from "../constants.js";
 
 export function newId(): string {
@@ -10,7 +10,7 @@ export function iriFor(
     type: "user" | "identity" | "session" | "device" | "loginattempt",
     id: string,
 ): IRI {
-    return new IRI(`${AUTH_NS}${type}:${id}`);
+    return new IRI(makeUri(AUTH_NS, type, id));
 }
 
 export function idFrom(iriStr: string): string {

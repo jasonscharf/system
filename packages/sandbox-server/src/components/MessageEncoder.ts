@@ -1,14 +1,14 @@
-import type { TernResult } from "@jasonscharf/core";
+import type { SystemResult } from "@jasonscharf/core";
 import type { WsMessage } from "@jasonscharf/flow";
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
 
 export interface OutgoingMessage {
     readonly connectionId: string;
-    readonly result: TernResult;
+    readonly result: SystemResult;
 }
 
 /**
- * Serialises TernResults to JSON WsMessages ready for WebSocketServer.send.
+ * Serialises SystemResults to JSON WsMessages ready for WebSocketServer.send.
  */
 export class MessageEncoder extends FlowComponent {
     readonly in: FlowPort<OutgoingMessage>;

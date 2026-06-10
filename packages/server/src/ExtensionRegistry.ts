@@ -1,21 +1,21 @@
-import { DEFAULT_GRAPH, IRI, NS_ROOT } from "@jasonscharf/core";
+import { DEFAULT_GRAPH, IRI, makeUri, NS_ROOT } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import { toLiteral } from "@jasonscharf/entities";
 import type { ServerContext } from "./ServerContext.js";
 
 // ── Ontology constants ────────────────────────────────────────────────────────
 
-const NS = `${NS_ROOT}app:`;
-const EXT_NS = `${NS}ext:`;
+const NS = makeUri(NS_ROOT, "app");
+const EXT_NS = makeUri(NS, "ext");
 
-const EXT_TYPE = new IRI(`${NS}InstalledExtension`);
+const EXT_TYPE = new IRI(makeUri(NS, "InstalledExtension"));
 const RDF_TYPE = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
-const PRED_NAME = new IRI(`${NS}extName`);
-const PRED_VERSION = new IRI(`${NS}extVersion`);
-const PRED_INSTALLED_AT = new IRI(`${NS}installedAt`);
+const PRED_NAME = new IRI(makeUri(NS, "extName"));
+const PRED_VERSION = new IRI(makeUri(NS, "extVersion"));
+const PRED_INSTALLED_AT = new IRI(makeUri(NS, "installedAt"));
 
 function _extIri(name: string): IRI {
-    return new IRI(`${EXT_NS}${encodeURIComponent(name)}`);
+    return new IRI(makeUri(EXT_NS, encodeURIComponent(name)));
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -32,10 +32,10 @@ export interface ExtensionRecord {
  * Persists extension install records as quads in the triple store.
  *
  * Each installed extension is represented as:
- *   tern:app/ext/{name}  a  tern:app:InstalledExtension ;
- *     tern:app:extName      "{name}" ;
- *     tern:app:extVersion   "{version}" ;
- *     tern:app:installedAt  "{iso-timestamp}" .
+ *   urn:sys:app:ext:{name}  a  urn:sys:app:InstalledExtension ;
+ *     urn:sys:app:extName      "{name}" ;
+ *     urn:sys:app:extVersion   "{version}" ;
+ *     urn:sys:app:installedAt  "{iso-timestamp}" .
  */
 export class ExtensionRegistry {
     constructor(private readonly _store: TripleStore) {}

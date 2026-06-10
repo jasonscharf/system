@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DomainEvent, EventSubscription, IDomainEventBus } from "@jasonscharf/core";
+import { makeUri, NS_CORE } from "@jasonscharf/core";
 import { Redis } from "ioredis";
 
 // ── Options ───────────────────────────────────────────────────────────────────
@@ -8,7 +9,7 @@ export interface RedisStreamEventBusOptions {
     /**
      * Key prefix applied to every Redis stream.
      * Override per-instance in tests to prevent cross-test contamination.
-     * Default: "tern:events:"
+     * Default: "urn:sys:core:events:"
      */
     streamPrefix?: string;
     /**
@@ -81,7 +82,7 @@ export class RedisStreamEventBus implements IDomainEventBus {
 
     constructor(redisUrl: string, options: RedisStreamEventBusOptions = {}) {
         this._url = redisUrl;
-        this._prefix = options.streamPrefix ?? "tern:events:";
+        this._prefix = options.streamPrefix ?? `${makeUri(NS_CORE, "events")}:`;
         this._claimMinIdleMs = options.claimMinIdleMs ?? 30_000;
         this._claimIntervalMs = options.claimIntervalMs ?? 5_000;
         this._claimBatchSize = options.claimBatchSize ?? 10;

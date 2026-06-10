@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type {
-    DomainEvent,
-    EventSubscription,
-    IDomainEventBus,
-    ISystemBus,
-    RpcHandler,
-    RpcKind,
+import {
+    type DomainEvent,
+    type EventSubscription,
+    type ISystemBus,
+    NS_CORE,
+    type RpcHandler,
+    type RpcKind,
+    makeUri,
 } from "@jasonscharf/core";
 import { Redis } from "ioredis";
 import { RedisStreamEventBus, type RedisStreamEventBusOptions } from "./RedisStreamEventBus.js";
@@ -15,7 +16,7 @@ import { RedisStreamEventBus, type RedisStreamEventBusOptions } from "./RedisStr
 export interface RedisSystemBusOptions extends RedisStreamEventBusOptions {
     /**
      * Prefix for RPC request streams and reply lists.
-     * Default: "tern:rpc:"
+     * Default: "urn:sys:core:rpc:"
      */
     rpcPrefix?: string;
     /**
@@ -85,7 +86,7 @@ export class RedisSystemBus implements ISystemBus {
 
     constructor(redisUrl: string, options: RedisSystemBusOptions = {}) {
         this._url = redisUrl;
-        this._rpcPrefix = options.rpcPrefix ?? "tern:rpc:";
+        this._rpcPrefix = options.rpcPrefix ?? `${makeUri(NS_CORE, "rpc")}:`;
         this._rpcTimeoutMs = options.rpcTimeoutMs ?? 10_000;
         this._replyTtlSecs = options.replyTtlSecs ?? 60;
         this._handlerGroup = options.handlerGroup ?? "handlers";

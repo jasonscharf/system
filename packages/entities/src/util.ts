@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { Literal } from "@jasonscharf/core";
-import { IRI, literal } from "@jasonscharf/core";
+import { IRI, literal, makeUri } from "@jasonscharf/core";
 import { XSD_BOOLEAN, XSD_DATETIME, XSD_DECIMAL, XSD_INTEGER, XSD_STRING } from "./constants.js";
 
 export function newId(): string {
@@ -9,7 +9,7 @@ export function newId(): string {
 
 /** Build the IRI for an entity of a given type within a namespace. */
 export function entityIri(ns: string, typeLocalName: string, id: string): IRI {
-    return new IRI(`${ns}${typeLocalName.toLowerCase()}:${id}`);
+    return new IRI(makeUri(ns, typeLocalName.toLowerCase(), id));
 }
 
 /**
@@ -21,7 +21,7 @@ export function entityIriFor(
     id: string,
 ): IRI {
     const segment = schema.idSegment ?? localName(schema.typeIRI.value).toLowerCase();
-    return new IRI(`${schema.ns}${segment}:${id}`);
+    return new IRI(makeUri(schema.ns, segment, id));
 }
 
 /**

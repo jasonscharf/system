@@ -36,6 +36,7 @@ import {
     UserSessionRepository,
     UserSessionSchema,
 } from "@jasonscharf/auth";
+import { makeUri, NS_CORE } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import {
     FlowContext,
@@ -966,7 +967,7 @@ describe("SessionComponent", () => {
             deviceId: "d1",
             expiresAt: Date.now() - 1000,
         });
-        await memStore.set("tern:session:expired-tok", expiredData, 60);
+        await memStore.set(makeUri(NS_CORE, "session", "expired-tok"), expiredData, 60);
         sessComp.validateIn.put({ token: "expired-tok", requestId: "r3" });
         sessComp.step();
         await new Promise((r) => setTimeout(r, 50));
@@ -1014,7 +1015,7 @@ describe("SessionComponent", () => {
             deviceId: "d-fast",
             expiresAt: Date.now() + 60_000,
         });
-        await memStore.set(`tern:session:${session.sessionToken}`, cachedData, 60);
+        await memStore.set(makeUri(NS_CORE, "session", session.sessionToken), cachedData, 60);
         sessComp.validateIn.put({ token: session.sessionToken, requestId: "r5" });
         sessComp.step();
         await new Promise((r) => setTimeout(r, 100));
@@ -1668,7 +1669,7 @@ describe("AuthService.validateToken — cache hit", () => {
         // Manually prime the cache with an already-expired entry
         const fakeToken = "expired-token-xyz";
         await memStore.set(
-            `tern:session:${fakeToken}`,
+            makeUri(NS_CORE, "session", fakeToken),
             JSON.stringify({ userId: "some-id", expiresAt: Date.now() - 1000 }), // in the past
             1,
         );

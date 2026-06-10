@@ -1,13 +1,13 @@
-import { DEFAULT_GRAPH, type DefaultGraph, IRI, NS_ROOT } from "@jasonscharf/core";
+import { DEFAULT_GRAPH, type DefaultGraph, IRI, makeUri, NS_ROOT } from "@jasonscharf/core";
 import type { ServerContext } from "./ServerContext.js";
 
-const TENANT_NS = `${NS_ROOT}tenant:`;
+const TENANT_NS = makeUri(NS_ROOT, "tenant");
 
 /**
  * Returns the named graph IRI for this tenant, optionally scoped to a domain.
  *
- *   tenantGraph(ctx)          → urn:sys:core:tenant:{id}
- *   tenantGraph(ctx, "labs")  → urn:sys:core:tenant:{id}/labs
+ *   tenantGraph(ctx)          → urn:sys:tenant:{id}
+ *   tenantGraph(ctx, "labs")  → urn:sys:tenant:{id}/labs
  *
  * Returns null when ctx carries no tenantId (DEFAULT_GRAPH semantics).
  */
@@ -15,7 +15,7 @@ export function tenantGraph(ctx: ServerContext, domain?: string): IRI | null {
     if (!ctx.tenantId) {
         return null;
     }
-    const base = `${TENANT_NS}${encodeURIComponent(ctx.tenantId)}`;
+    const base = makeUri(TENANT_NS, encodeURIComponent(ctx.tenantId));
     if (!domain) {
         return new IRI(base);
     }

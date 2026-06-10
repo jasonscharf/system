@@ -9,7 +9,7 @@ import type { TripleStore } from "@jasonscharf/data";
 
 /** One handler module registration for a named message type. */
 export interface HandlerEntry {
-    /** Full IRI of the TernTypeRef this handler responds to. */
+    /** Full IRI of the SystemTypeRef this handler responds to. */
     readonly typeIri: string;
     /** Module specifier — a file path or URL resolved relative to the config file. */
     readonly module: string;
@@ -65,7 +65,7 @@ export interface AppConfig {
 export interface ExtensionInstallContext {
     /** Live triple store — use store.knex for schema migrations. */
     readonly store: TripleStore;
-    /** Host application context supplied to TernApp (e.g. { logger }). */
+    /** Host application context supplied to SystemApp (e.g. { logger }). */
     readonly context: Record<string, unknown>;
     /**
      * Extensions already installed in dependency order.
@@ -76,7 +76,7 @@ export interface ExtensionInstallContext {
 
 /**
  * The record of a successfully installed TernExtension, returned by
- * TernApp.use().  Services are keyed by the name the extension chose.
+ * SystemApp.use().  Services are keyed by the name the extension chose.
  */
 export interface InstalledExtension {
     readonly name: string;
@@ -97,7 +97,7 @@ export interface InstalledExtension {
  * seed data, service construction, and optional message handlers.
  *
  * Usage:
- *   const ternApp = await TernApp.fromYAML(config, { context: { store } });
+ *   const ternApp = await SystemApp.fromYAML(config, { context: { store } });
  *   const rbacInstalled  = await ternApp.use(rbacExtension);
  *   const convosInstalled = await ternApp.use(convosExtension);
  *   const rbac  = getRbacService(rbacInstalled);
@@ -113,7 +113,7 @@ export interface TernExtension {
     readonly description?: string;
     /**
      * Names of other TernExtension objects that must be installed via
-     * TernApp.use() before this one.  TernApp enforces this order.
+     * SystemApp.use() before this one.  SystemApp enforces this order.
      */
     readonly requires?: readonly string[];
     /**

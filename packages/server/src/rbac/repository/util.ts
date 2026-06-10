@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { IRI } from "@jasonscharf/core";
+import { IRI, makeUri } from "@jasonscharf/core";
 import type { EdgeRef, EntityRecord } from "@jasonscharf/entities";
 import { RBAC_NS } from "../constants.js";
 
@@ -23,7 +23,7 @@ export function newId(): string {
 }
 
 export function iriFor(type: RbacEntityType, id: string): IRI {
-    return new IRI(`${RBAC_NS}${type}:${id}`);
+    return new IRI(makeUri(RBAC_NS, type, id));
 }
 
 export function idFrom(iriStr: string): string {

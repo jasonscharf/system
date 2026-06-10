@@ -1,13 +1,13 @@
-import { NS_ROOT } from "@jasonscharf/core";
+import { makeUri, NS_ROOT } from "@jasonscharf/core";
 import type { Knex } from "knex";
 import { C, T } from "../schema.js";
 
 /**
  * Bootstraps the RBAC graph with three system-level entities:
  *
- *   tern:system/tenant     — the single root Tenant all system entities live under
- *   tern:system/superusers — a Group whose members have unrestricted system access
- *   tern:system/superadmin — a Role that grants the wildcard (*) permission
+ *   sys:rbac:tenant     — the single root Tenant all system entities live under
+ *   sys:rbac:superusers — a Group whose members have unrestricted system access
+ *   sys:rbac:superadmin — a Role that grants the wildcard (*) permission
  *
  * The grant chain is:
  *   superusers --[grantPrincipal]-- PolicyGrant --[grantRole]--> superadmin
@@ -17,8 +17,8 @@ import { C, T } from "../schema.js";
  * are predictable and importable as constants without a DB lookup.
  */
 
-const RBAC_NS = `${NS_ROOT}rbac:`;
-const RBAC_GRAPH_IRI = `${RBAC_NS}graph`;
+const RBAC_NS = makeUri(NS_ROOT, "rbac");
+const RBAC_GRAPH_IRI = makeUri(RBAC_NS, "graph");
 const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 const XSD_STRING = "http://www.w3.org/2001/XMLSchema#string";
 const XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
@@ -32,34 +32,34 @@ const SYS_WILDCARD_ID = "sys0000000000000000000000000004";
 const SYS_GRANT_ID = "sys0000000000000000000000000005";
 
 // Derived IRIs
-const SYS_TENANT_IRI = `${RBAC_NS}tenant:${SYS_TENANT_ID}`;
-const SYS_SUPERUSERS_IRI = `${RBAC_NS}group:${SYS_SUPERUSERS_ID}`;
-const SYS_SUPERADMIN_IRI = `${RBAC_NS}role:${SYS_SUPERADMIN_ID}`;
-const SYS_WILDCARD_IRI = `${RBAC_NS}permission:${SYS_WILDCARD_ID}`;
-const SYS_GRANT_IRI = `${RBAC_NS}grant:${SYS_GRANT_ID}`;
+const SYS_TENANT_IRI = makeUri(RBAC_NS, "tenant", SYS_TENANT_ID);
+const SYS_SUPERUSERS_IRI = makeUri(RBAC_NS, "group", SYS_SUPERUSERS_ID);
+const SYS_SUPERADMIN_IRI = makeUri(RBAC_NS, "role", SYS_SUPERADMIN_ID);
+const SYS_WILDCARD_IRI = makeUri(RBAC_NS, "permission", SYS_WILDCARD_ID);
+const SYS_GRANT_IRI = makeUri(RBAC_NS, "grant", SYS_GRANT_ID);
 
 // Class IRIs
-const CLS_TENANT = `${RBAC_NS}Tenant`;
-const CLS_USER_GROUP = `${RBAC_NS}UserGroup`;
-const CLS_ROLE = `${RBAC_NS}Role`;
-const CLS_PERMISSION = `${RBAC_NS}Permission`;
-const CLS_POLICY_GRANT = `${RBAC_NS}PolicyGrant`;
+const CLS_TENANT = makeUri(RBAC_NS, "Tenant");
+const CLS_USER_GROUP = makeUri(RBAC_NS, "UserGroup");
+const CLS_ROLE = makeUri(RBAC_NS, "Role");
+const CLS_PERMISSION = makeUri(RBAC_NS, "Permission");
+const CLS_POLICY_GRANT = makeUri(RBAC_NS, "PolicyGrant");
 
 // Predicate IRIs
-const P_TENANT_NAME = `${RBAC_NS}tenantName`;
-const P_IS_SYSTEM_TENANT = `${RBAC_NS}isSystemTenant`;
-const P_GROUP_NAME = `${RBAC_NS}groupName`;
-const P_IS_SYSTEM_GROUP = `${RBAC_NS}isSystemGroup`;
-const P_ROLE_NAME = `${RBAC_NS}roleName`;
-const P_IS_SYSTEM_ROLE = `${RBAC_NS}isSystemRole`;
-const P_PERMISSION_KEY = `${RBAC_NS}permissionKey`;
-const P_IS_DENIAL = `${RBAC_NS}isDenial`;
-const P_IN_TENANT = `${RBAC_NS}isInTenant`;
-const P_GRANTS = `${RBAC_NS}grants`;
-const P_GRANT_PRINCIPAL = `${RBAC_NS}hasPrincipal`;
-const P_GRANT_ROLE = `${RBAC_NS}hasRole`;
-const P_CREATED_AT = `${RBAC_NS}createdAt`;
-const P_UPDATED_AT = `${RBAC_NS}updatedAt`;
+const P_TENANT_NAME = makeUri(RBAC_NS, "tenantName");
+const P_IS_SYSTEM_TENANT = makeUri(RBAC_NS, "isSystemTenant");
+const P_GROUP_NAME = makeUri(RBAC_NS, "groupName");
+const P_IS_SYSTEM_GROUP = makeUri(RBAC_NS, "isSystemGroup");
+const P_ROLE_NAME = makeUri(RBAC_NS, "roleName");
+const P_IS_SYSTEM_ROLE = makeUri(RBAC_NS, "isSystemRole");
+const P_PERMISSION_KEY = makeUri(RBAC_NS, "permissionKey");
+const P_IS_DENIAL = makeUri(RBAC_NS, "isDenial");
+const P_IN_TENANT = makeUri(RBAC_NS, "isInTenant");
+const P_GRANTS = makeUri(RBAC_NS, "grants");
+const P_GRANT_PRINCIPAL = makeUri(RBAC_NS, "hasPrincipal");
+const P_GRANT_ROLE = makeUri(RBAC_NS, "hasRole");
+const P_CREATED_AT = makeUri(RBAC_NS, "createdAt");
+const P_UPDATED_AT = makeUri(RBAC_NS, "updatedAt");
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

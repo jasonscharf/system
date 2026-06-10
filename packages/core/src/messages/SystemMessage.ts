@@ -1,77 +1,77 @@
-import { NS_ROOT } from "../constants.js";
+import { makeUri, NS_CORE } from "../constants.js";
 import { uuidv4Binary } from "../util/random.js";
 
 // ── Wire format ───────────────────────────────────────────────────────────────
 // All messages that cross process boundaries (WebSocket, etc.) are serialised
 // to this shape.  IDs are UUID v4 strings so JSON round-trips are lossless.
 
-export type TernKind = "command" | "query" | "operation" | "event" | "result";
+export type SystemKind = "command" | "query" | "operation" | "event" | "result";
 
 /**
  * A reference to a well-known message type registered in the datastore.
  *
  * The `iri` uniquely names the type across all processes and is always
- * present on the wire.  The `id` is the primary key from `tern_names` and
- * is populated locally by a TernTypeResolver after the message enters a
+ * present on the wire.  The `id` is the primary key from `sys_names` and
+ * is populated locally by a SystemTypeResolver after the message enters a
  * process that holds a database connection; it enables O(1) dispatch tables
  * keyed by integer rather than string comparison.
  */
-export interface TernTypeRef {
+export interface SystemTypeRef {
     /** Full IRI of the type (e.g. "urn:sys:core:msg:ping"). */
     readonly iri: string;
-    /** PK in tern_names — present only after local resolution; never sent on the wire. */
+    /** PK in sys_names — present only after local resolution; never sent on the wire. */
     readonly id?: number;
 }
 
-/** Resolve a plain IRI string into a TernTypeRef (unresolved). */
-export function typeRef(iri: string, id?: number): TernTypeRef {
+/** Resolve a plain IRI string into a SystemTypeRef (unresolved). */
+export function typeRef(iri: string, id?: number): SystemTypeRef {
     return id !== undefined ? { iri, id } : { iri };
 }
 
 // ── Well-known message types ──────────────────────────────────────────────────
 
-const NS = `${NS_ROOT}msg:`;
+const NS = makeUri(NS_CORE, "msg");
 
-export const TERN_TYPES = {
-    ping: typeRef(`${NS}ping`),
-    echo: typeRef(`${NS}echo`),
-    tripleInsert: typeRef(`${NS}triple.insert`),
-    tripleFind: typeRef(`${NS}triple.find`),
-    tripleDelete: typeRef(`${NS}triple.delete`),
-    tripleStats: typeRef(`${NS}triple.stats`),
-} as const satisfies Record<string, TernTypeRef>;
+export const SYSTEM_TYPES = {
+    ping: typeRef(makeUri(NS, "ping")),
+    echo: typeRef(makeUri(NS, "echo")),
+    tripleInsert: typeRef(makeUri(NS, "triple.insert")),
+    tripleFind: typeRef(makeUri(NS, "triple.find")),
+    tripleDelete: typeRef(makeUri(NS, "triple.delete")),
+    tripleStats: typeRef(makeUri(NS, "triple.stats")),
+} as const satisfies Record<string, SystemTypeRef>;
 
 // ── Message interfaces ────────────────────────────────────────────────────────
 
-export interface TernMessage {
+export interface SystemMessage {
     readonly id: string;
-    readonly kind: TernKind;
+    readonly kind: SystemKind;
     /** Well-known type reference pointing to a registered name in the datastore. */
-    readonly type: TernTypeRef;
+    readonly type: SystemTypeRef;
 }
 
-export interface TernRequest extends TernMessage {
+export interface SystemRequest extends SystemMessage {
     readonly kind: "command" | "query" | "operation" | "event";
     readonly payload?: unknown;
 }
 
-export interface TernCommand extends TernRequest {
+export interface SystemCommand extends SystemRequest {
     readonly kind: "command";
 }
 
-export interface TernQuery extends TernRequest {
+export interface SystemQuery extends SystemRequest {
     readonly kind: "query";
 }
 
-export interface TernEvent extends TernRequest {
+export interface SystemEvent extends SystemRequest {
     readonly kind: "event";
 }
 
-export interface TernOperation extends TernRequest {
+export interface SystemOperation extends SystemRequest {
     readonly kind: "operation";
 }
 
-export interface TernResult extends TernMessage {
+export interface SystemResult extends SystemMessage {
     readonly kind: "result";
     readonly correlationId: string;
     readonly ok: boolean;
@@ -95,47 +95,47 @@ function newId(): string {
     ].join("-");
 }
 
-/** Create a TernCommand from a well-known TernTypeRef. */
-export function command(type: TernTypeRef, payload?: unknown): TernCommand {
+/** Create a SystemCommand from a well-known SystemTypeRef. */
+export function command(type: SystemTypeRef, payload?: unknown): SystemCommand {
     return { id: newId(), kind: "command", type, payload };
 }
 
-/** Create a TernQuery from a well-known TernTypeRef. */
-export function query(type: TernTypeRef, payload?: unknown): TernQuery {
+/** Create a SystemQuery from a well-known SystemTypeRef. */
+export function query(type: SystemTypeRef, payload?: unknown): SystemQuery {
     return { id: newId(), kind: "query", type, payload };
 }
 
-/** Create a TernOperation from a well-known TernTypeRef. */
-export function operation(type: TernTypeRef, payload?: unknown): TernOperation {
+/** Create a SystemOperation from a well-known SystemTypeRef. */
+export function operation(type: SystemTypeRef, payload?: unknown): SystemOperation {
     return { id: newId(), kind: "operation", type, payload };
 }
 
-/** Create a TernEvent from a well-known TernTypeRef. */
-export function event(type: TernTypeRef, payload?: unknown): TernEvent {
+/** Create a SystemEvent from a well-known SystemTypeRef. */
+export function event(type: SystemTypeRef, payload?: unknown): SystemEvent {
     return { id: newId(), kind: "event", type, payload };
 }
 
 export function result(
     correlationId: string,
-    type: TernTypeRef,
+    type: SystemTypeRef,
     ok: boolean,
     data?: unknown,
     error?: string,
-): TernResult {
+): SystemResult {
     return { id: newId(), kind: "result", correlationId, type, ok, data, error };
 }
 
-export function okResult(correlationId: string, type: TernTypeRef, data?: unknown): TernResult {
+export function okResult(correlationId: string, type: SystemTypeRef, data?: unknown): SystemResult {
     return result(correlationId, type, true, data);
 }
 
-export function errResult(correlationId: string, type: TernTypeRef, error: string): TernResult {
+export function errResult(correlationId: string, type: SystemTypeRef, error: string): SystemResult {
     return result(correlationId, type, false, undefined, error);
 }
 
 // ── Guards ────────────────────────────────────────────────────────────────────
 
-export function isTernRequest(msg: unknown): msg is TernRequest {
+export function isSystemRequest(msg: unknown): msg is SystemRequest {
     if (typeof msg !== "object" || msg === null) {
         return false;
     }
@@ -150,7 +150,7 @@ export function isTernRequest(msg: unknown): msg is TernRequest {
     );
 }
 
-export function isTernResult(msg: unknown): msg is TernResult {
+export function isSystemResult(msg: unknown): msg is SystemResult {
     if (typeof msg !== "object" || msg === null) {
         return false;
     }

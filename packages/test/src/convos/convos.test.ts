@@ -1,7 +1,7 @@
 /**
  * Convos integration tests.
  *
- * Runs against both SQLite (always) and Postgres (when TERN_PG_URL is set),
+ * Runs against both SQLite (always) and Postgres (when SYS_PG_URL is set),
  * each operation inside a rolled-back transaction for clean isolation.
  *
  * Suites:
@@ -73,8 +73,8 @@ const providers: DbProvider[] = [
     },
 ];
 
-if (process.env.TERN_PG_URL) {
-    const url = new URL(process.env.TERN_PG_URL);
+if (process.env.SYS_PG_URL) {
+    const url = new URL(process.env.SYS_PG_URL);
     providers.push({
         name: "Postgres",
         create: () =>

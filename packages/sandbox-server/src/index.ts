@@ -64,8 +64,8 @@ async function main(): Promise<void> {
 
     // ── Data layer ────────────────────────────────────────────────────────────
     const dbClient = (await secrets.getWithDefault(
-        "TERN_DB_CLIENT",
-        process.env.TERN_DB_CLIENT ?? "sqlite",
+        "SYS_DB_CLIENT",
+        process.env.SYS_DB_CLIENT ?? "sqlite",
     )) as "sqlite" | "pg";
 
     let knex: Awaited<ReturnType<typeof createDataContext>>;
@@ -73,24 +73,24 @@ async function main(): Promise<void> {
         knex = await createDataContext({
             client: "pg",
             host: await secrets.getWithDefault(
-                "TERN_PG_HOST",
-                process.env.TERN_PG_HOST ?? "localhost",
+                "SYS_PG_HOST",
+                process.env.SYS_PG_HOST ?? "localhost",
             ),
             port: Number(
-                await secrets.getWithDefault("TERN_PG_PORT", process.env.TERN_PG_PORT ?? "5432"),
+                await secrets.getWithDefault("SYS_PG_PORT", process.env.SYS_PG_PORT ?? "5432"),
             ),
             database: await secrets.getWithDefault(
-                "TERN_PG_DATABASE",
-                process.env.TERN_PG_DATABASE ?? "tern",
+                "SYS_PG_DATABASE",
+                process.env.SYS_PG_DATABASE ?? "system",
             ),
-            user: await secrets.getWithDefault("TERN_PG_USER", process.env.TERN_PG_USER ?? "tern"),
-            password: await secrets.getRequired("TERN_PG_PASSWORD"),
+            user: await secrets.getWithDefault("SYS_PG_USER", process.env.SYS_PG_USER ?? "tern"),
+            password: await secrets.getRequired("SYS_PG_PASSWORD"),
         });
         console.log("[sandbox-server] DB: PostgreSQL");
     } else {
         const dbPath = await secrets.getWithDefault(
-            "TERN_DB_PATH",
-            process.env.TERN_DB_PATH ?? ":memory:",
+            "SYS_DB_PATH",
+            process.env.SYS_DB_PATH ?? ":memory:",
         );
         knex = await createDataContext({ client: "sqlite", filename: dbPath });
         console.log(`[sandbox-server] DB: SQLite (${dbPath})`);

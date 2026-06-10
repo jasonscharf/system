@@ -9,7 +9,7 @@ import {
 } from "@jasonscharf/core";
 import type { Knex } from "knex";
 import { coerceLiteralValue } from "./migrations/002_time_series.js";
-import { C, type LiteralJson, type NodeKind, T } from "./schema.js";
+import { C, DEFAULT_GRAPH_IRI, type LiteralJson, type NodeKind, T } from "./schema.js";
 
 interface ServerContext extends ApplicationContext {
     trx?: Knex.Transaction;
@@ -17,15 +17,13 @@ interface ServerContext extends ApplicationContext {
 
 // ── Internal row types ────────────────────────────────────────────────────────
 
-interface NameRow {
-    id: number;
-    iri: string;
-}
 interface NodeRow {
     id: number;
     kind: NodeKind;
-    name_id: number | null;
-    blank: string | null;
+    /** IRI string for kind='iri'; null otherwise. */
+    iri: string | null;
+    /** Blank-node identifier for kind='blank'; null otherwise. */
+    blank_id: string | null;
     value: string | null;
     datatype: string | null;
     lang: string | null;
@@ -39,7 +37,7 @@ interface EdgeRow {
     subject: number;
     predicate: number;
     object: number;
-    graph: number | null;
+    graph: number;
     created_at: string;
     updated_at: string;
     is_deleted: boolean;
@@ -47,6 +45,10 @@ interface EdgeRow {
 }
 
 type RdfTerm = IRI | BlankNode | Literal;
+
+// ── Module-level constants ────────────────────────────────────────────────────
+
+const DEFAULT_GRAPH_NODE = makeIRI(DEFAULT_GRAPH_IRI);
 
 // ── Literal JSONB helpers ─────────────────────────────────────────────────────
 
@@ -81,18 +83,18 @@ function isIRI(term: RdfTerm): term is IRI {
     return !("termType" in term);
 }
 
-function nodeToTerm(row: NodeRow, nameIri: string | null): RdfTerm {
+function nodeToTerm(row: NodeRow): RdfTerm {
     if (row.kind === "iri") {
-        if (nameIri == null) {
-            throw new Error("nodeToTerm: nameIri must not be null for IRI node");
+        if (row.iri == null) {
+            throw new Error("nodeToTerm: iri must not be null for IRI node");
         }
-        return makeIRI(nameIri);
+        return makeIRI(row.iri);
     }
     if (row.kind === "blank") {
-        if (row.blank == null) {
-            throw new Error("nodeToTerm: blank must not be null for blank node");
+        if (row.blank_id == null) {
+            throw new Error("nodeToTerm: blank_id must not be null for blank node");
         }
-        return { termType: "BlankNode", id: row.blank } satisfies BlankNode;
+        return { termType: "BlankNode", id: row.blank_id } satisfies BlankNode;
     }
 
     // Literal — prefer the typed JSONB payload when present
@@ -126,6 +128,11 @@ export interface QuadPattern {
     subject?: IRI | BlankNode;
     predicate?: IRI;
     object?: IRI | BlankNode | Literal;
+    /**
+     * Named graph IRI to scope the query.
+     * Pass `null` to scope to the default graph (urn:sys:graph:default).
+     * Omit to match across all graphs.
+     */
     graph?: IRI | null;
 }
 
@@ -188,7 +195,7 @@ export interface TraverseHop {
 /**
  * A rooted graph traversal: the path that every domain query must walk from the
  * tenant root down to its leaf. Compiles to a single chain of inner joins on
- * tern_edges (one per hop), scoped to `graph` and live edges, so a result is
+ * edges (one per hop), scoped to `graph` and live edges, so a result is
  * returned only if the full root→leaf path exists. There is no flat
  * "find nodes of type X" — reachability from the root is the query.
  */
@@ -207,7 +214,6 @@ export interface RootedTraverseOpts {
 
 export interface StoreStats {
     namespaces: number;
-    names: number;
     nodes: number;
     /** Count of active (non-deleted) edges only. */
     edges: number;
@@ -221,11 +227,16 @@ export interface StoreStats {
  * Graph + time-series RDF quad store backed by Knex.
  *
  * Schema (see migrations/001_init.ts + 002_time_series.ts):
- *   tern_namespaces — prefix → IRI mappings
- *   tern_names      — every unique IRI interned once
- *   tern_nodes      — every RDF term (IRI / blank / literal); all carry created_at + updated_at.
- *                     Literal nodes additionally store a typed JSONB payload in value_json.
- *   tern_edges      — quads (subject, predicate, object, graph) with full temporal metadata.
+ *   namespaces — prefix → IRI mappings
+ *   nodes      — every RDF term (IRI / blank / literal).
+ *                IRI nodes store the full IRI string in the `iri` column.
+ *                Blank nodes store the blank-node identifier in `blank_id`.
+ *                Literal nodes store lexical form in `value`, datatype IRI in
+ *                `datatype`, language in `lang`, and a typed JSONB payload in
+ *                `value_json`.
+ *   edges      — quads (subject, predicate, object, graph) with full temporal
+ *                     metadata.  The `graph` column is always non-null: quads in the
+ *                     RDF default graph use the well-known IRI urn:sys:graph:default.
  *
  * All writes are append-only:
  *   - Nodes are interned on first use and never deleted.
@@ -313,42 +324,29 @@ export class TripleStore {
 
     // ── Term internment ───────────────────────────────────────────────────────
 
-    async ensureName(ctx: ServerContext, iriStr: string): Promise<number> {
-        return this.withTransaction(ctx, (ctx) => this._ensureName(ctx, iriStr));
-    }
-
-    private async _ensureName(ctx: ServerContext, iriStr: string): Promise<number> {
-        const row = await this._db(ctx)(T.names).where(C.iri, iriStr).first<NameRow>();
-        if (row) {
-            return row.id;
-        }
-        return this._insert(ctx, T.names, { [C.iri]: iriStr });
-    }
-
     async ensureNode(ctx: ServerContext, term: RdfTerm): Promise<number> {
         return this.withTransaction(ctx, (ctx) => this._ensureNode(ctx, term));
     }
 
     private async _ensureNode(ctx: ServerContext, term: RdfTerm): Promise<number> {
         if (isIRI(term)) {
-            const nameId = await this.ensureName(ctx, term.value);
             const row = await this._db(ctx)(T.nodes)
-                .where({ [C.kind]: "iri", [C.nameId]: nameId })
+                .where({ [C.kind]: "iri", [C.iri]: term.value })
                 .first<NodeRow>();
             if (row) {
                 return row.id;
             }
-            return this._insert(ctx, T.nodes, { [C.kind]: "iri", [C.nameId]: nameId });
+            return this._insert(ctx, T.nodes, { [C.kind]: "iri", [C.iri]: term.value });
         }
 
         if (term.termType === "BlankNode") {
             const row = await this._db(ctx)(T.nodes)
-                .where({ [C.kind]: "blank", [C.blank]: term.id })
+                .where({ [C.kind]: "blank", [C.blankId]: term.id })
                 .first<NodeRow>();
             if (row) {
                 return row.id;
             }
-            return this._insert(ctx, T.nodes, { [C.kind]: "blank", [C.blank]: term.id });
+            return this._insert(ctx, T.nodes, { [C.kind]: "blank", [C.blankId]: term.id });
         }
 
         // Literal node — deduplicate by (value, datatype, lang), populate value_json
@@ -382,6 +380,9 @@ export class TripleStore {
      * Asserts a quad.  Idempotent: if an identical active quad already exists,
      * nothing is written.  Restores a previously soft-deleted quad by creating
      * a fresh edge row (the soft-deleted row is left as history).
+     *
+     * Quads with `graph: DEFAULT_GRAPH` or no graph are stored under the
+     * well-known IRI urn:sys:graph:default so `graph` is never null.
      */
     async insert(ctx: ServerContext, quad: Quad): Promise<void> {
         return this.withTransaction(ctx, (ctx) => this._insertQuad(ctx, quad));
@@ -389,26 +390,21 @@ export class TripleStore {
 
     private async _insertQuad(ctx: ServerContext, quad: Quad): Promise<void> {
         const [sId, pId, oId] = await Promise.all([
-            this.ensureNode(ctx, quad.subject as RdfTerm),
-            this.ensureNode(ctx, quad.predicate as IRI),
-            this.ensureNode(ctx, quad.object as RdfTerm),
+            this._ensureNode(ctx, quad.subject as RdfTerm),
+            this._ensureNode(ctx, quad.predicate as IRI),
+            this._ensureNode(ctx, quad.object as RdfTerm),
         ]);
 
         const gIsDefault =
             !quad.graph || ("termType" in quad.graph && quad.graph.termType === "DefaultGraph");
-        const gId = gIsDefault ? null : await this.ensureNode(ctx, quad.graph as IRI);
+        const graphTerm = gIsDefault ? DEFAULT_GRAPH_NODE : (quad.graph as IRI);
+        const gId = await this._ensureNode(ctx, graphTerm);
 
         // Deduplication: skip if an active edge with exactly this quad already exists
-        const existsQ = this._db(ctx)(T.edges)
-            .where({ [C.subject]: sId, [C.predicate]: pId, [C.object]: oId })
-            .where(C.isDeleted, false);
-        if (gId === null) {
-            existsQ.whereNull(C.graph);
-        } else {
-            existsQ.where(C.graph, gId);
-        }
-
-        const existing = await existsQ.first<{ id: number }>();
+        const existing = await this._db(ctx)(T.edges)
+            .where({ [C.subject]: sId, [C.predicate]: pId, [C.object]: oId, [C.graph]: gId })
+            .where(C.isDeleted, false)
+            .first<{ id: number }>();
         if (existing) {
             return;
         }
@@ -507,9 +503,7 @@ export class TripleStore {
             nodeIds.add(e.subject);
             nodeIds.add(e.predicate);
             nodeIds.add(e.object);
-            if (e.graph !== null) {
-                nodeIds.add(e.graph);
-            }
+            nodeIds.add(e.graph);
         }
         const nodeMap = await this._loadNodes(ctx, [...nodeIds]);
 
@@ -526,16 +520,7 @@ export class TripleStore {
             if (object == null) {
                 throw new Error(`findHistory: missing node for object id ${e.object}`);
             }
-            let graph: IRI | DefaultGraph;
-            if (e.graph !== null) {
-                const graphNode = nodeMap.get(e.graph);
-                if (graphNode == null) {
-                    throw new Error(`findHistory: missing node for graph id ${e.graph}`);
-                }
-                graph = graphNode as IRI;
-            } else {
-                graph = DEFAULT_GRAPH satisfies DefaultGraph;
-            }
+            const graph = this._graphTermFromNode(nodeMap.get(e.graph));
             return {
                 subject: subject as IRI | BlankNode,
                 predicate: predicate as IRI,
@@ -598,10 +583,11 @@ export class TripleStore {
 
         let q = this._db(ctx)(T.edges).whereIn(C.subject, validIds).where(C.isDeleted, false);
         if (graph !== undefined) {
-            q =
-                graph === null
-                    ? q.whereNull(C.graph)
-                    : q.where(C.graph, await this._nodeId(ctx, graph));
+            const gId = await this._resolveGraph(ctx, graph);
+            if (gId === null) {
+                return 0;
+            }
+            q = q.where(C.graph, gId);
         }
         return q.update({ [C.isDeleted]: true });
     }
@@ -646,10 +632,11 @@ export class TripleStore {
             .whereIn(C.predicate, validPIds)
             .where(C.isDeleted, false);
         if (graph !== undefined) {
-            q =
-                graph === null
-                    ? q.whereNull(C.graph)
-                    : q.where(C.graph, await this._nodeId(ctx, graph));
+            const gId = await this._resolveGraph(ctx, graph);
+            if (gId === null) {
+                return 0;
+            }
+            q = q.where(C.graph, gId);
         }
         return q.update({ [C.isDeleted]: true });
     }
@@ -686,12 +673,6 @@ export class TripleStore {
         }
 
         const idToSubject = new Map(validPairs.map(([term, id]) => [id, term]));
-        const graphId =
-            graph !== undefined
-                ? graph === null
-                    ? null
-                    : await this._nodeId(ctx, graph)
-                : undefined;
 
         let edgesQ = this._db(ctx)(T.edges)
             .whereIn(
@@ -699,8 +680,12 @@ export class TripleStore {
                 validPairs.map(([, id]) => id),
             )
             .where(C.isDeleted, false);
-        if (graphId !== undefined) {
-            edgesQ = graphId === null ? edgesQ.whereNull(C.graph) : edgesQ.where(C.graph, graphId);
+        if (graph !== undefined) {
+            const gId = await this._resolveGraph(ctx, graph);
+            if (gId === null) {
+                return new Map();
+            }
+            edgesQ = edgesQ.where(C.graph, gId);
         }
         const edges = await edgesQ.select<EdgeRow[]>("*");
 
@@ -713,9 +698,7 @@ export class TripleStore {
             nodeIds.add(e.subject);
             nodeIds.add(e.predicate);
             nodeIds.add(e.object);
-            if (e.graph !== null) {
-                nodeIds.add(e.graph);
-            }
+            nodeIds.add(e.graph);
         }
         const nodeMap = await this._loadNodes(ctx, [...nodeIds]);
 
@@ -741,16 +724,7 @@ export class TripleStore {
             if (objectNode == null) {
                 throw new Error(`findForSubjects: missing node for object id ${e.object}`);
             }
-            let graph: IRI | DefaultGraph;
-            if (e.graph !== null) {
-                const graphNode = nodeMap.get(e.graph);
-                if (graphNode == null) {
-                    throw new Error(`findForSubjects: missing node for graph id ${e.graph}`);
-                }
-                graph = graphNode as IRI;
-            } else {
-                graph = DEFAULT_GRAPH satisfies DefaultGraph;
-            }
+            const graph = this._graphTermFromNode(nodeMap.get(e.graph));
             result.get(key)?.push({
                 subject: subjectNode as IRI | BlankNode,
                 predicate: predicateNode as IRI,
@@ -797,16 +771,6 @@ export class TripleStore {
         }
 
         const idToSubject = new Map(validPairs.map(([term, id]) => [id, term]));
-        const graphId =
-            graph !== undefined
-                ? graph === null
-                    ? null
-                    : await this._nodeId(ctx, graph)
-                : undefined;
-        // A graph that was requested but never interned matches nothing.
-        if (graphId === null && graph != null) {
-            return new Map();
-        }
 
         let q = this._db(ctx)(T.edges)
             .whereIn(
@@ -814,8 +778,12 @@ export class TripleStore {
                 validPairs.map(([, id]) => id),
             )
             .where(C.isDeleted, false);
-        if (graphId !== undefined && graphId !== null) {
-            q = q.where(C.graph, graphId);
+        if (graph !== undefined) {
+            const gId = await this._resolveGraph(ctx, graph);
+            if (gId === null) {
+                return new Map();
+            }
+            q = q.where(C.graph, gId);
         }
         const rows = await q
             .groupBy(C.subject)
@@ -880,16 +848,11 @@ export class TripleStore {
 
         let graphClause = "1 = 1";
         if (opts.graph !== undefined) {
-            if (opts.graph === null) {
-                graphClause = `e.${C.graph} IS NULL`;
-            } else {
-                const gId = await this._nodeId(ctx, opts.graph as RdfTerm);
-                if (gId === null) {
-                    // Graph never interned ⇒ no edges in it; only roots qualify.
-                    return includeRoots ? this._idsToIris(ctx, rootIds) : [];
-                }
-                graphClause = `e.${C.graph} = ${gId}`;
+            const gId = await this._resolveGraph(ctx, opts.graph);
+            if (gId === null) {
+                return includeRoots ? this._idsToIris(ctx, rootIds) : [];
             }
+            graphClause = `e.${C.graph} = ${gId}`;
         }
 
         const fromCol = opts.direction === "out" ? C.subject : C.object;
@@ -950,7 +913,7 @@ export class TripleStore {
 
     /**
      * Walks a fixed path from `opts.root` to a leaf, following `opts.hops` as a
-     * chain of inner joins on tern_edges. Returns the leaf IRIs reachable via the
+     * chain of inner joins on edges. Returns the leaf IRIs reachable via the
      * full path — the rooted-traversal primitive the query layer is built on.
      * Every join is scoped to `opts.graph` and live edges, so a leaf is returned
      * only when the entire root→leaf path exists in that graph.
@@ -966,25 +929,18 @@ export class TripleStore {
         }
 
         // Resolve the graph scope to a node id once; reused on every join.
-        let graphId: number | null | undefined;
-        if (opts.graph === undefined) {
-            graphId = undefined;
-        } else if (opts.graph === null) {
-            graphId = null;
-        } else {
-            graphId = await this._nodeId(ctx, opts.graph as RdfTerm);
-            if (graphId === null) {
+        let graphId: number | undefined;
+        if (opts.graph !== undefined) {
+            const gId = await this._resolveGraph(ctx, opts.graph);
+            if (gId === null) {
                 return [];
             }
+            graphId = gId;
         }
         const falseLit = this._isPg() ? "false" : "0";
         const scope = (alias: string): string => {
             const g =
-                graphId === undefined
-                    ? "1 = 1"
-                    : graphId === null
-                      ? `${alias}.${C.graph} IS NULL`
-                      : `${alias}.${C.graph} = ${graphId}`;
+                graphId === undefined ? "1 = 1" : `${alias}.${C.graph} = ${graphId}`;
             return `${g} AND ${alias}.${C.isDeleted} = ${falseLit}`;
         };
 
@@ -1079,9 +1035,8 @@ export class TripleStore {
     }
 
     private async _stats(ctx: ServerContext): Promise<StoreStats> {
-        const [ns, na, no, ne, net] = await Promise.all([
+        const [ns, no, ne, net] = await Promise.all([
             this._db(ctx)(T.namespaces).count<[{ count: number }]>(`${C.id} as count`),
-            this._db(ctx)(T.names).count<[{ count: number }]>(`${C.id} as count`),
             this._db(ctx)(T.nodes).count<[{ count: number }]>(`${C.id} as count`),
             this._db(ctx)(T.edges)
                 .where(C.isDeleted, false)
@@ -1090,7 +1045,6 @@ export class TripleStore {
         ]);
         return {
             namespaces: Number(ns[0].count),
-            names: Number(na[0].count),
             nodes: Number(no[0].count),
             edges: Number(ne[0].count),
             edgesTotal: Number(net[0].count),
@@ -1101,20 +1055,15 @@ export class TripleStore {
 
     private async _nodeId(ctx: ServerContext, term: RdfTerm): Promise<number | null> {
         if (isIRI(term)) {
-            const name = await this._db(ctx)(T.names).where(C.iri, term.value).first<NameRow>();
-            if (!name) {
-                return null;
-            }
             const node = await this._db(ctx)(T.nodes)
-                .where({ [C.kind]: "iri", [C.nameId]: name.id })
+                .where({ [C.kind]: "iri", [C.iri]: term.value })
                 .first<NodeRow>();
-            /* v8 ignore next */
             return node?.id ?? null;
         }
 
         if (term.termType === "BlankNode") {
             const node = await this._db(ctx)(T.nodes)
-                .where({ [C.kind]: "blank", [C.blank]: term.id })
+                .where({ [C.kind]: "blank", [C.blankId]: term.id })
                 .first<NodeRow>();
             return node?.id ?? null;
         }
@@ -1134,6 +1083,16 @@ export class TripleStore {
     }
 
     /**
+     * Resolves a graph term to its node ID.
+     * `null` input means "default graph" → looks up urn:sys:graph:default.
+     * Returns null if the graph has never been interned (no matching quads).
+     */
+    private async _resolveGraph(ctx: ServerContext, graph: IRI | null): Promise<number | null> {
+        const gTerm = graph === null ? DEFAULT_GRAPH_NODE : graph;
+        return this._nodeId(ctx, gTerm);
+    }
+
+    /**
      * Resolves a QuadPattern to concrete node IDs.
      * Returns null (meaning "no rows can match") if any required node isn't in the store.
      */
@@ -1144,13 +1103,13 @@ export class TripleStore {
         subject?: number;
         predicate?: number;
         object?: number;
-        graphId?: number | null; // null = default graph; undefined = no graph filter
+        graphId?: number;
     } | null> {
         const result: {
             subject?: number;
             predicate?: number;
             object?: number;
-            graphId?: number | null;
+            graphId?: number;
         } = {};
 
         if (pattern.subject !== undefined) {
@@ -1175,15 +1134,11 @@ export class TripleStore {
             result.object = id;
         }
         if (pattern.graph !== undefined) {
-            if (pattern.graph === null) {
-                result.graphId = null;
-            } else {
-                const id = await this._nodeId(ctx, pattern.graph);
-                if (id === null) {
-                    return null;
-                }
-                result.graphId = id;
+            const id = await this._resolveGraph(ctx, pattern.graph);
+            if (id === null) {
+                return null;
             }
+            result.graphId = id;
         }
         return result;
     }
@@ -1203,7 +1158,7 @@ export class TripleStore {
             q = q.where(C.object, ids.object);
         }
         if (ids.graphId !== undefined) {
-            q = ids.graphId === null ? q.whereNull(C.graph) : q.where(C.graph, ids.graphId);
+            q = q.where(C.graph, ids.graphId);
         }
         return q;
     }
@@ -1214,9 +1169,7 @@ export class TripleStore {
             nodeIds.add(e.subject);
             nodeIds.add(e.predicate);
             nodeIds.add(e.object);
-            if (e.graph !== null) {
-                nodeIds.add(e.graph);
-            }
+            nodeIds.add(e.graph);
         }
         const nodeMap = await this._loadNodes(ctx, [...nodeIds]);
 
@@ -1233,16 +1186,7 @@ export class TripleStore {
             if (object == null) {
                 throw new Error(`_hydrateEdges: missing node for object id ${e.object}`);
             }
-            let graph: IRI | DefaultGraph;
-            if (e.graph !== null) {
-                const graphNode = nodeMap.get(e.graph);
-                if (graphNode == null) {
-                    throw new Error(`_hydrateEdges: missing node for graph id ${e.graph}`);
-                }
-                graph = graphNode as IRI;
-            } else {
-                graph = DEFAULT_GRAPH satisfies DefaultGraph;
-            }
+            const graph = this._graphTermFromNode(nodeMap.get(e.graph));
             return {
                 subject: subject as IRI | BlankNode,
                 predicate: predicate as IRI,
@@ -1252,30 +1196,29 @@ export class TripleStore {
         });
     }
 
+    /**
+     * Converts a graph node from the node map to the appropriate Quad graph term.
+     * The well-known default graph IRI is mapped back to the DEFAULT_GRAPH sentinel.
+     */
+    private _graphTermFromNode(node: RdfTerm | undefined): IRI | DefaultGraph {
+        if (node == null || !isIRI(node)) {
+            // Defensive fallback — graph column is always set to a non-null IRI node.
+            /* v8 ignore next */
+            return DEFAULT_GRAPH satisfies DefaultGraph;
+        }
+        if ((node as IRI).value === DEFAULT_GRAPH_IRI) {
+            return DEFAULT_GRAPH satisfies DefaultGraph;
+        }
+        return node as IRI;
+    }
+
     private async _loadNodes(ctx: ServerContext, ids: number[]): Promise<Map<number, RdfTerm>> {
         /* v8 ignore next */
         if (ids.length === 0) {
             return new Map();
         }
-
         const nodes = await this._db(ctx)(T.nodes).whereIn(C.id, ids).select<NodeRow[]>("*");
-
-        const iriNodeIds = nodes
-            .filter((n) => n.kind === "iri" && n.name_id !== null)
-            .map((n) => n.name_id as number);
         /* v8 ignore next */
-        const names: NameRow[] =
-            iriNodeIds.length > 0
-                ? await this._db(ctx)(T.names).whereIn(C.id, iriNodeIds).select<NameRow[]>("*")
-                : [];
-        const nameMap = new Map(names.map((n) => [n.id, n.iri]));
-
-        /* v8 ignore next */
-        return new Map(
-            nodes.map((n) => [
-                n.id,
-                nodeToTerm(n, n.name_id !== null ? (nameMap.get(n.name_id) ?? null) : null),
-            ]),
-        );
+        return new Map(nodes.map((n) => [n.id, nodeToTerm(n)]));
     }
 }

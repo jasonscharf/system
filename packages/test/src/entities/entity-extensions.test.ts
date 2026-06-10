@@ -3,7 +3,7 @@
  *   - EntitySchema.graphIri: pin an entity type to a fixed, tenant-independent graph
  *   - EntityStore.addEdge / removeEdge: append/remove a single edge (many-edges)
  *   - EntityQuery.connectedToAny: reverse batched edge-membership filter
- * Runs against SQLite (always) and Postgres (when TERN_PG_URL is set).
+ * Runs against SQLite (always) and Postgres (when SYS_PG_URL is set).
  */
 
 import { IRI } from "@jasonscharf/core";
@@ -47,8 +47,8 @@ interface Provider {
 const providers: Provider[] = [
     { name: "SQLite", create: () => createDataContext({ client: "sqlite", filename: ":memory:" }) },
 ];
-if (process.env.TERN_PG_URL) {
-    const url = new URL(process.env.TERN_PG_URL);
+if (process.env.SYS_PG_URL) {
+    const url = new URL(process.env.SYS_PG_URL);
     providers.push({
         name: "Postgres",
         create: () =>

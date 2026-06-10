@@ -25,7 +25,7 @@ type SecretClientLike = {
  * Environment variable names (e.g. `GOOGLE_CLIENT_SECRET`) are mapped to Azure
  * Key Vault secret names by lowercasing and replacing underscores with hyphens:
  *   GOOGLE_CLIENT_SECRET  →  google-client-secret
- *   TERN_PG_PASSWORD      →  tern-pg-password
+ *   SYS_PG_PASSWORD      →  tern-pg-password
  *
  * Azure KV secret names allow only [a-zA-Z0-9-] and max 127 characters.
  */
@@ -93,6 +93,8 @@ export class AzureKeyVaultProvider implements ISecretsProvider {
     }
 
     private _toVaultName(key: string): string {
-        return key.toLowerCase().replace(/_/g, "-");
+        // SYS_ is the internal env prefix; Azure vault secrets keep the tern- prefix
+        const normalized = key.startsWith("SYS_") ? `TERN_${key.slice(4)}` : key;
+        return normalized.toLowerCase().replace(/_/g, "-");
     }
 }

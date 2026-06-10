@@ -1,12 +1,12 @@
 import { errResult } from "@jasonscharf/core";
 import type { PayloadSchemaRegistry } from "../registry/PayloadSchemaRegistry.js";
-import type { TernMiddlewareFn } from "./TernRouter.js";
+import type { SystemMiddlewareFn } from "./SystemRouter.js";
 
 /**
- * Middleware factory that validates TernRequest.payload against any SHACL
+ * Middleware factory that validates SystemRequest.payload against any SHACL
  * shape registered in the supplied PayloadSchemaRegistry.
  *
- * Mount this as global middleware on a TernRouter:
+ * Mount this as global middleware on a SystemRouter:
  *
  *   const reg = new PayloadSchemaRegistry();
  *   reg.register(CREATE_USER, UserShape, userPropertyMap);
@@ -18,7 +18,7 @@ import type { TernMiddlewareFn } from "./TernRouter.js";
  * If validation fails the middleware sets ctx.result to an error result and
  * does not call next(), short-circuiting the handler chain.
  */
-export function payloadValidation(registry: PayloadSchemaRegistry): TernMiddlewareFn {
+export function payloadValidation(registry: PayloadSchemaRegistry): SystemMiddlewareFn {
     return async (ctx, next) => {
         const typeIri = ctx.request.type.iri;
 

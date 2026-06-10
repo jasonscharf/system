@@ -1,7 +1,7 @@
-import { IRI, NS_ROOT } from "@jasonscharf/core";
+import { IRI, makeUri, NS_ROOT } from "@jasonscharf/core";
 
-export const RBAC_NS = `${NS_ROOT}rbac:`;
-export const RBAC_GRAPH = new IRI(`${RBAC_NS}graph`);
+export const RBAC_NS = makeUri(NS_ROOT, "rbac");
+export const RBAC_GRAPH = new IRI(makeUri(RBAC_NS, "graph"));
 
 // Stable system entity IDs — must match values in migration 004_rbac
 export const SYS_TENANT_ID = "sys0000000000000000000000000001";
@@ -11,11 +11,11 @@ export const SYS_WILDCARD_PERM_ID = "sys0000000000000000000000000004";
 export const SYS_GRANT_ID = "sys0000000000000000000000000005";
 
 // Derived system IRIs
-export const SYS_TENANT_IRI = `${RBAC_NS}tenant:${SYS_TENANT_ID}`;
-export const SYS_SUPERUSERS_IRI = `${RBAC_NS}group:${SYS_SUPERUSERS_ID}`;
-export const SYS_SUPERADMIN_IRI = `${RBAC_NS}role:${SYS_SUPERADMIN_ID}`;
-export const SYS_WILDCARD_PERM_IRI = `${RBAC_NS}permission:${SYS_WILDCARD_PERM_ID}`;
-export const SYS_GRANT_IRI = `${RBAC_NS}grant:${SYS_GRANT_ID}`;
+export const SYS_TENANT_IRI = makeUri(RBAC_NS, "tenant", SYS_TENANT_ID);
+export const SYS_SUPERUSERS_IRI = makeUri(RBAC_NS, "group", SYS_SUPERUSERS_ID);
+export const SYS_SUPERADMIN_IRI = makeUri(RBAC_NS, "role", SYS_SUPERADMIN_ID);
+export const SYS_WILDCARD_PERM_IRI = makeUri(RBAC_NS, "permission", SYS_WILDCARD_PERM_ID);
+export const SYS_GRANT_IRI = makeUri(RBAC_NS, "grant", SYS_GRANT_ID);
 
 export const WILDCARD_PERMISSION = "*";
 

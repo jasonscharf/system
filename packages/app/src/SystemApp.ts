@@ -1,5 +1,5 @@
 import { dirname, resolve } from "node:path";
-import type { TernTypeRef } from "@jasonscharf/core";
+import type { SystemTypeRef } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import { FlowApp } from "@jasonscharf/flow";
 import { loadAppConfig, mergeHandlers } from "./config/loader.js";
@@ -16,7 +16,7 @@ import {
     HandlerRegistry,
 } from "./registry/HandlerRegistry.js";
 
-export interface TernAppOptions {
+export interface SystemAppOptions {
     /**
      * Extra context fields injected into every handler invocation alongside
      * the standard `connectionId`.  Pass `{ store }` here and all installed
@@ -28,11 +28,11 @@ export interface TernAppOptions {
 }
 
 /**
- * TernApp — the top-level application object.
+ * SystemApp — the top-level application object.
  *
  * Create via the static factory methods:
- *   TernApp.fromYAML('./config/app.yaml', options)
- *   TernApp.fromEntries([...handlerEntries], options)
+ *   SystemApp.fromYAML('./config/app.yaml', options)
+ *   SystemApp.fromEntries([...handlerEntries], options)
  *
  * Install infrastructure extensions before starting:
  *   const rbacInstalled  = await app.use(rbacExtension);
@@ -42,7 +42,7 @@ export interface TernAppOptions {
  *
  * Then call `app.start()` to bring up the FBP runtime.
  */
-export class TernApp {
+export class SystemApp {
     readonly config: AppConfig;
     readonly registry: HandlerRegistry;
     readonly flow: FlowApp;
@@ -53,7 +53,7 @@ export class TernApp {
     private constructor(
         config: AppConfig,
         registry: HandlerRegistry,
-        options: TernAppOptions = {},
+        options: SystemAppOptions = {},
     ) {
         this.config = config;
         this.registry = registry;
@@ -65,28 +65,28 @@ export class TernApp {
 
     /**
      * Load an application config from a YAML file, resolve all referenced
-     * extension configs (YAML or Turtle), and return a ready-to-start TernApp.
+     * extension configs (YAML or Turtle), and return a ready-to-start SystemApp.
      */
-    static async fromYAML(configPath: string, options: TernAppOptions = {}): Promise<TernApp> {
+    static async fromYAML(configPath: string, options: SystemAppOptions = {}): Promise<SystemApp> {
         const absPath = resolve(configPath);
         const { config, resolvedHandlers } = await loadAppConfig(absPath);
         const registry = new HandlerRegistry(dirname(absPath));
         registry.registerAll(resolvedHandlers);
-        return new TernApp(config, registry, options);
+        return new SystemApp(config, registry, options);
     }
 
     /**
-     * Construct a TernApp directly from a flat list of HandlerEntries.
+     * Construct a SystemApp directly from a flat list of HandlerEntries.
      * Useful for programmatic setup or testing without config files.
      */
     static fromEntries(
         config: AppConfig,
         entries: HandlerEntry[],
-        options: TernAppOptions = {},
-    ): TernApp {
+        options: SystemAppOptions = {},
+    ): SystemApp {
         const registry = new HandlerRegistry(process.cwd());
         registry.registerAll(mergeHandlers([], entries));
-        return new TernApp(config, registry, options);
+        return new SystemApp(config, registry, options);
     }
 
     // ── Extension lifecycle ───────────────────────────────────────────────────
@@ -98,12 +98,12 @@ export class TernApp {
      * twice returns the cached result without re-running `install()`.
      *
      * Prerequisites listed in `extension.requires` must already be installed;
-     * TernApp throws if they are not.
+     * SystemApp throws if they are not.
      *
      * Installed services are automatically merged into the HandlerContext so
      * message handlers can access them as `ctx.rbac`, `ctx.convos`, etc.
      *
-     * Requires `{ store: TripleStore }` to be present in TernAppOptions.context.
+     * Requires `{ store: TripleStore }` to be present in SystemAppOptions.context.
      */
     async use(extension: TernExtension): Promise<InstalledExtension> {
         const existing = this._installed.get(extension.name);
@@ -122,7 +122,7 @@ export class TernApp {
         const store = this._extraContext.store as TripleStore | undefined;
         if (!store) {
             throw new Error(
-                `Extension "${extension.name}" requires a TripleStore — pass { store } in TernApp context`,
+                `Extension "${extension.name}" requires a TripleStore — pass { store } in SystemApp context`,
             );
         }
 
@@ -158,7 +158,7 @@ export class TernApp {
     // ── Registration ──────────────────────────────────────────────────────────
 
     /** Register an inline handler — useful for host-app defaults not in config. */
-    register(typeRef: TernTypeRef, handler: HandlerFn, priority?: number): this {
+    register(typeRef: SystemTypeRef, handler: HandlerFn, priority?: number): this {
         this.registry.registerInline(typeRef, handler, priority);
         return this;
     }

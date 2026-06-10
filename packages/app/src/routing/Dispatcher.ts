@@ -1,10 +1,10 @@
-import type { TernRequest, TernResult } from "@jasonscharf/core";
+import type { SystemRequest, SystemResult } from "@jasonscharf/core";
 
 /**
- * Minimal dispatch contract shared by TernRouter, HandlerRegistry, and any
- * other object that can process a TernRequest.  MessageRouter accepts any
+ * Minimal dispatch contract shared by SystemRouter, HandlerRegistry, and any
+ * other object that can process a SystemRequest.  MessageRouter accepts any
  * Dispatcher so the two implementations are interchangeable.
  */
 export interface Dispatcher {
-    dispatch(request: TernRequest, extras: Record<string, unknown>): Promise<TernResult>;
+    dispatch(request: SystemRequest, extras: Record<string, unknown>): Promise<SystemResult>;
 }

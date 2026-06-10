@@ -2,9 +2,9 @@ import type { HandlerContext } from "@jasonscharf/app";
 import {
     errResult,
     okResult,
-    TERN_TYPES,
-    type TernRequest,
-    type TernResult,
+    SYSTEM_TYPES,
+    type SystemRequest,
+    type SystemResult,
 } from "@jasonscharf/core";
 
 interface EchoPayload {
@@ -12,18 +12,18 @@ interface EchoPayload {
 }
 
 /**
- * tern:echo — returns the caller's message back, uppercased, with a server
+ * urn:sys:core:msg:echo — returns the caller's message back, uppercased, with a server
  * timestamp.  Registered via config/extensions/echo.yaml so no code changes
  * to the server entry-point are needed to add or remove it.
  */
-export async function handleEcho(request: TernRequest, _ctx: HandlerContext): Promise<TernResult> {
+export async function handleEcho(request: SystemRequest, _ctx: HandlerContext): Promise<SystemResult> {
     const payload = request.payload as Partial<EchoPayload> | undefined;
 
     if (!payload || typeof payload.message !== "string") {
-        return errResult(request.id, TERN_TYPES.echo, "Payload must be { message: string }");
+        return errResult(request.id, SYSTEM_TYPES.echo, "Payload must be { message: string }");
     }
 
-    return okResult(request.id, TERN_TYPES.echo, {
+    return okResult(request.id, SYSTEM_TYPES.echo, {
         echo: payload.message.toUpperCase(),
         original: payload.message,
         receivedAt: Date.now(),

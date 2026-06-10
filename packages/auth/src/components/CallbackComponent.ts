@@ -1,3 +1,4 @@
+import { makeUri, NS_CORE } from "@jasonscharf/core";
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
 import { buildServerContext, systemSec } from "@jasonscharf/server";
 import { SESSION_TTL_SECS } from "../constants.js";
@@ -155,7 +156,7 @@ export class CallbackComponent extends FlowComponent {
             });
 
             await this._sessions.set(
-                `tern:session:${session.sessionToken}`,
+                makeUri(NS_CORE, "session", session.sessionToken),
                 JSON.stringify({
                     userId: user.id,
                     deviceId: device.id,

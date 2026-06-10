@@ -10,14 +10,14 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl:  <http://www.w3.org/2002/07/owl#> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
-@prefix tern: <urn:sys:core:core:> .
+@prefix sys: <urn:sys:core:core:> .
 
 # ── PropGroup infrastructure ──────────────────────────────────────────────────
 
-tern:propGroup a owl:ObjectProperty ;
+sys:propGroup a owl:ObjectProperty ;
     rdfs:comment "Links an entity node to one of its PropGroup nodes." .
 
-tern:handle a owl:DatatypeProperty ;
+sys:handle a owl:DatatypeProperty ;
     rdfs:range xsd:string ;
     rdfs:comment "The handle string ('id@version') identifying a PropGroup." .
 
@@ -34,65 +34,65 @@ tern:handle a owl:DatatypeProperty ;
 # Example (Group has members; User holds a view over those members):
 #
 #   group:abc/pg/tern_core_v1  ← PropGroup that owns the members collection
-#   view:xyz  tern:cvSource  "group:abc/pg/tern_core_v1"
-#   view:xyz  tern:cvProp    "http://test.dev/group/member"
-#   view:xyz  tern:cvSortProp "urn:sys:core:auth:displayName"
-#   view:xyz  tern:cvSortDir  "asc"
-#   view:xyz  tern:cvItem    view-item:1
-#   view-item:1  tern:cviView  view:xyz
-#   view-item:1  tern:cviRef   "urn:sys:core:auth:user:alice_id"
-#   view-item:1  tern:cviPos   0
+#   view:xyz  sys:cvSource  "group:abc/pg/tern_core_v1"
+#   view:xyz  sys:cvProp    "http://test.dev/group/member"
+#   view:xyz  sys:cvSortProp "urn:sys:core:auth:displayName"
+#   view:xyz  sys:cvSortDir  "asc"
+#   view:xyz  sys:cvItem    view-item:1
+#   view-item:1  sys:cviView  view:xyz
+#   view-item:1  sys:cviRef   "urn:sys:core:auth:user:alice_id"
+#   view-item:1  sys:cviPos   0
 
-tern:CollectionView a owl:Class ;
+sys:CollectionView a owl:Class ;
     rdfs:comment "A view over a collection property.  Stores sort/filter config and owns CollectionViewItems." .
 
-tern:CollectionViewItem a owl:Class ;
+sys:CollectionViewItem a owl:Class ;
     rdfs:comment "One entry in a CollectionView.  Points back to its parent view and to the actual item." .
 
 # ── CollectionView data properties ───────────────────────────────────────────
 
-tern:cvSource a owl:DatatypeProperty ;
-    rdfs:domain tern:CollectionView ;
+sys:cvSource a owl:DatatypeProperty ;
+    rdfs:domain sys:CollectionView ;
     rdfs:range  xsd:string ;
     rdfs:comment "IRI string of the PropGroup node that owns the source collection." .
 
-tern:cvProp a owl:DatatypeProperty ;
-    rdfs:domain tern:CollectionView ;
+sys:cvProp a owl:DatatypeProperty ;
+    rdfs:domain sys:CollectionView ;
     rdfs:range  xsd:string ;
     rdfs:comment "IRI string of the property on the source PropGroup this view is over." .
 
-tern:cvSortProp a owl:DatatypeProperty ;
-    rdfs:domain tern:CollectionView ;
+sys:cvSortProp a owl:DatatypeProperty ;
+    rdfs:domain sys:CollectionView ;
     rdfs:range  xsd:string ;
     rdfs:comment "Optional IRI string of the property to sort by on each referenced entity." .
 
-tern:cvSortDir a owl:DatatypeProperty ;
-    rdfs:domain tern:CollectionView ;
+sys:cvSortDir a owl:DatatypeProperty ;
+    rdfs:domain sys:CollectionView ;
     rdfs:range  xsd:string ;
     rdfs:comment "Sort direction: 'asc' or 'desc' (default 'asc')." .
 
 # ── CollectionView object properties ─────────────────────────────────────────
 
-tern:cvItem a owl:ObjectProperty ;
-    rdfs:domain tern:CollectionView ;
-    rdfs:range  tern:CollectionViewItem ;
+sys:cvItem a owl:ObjectProperty ;
+    rdfs:domain sys:CollectionView ;
+    rdfs:range  sys:CollectionViewItem ;
     rdfs:comment "Links a CollectionView to one of its CollectionViewItems." .
 
 # ── CollectionViewItem data properties ───────────────────────────────────────
 
-tern:cviRef a owl:DatatypeProperty ;
-    rdfs:domain tern:CollectionViewItem ;
+sys:cviRef a owl:DatatypeProperty ;
+    rdfs:domain sys:CollectionViewItem ;
     rdfs:range  xsd:string ;
     rdfs:comment "String representation of the referenced collection item (IRI or plain value)." .
 
-tern:cviPos a owl:DatatypeProperty ;
-    rdfs:domain tern:CollectionViewItem ;
+sys:cviPos a owl:DatatypeProperty ;
+    rdfs:domain sys:CollectionViewItem ;
     rdfs:range  xsd:integer ;
     rdfs:comment "Zero-based position of this item within the CollectionView." .
 
 # ── CollectionViewItem object properties ─────────────────────────────────────
 
-tern:cviView a owl:ObjectProperty ;
-    rdfs:domain tern:CollectionViewItem ;
-    rdfs:range  tern:CollectionView ;
+sys:cviView a owl:ObjectProperty ;
+    rdfs:domain sys:CollectionViewItem ;
+    rdfs:range  sys:CollectionView ;
     rdfs:comment "Back-link from a CollectionViewItem to its parent CollectionView." .

@@ -2,12 +2,12 @@ import {
     command,
     errResult,
     event,
-    isTernRequest,
-    isTernResult,
+    isSystemRequest,
+    isSystemResult,
     okResult,
     query,
     result,
-    TERN_TYPES,
+    SYSTEM_TYPES,
     typeRef,
 } from "@jasonscharf/core";
 import { describe, expect, it } from "vitest";
@@ -27,44 +27,44 @@ describe("typeRef", () => {
 });
 
 describe("command", () => {
-    it("creates a TernCommand with kind=command", () => {
-        const msg = command(TERN_TYPES.ping);
+    it("creates a SystemCommand with kind=command", () => {
+        const msg = command(SYSTEM_TYPES.ping);
         expect(msg.kind).toBe("command");
-        expect(msg.type.iri).toBe(TERN_TYPES.ping.iri);
+        expect(msg.type.iri).toBe(SYSTEM_TYPES.ping.iri);
         expect(typeof msg.id).toBe("string");
         expect(msg.id).toMatch(/^[0-9a-f-]{36}$/);
     });
 
     it("includes payload when provided", () => {
-        const msg = command(TERN_TYPES.ping, { x: 1 });
+        const msg = command(SYSTEM_TYPES.ping, { x: 1 });
         expect(msg.payload).toEqual({ x: 1 });
     });
 });
 
 describe("query", () => {
-    it("creates a TernQuery with kind=query", () => {
-        const msg = query(TERN_TYPES.tripleFind, { subject: null });
+    it("creates a SystemQuery with kind=query", () => {
+        const msg = query(SYSTEM_TYPES.tripleFind, { subject: null });
         expect(msg.kind).toBe("query");
         expect(msg.payload).toEqual({ subject: null });
     });
 });
 
 describe("event", () => {
-    it("creates a TernEvent with kind=event", () => {
-        const msg = event(TERN_TYPES.ping);
+    it("creates a SystemEvent with kind=event", () => {
+        const msg = event(SYSTEM_TYPES.ping);
         expect(msg.kind).toBe("event");
-        expect(msg.type).toBe(TERN_TYPES.ping);
+        expect(msg.type).toBe(SYSTEM_TYPES.ping);
     });
 
     it("includes payload", () => {
-        const msg = event(TERN_TYPES.ping, { ts: 42 });
+        const msg = event(SYSTEM_TYPES.ping, { ts: 42 });
         expect(msg.payload).toEqual({ ts: 42 });
     });
 });
 
 describe("result / okResult / errResult", () => {
-    it("result creates a TernResult with supplied fields", () => {
-        const r = result("corr-1", TERN_TYPES.ping, true, { pong: true });
+    it("result creates a SystemResult with supplied fields", () => {
+        const r = result("corr-1", SYSTEM_TYPES.ping, true, { pong: true });
         expect(r.kind).toBe("result");
         expect(r.correlationId).toBe("corr-1");
         expect(r.ok).toBe(true);
@@ -73,77 +73,77 @@ describe("result / okResult / errResult", () => {
     });
 
     it("result carries error when ok=false", () => {
-        const r = result("c", TERN_TYPES.ping, false, undefined, "boom");
+        const r = result("c", SYSTEM_TYPES.ping, false, undefined, "boom");
         expect(r.ok).toBe(false);
         expect(r.error).toBe("boom");
     });
 
     it("okResult shorthand", () => {
-        const r = okResult("c", TERN_TYPES.ping, 42);
+        const r = okResult("c", SYSTEM_TYPES.ping, 42);
         expect(r.ok).toBe(true);
         expect(r.data).toBe(42);
     });
 
     it("errResult shorthand", () => {
-        const r = errResult("c", TERN_TYPES.ping, "failed");
+        const r = errResult("c", SYSTEM_TYPES.ping, "failed");
         expect(r.ok).toBe(false);
         expect(r.error).toBe("failed");
     });
 });
 
-describe("isTernRequest", () => {
+describe("isSystemRequest", () => {
     it("returns true for a valid command", () => {
-        expect(isTernRequest(command(TERN_TYPES.ping))).toBe(true);
+        expect(isSystemRequest(command(SYSTEM_TYPES.ping))).toBe(true);
     });
 
     it("returns true for a valid query", () => {
-        expect(isTernRequest(query(TERN_TYPES.ping))).toBe(true);
+        expect(isSystemRequest(query(SYSTEM_TYPES.ping))).toBe(true);
     });
 
     it("returns true for a valid event", () => {
-        expect(isTernRequest(event(TERN_TYPES.ping))).toBe(true);
+        expect(isSystemRequest(event(SYSTEM_TYPES.ping))).toBe(true);
     });
 
     it("returns false for null", () => {
-        expect(isTernRequest(null)).toBe(false);
+        expect(isSystemRequest(null)).toBe(false);
     });
 
     it("returns false for a non-object", () => {
-        expect(isTernRequest("string")).toBe(false);
-        expect(isTernRequest(42)).toBe(false);
+        expect(isSystemRequest("string")).toBe(false);
+        expect(isSystemRequest(42)).toBe(false);
     });
 
     it("returns false when kind is result", () => {
-        expect(isTernRequest(okResult("c", TERN_TYPES.ping))).toBe(false);
+        expect(isSystemRequest(okResult("c", SYSTEM_TYPES.ping))).toBe(false);
     });
 
     it("returns false when type.iri is missing", () => {
-        expect(isTernRequest({ id: "x", kind: "command", type: { noIri: true } })).toBe(false);
+        expect(isSystemRequest({ id: "x", kind: "command", type: { noIri: true } })).toBe(false);
     });
 
     it("returns false when type is not an object", () => {
-        expect(isTernRequest({ id: "x", kind: "command", type: "not-an-obj" })).toBe(false);
+        expect(isSystemRequest({ id: "x", kind: "command", type: "not-an-obj" })).toBe(false);
     });
 
     it("returns false when type is null", () => {
-        expect(isTernRequest({ id: "x", kind: "command", type: null })).toBe(false);
+        expect(isSystemRequest({ id: "x", kind: "command", type: null })).toBe(false);
     });
 });
 
-describe("isTernResult", () => {
-    it("returns true for a TernResult", () => {
-        expect(isTernResult(okResult("c", TERN_TYPES.ping))).toBe(true);
+describe("isSystemResult", () => {
+    it("returns true for a SystemResult", () => {
+        expect(isSystemResult(okResult("c", SYSTEM_TYPES.ping))).toBe(true);
     });
 
-    it("returns false for a TernRequest", () => {
-        expect(isTernResult(command(TERN_TYPES.ping))).toBe(false);
+    it("returns false for a SystemRequest", () => {
+        expect(isSystemResult(command(SYSTEM_TYPES.ping))).toBe(false);
     });
 
     it("returns false for null", () => {
-        expect(isTernResult(null)).toBe(false);
+        expect(isSystemResult(null)).toBe(false);
     });
 
     it("returns false for non-object", () => {
-        expect(isTernResult("x")).toBe(false);
+        expect(isSystemResult("x")).toBe(false);
     });
 });

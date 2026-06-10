@@ -1,14 +1,14 @@
-import { isTernRequest, type TernRequest } from "@jasonscharf/core";
+import { isSystemRequest, type SystemRequest } from "@jasonscharf/core";
 import type { WsMessage } from "@jasonscharf/flow";
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
 
 export interface IncomingMessage {
     readonly connectionId: string;
-    readonly request: TernRequest;
+    readonly request: SystemRequest;
 }
 
 /**
- * Decodes raw WsMessages (JSON text) into typed TernRequests.
+ * Decodes raw WsMessages (JSON text) into typed SystemRequests.
  * Malformed messages are silently dropped.
  */
 export class MessageDecoder extends FlowComponent {
@@ -31,7 +31,7 @@ export class MessageDecoder extends FlowComponent {
                 const raw = JSON.parse(
                     typeof msg.data === "string" ? msg.data : new TextDecoder().decode(msg.data),
                 );
-                if (isTernRequest(raw)) {
+                if (isSystemRequest(raw)) {
                     this.out.put({ connectionId: msg.connectionId, request: raw });
                 }
             } catch {

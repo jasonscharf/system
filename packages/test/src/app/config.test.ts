@@ -1,6 +1,6 @@
 /**
  * Tests for @system/app: config loading, Turtle/YAML parsing,
- * HandlerRegistry, and TernApp.
+ * HandlerRegistry, and SystemApp.
  */
 
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -16,16 +16,18 @@ import {
     mergeHandlers,
     parseTurtle,
     parseYaml,
-    TernApp,
+    SystemApp,
     type TernExtension,
 } from "@jasonscharf/app";
 import {
     errResult,
+    makeUri,
+    NS_TEST,
     okResult,
     query,
-    TERN_TYPES,
-    type TernRequest,
-    type TernResult,
+    SYSTEM_TYPES,
+    type SystemRequest,
+    type SystemResult,
 } from "@jasonscharf/core";
 import { createDataContext } from "@jasonscharf/data";
 import { describe, expect, it } from "vitest";
@@ -179,15 +181,15 @@ describe("parseTurtle", () => {
 
 describe("mergeHandlers", () => {
     it("merges extension handlers sorted by priority", () => {
-        const a: HandlerEntry = { typeIri: "tern:ping", module: "a.js", priority: 200 };
-        const b: HandlerEntry = { typeIri: "tern:ping", module: "b.js", priority: 50 };
+        const a: HandlerEntry = { typeIri: makeUri(NS_TEST, "ping"), module: "a.js", priority: 200 };
+        const b: HandlerEntry = { typeIri: makeUri(NS_TEST, "ping"), module: "b.js", priority: 50 };
         const merged = mergeHandlers([{ name: "ext", handlers: [a] }], [{ ...b, priority: 0 }]);
         expect(merged[0].priority).toBe(0);
         expect(merged[1].priority).toBe(200);
     });
 
     it("user handlers default to priority 0", () => {
-        const user: HandlerEntry = { typeIri: "tern:ping", module: "override.js" };
+        const user: HandlerEntry = { typeIri: makeUri(NS_TEST, "ping"), module: "override.js" };
         const merged = mergeHandlers([], [user]);
         expect(merged[0].priority).toBe(0);
     });
@@ -284,42 +286,42 @@ handlers: []
 describe("HandlerRegistry", () => {
     it("dispatches to a registered inline handler", async () => {
         const reg = new HandlerRegistry();
-        reg.registerInline(TERN_TYPES.ping, async (req, _ctx) =>
+        reg.registerInline(SYSTEM_TYPES.ping, async (req, _ctx) =>
             okResult(req.id, req.type, { pong: true }),
         );
-        const r = await reg.dispatch(query(TERN_TYPES.ping), { connectionId: "c1" });
+        const r = await reg.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c1" });
         expect(r.ok).toBe(true);
     });
 
     it("returns error when no handler registered", async () => {
         const reg = new HandlerRegistry();
-        const r = await reg.dispatch(query(TERN_TYPES.ping), { connectionId: "c1" });
+        const r = await reg.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c1" });
         expect(r.ok).toBe(false);
         expect(r.error).toMatch(/No handler/);
     });
 
     it("returns error when all handlers fail", async () => {
         const reg = new HandlerRegistry();
-        reg.registerInline(TERN_TYPES.ping, async (req, _ctx) =>
+        reg.registerInline(SYSTEM_TYPES.ping, async (req, _ctx) =>
             errResult(req.id, req.type, "nope"),
         );
-        const r = await reg.dispatch(query(TERN_TYPES.ping), { connectionId: "c1" });
+        const r = await reg.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c1" });
         expect(r.ok).toBe(false);
     });
 
     it("falls back to next handler when first returns error", async () => {
         const reg = new HandlerRegistry();
         reg.registerInline(
-            TERN_TYPES.ping,
+            SYSTEM_TYPES.ping,
             async (req, _ctx) => errResult(req.id, req.type, "first failed"),
             10,
         );
         reg.registerInline(
-            TERN_TYPES.ping,
+            SYSTEM_TYPES.ping,
             async (req, _ctx) => okResult(req.id, req.type, "second"),
             20,
         );
-        const r = await reg.dispatch(query(TERN_TYPES.ping), { connectionId: "c1" });
+        const r = await reg.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c1" });
         expect(r.ok).toBe(true);
         expect(r.data).toBe("second");
     });
@@ -327,13 +329,13 @@ describe("HandlerRegistry", () => {
     it("loads handler from a module entry lazily", async () => {
         const reg = new HandlerRegistry();
         const mockModule = {
-            handlePing: async (req: TernRequest, _ctx: HandlerContext): Promise<TernResult> =>
+            handlePing: async (req: SystemRequest, _ctx: HandlerContext): Promise<SystemResult> =>
                 okResult(req.id, req.type, { lazy: true }),
         };
 
         reg.registerAll([
             {
-                typeIri: TERN_TYPES.ping.iri,
+                typeIri: SYSTEM_TYPES.ping.iri,
                 module: "__inline__",
                 export: "handlePing",
                 priority: 100,
@@ -341,58 +343,58 @@ describe("HandlerRegistry", () => {
         ]);
 
         // Intercept the dynamic import — we can't do that here, so use inline
-        reg.registerInline(TERN_TYPES.ping, mockModule.handlePing, 0);
-        const r = await reg.dispatch(query(TERN_TYPES.ping), { connectionId: "c1" });
+        reg.registerInline(SYSTEM_TYPES.ping, mockModule.handlePing, 0);
+        const r = await reg.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c1" });
         expect(r.ok).toBe(true);
         expect((r.data as { lazy: boolean }).lazy).toBe(true);
     });
 
     it("exposes registeredTypes", () => {
         const reg = new HandlerRegistry();
-        reg.registerInline(TERN_TYPES.ping, async (req) => okResult(req.id, req.type, null));
-        expect(reg.registeredTypes).toContain(TERN_TYPES.ping.iri);
+        reg.registerInline(SYSTEM_TYPES.ping, async (req) => okResult(req.id, req.type, null));
+        expect(reg.registeredTypes).toContain(SYSTEM_TYPES.ping.iri);
     });
 });
 
-// ── TernApp ───────────────────────────────────────────────────────────────────
+// ── SystemApp ───────────────────────────────────────────────────────────────────
 
-describe("TernApp.fromEntries", () => {
-    it("creates a TernApp with inline handler entries", async () => {
-        const app = TernApp.fromEntries({ name: "test", extensions: [], handlers: [] }, []);
+describe("SystemApp.fromEntries", () => {
+    it("creates a SystemApp with inline handler entries", async () => {
+        const app = SystemApp.fromEntries({ name: "test", extensions: [], handlers: [] }, []);
         expect(app.config.name).toBe("test");
         expect(app.registry).toBeInstanceOf(HandlerRegistry);
         expect(app.flow).toBeDefined();
     });
 
     it("dispatches through an inline handler", async () => {
-        const app = TernApp.fromEntries({ name: "test", extensions: [], handlers: [] }, []);
-        app.register(TERN_TYPES.ping, async (req) => okResult(req.id, req.type, "pong"));
-        const r = await app.dispatch(query(TERN_TYPES.ping), "conn-1");
+        const app = SystemApp.fromEntries({ name: "test", extensions: [], handlers: [] }, []);
+        app.register(SYSTEM_TYPES.ping, async (req) => okResult(req.id, req.type, "pong"));
+        const r = await app.dispatch(query(SYSTEM_TYPES.ping), "conn-1");
         expect(r.ok).toBe(true);
         expect(r.data).toBe("pong");
     });
 
     it("passes extra context to handlers", async () => {
-        const app = TernApp.fromEntries({ name: "test", extensions: [], handlers: [] }, [], {
+        const app = SystemApp.fromEntries({ name: "test", extensions: [], handlers: [] }, [], {
             context: { myExtra: "hello" },
         });
         let seen: unknown;
-        app.register(TERN_TYPES.ping, async (req, ctx) => {
+        app.register(SYSTEM_TYPES.ping, async (req, ctx) => {
             seen = ctx.myExtra;
             return okResult(req.id, req.type, null);
         });
-        await app.dispatch(query(TERN_TYPES.ping), "conn-1");
+        await app.dispatch(query(SYSTEM_TYPES.ping), "conn-1");
         expect(seen).toBe("hello");
     });
 
     it("start / stop lifecycle does not throw", async () => {
-        const app = TernApp.fromEntries({ name: "test", extensions: [], handlers: [] }, []);
+        const app = SystemApp.fromEntries({ name: "test", extensions: [], handlers: [] }, []);
         await app.start();
         await app.stop();
     });
 });
 
-describe("TernApp.fromYAML", () => {
+describe("SystemApp.fromYAML", () => {
     it("loads config and builds registry from YAML+extensions", async () => {
         const dir = await mkdtemp(join(tmpdir(), "tern-tapp-"));
         try {
@@ -405,9 +407,9 @@ describe("TernApp.fromYAML", () => {
                 "name: myapp\nextensions:\n  - ./ext.yaml\nhandlers: []",
             );
 
-            const app = await TernApp.fromYAML(join(dir, "app.yaml"));
+            const app = await SystemApp.fromYAML(join(dir, "app.yaml"));
             expect(app.config.name).toBe("myapp");
-            expect(app.registry.registeredTypes).toContain(TERN_TYPES.ping.iri);
+            expect(app.registry.registeredTypes).toContain(SYSTEM_TYPES.ping.iri);
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
@@ -485,18 +487,18 @@ describe("HandlerRegistry: remaining branches", () => {
     it("catches a throwing handler and falls back", async () => {
         const reg = new HandlerRegistry();
         reg.registerInline(
-            TERN_TYPES.ping,
+            SYSTEM_TYPES.ping,
             async () => {
                 throw new Error("handler boom");
             },
             10,
         );
         reg.registerInline(
-            TERN_TYPES.ping,
+            SYSTEM_TYPES.ping,
             async (req) => okResult(req.id, req.type, "second"),
             20,
         );
-        const r = await reg.dispatch(query(TERN_TYPES.ping), { connectionId: "c" });
+        const r = await reg.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c" });
         expect(r.ok).toBe(true);
         expect(r.data).toBe("second");
     });
@@ -505,14 +507,14 @@ describe("HandlerRegistry: remaining branches", () => {
         const reg = new HandlerRegistry();
         reg.registerAll([
             {
-                typeIri: TERN_TYPES.ping.iri,
+                typeIri: SYSTEM_TYPES.ping.iri,
                 module: "file:///nonexistent/handler.js",
                 export: "handle",
                 priority: 100,
             },
         ]);
         // _load() fails, is caught, falls through to "all handlers failed"
-        const r = await reg.dispatch(query(TERN_TYPES.ping), { connectionId: "c" });
+        const r = await reg.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c" });
         expect(r.ok).toBe(false);
     });
 
@@ -520,14 +522,14 @@ describe("HandlerRegistry: remaining branches", () => {
         const reg = new HandlerRegistry();
         reg.registerAll([
             {
-                typeIri: TERN_TYPES.ping.iri,
+                typeIri: SYSTEM_TYPES.ping.iri,
                 module: "@system/core",
                 export: "__no_such_export__",
                 priority: 100,
             },
         ]);
         // _load() throws "no export named", caught, falls through
-        const r = await reg.dispatch(query(TERN_TYPES.ping), { connectionId: "c" });
+        const r = await reg.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c" });
         expect(r.ok).toBe(false);
         expect(r.error).toMatch(/All handlers failed/);
     });
@@ -559,16 +561,16 @@ describe("HandlerRegistry: successful module load (caches handler)", () => {
         const reg = new HandlerRegistry();
         // uuidv4Binary is a real function exported from @system/core
         // _load() succeeds: sets entry.handler (lines 138-139)
-        // fn(request, ctx) returns Uint8Array (not TernResult), .ok is undefined → loop continues
+        // fn(request, ctx) returns Uint8Array (not SystemResult), .ok is undefined → loop continues
         reg.registerAll([
             {
-                typeIri: TERN_TYPES.ping.iri,
+                typeIri: SYSTEM_TYPES.ping.iri,
                 module: "@system/core",
                 export: "uuidv4Binary",
                 priority: 100,
             },
         ]);
-        const r = await reg.dispatch(query(TERN_TYPES.ping), { connectionId: "c" });
+        const r = await reg.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c" });
         // The loaded function doesn't return ok=true, so falls through
         expect(r.ok).toBe(false);
     });
@@ -637,7 +639,7 @@ describe("loader.ts: optional field branches", () => {
 
     it("mergeHandlers with handler missing priority (uses ?? 100 default)", () => {
         const merged = mergeHandlers(
-            [{ name: "e", handlers: [{ typeIri: "tern:x", module: "a.js" }] }],
+            [{ name: "e", handlers: [{ typeIri: makeUri(NS_TEST, "x"), module: "a.js" }] }],
             [],
         );
         expect(merged[0].priority).toBeUndefined(); // priority comes from the entry as-is
@@ -676,36 +678,36 @@ describe("HandlerRegistry: additional branch coverage", () => {
     it("registering two handlers for the same type (has(typeIri) true branch)", async () => {
         const reg = new HandlerRegistry();
         reg.registerInline(
-            TERN_TYPES.ping,
+            SYSTEM_TYPES.ping,
             async (req) => errResult(req.id, req.type, "first"),
             10,
         );
         reg.registerInline(
-            TERN_TYPES.ping,
+            SYSTEM_TYPES.ping,
             async (req) => okResult(req.id, req.type, "second"),
             20,
         );
         // Both registered for same typeIri; dispatch tries first (fails), then second
-        const r = await reg.dispatch(query(TERN_TYPES.ping), { connectionId: "c" });
+        const r = await reg.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c" });
         expect(r.ok).toBe(true);
         expect(r.data).toBe("second");
     });
 
     it("registerAll without export field uses default export name", () => {
         const reg = new HandlerRegistry();
-        reg.registerAll([{ typeIri: TERN_TYPES.ping.iri, module: "./h.js" }]); // no export
-        expect(reg.registeredTypes).toContain(TERN_TYPES.ping.iri);
+        reg.registerAll([{ typeIri: SYSTEM_TYPES.ping.iri, module: "./h.js" }]); // no export
+        expect(reg.registeredTypes).toContain(SYSTEM_TYPES.ping.iri);
     });
 
     it("dispatching cached handler (second dispatch reuses loaded fn)", async () => {
         const reg = new HandlerRegistry();
         reg.registerAll([
-            { typeIri: TERN_TYPES.ping.iri, module: "@system/core", export: "uuidv4Binary" },
+            { typeIri: SYSTEM_TYPES.ping.iri, module: "@system/core", export: "uuidv4Binary" },
         ]);
         // First dispatch: loads module, sets entry.handler
-        await reg.dispatch(query(TERN_TYPES.ping), { connectionId: "c" });
+        await reg.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c" });
         // Second dispatch: entry.handler already set → if (entry.handler) true branch
-        const r2 = await reg.dispatch(query(TERN_TYPES.ping), { connectionId: "c" });
+        const r2 = await reg.dispatch(query(SYSTEM_TYPES.ping), { connectionId: "c" });
         expect(r2.ok).toBe(false); // uuidv4Binary not a valid handler, but we got there
     });
 });
@@ -718,10 +720,10 @@ describe("HandlerRegistry: _add called twice for same typeIri", () => {
         // Two entries for the same typeIri — second call hits `has(typeIri) === true`
         // The sort comparator `(a,b) => a.priority - b.priority` executes with 2+ items
         reg.registerAll([
-            { typeIri: TERN_TYPES.ping.iri, module: "mod-a", export: "handler", priority: 200 },
-            { typeIri: TERN_TYPES.ping.iri, module: "mod-b", export: "handler", priority: 50 },
+            { typeIri: SYSTEM_TYPES.ping.iri, module: "mod-a", export: "handler", priority: 200 },
+            { typeIri: SYSTEM_TYPES.ping.iri, module: "mod-b", export: "handler", priority: 50 },
         ]);
-        expect(reg.registeredTypes).toContain(TERN_TYPES.ping.iri);
+        expect(reg.registeredTypes).toContain(SYSTEM_TYPES.ping.iri);
     });
 });
 
@@ -850,12 +852,12 @@ describe("loader.ts: handlerEntryFromYaml edge cases", () => {
                     "name: x",
                     "extensions: []",
                     "handlers:",
-                    "  - typeIri: tern:ping",
+                    "  - typeIri: urn:sys:test:ping",
                     "    module: ./h.js",
                 ].join("\n"),
             );
             const { resolvedHandlers } = await loadAppConfig(join(dir, "app.yaml"));
-            expect(resolvedHandlers[0].typeIri).toBe("tern:ping");
+            expect(resolvedHandlers[0].typeIri).toBe(makeUri(NS_TEST, "ping"));
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
@@ -880,7 +882,7 @@ describe("loader.ts: handlerEntryFromYaml edge cases", () => {
         try {
             await writeFile(
                 join(dir, "app.yaml"),
-                ["name: x", "extensions: []", "handlers:", "  - type: tern:ping"].join("\n"),
+                ["name: x", "extensions: []", "handlers:", "  - type: urn:sys:test:ping"].join("\n"),
             );
             const { resolvedHandlers } = await loadAppConfig(join(dir, "app.yaml"));
             expect(resolvedHandlers[0].module).toBe("");
@@ -970,7 +972,7 @@ describe("loader.ts: optional fields truthy branches", () => {
                 'version: "2.0.0"',
                 "description: A test extension",
                 "handlers:",
-                "  - type: tern:ping",
+                "  - type: urn:sys:test:ping",
                 "    module: ./h.js",
                 "    export: handlePing",
                 "    priority: 10",
@@ -1021,12 +1023,12 @@ describe("loader.ts: optional fields truthy branches", () => {
                     "name: x",
                     "extensions: []",
                     "handlers:",
-                    "  - type: tern:ping",
+                    "  - type: urn:sys:test:ping",
                     "    module: ./h.js",
                 ].join("\n"),
             );
             const { resolvedHandlers } = await loadAppConfig(join(dir, "app.yaml"));
-            expect(resolvedHandlers[0].typeIri).toBe("tern:ping");
+            expect(resolvedHandlers[0].typeIri).toBe(makeUri(NS_TEST, "ping"));
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
@@ -1166,9 +1168,9 @@ describe("loader.ts: mergeHandlers sort comparator with undefined priorities", (
     it("exercises ?? 100 branches sorting handlers with mixed priority", () => {
         const merged = mergeHandlers(
             [
-                { name: "e1", handlers: [{ typeIri: "tern:x", module: "a.js", priority: 50 }] },
-                { name: "e2", handlers: [{ typeIri: "tern:x", module: "b.js" }] },
-                { name: "e3", handlers: [{ typeIri: "tern:x", module: "c.js", priority: 200 }] },
+                { name: "e1", handlers: [{ typeIri: makeUri(NS_TEST, "x"), module: "a.js", priority: 50 }] },
+                { name: "e2", handlers: [{ typeIri: makeUri(NS_TEST, "x"), module: "b.js" }] },
+                { name: "e3", handlers: [{ typeIri: makeUri(NS_TEST, "x"), module: "c.js", priority: 200 }] },
             ],
             [],
         );
@@ -1229,12 +1231,12 @@ describe("loader.ts: Turtle handler bnode missing type and module triples", () =
     });
 });
 
-// ── TernApp.use() — infrastructure extension lifecycle ───────────────────────
+// ── SystemApp.use() — infrastructure extension lifecycle ───────────────────────
 
-describe("TernApp.use()", () => {
-    function makeApp(withStore = true): TernApp {
+describe("SystemApp.use()", () => {
+    function makeApp(withStore = true): SystemApp {
         const ctx = withStore ? { store: "fake-store" } : {};
-        return TernApp.fromEntries({ name: "test", extensions: [], handlers: [] }, [], {
+        return SystemApp.fromEntries({ name: "test", extensions: [], handlers: [] }, [], {
             context: ctx,
         });
     }
@@ -1261,7 +1263,7 @@ describe("TernApp.use()", () => {
 
     it("merges installed services into the HandlerContext", async () => {
         const knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
-        const app = TernApp.fromEntries({ name: "test", extensions: [], handlers: [] }, [], {
+        const app = SystemApp.fromEntries({ name: "test", extensions: [], handlers: [] }, [], {
             context: { store: knex },
         });
 
@@ -1273,12 +1275,12 @@ describe("TernApp.use()", () => {
         });
 
         let capturedValue: unknown;
-        app.register(TERN_TYPES.ping, async (req, ctx) => {
+        app.register(SYSTEM_TYPES.ping, async (req, ctx) => {
             capturedValue = (ctx as Record<string, unknown>).magicValue;
             return okResult(req.id, req.type, {});
         });
 
-        await app.dispatch(query(TERN_TYPES.ping, {}), "conn-1");
+        await app.dispatch(query(SYSTEM_TYPES.ping, {}), "conn-1");
         expect(capturedValue).toBe(42);
         await knex.destroy();
     });

@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { makeUri, NS_CORE } from "@jasonscharf/core";
 import {
     anonymousSec,
     buildServerContext,
@@ -154,7 +155,7 @@ export class AuthService {
         );
 
         await this._store.set(
-            `tern:session:${session.sessionToken}`,
+            makeUri(NS_CORE, "session", session.sessionToken),
             JSON.stringify({
                 userId: user.id,
                 deviceId: session.deviceId,
@@ -172,7 +173,7 @@ export class AuthService {
         _sec: SecurityContext,
         args: TokenArgs,
     ): Promise<UserEntity | null> {
-        const key = `tern:session:${args.token}`;
+        const key = makeUri(NS_CORE, "session", args.token);
         const cached = await this._store.get(key);
 
         if (cached) {
@@ -193,7 +194,7 @@ export class AuthService {
     /** @insecure @nochecks */
     async revokeToken(ctx: ServerContext, _sec: SecurityContext, args: TokenArgs): Promise<void> {
         await Promise.all([
-            this._store.del(`tern:session:${args.token}`),
+            this._store.del(makeUri(NS_CORE, "session", args.token)),
             this._sessions.revoke(ctx, systemSec, { token: args.token }),
         ]);
     }
@@ -223,7 +224,7 @@ export class AuthService {
         });
         const active = sessions.filter((s) => s.isActive);
 
-        await Promise.all(active.map((s) => this._store.del(`tern:session:${s.sessionToken}`)));
+        await Promise.all(active.map((s) => this._store.del(makeUri(NS_CORE, "session", s.sessionToken))));
         return this._sessions.revokeAllForUser(ctx, systemSec, { userId: args.userId });
     }
 

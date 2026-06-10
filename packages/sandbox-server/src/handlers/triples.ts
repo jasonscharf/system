@@ -5,9 +5,9 @@ import {
     type IRI,
     type Literal,
     okResult,
-    TERN_TYPES,
-    type TernRequest,
-    type TernResult,
+    SYSTEM_TYPES,
+    type SystemRequest,
+    type SystemResult,
 } from "@jasonscharf/core";
 import { type QuadPattern, TripleStore } from "@jasonscharf/data";
 import { buildServerContext } from "@jasonscharf/server";
@@ -65,30 +65,30 @@ function getStore(ctx: HandlerContext): TripleStore {
     return store;
 }
 
-export async function handleFind(request: TernRequest, ctx: HandlerContext): Promise<TernResult> {
+export async function handleFind(request: SystemRequest, ctx: HandlerContext): Promise<SystemResult> {
     const store = getStore(ctx);
     const pattern = patternFromWire(request.payload);
     const quads = await store.find(buildServerContext(store), pattern);
-    return okResult(request.id, TERN_TYPES.tripleFind, { quads });
+    return okResult(request.id, SYSTEM_TYPES.tripleFind, { quads });
 }
 
-export async function handleInsert(request: TernRequest, ctx: HandlerContext): Promise<TernResult> {
+export async function handleInsert(request: SystemRequest, ctx: HandlerContext): Promise<SystemResult> {
     const store = getStore(ctx);
     const payload = request.payload as Record<string, unknown> | undefined;
     if (!payload) {
-        return errResult(request.id, TERN_TYPES.tripleInsert, "Missing payload");
+        return errResult(request.id, SYSTEM_TYPES.tripleInsert, "Missing payload");
     }
     const subject = termFromWire(payload.subject);
     if (subject == null) {
-        return errResult(request.id, TERN_TYPES.tripleInsert, "Missing or invalid subject");
+        return errResult(request.id, SYSTEM_TYPES.tripleInsert, "Missing or invalid subject");
     }
     const predicate = termFromWire(payload.predicate);
     if (predicate == null) {
-        return errResult(request.id, TERN_TYPES.tripleInsert, "Missing or invalid predicate");
+        return errResult(request.id, SYSTEM_TYPES.tripleInsert, "Missing or invalid predicate");
     }
     const object = termFromWire(payload.object);
     if (object == null) {
-        return errResult(request.id, TERN_TYPES.tripleInsert, "Missing or invalid object");
+        return errResult(request.id, SYSTEM_TYPES.tripleInsert, "Missing or invalid object");
     }
     await store.insert(buildServerContext(store), {
         subject: subject as IRI | BlankNode,
@@ -96,11 +96,11 @@ export async function handleInsert(request: TernRequest, ctx: HandlerContext): P
         object: object as RdfTerm,
         graph: (termFromWire(payload.graph) as IRI | undefined) ?? makeIRI(""),
     });
-    return okResult(request.id, TERN_TYPES.tripleInsert);
+    return okResult(request.id, SYSTEM_TYPES.tripleInsert);
 }
 
-export async function handleStats(request: TernRequest, ctx: HandlerContext): Promise<TernResult> {
+export async function handleStats(request: SystemRequest, ctx: HandlerContext): Promise<SystemResult> {
     const store = getStore(ctx);
     const stats = await store.stats(buildServerContext(store));
-    return okResult(request.id, TERN_TYPES.tripleStats, stats);
+    return okResult(request.id, SYSTEM_TYPES.tripleStats, stats);
 }

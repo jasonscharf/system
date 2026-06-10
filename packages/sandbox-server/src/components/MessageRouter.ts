@@ -6,7 +6,7 @@ import type { OutgoingMessage } from "./MessageEncoder.js";
 export interface MessageRouterOptions extends FlowComponentOptions {
     /**
      * Any object that implements the Dispatcher interface — either a
-     * TernRouter (code-first, Koa-style) or a HandlerRegistry (config-driven).
+     * SystemRouter (code-first, Koa-style) or a HandlerRegistry (config-driven).
      */
     dispatcher: Dispatcher;
     /** Extra context fields passed to every handler invocation. */
@@ -14,9 +14,9 @@ export interface MessageRouterOptions extends FlowComponentOptions {
 }
 
 /**
- * FBP component that dispatches inbound TernRequests through a Dispatcher.
+ * FBP component that dispatches inbound SystemRequests through a Dispatcher.
  *
- * Accepts both TernRouter (code-first) and HandlerRegistry (config-driven)
+ * Accepts both SystemRouter (code-first) and HandlerRegistry (config-driven)
  * since both implement the Dispatcher interface.
  */
 export class MessageRouter extends FlowComponent {

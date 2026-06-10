@@ -1,4 +1,4 @@
-import type { TernTypeRef } from "@jasonscharf/core";
+import type { SystemTypeRef } from "@jasonscharf/core";
 import type { ShaclNodeShape, ValidationResult } from "@jasonscharf/gen";
 import { validate } from "@jasonscharf/gen";
 
@@ -18,7 +18,7 @@ export class PayloadSchemaRegistry {
     private readonly _shapes = new Map<string, RegisteredShape>();
 
     register(
-        typeRef: TernTypeRef,
+        typeRef: SystemTypeRef,
         shape: ShaclNodeShape,
         propertyMap: Record<string, string>,
     ): this {

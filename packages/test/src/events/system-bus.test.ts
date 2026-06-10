@@ -7,7 +7,7 @@
  * Each Redis test suite uses a unique prefix so runs never see stale state.
  */
 
-import type { DomainEvent, ISystemBus } from "@jasonscharf/core";
+import { makeUri, NS_TEST, type DomainEvent, type ISystemBus } from "@jasonscharf/core";
 import { InMemorySystemBus } from "@jasonscharf/core";
 import { RedisSystemBus } from "@jasonscharf/events";
 import { Redis } from "ioredis";
@@ -295,7 +295,7 @@ if (process.env.TERN_REDIS_URL) {
 
     // Run the full contract suite against Redis.
     systemBusSuite("RedisSystemBus (contract)", () => {
-        const prefix = `tern:test:${uniqueId()}:`;
+        const prefix = `${makeUri(NS_TEST, uniqueId())}:`;
         return makeRedisBus(prefix);
     });
 
@@ -306,7 +306,7 @@ if (process.env.TERN_REDIS_URL) {
         let buses: RedisSystemBus[];
 
         beforeEach(() => {
-            prefix = `tern:test:${uniqueId()}:`;
+            prefix = `${makeUri(NS_TEST, uniqueId())}:`;
             buses = [];
         });
 
@@ -355,7 +355,7 @@ if (process.env.TERN_REDIS_URL) {
 
         it("test query timeout rejects when no handler registered", async () => {
             const callerBus = new RedisSystemBus(redisUrl, {
-                rpcPrefix:    `tern:test:${uniqueId()}:rpc:`,
+                rpcPrefix:    `${makeUri(NS_TEST, uniqueId())}:rpc:`,
                 rpcTimeoutMs: 300,
             });
             buses.push(callerBus);

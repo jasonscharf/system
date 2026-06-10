@@ -2,12 +2,12 @@
  * Dispatch-time payload validation tests.
  *
  * Verifies that the payloadValidation middleware short-circuits with an error
- * TernResult when the incoming payload violates the registered SHACL shape,
+ * SystemResult when the incoming payload violates the registered SHACL shape,
  * and passes through normally when the shape is satisfied or unregistered.
  */
 
 import { command, okResult, typeRef } from "@jasonscharf/core";
-import { PayloadSchemaRegistry, payloadValidation, TernRouter } from "@jasonscharf/app";
+import { PayloadSchemaRegistry, payloadValidation, SystemRouter } from "@jasonscharf/app";
 import type { ShaclNodeShape } from "@jasonscharf/gen";
 import { describe, expect, it } from "vitest";
 
@@ -40,8 +40,8 @@ const WIDGET_PROP_MAP: Record<string, string> = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function buildRouter(registry: PayloadSchemaRegistry): TernRouter {
-    const router = new TernRouter();
+function buildRouter(registry: PayloadSchemaRegistry): SystemRouter {
+    const router = new SystemRouter();
     router.use(payloadValidation(registry));
     router.handle(CREATE_WIDGET, async (ctx) => {
         ctx.result = okResult(ctx.request.id, ctx.request.type, { ok: true });

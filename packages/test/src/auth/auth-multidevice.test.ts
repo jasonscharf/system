@@ -29,6 +29,7 @@ import {
     UserRepository,
     UserSessionRepository,
 } from "@jasonscharf/auth";
+import { makeUri, NS_CORE } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import { buildServerContext, systemSec } from "@jasonscharf/server";
 import type { Knex } from "knex";
@@ -315,13 +316,13 @@ for (const db of providers) {
 
         it("revokeAllSessions clears the fast-path session store", async () => {
             // Both tokens should be cached in the session store
-            expect(await ctx.memStore.get(`tern:session:${pcToken}`)).not.toBeNull();
-            expect(await ctx.memStore.get(`tern:session:${phoneToken}`)).not.toBeNull();
+            expect(await ctx.memStore.get(makeUri(NS_CORE, "session", pcToken))).not.toBeNull();
+            expect(await ctx.memStore.get(makeUri(NS_CORE, "session", phoneToken))).not.toBeNull();
 
             await ctx.service.revokeAllSessions(buildServerContext(ctx.store), systemSec, { userId });
 
-            expect(await ctx.memStore.get(`tern:session:${pcToken}`)).toBeNull();
-            expect(await ctx.memStore.get(`tern:session:${phoneToken}`)).toBeNull();
+            expect(await ctx.memStore.get(makeUri(NS_CORE, "session", pcToken))).toBeNull();
+            expect(await ctx.memStore.get(makeUri(NS_CORE, "session", phoneToken))).toBeNull();
         });
     });
 
@@ -431,7 +432,7 @@ for (const db of providers) {
         });
 
         it("revokeToken removes token from the session store cache", async () => {
-            const key = `tern:session:${token}`;
+            const key = makeUri(NS_CORE, "session", token);
             expect(await ctx.memStore.get(key)).not.toBeNull();
             await ctx.service.revokeToken(buildServerContext(ctx.store), systemSec, { token });
             expect(await ctx.memStore.get(key)).toBeNull();

@@ -3,7 +3,7 @@
  *
  * SuperuserService is a thin facade over RBAC's SYS_SUPERUSERS group (seeded by
  * migration 004_rbac). Runs against SQLite (always) and Postgres (when
- * TERN_PG_URL is set), each in a rolled-back transaction.
+ * SYS_PG_URL is set), each in a rolled-back transaction.
  */
 
 import { createDataContext, TripleStore } from "@jasonscharf/data";
@@ -38,8 +38,8 @@ const providers: DbProvider[] = [
     },
 ];
 
-if (process.env.TERN_PG_URL) {
-    const url = new URL(process.env.TERN_PG_URL);
+if (process.env.SYS_PG_URL) {
+    const url = new URL(process.env.SYS_PG_URL);
     providers.push({
         name: "Postgres",
         create: () =>

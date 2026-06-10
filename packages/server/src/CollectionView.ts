@@ -9,17 +9,17 @@ import {
     fromLiteral,
     newId,
     RDF_TYPE,
-    TERN_COLLECTION_VIEW,
-    TERN_COLLECTION_VIEW_ITEM,
-    TERN_CV_ITEM,
-    TERN_CV_PROP,
-    TERN_CV_SORT_DIR,
-    TERN_CV_SORT_PROP,
-    TERN_CV_SOURCE,
-    TERN_CVI_POS,
-    TERN_CVI_REF,
-    TERN_CVI_VIEW,
-    TERN_VIEW_NS,
+    SYS_COLLECTION_VIEW,
+    SYS_COLLECTION_VIEW_ITEM,
+    SYS_CV_ITEM,
+    SYS_CV_PROP,
+    SYS_CV_SORT_DIR,
+    SYS_CV_SORT_PROP,
+    SYS_CV_SOURCE,
+    SYS_CVI_POS,
+    SYS_CVI_REF,
+    SYS_CVI_VIEW,
+    SYS_VIEW_NS,
     toLiteral,
 } from "@jasonscharf/entities";
 import type { ServerContext } from "./ServerContext.js";
@@ -29,10 +29,10 @@ export type { CollectionViewItemRecord, CollectionViewOpts, CollectionViewRecord
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function viewIri(id: string): IRI {
-    return new IRI(makeUri(TERN_VIEW_NS, id));
+    return new IRI(makeUri(SYS_VIEW_NS, id));
 }
 function viewItemIri(id: string): IRI {
-    return new IRI(makeUri(TERN_VIEW_NS, "item", id));
+    return new IRI(makeUri(SYS_VIEW_NS, "item", id));
 }
 function str(term: unknown): string {
     return String(fromLiteral(term) ?? "");
@@ -60,18 +60,18 @@ export class CollectionViewStore {
                 {
                     subject: vIri,
                     predicate: RDF_TYPE,
-                    object: TERN_COLLECTION_VIEW,
+                    object: SYS_COLLECTION_VIEW,
                     graph: DEFAULT_GRAPH,
                 },
                 {
                     subject: vIri,
-                    predicate: TERN_CV_SOURCE,
+                    predicate: SYS_CV_SOURCE,
                     object: toLiteral(sourcePgIri),
                     graph: DEFAULT_GRAPH,
                 },
                 {
                     subject: vIri,
-                    predicate: TERN_CV_PROP,
+                    predicate: SYS_CV_PROP,
                     object: toLiteral(sourcePropIri),
                     graph: DEFAULT_GRAPH,
                 },
@@ -79,7 +79,7 @@ export class CollectionViewStore {
                     ? [
                           {
                               subject: vIri,
-                              predicate: TERN_CV_SORT_PROP,
+                              predicate: SYS_CV_SORT_PROP,
                               object: toLiteral(opts.sortProp.value),
                               graph: DEFAULT_GRAPH,
                           },
@@ -89,7 +89,7 @@ export class CollectionViewStore {
                     ? [
                           {
                               subject: vIri,
-                              predicate: TERN_CV_SORT_DIR,
+                              predicate: SYS_CV_SORT_DIR,
                               object: toLiteral(opts.sortDir),
                               graph: DEFAULT_GRAPH,
                           },
@@ -131,7 +131,7 @@ export class CollectionViewStore {
             const viewNode = new IRI(viewIriStr);
             await this._store.delete(txCtx, {
                 subject: viewNode,
-                predicate: TERN_CV_ITEM,
+                predicate: SYS_CV_ITEM,
                 object: itemNode,
             });
             await this._store.delete(txCtx, { subject: itemNode });
@@ -157,16 +157,16 @@ export class CollectionViewStore {
             for (const q of quads) {
                 const pred = (q.predicate as IRI).value;
                 const val = str(q.object);
-                if (pred === TERN_CV_SOURCE.value) {
+                if (pred === SYS_CV_SOURCE.value) {
                     sourcePg = val;
                 }
-                if (pred === TERN_CV_PROP.value) {
+                if (pred === SYS_CV_PROP.value) {
                     prop = val;
                 }
-                if (pred === TERN_CV_SORT_PROP.value) {
+                if (pred === SYS_CV_SORT_PROP.value) {
                     sortProp = val;
                 }
-                if (pred === TERN_CV_SORT_DIR.value) {
+                if (pred === SYS_CV_SORT_DIR.value) {
                     sortDir = val as "asc" | "desc";
                 }
             }
@@ -192,10 +192,10 @@ export class CollectionViewStore {
                     continue;
                 }
                 const itemNode = new IRI(item.iri);
-                await this._store.delete(txCtx, { subject: itemNode, predicate: TERN_CVI_POS });
+                await this._store.delete(txCtx, { subject: itemNode, predicate: SYS_CVI_POS });
                 await this._store.insert(txCtx, {
                     subject: itemNode,
-                    predicate: TERN_CVI_POS,
+                    predicate: SYS_CVI_POS,
                     object: toLiteral(newPos),
                     graph: DEFAULT_GRAPH,
                 });
@@ -231,7 +231,7 @@ export class CollectionViewStore {
                 const itemNode = new IRI(item.iri);
                 await this._store.delete(txCtx, {
                     subject: viewNode,
-                    predicate: TERN_CV_ITEM,
+                    predicate: SYS_CV_ITEM,
                     object: itemNode,
                 });
                 await this._store.delete(txCtx, { subject: itemNode });
@@ -249,7 +249,7 @@ export class CollectionViewStore {
     ): Promise<string[]> {
         return this._store.withTransaction(ctx, async (txCtx) => {
             const bySource = await this._store.find(txCtx, {
-                predicate: TERN_CV_SOURCE,
+                predicate: SYS_CV_SOURCE,
                 object: toLiteral(sourcePgIri),
             });
             if (bySource.length === 0) {
@@ -261,7 +261,7 @@ export class CollectionViewStore {
                 const viewNode = q.subject as IRI;
                 const propQ = await this._store.find(txCtx, {
                     subject: viewNode,
-                    predicate: TERN_CV_PROP,
+                    predicate: SYS_CV_PROP,
                     object: toLiteral(propIri),
                 });
                 if (propQ.length > 0) {
@@ -286,23 +286,23 @@ export class CollectionViewStore {
             {
                 subject: itemNode,
                 predicate: RDF_TYPE,
-                object: TERN_COLLECTION_VIEW_ITEM,
+                object: SYS_COLLECTION_VIEW_ITEM,
                 graph: DEFAULT_GRAPH,
             },
-            { subject: itemNode, predicate: TERN_CVI_VIEW, object: viewNode, graph: DEFAULT_GRAPH },
+            { subject: itemNode, predicate: SYS_CVI_VIEW, object: viewNode, graph: DEFAULT_GRAPH },
             {
                 subject: itemNode,
-                predicate: TERN_CVI_REF,
+                predicate: SYS_CVI_REF,
                 object: toLiteral(ref),
                 graph: DEFAULT_GRAPH,
             },
             {
                 subject: itemNode,
-                predicate: TERN_CVI_POS,
+                predicate: SYS_CVI_POS,
                 object: toLiteral(pos),
                 graph: DEFAULT_GRAPH,
             },
-            { subject: viewNode, predicate: TERN_CV_ITEM, object: itemNode, graph: DEFAULT_GRAPH },
+            { subject: viewNode, predicate: SYS_CV_ITEM, object: itemNode, graph: DEFAULT_GRAPH },
         ]);
     }
 
@@ -313,7 +313,7 @@ export class CollectionViewStore {
         const viewNode = new IRI(viewIriStr);
         const itemLinks = await this._store.find(ctx, {
             subject: viewNode,
-            predicate: TERN_CV_ITEM,
+            predicate: SYS_CV_ITEM,
         });
         if (itemLinks.length === 0) {
             return [];
@@ -329,10 +329,10 @@ export class CollectionViewStore {
             let pos = 0;
             for (const q of quads) {
                 const pred = (q.predicate as IRI).value;
-                if (pred === TERN_CVI_REF.value) {
+                if (pred === SYS_CVI_REF.value) {
                     ref = str(q.object);
                 }
-                if (pred === TERN_CVI_POS.value) {
+                if (pred === SYS_CVI_POS.value) {
                     pos = Number(fromLiteral(q.object) ?? 0);
                 }
             }

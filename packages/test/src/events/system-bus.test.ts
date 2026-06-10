@@ -2,7 +2,7 @@
  * ISystemBus integration tests — command, query, operation, and event roundtrips.
  *
  * InMemorySystemBus:  always runs.
- * RedisSystemBus:     runs when TERN_REDIS_URL is set.
+ * RedisSystemBus:     runs when SYS_REDIS_URL is set.
  *
  * Each Redis test suite uses a unique prefix so runs never see stale state.
  */
@@ -277,8 +277,8 @@ systemBusSuite("InMemorySystemBus", () => new InMemorySystemBus());
 
 // ── RedisSystemBus ────────────────────────────────────────────────────────────
 
-if (process.env.TERN_REDIS_URL) {
-    const redisUrl = process.env.TERN_REDIS_URL as string;
+if (process.env.SYS_REDIS_URL) {
+    const redisUrl = process.env.SYS_REDIS_URL as string;
 
     function makeRedisBus(prefix: string): RedisSystemBus {
         return new RedisSystemBus(redisUrl, {
@@ -389,7 +389,7 @@ if (process.env.TERN_REDIS_URL) {
     });
 
 } else {
-    describe("RedisSystemBus (skipped — set TERN_REDIS_URL to enable)", () => {
+    describe("RedisSystemBus (skipped — set SYS_REDIS_URL to enable)", () => {
         it("test skipped", () => { /* no-op */ });
     });
 }

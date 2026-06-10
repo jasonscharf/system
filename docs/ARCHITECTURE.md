@@ -1,4 +1,4 @@
-# Tern Platform — Architecture Guide
+# TSystem // Architecture Guide
 
 > Authoritative reference for agents and developers building applications and extensions on Tern. Read this before writing any code.
 

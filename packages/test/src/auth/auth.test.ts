@@ -2,7 +2,7 @@
  * Auth integration tests.
  *
  * All database tests run against both SQLite (always) and Postgres
- * (when TERN_PG_URL is set) inside rolled-back transactions.
+ * (when SYS_PG_URL is set) inside rolled-back transactions.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -84,8 +84,8 @@ const dbProviders: DbProvider[] = [
     },
 ];
 
-if (process.env.TERN_PG_URL) {
-    const url = new URL(process.env.TERN_PG_URL);
+if (process.env.SYS_PG_URL) {
+    const url = new URL(process.env.SYS_PG_URL);
     dbProviders.push({
         name: "Postgres",
         create: () =>

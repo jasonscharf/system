@@ -5,7 +5,7 @@
  * a Knex instance runs is emitted with its bindings interpolated inline and its
  * wall-clock duration, e.g.
  *
- *   [sql 1.8ms] insert into "tern_edges" ("object", "subject") values (42, 7)
+ *   [sql 1.8ms] insert into "edges" ("object", "subject") values (42, 7)
  *
  * The formatting helpers are pure and exported so they can be tested directly
  * with real inputs (no console capture, no mocks).

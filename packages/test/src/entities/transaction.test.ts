@@ -30,8 +30,8 @@ const providers: DbProvider[] = [
     },
 ];
 
-if (process.env.TERN_PG_URL) {
-    const url = new URL(process.env.TERN_PG_URL);
+if (process.env.SYS_PG_URL) {
+    const url = new URL(process.env.SYS_PG_URL);
     providers.push({
         name: "Postgres",
         isPg: true,
@@ -85,7 +85,7 @@ for (const db of providers) {
             env = await setup(db);
         });
         afterEach(async () => {
-            for (const t of ["tern_edges", "tern_nodes", "tern_names", "tern_namespaces"]) {
+            for (const t of ["edges", "nodes", "namespaces"]) {
                 await env.knex(t).del();
             }
             await teardown(env);
@@ -228,7 +228,7 @@ for (const db of providers) {
             env = await setup(db);
         });
         afterEach(async () => {
-            for (const t of ["tern_edges", "tern_nodes", "tern_names", "tern_namespaces"]) {
+            for (const t of ["edges", "nodes", "namespaces"]) {
                 await env.knex(t).del();
             }
             await teardown(env);

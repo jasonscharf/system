@@ -2,7 +2,7 @@
  * Domain event bus integration tests.
  *
  * InMemoryEventBus: always runs.
- * RedisStreamEventBus: runs when TERN_REDIS_URL is set.
+ * RedisStreamEventBus: runs when SYS_REDIS_URL is set.
  *
  * Redis tests use a unique streamPrefix per test so each test gets a
  * completely isolated set of Redis Streams — no cross-test contamination
@@ -166,8 +166,8 @@ eventBusSuite("InMemoryEventBus", () => new InMemoryEventBus());
 
 // ── Run shared contract suite for RedisStreamEventBus ────────────────────────
 
-if (process.env.TERN_REDIS_URL) {
-    const redisUrl = process.env.TERN_REDIS_URL as string;
+if (process.env.SYS_REDIS_URL) {
+    const redisUrl = process.env.SYS_REDIS_URL as string;
 
     // Each test gets its own stream prefix so re-runs never see stale messages.
     eventBusSuite("RedisStreamEventBus (contract)", () => {
@@ -448,7 +448,7 @@ if (process.env.TERN_REDIS_URL) {
     });
 
 } else {
-    describe("RedisStreamEventBus (skipped — set TERN_REDIS_URL to enable)", () => {
+    describe("RedisStreamEventBus (skipped — set SYS_REDIS_URL to enable)", () => {
         it("test skipped", () => { /* no-op */ });
     });
 }

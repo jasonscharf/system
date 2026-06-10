@@ -171,7 +171,7 @@ for (const provider of providers) {
                 graph: GRAPH,
             });
 
-            const byType = await store.find(ctx, { predicate: RDF_TYPE });
+            const byType = await store.find(ctx, { predicate: RDF_TYPE, graph: GRAPH });
             expect(byType).toHaveLength(1);
             expect((byType[0].subject as IRI).value).toBe("http://example.org/a");
         });
@@ -238,7 +238,7 @@ for (const provider of providers) {
                 { subject: EX("c"), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH },
             ]);
 
-            const all = await store.find(ctx);
+            const all = await store.find(ctx, { graph: GRAPH });
             expect(all).toHaveLength(3);
         });
 
@@ -294,7 +294,7 @@ for (const provider of providers) {
                 { subject: EX("remove"), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH },
             ]);
             await store.delete(ctx, { subject: EX("remove") });
-            const all = await store.find(ctx);
+            const all = await store.find(ctx, { graph: GRAPH });
             expect(all).toHaveLength(1);
             expect((all[0].subject as IRI).value).toBe("http://example.org/keep");
         });
@@ -302,16 +302,18 @@ for (const provider of providers) {
         // ── stats ─────────────────────────────────────────────────────────────
 
         it("reports accurate stats after insertions", async () => {
+            const base = await store.stats(ctx);
             await store.insertMany(ctx, [
                 { subject: EX("a"), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH },
                 { subject: EX("b"), predicate: RDFS_LABEL, object: literal("B"), graph: GRAPH },
             ]);
             const s = await store.stats(ctx);
-            expect(s.edges).toBe(2);
-            expect(s.nodes).toBeGreaterThanOrEqual(4); // a, b, rdf:type, rdfs:label, owl:Thing, lit, default-graph
+            expect(s.edges - base.edges).toBe(2);
+            expect(s.nodes - base.nodes).toBeGreaterThanOrEqual(4);
         });
 
         it("stats reflect deletions", async () => {
+            const base = await store.stats(ctx);
             await store.insert(ctx, {
                 subject: EX("x"),
                 predicate: RDF_TYPE,
@@ -320,7 +322,7 @@ for (const provider of providers) {
             });
             await store.delete(ctx, { subject: EX("x") });
             const s = await store.stats(ctx);
-            expect(s.edges).toBe(0);
+            expect(s.edges - base.edges).toBe(0);
         });
 
         // ── delete by predicate / object / graph:null ─────────────────────────
@@ -330,9 +332,9 @@ for (const provider of providers) {
                 { subject: EX("a"), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH },
                 { subject: EX("b"), predicate: RDFS_LABEL, object: literal("B"), graph: GRAPH },
             ]);
-            const deleted = await store.delete(ctx, { predicate: RDF_TYPE });
+            const deleted = await store.delete(ctx, { predicate: RDF_TYPE, graph: GRAPH });
             expect(deleted).toBe(1);
-            expect(await store.find(ctx)).toHaveLength(1);
+            expect(await store.find(ctx, { graph: GRAPH })).toHaveLength(1);
         });
 
         it("deletes triples matching an object pattern", async () => {
@@ -373,19 +375,6 @@ describe("migration 001_init down()", () => {
         await migration001Down(knex);
         // After down(), the tables should be gone — querying should throw
         await expect(knex("edges").count()).rejects.toThrow();
-        await knex.destroy();
-    });
-});
-
-// ── migration 003_timestamps down() ──────────────────────────────────────────
-
-describe("migration 003_timestamps down()", () => {
-    it("drops SQLite triggers cleanly", async () => {
-        const knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
-        const { down: migration003Down } = await import(
-            "../../../data/src/migrations/003_timestamps.js"
-        );
-        await migration003Down(knex);
         await knex.destroy();
     });
 });

@@ -4,7 +4,7 @@ import {
     inheritsFromIRI,
     isMemberOfIRI,
     permissionKeyIRI,
-    rbacGrantsIRI,
+    grantsIRI,
     roleNameIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
@@ -411,7 +411,7 @@ export class RbacInspector {
 
         const grantQuads = await this._store.find(ctx, {
             subject: new IRI(roleIri),
-            predicate: rbacGrantsIRI,
+            predicate: grantsIRI,
             graph: tenantGraph(ctx),
         });
         for (const q of grantQuads) {

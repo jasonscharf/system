@@ -1,4 +1,4 @@
-import { DEFAULT_GRAPH, IRI } from "@jasonscharf/core";
+import { DEFAULT_GRAPH, IRI, makeUri } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import type {
     CollectionViewItemRecord,
@@ -29,10 +29,10 @@ export type { CollectionViewItemRecord, CollectionViewOpts, CollectionViewRecord
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function viewIri(id: string): IRI {
-    return new IRI(`${TERN_VIEW_NS}${id}`);
+    return new IRI(makeUri(TERN_VIEW_NS, id));
 }
 function viewItemIri(id: string): IRI {
-    return new IRI(`${TERN_VIEW_NS}item:${id}`);
+    return new IRI(makeUri(TERN_VIEW_NS, "item", id));
 }
 function str(term: unknown): string {
     return String(fromLiteral(term) ?? "");

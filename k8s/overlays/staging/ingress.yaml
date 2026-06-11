@@ -11,13 +11,17 @@ metadata:
   name: tern
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-staging
-    nginx.ingress.kubernetes.io/proxy-read-timeout:   "3600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout:   "3600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     # WebSocket upgrade support
-    nginx.ingress.kubernetes.io/proxy-http-version:   "1.1"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
     nginx.ingress.kubernetes.io/configuration-snippet: |
       proxy_set_header Upgrade $http_upgrade;
       proxy_set_header Connection "upgrade";
+    # HTTP Basic Auth — keeps staging off the open internet
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: staging-basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Tern Staging"
 spec:
   ingressClassName: nginx
   tls:

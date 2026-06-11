@@ -1,4 +1,5 @@
 import type { FlowComponent } from "./FlowComponent.js";
+import type { FlowPort } from "./FlowPort.js";
 import type { ScheduleMode } from "./types.js";
 
 export abstract class FlowScheduler {
@@ -7,6 +8,18 @@ export abstract class FlowScheduler {
     abstract get mode(): ScheduleMode;
     abstract get queueSize(): number;
     abstract enqueue(component: FlowComponent): void;
+
+    /**
+     * Deliver one message to a port's handlers. Ports report the put side via
+     * enqueue(); this is the matching delivery side. The default fires
+     * immediately. Subclasses may override to observe, gate, or account for
+     * every message in the graph — not calling fire() holds the message (it
+     * has already left the queue), making the scheduler responsible for
+     * redelivery via port.put().
+     */
+    dispatch(_port: FlowPort<unknown>, _msg: unknown, fire: () => void): void {
+        fire();
+    }
 
     /** Process one scheduling cycle. */
     abstract tick(): Promise<void>;

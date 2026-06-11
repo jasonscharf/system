@@ -1,4 +1,4 @@
-import { makeUri, NS_CORE, type IRI } from "@jasonscharf/core";
+import { type IRI, makeUri, NS_CORE } from "@jasonscharf/core";
 import {
     Clock,
     createMessage,
@@ -7,11 +7,13 @@ import {
     type FlowComponentOptions,
     type FlowContext,
     type FlowMessage,
+    type FlowPort,
     FlowPortGroup,
     FlowTransport,
     fromJSON,
     fromRDF,
     fromYAML,
+    PushScheduler,
     type ReadMode,
     type ScheduleMode,
     TickEvent,
@@ -191,7 +193,9 @@ class AsyncEcho<T> extends FlowComponent {
     }
     override async step(): Promise<void> {
         await super.step();
-        if (!this.isRunning) { return; }
+        if (!this.isRunning) {
+            return;
+        }
         const msg = this.input.read();
         if (msg !== undefined) {
             await new Promise<void>((r) => setTimeout(r, 0));
@@ -216,7 +220,9 @@ class Merger<L, R> extends FlowComponent {
     }
     override step(): void {
         super.step();
-        if (!this.isRunning) { return; }
+        if (!this.isRunning) {
+            return;
+        }
         const pair = this._group.readAll();
         if (pair !== undefined) {
             this.output.put({ left: pair[0], right: pair[1] });
@@ -430,7 +436,9 @@ describe("FlowTransport / wire: pluggable delivery edges", () => {
         class LoggingTransport extends FlowTransport<string> {
             override deliver(msg: string): void {
                 intercepted.push(msg);
-                if (this.to) { this.to.put(msg); }
+                if (this.to) {
+                    this.to.put(msg);
+                }
             }
         }
         app.connect(source.output, collector.input, new LoggingTransport());
@@ -692,8 +700,12 @@ describe("FlowApp: full graph wiring and execution", () => {
 describe("TickEvent: timing signals", () => {
     // Fake timers are used for the Clock-driven test; afterEach ensures they
     // are always restored even if an assertion fails mid-test.
-    beforeEach(() => { vi.useFakeTimers(); });
-    afterEach(() => { vi.useRealTimers(); });
+    beforeEach(() => {
+        vi.useFakeTimers();
+    });
+    afterEach(() => {
+        vi.useRealTimers();
+    });
 
     it("carries a numeric timestamp", () => {
         expect(typeof new TickEvent().timestamp).toBe("number");
@@ -719,8 +731,12 @@ describe("TickEvent: timing signals", () => {
 // so a mid-test failure never leaves fake timers in place for other suites.
 
 describe("Clock: start, stop, pause, resume", () => {
-    beforeEach(() => { vi.useFakeTimers(); });
-    afterEach(() => { vi.useRealTimers(); });
+    beforeEach(() => {
+        vi.useFakeTimers();
+    });
+    afterEach(() => {
+        vi.useRealTimers();
+    });
 
     it("auto-starts on app.init() and auto-stops on app.stop()", async () => {
         const app = new FlowApp();
@@ -806,6 +822,45 @@ describe("Clock: start, stop, pause, resume", () => {
     });
 });
 
+// ── FlowScheduler.dispatch ────────────────────────────────────────────────────
+//
+// Ports route both sides of message movement through the scheduler: put()
+// reports via enqueue(), and delivery runs through dispatch(). A scheduler
+// subclass therefore has full oversight of the graph — it can observe, gate,
+// or account for every message — while components remain vanilla.
+
+describe("FlowScheduler.dispatch: schedulers own message delivery", () => {
+    it("a scheduler subclass observes every dispatch and can hold messages for later redelivery", async () => {
+        const seen: string[] = [];
+        let gateClosed = true;
+        class GatingScheduler extends PushScheduler {
+            override dispatch(port: FlowPort<unknown>, msg: unknown, fire: () => void): void {
+                seen.push(`${port.name}:${msg}`);
+                if (gateClosed && msg === 2) {
+                    return; // held — the scheduler now owns redelivery
+                }
+                fire();
+            }
+        }
+
+        const app = new FlowApp({ scheduler: new GatingScheduler() });
+        const source = new Source<number>(app.context, { messages: [1, 2, 3] });
+        const collector = new Collector<number>(app.context);
+        app.connect(source.output, collector.input);
+
+        await app.init();
+        await app.drain();
+        expect(collector.received).toEqual([1, 3]);
+
+        gateClosed = false;
+        collector.input.put(2);
+        await app.drain();
+        await app.stop();
+        expect(collector.received).toEqual([1, 3, 2]);
+        expect(seen).toEqual(["input:1", "input:2", "input:3", "input:2"]);
+    });
+});
+
 // ── FlowLoader ────────────────────────────────────────────────────────────────
 //
 // FlowLoader builds a FlowApp from a declarative JSON or YAML spec.
@@ -832,7 +887,9 @@ describe("FlowLoader: declarative graph construction", () => {
             },
         };
         const cls = classes[uri];
-        if (!cls) { throw new Error(`Unknown component type: ${uri}`); }
+        if (!cls) {
+            throw new Error(`Unknown component type: ${uri}`);
+        }
         return { default: cls };
     };
 
@@ -852,7 +909,10 @@ describe("FlowLoader: declarative graph construction", () => {
         const app = await fromJSON(
             JSON.stringify({
                 mode: "push",
-                components: [{ id: "src", type: "Echo" }, { id: "dst", type: "Collector" }],
+                components: [
+                    { id: "src", type: "Echo" },
+                    { id: "dst", type: "Collector" },
+                ],
                 connections: [{ from: "src.output", to: "dst.input" }],
             }),
             { moduleResolver: resolver },
@@ -866,10 +926,13 @@ describe("FlowLoader: declarative graph construction", () => {
 
     it("fromJSON throws on unknown component in a connection", async () => {
         await expect(
-            fromJSON(JSON.stringify({
-                mode: "push", components: [],
-                connections: [{ from: "ghost.out", to: "ghost.in" }],
-            })),
+            fromJSON(
+                JSON.stringify({
+                    mode: "push",
+                    components: [],
+                    connections: [{ from: "ghost.out", to: "ghost.in" }],
+                }),
+            ),
         ).rejects.toThrow();
     });
 });

@@ -41,13 +41,29 @@ export class Clock extends FlowComponent {
         return this._paused;
     }
 
-    protected override onStart(): void { this._startTimer(); this._paused = false; }
-    protected override onResume(_wasStopped: boolean, _since: number): void { this._startTimer(); this._paused = false; }
-    protected override onPause(): void { this._stopTimer(); this._paused = true; }
-    protected override onStop(): void { this._stopTimer(); this._paused = false; }
+    protected override onStart(): void {
+        this._startTimer();
+        this._paused = false;
+    }
+    protected override onResume(_wasStopped: boolean, _since: number): void {
+        this._startTimer();
+        this._paused = false;
+    }
+    protected override onPause(): void {
+        this._stopTimer();
+        this._paused = true;
+    }
+    protected override onStop(): void {
+        this._stopTimer();
+        this._paused = false;
+    }
 
-    protected override onInit(): void { this._startTimer(); }
-    protected override onDispose(): void { this._stopTimer(); }
+    protected override onInit(): void {
+        this._startTimer();
+    }
+    protected override onDispose(): void {
+        this._stopTimer();
+    }
 
     private _startTimer(): void {
         if (this._timer != null) {

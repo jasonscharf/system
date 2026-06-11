@@ -17,7 +17,7 @@ import {
     validate,
 } from "@jasonscharf/gen";
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 async function collect(gen: AsyncIterable<Triple>): Promise<Triple[]> {
     const result: Triple[] = [];
@@ -36,7 +36,6 @@ describe("generate", () => {
 
     afterEach(async () => {
         await rm(tmpDir, { recursive: true });
-        vi.restoreAllMocks();
     });
 
     it("reads an RDF file and writes a .generated.ts sibling", async () => {
@@ -46,8 +45,7 @@ describe("generate", () => {
             "<http://example.org/User> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .\n",
         );
 
-        vi.spyOn(console, "log").mockImplementation(() => {});
-        await generate(ntPath);
+        await generate(ntPath, () => {});
 
         const output = await readFile(join(tmpDir, "schema.generated.ts"), "utf-8");
         expect(output).toContain("export interface User");
@@ -907,7 +905,6 @@ describe("generateFromConfig", () => {
     });
     afterEach(async () => {
         await rm(tmpDir, { recursive: true });
-        vi.restoreAllMocks();
     });
 
     it("generates a types file from a minimal config", async () => {
@@ -934,8 +931,7 @@ describe("generateFromConfig", () => {
         const configPath = join(tmpDir, "tern-gen.json");
         await writeFile(configPath, JSON.stringify(config));
 
-        vi.spyOn(console, "log").mockImplementation(() => {});
-        await generateFromConfig(configPath);
+        await generateFromConfig(configPath, () => {});
 
         const output = await readFile(outPath, "utf-8");
         expect(output).toContain("export interface Project");
@@ -973,8 +969,7 @@ describe("generateFromConfig", () => {
         const configPath = join(tmpDir, "tern-gen.json");
         await writeFile(configPath, JSON.stringify(config));
 
-        vi.spyOn(console, "log").mockImplementation(() => {});
-        await generateFromConfig(configPath);
+        await generateFromConfig(configPath, () => {});
 
         const shapesOut = await readFile(join(tmpDir, "shapes.generated.ts"), "utf-8");
         expect(shapesOut).toContain("TaskShape");
@@ -1000,8 +995,7 @@ describe("generateFromConfig", () => {
         const configPath = join(tmpDir, "tern-gen.json");
         await writeFile(configPath, JSON.stringify(config));
 
-        vi.spyOn(console, "log").mockImplementation(() => {});
-        await generateFromConfig(configPath);
+        await generateFromConfig(configPath, () => {});
 
         const output = await readFile(join(tmpDir, "types.ts"), "utf-8");
         expect(output).toContain("Widget");
@@ -1035,8 +1029,7 @@ describe("generateFromConfig", () => {
         };
         const configPath = join(tmpDir, "tern-gen.json");
         await writeFile(configPath, JSON.stringify(config));
-        vi.spyOn(console, "log").mockImplementation(() => {});
-        await generateFromConfig(configPath);
+        await generateFromConfig(configPath, () => {});
         const output = await readFile(join(tmpDir, "out", "types.ts"), "utf-8");
         expect(output).toContain("@system/auth/types");
     });
@@ -1057,8 +1050,7 @@ describe("generateFromConfig", () => {
                 out: "types.ts",
             }),
         );
-        vi.spyOn(console, "log").mockImplementation(() => {});
-        await generateFromConfig(configPath);
+        await generateFromConfig(configPath, () => {});
         const output = await readFile(join(tmpDir, "types.ts"), "utf-8");
         expect(output).toContain("// auto-generated");
     });

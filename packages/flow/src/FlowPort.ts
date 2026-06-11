@@ -75,18 +75,28 @@ export class FlowPort<T> {
                 if (msg === undefined) {
                     break;
                 }
-                for (const h of this._handlers) {
-                    h(msg);
-                }
+                this._dispatchOne(msg);
             }
         } else {
             const msg = this._queue.shift();
             if (msg !== undefined) {
-                for (const h of this._handlers) {
-                    h(msg);
-                }
+                this._dispatchOne(msg);
             }
         }
+    }
+
+    private _dispatchOne(msg: T): void {
+        const fire = (): void => {
+            for (const h of this._handlers) {
+                h(msg);
+            }
+        };
+        const scheduler = this.owner.context.scheduler;
+        if (scheduler === undefined) {
+            fire();
+            return;
+        }
+        scheduler.dispatch(this as unknown as FlowPort<unknown>, msg, fire);
     }
 
     addTransport(transport: FlowTransport<T>): void {

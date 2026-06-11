@@ -24,7 +24,7 @@ interface NodeRow {
     /** Blank-node identifier for kind='blank'; null otherwise. */
     blank_id: string | null;
     value: string | null;
-    datatype: string | null;
+    dt: string | null;
     lang: string | null;
     /** JSONB payload for literal nodes.  May be an object (Postgres) or JSON string (SQLite). */
     value_json: LiteralJson | string | null;
@@ -80,7 +80,7 @@ function coerceLiteralValue(value: string, datatypeIri: string): string | number
 }
 
 function makeLiteralJson(value: string, datatypeIri: string, language?: string): LiteralJson {
-    const json: LiteralJson = { v: coerceLiteralValue(value, datatypeIri), dt: datatypeIri };
+    const json: LiteralJson = { v: coerceLiteralValue(value, datatypeIri) };
     if (language) {
         json.lang = language;
     }
@@ -126,18 +126,18 @@ function nodeToTerm(row: NodeRow): RdfTerm {
 
     // Literal — prefer the typed JSONB payload when present
     const json = parseLiteralJson(row.value_json);
+    /* v8 ignore next -- row.dt is always set by ensureNode */
+    const dtIri = row.dt ?? "http://www.w3.org/2001/XMLSchema#string";
     if (json) {
         return {
             termType: "Literal",
             value: String(json.v),
-            datatype: makeIRI(json.dt),
+            datatype: makeIRI(dtIri),
             language: json.lang ?? undefined,
         } satisfies Literal;
     }
 
-    // Fallback: legacy value / datatype / lang columns (pre-migration rows)
-    /* v8 ignore next -- row.datatype is always set by ensureNode */
-    const dtIri = row.datatype ?? "http://www.w3.org/2001/XMLSchema#string";
+    // Fallback: rows without value_json (pre-002 rows in existing DBs)
     if (row.value == null) {
         throw new Error("nodeToTerm: value must not be null for literal node");
     }
@@ -376,14 +376,14 @@ export class TripleStore {
             return this._insert(ctx, T.nodes, { [C.kind]: "blank", [C.blankId]: term.id });
         }
 
-        // Literal node — deduplicate by (value, datatype, lang), populate value_json
+        // Literal node — deduplicate by (value, dt, lang), populate value_json
         /* v8 ignore next */
         const dtIri = term.datatype?.value ?? "http://www.w3.org/2001/XMLSchema#string";
         const row = await this._db(ctx)(T.nodes)
             .where({
                 [C.kind]: "literal",
                 [C.value]: term.value,
-                [C.datatype]: dtIri,
+                [C.dt]: dtIri,
                 [C.lang]: term.language ?? null,
             })
             .first<NodeRow>();
@@ -395,7 +395,7 @@ export class TripleStore {
         return this._insert(ctx, T.nodes, {
             [C.kind]: "literal",
             [C.value]: term.value,
-            [C.datatype]: dtIri,
+            [C.dt]: dtIri,
             [C.lang]: term.language ?? null,
             [C.valueJson]: JSON.stringify(jsonPayload),
         });
@@ -1102,7 +1102,7 @@ export class TripleStore {
             .where({
                 [C.kind]: "literal",
                 [C.value]: term.value,
-                [C.datatype]: dtIri,
+                [C.dt]: dtIri,
                 [C.lang]: term.language ?? null,
             })
             .first<NodeRow>();

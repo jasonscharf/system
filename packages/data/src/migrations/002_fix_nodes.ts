@@ -1,0 +1,48 @@
+import type { Knex } from "knex";
+
+/**
+ * TRN-85: Clean up the nodes table.
+ *
+ *  1. Delete rows with no semantic content (all-null triples).
+ *  2. Strip the redundant `dt` field from value_json — the datatype IRI is
+ *     already stored in the dedicated column.
+ *  3. Rename `datatype` → `dt`.
+ *  4. Add `v` (integer version counter, default 0) and `vh` (version hash) for
+ *     entity node versioning.
+ */
+export async function up(knex: Knex): Promise<void> {
+    const client = (knex.client as { config: { client: string } }).config.client;
+    const isPg = client === "pg" || client === "postgresql";
+
+    // 1. Remove all-null triples — rows with no IRI, blank ID, value, or JSON payload.
+    await knex("nodes").whereNull("iri").whereNull("blank_id").whereNull("value").whereNull("value_json").delete();
+
+    // 2. Strip the `dt` field from value_json — it duplicates the datatype column.
+    if (isPg) {
+        await knex.raw(`UPDATE nodes SET value_json = value_json - 'dt' WHERE kind = 'literal' AND value_json IS NOT NULL`);
+    } else {
+        await knex.raw(`UPDATE nodes SET value_json = json_remove(value_json, '$.dt') WHERE kind = 'literal' AND value_json IS NOT NULL`);
+    }
+
+    // 3. Rename datatype → dt.
+    await knex.schema.alterTable("nodes", (t) => {
+        t.renameColumn("datatype", "dt");
+    });
+
+    // 4. Add version columns.
+    await knex.schema.alterTable("nodes", (t) => {
+        t.integer("v").notNullable().defaultTo(0);
+        t.text("vh").nullable();
+    });
+}
+
+export async function down(knex: Knex): Promise<void> {
+    await knex.schema.alterTable("nodes", (t) => {
+        t.dropColumn("v");
+        t.dropColumn("vh");
+    });
+    await knex.schema.alterTable("nodes", (t) => {
+        t.renameColumn("dt", "datatype");
+    });
+    // Deleted null triples and stripped dt from value_json cannot be restored.
+}

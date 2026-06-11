@@ -119,7 +119,7 @@ async function getLiteralNode(knex: Knex, value: string) {
     return knex("nodes").where({ kind: "literal", value }).first<{
         id: number;
         value: string;
-        datatype: string;
+        dt: string;
         value_json: string;
         created_at: string;
         updated_at: string;
@@ -219,7 +219,7 @@ for (const db of providers) {
             }
             const json = parseJson(row.value_json);
             expect(json.v).toBe("alice@example.com");
-            expect(json.dt).toBe(`${XSD}string`);
+            expect(row.dt).toBe(`${XSD}string`);
         });
 
         it("stores a boolean literal with native boolean v=true", async () => {
@@ -273,7 +273,7 @@ for (const db of providers) {
             }
             const json = parseJson(row.value_json);
             expect(json.v).toBe(dt);
-            expect(json.dt).toBe(`${XSD}dateTime`);
+            expect(row.dt).toBe(`${XSD}dateTime`);
         });
 
         it("stores a lang-tagged literal with lang key", async () => {

@@ -3,12 +3,12 @@ import {
     hasOrgIRI,
     OrganizationIRI,
     orgNameIRI,
-    TENANCY_NS,
     TenantIRI,
     tenantNameIRI,
 } from "@jasonscharf/core/tenancy";
 import { EntitySchema } from "@jasonscharf/entities";
 import { registerTopology } from "../topology.js";
+import { TENANCY_NS } from "./constants.js";
 
 /**
  * The tenancy topology, modelled as an outward-from-root DAG so every domain

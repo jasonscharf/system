@@ -8,7 +8,6 @@ import {
     type Quad,
 } from "@jasonscharf/core";
 import type { Knex } from "knex";
-import { coerceLiteralValue } from "./migrations/002_time_series.js";
 import { C, DEFAULT_GRAPH_IRI, type LiteralJson, type NodeKind, T } from "./schema.js";
 
 interface ServerContext extends ApplicationContext {
@@ -51,6 +50,34 @@ type RdfTerm = IRI | BlankNode | Literal;
 const DEFAULT_GRAPH_NODE = makeIRI(DEFAULT_GRAPH_IRI);
 
 // ── Literal JSONB helpers ─────────────────────────────────────────────────────
+
+const XSD = "http://www.w3.org/2001/XMLSchema#";
+
+function coerceLiteralValue(value: string, datatypeIri: string): string | number | boolean {
+    switch (datatypeIri) {
+        case `${XSD}boolean`:
+            return value === "true";
+        case `${XSD}integer`:
+        case `${XSD}int`:
+        case `${XSD}long`:
+        case `${XSD}short`:
+        case `${XSD}byte`:
+        case `${XSD}unsignedInt`:
+        case `${XSD}unsignedLong`:
+        case `${XSD}unsignedShort`: {
+            const n = parseInt(value, 10);
+            return Number.isNaN(n) ? value : n;
+        }
+        case `${XSD}decimal`:
+        case `${XSD}float`:
+        case `${XSD}double`: {
+            const n = parseFloat(value);
+            return Number.isNaN(n) ? value : n;
+        }
+        default:
+            return value;
+    }
+}
 
 function makeLiteralJson(value: string, datatypeIri: string, language?: string): LiteralJson {
     const json: LiteralJson = { v: coerceLiteralValue(value, datatypeIri), dt: datatypeIri };
@@ -226,7 +253,7 @@ export interface StoreStats {
 /**
  * Graph + time-series RDF quad store backed by Knex.
  *
- * Schema (see migrations/001_init.ts + 002_time_series.ts):
+ * Schema (see migrations/001_init.ts):
  *   namespaces — prefix → IRI mappings
  *   nodes      — every RDF term (IRI / blank / literal).
  *                IRI nodes store the full IRI string in the `iri` column.

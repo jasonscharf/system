@@ -3,7 +3,27 @@
 import { IRI } from "@jasonscharf/core";
 import { EntitySchema } from "@jasonscharf/entities";
 
-/** Top-level isolation boundary. All groups, roles, and resources belong to a tenant. */
+/** A deployment of the platform (cloud-native, hybrid, or on-premise). Contains one or more Tenants. */
+export const InstallSchema: EntitySchema = new EntitySchema({
+    typeIRI: new IRI("urn:sys:core:rbac:Install"),
+    ns: "urn:sys:core:rbac:",
+    idSegment: "install",
+    properties: {
+        installName: new IRI("urn:sys:core:rbac:installName"),
+        isSystemInstall: new IRI("urn:sys:core:rbac:isSystemInstall"),
+        installKind: new IRI("urn:sys:core:rbac:installKind"),
+    },
+    edges: {
+        hasTenant: {
+            predicate: new IRI("urn:sys:core:rbac:hasTenant"),
+            target: () => TenantSchema,
+            cardinality: "many",
+            direction: "out",
+        },
+    },
+});
+
+/** An isolation boundary scoped to a single Install. All groups, roles, and resources belong to a tenant. */
 export const TenantSchema: EntitySchema = new EntitySchema({
     typeIRI: new IRI("urn:sys:core:rbac:Tenant"),
     ns: "urn:sys:core:rbac:",
@@ -40,7 +60,7 @@ export const ServiceAccountSchema: EntitySchema = new EntitySchema({
     properties: {
         serviceAccountName: new IRI("urn:sys:core:rbac:serviceAccountName"),
         serviceAccountToken: new IRI("urn:sys:core:rbac:serviceAccountToken"),
-        isActive: new IRI("urn:sys:core:rbac:isActive"),
+        serviceAccountIsActive: new IRI("urn:sys:core:rbac:serviceAccountIsActive"),
     },
     edges: {
         isInTenant: {

@@ -14,7 +14,7 @@ export interface ServiceAccountEntity {
     iri: string;
     serviceAccountName: string;
     serviceAccountToken: string;
-    isActive: boolean;
+    serviceAccountIsActive: boolean;
     isInTenant: EdgeRef | null;
 }
 

@@ -13,6 +13,7 @@ resources:
   - postgres/service.yaml
   - redis-pvc.yaml
   - ingress.yaml
+  - basic-auth-secret.yaml
 
 # ── Server config: point at PostgreSQL + Redis + vault ───────────────────────
 configMapGenerator:

@@ -92,8 +92,10 @@ function coerceLiteralToJson(value: string, datatypeIri: string): string | numbe
 }
 
 async function internLiteralNode(knex: Knex, value: string, datatype: string): Promise<number> {
+    // Migration 002 renames `datatype` → `dt`; detect which column is present for idempotency.
+    const dtCol = (await knex.schema.hasColumn(T.nodes, C.dt)) ? C.dt : "datatype";
     const existing = (await knex(T.nodes)
-        .where({ [C.kind]: "literal", [C.value]: value, [C.datatype]: datatype })
+        .where({ [C.kind]: "literal", [C.value]: value, [dtCol]: datatype })
         .select(C.id)
         .first()) as { id: number } | undefined;
     if (existing) {
@@ -104,7 +106,7 @@ async function internLiteralNode(knex: Knex, value: string, datatype: string): P
         .insert({
             [C.kind]: "literal",
             [C.value]: value,
-            [C.datatype]: datatype,
+            [dtCol]: datatype,
             [C.valueJson]: json,
         })
         .returning(C.id)) as [{ id: number } | number];
@@ -162,7 +164,7 @@ export async function up(knex: Knex): Promise<void> {
             t.text(C.iri).nullable();
             t.text(C.blankId).nullable();
             t.text(C.value).nullable();
-            t.text(C.datatype).nullable();
+            t.text("datatype").nullable();
             t.text(C.lang).nullable();
             t.timestamp(C.createdAt, { useTz: true }).notNullable().defaultTo(knex.fn.now());
             t.timestamp(C.updatedAt, { useTz: true }).notNullable().defaultTo(knex.fn.now());
@@ -171,7 +173,7 @@ export async function up(knex: Knex): Promise<void> {
             } else {
                 t.json(C.valueJson).nullable();
             }
-            t.unique([C.kind, C.iri, C.blankId, C.value, C.datatype, C.lang]);
+            t.unique([C.kind, C.iri, C.blankId, C.value, "datatype", C.lang]);
         });
     }
 

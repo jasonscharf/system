@@ -16,7 +16,7 @@ export const C = {
     kind: "kind",
     blankId: "blank_id",
     value: "value",
-    datatype: "datatype",
+    dt: "dt",
     lang: "lang",
     valueJson: "value_json",
     // edges
@@ -45,8 +45,6 @@ export type NodeKind = "iri" | "blank" | "literal";
 export interface LiteralJson {
     /** The typed value — boolean/number for xsd:boolean/integer/decimal, string otherwise. */
     v: string | number | boolean;
-    /** Datatype IRI. */
-    dt: string;
     /** Language tag (only present for rdf:langString literals). */
     lang?: string;
 }

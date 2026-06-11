@@ -111,10 +111,7 @@ async function parseFile(filePath: string): Promise<Triple[]> {
  * cross-namespace domain/range links (e.g. analytics properties on auth:User) resolve
  * correctly in a single readOntology pass.
  */
-export async function generateFromConfig(
-    configPath: string,
-    logger: (msg: string) => void = console.log,
-): Promise<void> {
+export async function generateFromConfig(configPath: string): Promise<void> {
     const dir = path.dirname(path.resolve(configPath));
     const config = JSON.parse(await readFile(configPath, "utf-8")) as GenConfig;
 
@@ -165,7 +162,7 @@ export async function generateFromConfig(
         await mkdir(path.dirname(outPath), { recursive: true });
         await writeFile(outPath, typesSource, "utf-8");
         formatGenerated(outPath);
-        logger(`[gen] merged types → ${path.relative(process.cwd(), outPath)}`);
+        console.log(`[gen] merged types → ${path.relative(process.cwd(), outPath)}`);
     }
 
     if (config.shapesOut) {
@@ -174,7 +171,7 @@ export async function generateFromConfig(
         await mkdir(path.dirname(shapesPath), { recursive: true });
         await writeFile(shapesPath, shapesSource, "utf-8");
         formatGenerated(shapesPath);
-        logger(`[gen] shapes descriptor → ${path.relative(process.cwd(), shapesPath)}`);
+        console.log(`[gen] shapes descriptor → ${path.relative(process.cwd(), shapesPath)}`);
     }
 
     if (config.schemasOut) {
@@ -190,7 +187,7 @@ export async function generateFromConfig(
         await mkdir(path.dirname(schemasPath), { recursive: true });
         await writeFile(schemasPath, schemasSource, "utf-8");
         formatGenerated(schemasPath);
-        logger(`[gen] entity schemas → ${path.relative(process.cwd(), schemasPath)}`);
+        console.log(`[gen] entity schemas → ${path.relative(process.cwd(), schemasPath)}`);
     }
 }
 
@@ -198,10 +195,7 @@ export async function generateFromConfig(
  * Reads an RDF file, generates TypeScript types, and writes a sibling `.generated.ts` file.
  * The output path is derived by replacing the RDF extension with `.generated.ts`.
  */
-export async function generate(
-    inputPath: string,
-    logger: (msg: string) => void = console.log,
-): Promise<void> {
+export async function generate(inputPath: string): Promise<void> {
     const triples = await parseFile(inputPath);
     const ontology = readOntology(triples);
     const source = generateTypes(ontology, path.basename(inputPath));
@@ -209,5 +203,5 @@ export async function generate(
     const outPath = inputPath.replace(/\.(nt|n3|ttl|rdf)$/, ".generated.ts");
     await writeFile(outPath, source, "utf-8");
     formatGenerated(outPath);
-    logger(`[gen] ${path.basename(inputPath)} → ${path.basename(outPath)}`);
+    console.log(`[gen] ${path.basename(inputPath)} → ${path.basename(outPath)}`);
 }

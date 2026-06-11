@@ -45,7 +45,7 @@ describe("generate", () => {
             "<http://example.org/User> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .\n",
         );
 
-        await generate(ntPath, () => {});
+        await generate(ntPath);
 
         const output = await readFile(join(tmpDir, "schema.generated.ts"), "utf-8");
         expect(output).toContain("export interface User");
@@ -931,7 +931,7 @@ describe("generateFromConfig", () => {
         const configPath = join(tmpDir, "tern-gen.json");
         await writeFile(configPath, JSON.stringify(config));
 
-        await generateFromConfig(configPath, () => {});
+        await generateFromConfig(configPath);
 
         const output = await readFile(outPath, "utf-8");
         expect(output).toContain("export interface Project");
@@ -969,7 +969,7 @@ describe("generateFromConfig", () => {
         const configPath = join(tmpDir, "tern-gen.json");
         await writeFile(configPath, JSON.stringify(config));
 
-        await generateFromConfig(configPath, () => {});
+        await generateFromConfig(configPath);
 
         const shapesOut = await readFile(join(tmpDir, "shapes.generated.ts"), "utf-8");
         expect(shapesOut).toContain("TaskShape");
@@ -995,7 +995,7 @@ describe("generateFromConfig", () => {
         const configPath = join(tmpDir, "tern-gen.json");
         await writeFile(configPath, JSON.stringify(config));
 
-        await generateFromConfig(configPath, () => {});
+        await generateFromConfig(configPath);
 
         const output = await readFile(join(tmpDir, "types.ts"), "utf-8");
         expect(output).toContain("Widget");
@@ -1029,7 +1029,7 @@ describe("generateFromConfig", () => {
         };
         const configPath = join(tmpDir, "tern-gen.json");
         await writeFile(configPath, JSON.stringify(config));
-        await generateFromConfig(configPath, () => {});
+        await generateFromConfig(configPath);
         const output = await readFile(join(tmpDir, "out", "types.ts"), "utf-8");
         expect(output).toContain("@system/auth/types");
     });
@@ -1050,7 +1050,7 @@ describe("generateFromConfig", () => {
                 out: "types.ts",
             }),
         );
-        await generateFromConfig(configPath, () => {});
+        await generateFromConfig(configPath);
         const output = await readFile(join(tmpDir, "types.ts"), "utf-8");
         expect(output).toContain("// auto-generated");
     });

@@ -19,6 +19,38 @@ export const SCHEDULER_TICK_INTERVAL_MS = 5_000;
  */
 export const SCHEDULER_BATCH_SIZE = 50;
 
+// ── JobRunner defaults ────────────────────────────────────────────────────────
+
+/**
+ * How often the runner polls for pending runs, in milliseconds.
+ * Short enough for timely execution; long enough to avoid hammering the DB.
+ */
+export const RUNNER_TICK_INTERVAL_MS = 2_000;
+
+/**
+ * Maximum number of pending runs claimed in a single tick.
+ * Keeps each tick bounded; excess runs drain across successive ticks.
+ */
+export const RUNNER_BATCH_SIZE = 10;
+
+/**
+ * Per-handler execution timeout in milliseconds.
+ * A wedged handler is killed and counted as a failure after this window.
+ */
+export const RUNNER_HANDLER_TIMEOUT_MS = 30_000;
+
+/**
+ * Base delay for exponential backoff between retry attempts, in milliseconds.
+ * attempt N → backoff = min(BASE * 2^(attempt-1), MAX).
+ */
+export const RUNNER_BACKOFF_BASE_MS = 5_000;
+
+/**
+ * Maximum backoff cap between retry attempts, in milliseconds.
+ * Prevents unbounded retry delays regardless of attempt count.
+ */
+export const RUNNER_BACKOFF_MAX_MS = 300_000;
+
 // ── RoleManager defaults ──────────────────────────────────────────────────────
 
 /** Default lease TTL. A process must renew within this window or lose its slot. */

@@ -6,10 +6,11 @@
 #   Organization — user-facing named group wrapping a Tenant
 #   Domain       — a registered domain belonging to a Tenant
 #
-# Relationships:
-#   Organization → Tenant  via orgTenant
-#   Organization → Domain  via hasDomain
-#   Domain       → Tenant  via domainTenant
+# Topology (outward-from-root DAG):
+#   Tenant → Organization  via hasOrg
+#   Tenant → Domain        via hasDomain   (siblings under Tenant)
+#   Organization → User    via hasMember
+#   Organization → Tenant  via orgTenant   (back-reference)
 
 @prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
@@ -28,11 +29,12 @@ tenancy:Organization a owl:Class ;
 tenancy:Domain a owl:Class ;
     rdfs:comment "A registered domain (e.g. example.com) belonging to a Tenant." .
 
-# ── Topology: outward-from-root edges (Tenant → Org → User) ───────────────────
+# ── Topology: outward-from-root edges ────────────────────────────────────────
 # Real object-property edges (object is the target entity's IRI node, never an
-# anyURI literal) so the graph can be traversed root→leaf with SQL joins. Every
-# domain query walks this path from the tenant root; nothing is reachable that is
-# not attached under the tenant.
+# anyURI literal) so the graph can be traversed root→leaf with SQL joins.
+#
+#   Tenant --hasOrg--> Organization --hasMember--> User
+#   Tenant --hasDomain--> Domain
 
 tenancy:hasOrg a owl:ObjectProperty ;
     rdfs:domain tenancy:Tenant ;
@@ -45,9 +47,9 @@ tenancy:hasMember a owl:ObjectProperty ;
     rdfs:comment "Outward edge: an Organization contains a member User (org→user)." .
 
 tenancy:hasDomain a owl:ObjectProperty ;
-    rdfs:domain tenancy:Organization ;
+    rdfs:domain tenancy:Tenant ;
     rdfs:range tenancy:Domain ;
-    rdfs:comment "Outward edge: an Organization owns a registered Domain (org→domain)." .
+    rdfs:comment "Outward edge: a Tenant owns a registered Domain (tenant→domain)." .
 
 tenancy:hasLicense a owl:ObjectProperty ;
     rdfs:domain tenancy:Tenant ;

@@ -8,6 +8,8 @@ import { IRI } from "../semantics/IRI.js";
 export interface Tenant {
     /** Outward edge: a Tenant contains an Organization (root→down). */
     hasOrg?: Organization[];
+    /** Outward edge: a Tenant owns a registered Domain (tenant→domain). */
+    hasDomain?: Domain[];
     /** Outward edge: a Tenant holds a License (root→down). */
     hasLicense?: License[];
     /** Display name of the tenant organisation. */
@@ -22,8 +24,6 @@ export const TenantIRI = new IRI("urn:sys:core:tenancy:Tenant");
 export interface Organization {
     /** Outward edge: an Organization contains a member User (org→user). */
     hasMember?: User[];
-    /** Outward edge: an Organization owns a registered Domain (org→domain). */
-    hasDomain?: Domain[];
     /** Display name of the organization (user-renameable). */
     orgName?: string;
     /** IRI of the Tenant that backs this Organization. */

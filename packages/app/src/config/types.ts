@@ -7,12 +7,35 @@
 
 import type { TripleStore } from "@jasonscharf/data";
 
-/** One handler module registration for a named message type. */
+/**
+ * One handler module registration for a named message type.
+ *
+ * A handler may be addressed in one of two ways:
+ *
+ *   1. **Split fields** (legacy, back-compat): provide `module` and optionally
+ *      `export`.  This is the original format and continues to work unchanged.
+ *
+ *   2. **Unified `ref`**: provide a single `module://` URI that encodes the
+ *      specifier, member name, and optional bind-time arguments in one string.
+ *      Resolved via `resolveModuleRef` from `@jasonscharf/core`.
+ *      Example: `module://@jasonscharf/server/ComputeStates.js#sweepDomains?scope=active`
+ *
+ * When `ref` is present it takes precedence; `module` and `export` are ignored.
+ * When `ref` is absent, `module` must be provided.
+ */
 export interface HandlerEntry {
     /** Full IRI of the SystemTypeRef this handler responds to. */
     readonly typeIri: string;
-    /** Module specifier — a file path or URL resolved relative to the config file. */
-    readonly module: string;
+    /**
+     * Unified `module://` URI addressing a specific exported function.
+     * When present, takes precedence over `module`/`export`.
+     */
+    readonly ref?: string;
+    /**
+     * Module specifier — a file path or URL resolved relative to the config
+     * file.  Required when `ref` is absent.
+     */
+    readonly module?: string;
     /** Named export in the module that is the HandlerFn.  Defaults to "default". */
     readonly export?: string;
     /**

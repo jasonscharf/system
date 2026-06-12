@@ -1,6 +1,6 @@
 {
     "extends": "../tsconfig.base.json",
-    "references": [{ "path": "../core" }],
+    "references": [{ "path": "../core" }, { "path": "../flow" }],
     "compilerOptions": {
         "composite": true,
         "rootDir": "src",

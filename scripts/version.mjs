@@ -46,6 +46,7 @@ const PACKAGES = [
     "gen",
     "server",
     "vaults",
+    "worker",
 ];
 const ROOT = new URL("..", import.meta.url).pathname;
 

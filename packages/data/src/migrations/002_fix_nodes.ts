@@ -24,16 +24,31 @@ export async function up(knex: Knex): Promise<void> {
         await knex.raw(`UPDATE nodes SET value_json = json_remove(value_json, '$.dt') WHERE kind = 'literal' AND value_json IS NOT NULL`);
     }
 
-    // 3. Rename datatype → dt.
-    await knex.schema.alterTable("nodes", (t) => {
-        t.renameColumn("datatype", "dt");
-    });
+    // 3. Rename datatype → dt — only if not already done. createDataContext
+    //    re-runs every migration on each connect, so this must be a no-op
+    //    against an already-migrated database (e.g. a second worker replica
+    //    sharing one Postgres). Renaming again would fail: the source column
+    //    no longer exists.
+    const hasDatatype = await knex.schema.hasColumn("nodes", "datatype");
+    const hasDt = await knex.schema.hasColumn("nodes", "dt");
+    if (hasDatatype && !hasDt) {
+        await knex.schema.alterTable("nodes", (t) => {
+            t.renameColumn("datatype", "dt");
+        });
+    }
 
-    // 4. Add version columns.
-    await knex.schema.alterTable("nodes", (t) => {
-        t.integer("v").notNullable().defaultTo(0);
-        t.text("vh").nullable();
-    });
+    // 4. Add version columns — each guarded so a re-run does not fail on an
+    //    already-present column.
+    if (!(await knex.schema.hasColumn("nodes", "v"))) {
+        await knex.schema.alterTable("nodes", (t) => {
+            t.integer("v").notNullable().defaultTo(0);
+        });
+    }
+    if (!(await knex.schema.hasColumn("nodes", "vh"))) {
+        await knex.schema.alterTable("nodes", (t) => {
+            t.text("vh").nullable();
+        });
+    }
 }
 
 export async function down(knex: Knex): Promise<void> {

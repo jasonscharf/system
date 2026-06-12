@@ -1449,6 +1449,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@jasonscharf/worker@workspace:packages/worker"
   dependencies:
+    "@jasonscharf/core": "workspace:^"
     "@jasonscharf/flow": "workspace:^"
     "@types/luxon": "npm:^3.7.1"
     cron-parser: "npm:^5.5.0"

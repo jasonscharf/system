@@ -5,6 +5,20 @@
  * Group constants by concern so callers can import only what they need.
  */
 
+// ── JobScheduler defaults ─────────────────────────────────────────────────────
+
+/**
+ * How often the scheduler polls for due jobs, in milliseconds.
+ * Short enough for timely firing; long enough to avoid hammering the DB.
+ */
+export const SCHEDULER_TICK_INTERVAL_MS = 5_000;
+
+/**
+ * Maximum number of due jobs processed in a single tick.
+ * Keeps each tick bounded; a backlog drains across successive ticks.
+ */
+export const SCHEDULER_BATCH_SIZE = 50;
+
 // ── RoleManager defaults ──────────────────────────────────────────────────────
 
 /** Default lease TTL. A process must renew within this window or lose its slot. */

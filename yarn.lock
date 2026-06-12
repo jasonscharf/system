@@ -1450,7 +1450,10 @@ __metadata:
   resolution: "@jasonscharf/worker@workspace:packages/worker"
   dependencies:
     "@jasonscharf/flow": "workspace:^"
+    "@types/luxon": "npm:^3.7.1"
+    cron-parser: "npm:^5.5.0"
     knex: "npm:^3.1.0"
+    luxon: "npm:^3.7.2"
     nodemon: "npm:^3.1.11"
   languageName: unknown
   linkType: soft
@@ -2128,6 +2131,13 @@ __metadata:
     "@types/koa-compose": "npm:*"
     "@types/node": "npm:*"
   checksum: 10c0/c9d44b89591fb319fece4fcb05092e4715be15e748ffbd91f536a2d9c298d42995980262dcb7d8e1dd5ee8d26cc5ff0303bef88f0ab5923f72454fc95ae47def
+  languageName: node
+  linkType: hard
+
+"@types/luxon@npm:^3.7.1":
+  version: 3.7.1
+  resolution: "@types/luxon@npm:3.7.1"
+  checksum: 10c0/2db30c13b58adcd86daa447faa3ba59515fe907ead8ee3e6bb716d662812af0619d712f6c1eb190cdd7f9d2c00444c3ecd80af0f36e8143eb0c5e7339d6b2aca
   languageName: node
   linkType: hard
 
@@ -2879,6 +2889,15 @@ __metadata:
   version: 2.0.1
   resolution: "copy-to@npm:2.0.1"
   checksum: 10c0/ee10fa7ab257ccc1fada75d8571312f7a7eb2fa6a3129d89c6e3afc9884e0eb0cbb79140a92671fd3e35fa285b1e7f27f5422f885494ff14cf4c8c56e62d9daf
+  languageName: node
+  linkType: hard
+
+"cron-parser@npm:^5.5.0":
+  version: 5.5.0
+  resolution: "cron-parser@npm:5.5.0"
+  dependencies:
+    luxon: "npm:^3.7.1"
+  checksum: 10c0/ffbda13dcfca26cd79c07d7cb4aa317c3634119696f3690dedf4f3baceacade5b1459fc160f65563b3a367ec1b020a2fd065fa49c4b6d937536ba3d637191cd2
   languageName: node
   linkType: hard
 
@@ -4495,6 +4514,13 @@ __metadata:
   dependencies:
     yallist: "npm:^3.0.2"
   checksum: 10c0/89b2ef2ef45f543011e38737b8a8622a2f8998cddf0e5437174ef8f1f70a8b9d14a918ab3e232cb3ba343b7abddffa667f0b59075b2b80e6b4d63c3de6127482
+  languageName: node
+  linkType: hard
+
+"luxon@npm:^3.7.1, luxon@npm:^3.7.2":
+  version: 3.7.2
+  resolution: "luxon@npm:3.7.2"
+  checksum: 10c0/ed8f0f637826c08c343a29dd478b00628be93bba6f068417b1d8896b61cb61c6deacbe1df1e057dbd9298334044afa150f9aaabbeb3181418ac8520acfdc2ae2
   languageName: node
   linkType: hard
 

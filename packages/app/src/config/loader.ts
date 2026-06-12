@@ -13,6 +13,7 @@ function handlerEntryFromYaml(raw: unknown): HandlerEntry {
     const r = raw as Record<string, unknown>;
     return {
         typeIri: String(r.type ?? r.typeIri ?? ""),
+        ref: r.ref ? String(r.ref) : undefined,
         module: String(r.module ?? ""),
         export: r.export ? String(r.export) : undefined,
         priority: r.priority ? Number(r.priority) : undefined,
@@ -68,6 +69,7 @@ const NS = {
     desc: "urn:sys:core:app:description",
     handler: "urn:sys:core:app:handler",
     hType: "urn:sys:core:app:type",
+    hRef: "urn:sys:core:app:ref",
     hModule: "urn:sys:core:app:module",
     hExport: "urn:sys:core:app:export",
     hPriority: "urn:sys:core:app:priority",
@@ -101,6 +103,7 @@ function extensionConfigFromTurtle(turtle: string): ExtensionConfig {
         const hGet = (p: string) => hTriples.find((t) => t.p === p)?.o;
         return {
             typeIri: hGet(NS.hType) ?? "",
+            ref: hGet(NS.hRef),
             module: hGet(NS.hModule) ?? "",
             export: hGet(NS.hExport),
             priority: hGet(NS.hPriority) ? Number(hGet(NS.hPriority)) : undefined,

@@ -16,3 +16,13 @@ export interface OrganizationEntity {
 	updatedAt: Date;
 	members?: string[];
 }
+
+export interface DomainEntity {
+	id: string;
+	iri: string;
+	name: string;
+	description?: string;
+	url?: string;
+	createdAt: Date;
+	updatedAt: Date;
+}

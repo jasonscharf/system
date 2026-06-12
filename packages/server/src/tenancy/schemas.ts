@@ -1,4 +1,9 @@
 import {
+    DomainIRI,
+    domainDescriptionIRI,
+    domainNameIRI,
+    domainUrlIRI,
+    hasDomainIRI,
     hasMemberIRI,
     hasOrgIRI,
     OrganizationIRI,
@@ -15,12 +20,24 @@ import { TENANCY_NS } from "./constants.js";
  * query can walk it root→leaf:
  *
  *   Tenant --hasOrg--> Org --hasMember--> User
+ *   Tenant --hasDomain--> Domain
  *
  * Edges are real object-property edges (object is the target's IRI node), not
  * anyURI literals, so they can be joined/traversed. The `member` edge is
  * polymorphic (no target schema) to avoid a tenancy→auth import cycle — the leaf
  * schema (UserSchema) is supplied at the query terminal.
  */
+
+export const DomainSchema = new EntitySchema({
+    typeIRI: DomainIRI,
+    ns: TENANCY_NS,
+    idSegment: "domain",
+    properties: {
+        name: domainNameIRI,
+        description: domainDescriptionIRI,
+        url: domainUrlIRI,
+    },
+});
 
 export const OrgSchema = new EntitySchema({
     typeIRI: OrganizationIRI,
@@ -45,8 +62,15 @@ export const TenantSchema = new EntitySchema({
             direction: "out",
             containment: true,
         },
+        domain: {
+            predicate: hasDomainIRI,
+            target: () => DomainSchema,
+            cardinality: "many",
+            direction: "out",
+            containment: true,
+        },
     },
 });
 
-// Register the tenant→org→member containment edges so scope chains resolve over them.
-registerTopology(TenantSchema, OrgSchema);
+// Register containment edges so scope chains resolve over them.
+registerTopology(TenantSchema, OrgSchema, DomainSchema);

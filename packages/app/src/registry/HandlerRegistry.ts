@@ -1,6 +1,12 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { errResult, type SystemRequest, type SystemResult, type SystemTypeRef } from "@jasonscharf/core";
+import {
+    errResult,
+    resolveModuleRef,
+    type SystemRequest,
+    type SystemResult,
+    type SystemTypeRef,
+} from "@jasonscharf/core";
 import type { HandlerEntry } from "../config/types.js";
 import type { Dispatcher } from "../routing/Dispatcher.js";
 
@@ -22,6 +28,11 @@ export interface HandlerContext {
 interface LoadedEntry {
     readonly typeIri: string;
     readonly priority: number;
+    /**
+     * When `refUri` is set, the handler is resolved via `resolveModuleRef`.
+     * When absent, the legacy `moduleUrl` + `exportName` path is used.
+     */
+    readonly refUri: string | undefined;
     readonly moduleUrl: string;
     readonly exportName: string;
     handler?: HandlerFn; // populated on first use
@@ -33,6 +44,13 @@ interface LoadedEntry {
  * Handlers are loaded lazily from their configured modules the first time a
  * matching request arrives.  Multiple handlers for the same type are tried in
  * ascending priority order; the first successful result short-circuits.
+ *
+ * Handlers may be registered in two ways:
+ *
+ *   - **Split fields** (`module` + optional `export`): the original format,
+ *     fully supported and unchanged.
+ *   - **Unified `ref`**: a `module://` URI resolved by `resolveModuleRef`.
+ *     When `ref` is present on a `HandlerEntry`, the split fields are ignored.
  */
 export class HandlerRegistry implements Dispatcher {
     private readonly _entries = new Map<string, LoadedEntry[]>();
@@ -67,6 +85,7 @@ export class HandlerRegistry implements Dispatcher {
         entries.push({
             typeIri,
             priority,
+            refUri: undefined,
             moduleUrl: "__inline__",
             exportName: "__inline__",
             handler,
@@ -121,15 +140,28 @@ export class HandlerRegistry implements Dispatcher {
             this._entries.set(typeIri, []);
         }
 
-        const moduleUrl = this._resolveModuleUrl(e.module);
-        const exportName = e.export ?? "default";
         const priority = e.priority ?? 100;
-
         const entries = this._entries.get(typeIri);
         if (entries == null) {
             throw new Error(`HandlerRegistry: missing entries for typeIri "${typeIri}"`);
         }
-        entries.push({ typeIri, priority, moduleUrl, exportName });
+
+        if (e.ref != null) {
+            // Unified module:// ref path — module/export fields are ignored.
+            entries.push({
+                typeIri,
+                priority,
+                refUri: e.ref,
+                moduleUrl: e.ref,
+                exportName: "__ref__",
+            });
+        } else {
+            // Legacy split-fields path — backward-compatible.
+            const moduleUrl = this._resolveModuleUrl(e.module ?? "");
+            const exportName = e.export ?? "default";
+            entries.push({ typeIri, priority, refUri: undefined, moduleUrl, exportName });
+        }
+
         entries.sort((a, b) => a.priority - b.priority);
     }
 
@@ -153,6 +185,13 @@ export class HandlerRegistry implements Dispatcher {
     private async _load(entry: LoadedEntry): Promise<HandlerFn> {
         if (entry.handler) {
             return entry.handler;
+        }
+
+        if (entry.refUri != null) {
+            const { fn } = await resolveModuleRef(entry.refUri, this._baseDir);
+            const handlerFn = fn as HandlerFn;
+            entry.handler = handlerFn;
+            return handlerFn;
         }
 
         const mod = (await import(/* @vite-ignore */ entry.moduleUrl)) as Record<string, unknown>;

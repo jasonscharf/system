@@ -6,6 +6,7 @@ export * from "./container/index.js";
 export * from "./events/index.js";
 export * from "./hydration/index.js";
 export * from "./messages/SystemMessage.js";
+export * from "./modref/resolveModuleRef.js";
 export * from "./rbac/index.js";
 export * from "./rdf/index.js";
 export * from "./semantics/IRI.js";

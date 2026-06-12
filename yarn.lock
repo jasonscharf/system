@@ -1449,6 +1449,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@jasonscharf/worker@workspace:packages/worker"
   dependencies:
+    "@jasonscharf/flow": "workspace:^"
+    knex: "npm:^3.1.0"
     nodemon: "npm:^3.1.11"
   languageName: unknown
   linkType: soft

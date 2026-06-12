@@ -51,6 +51,67 @@ export const RUNNER_BACKOFF_BASE_MS = 5_000;
  */
 export const RUNNER_BACKOFF_MAX_MS = 300_000;
 
+// ── StaleRunReaper defaults ───────────────────────────────────────────────────
+
+/**
+ * A running sys_job_run whose started_at is older than this threshold is
+ * considered stale (the executor crashed mid-run). The reaper recovers it
+ * by marking it failed and, if retries remain, enqueuing a new pending run.
+ */
+export const REAPER_STALE_TIMEOUT_MS = 10 * 60 * 1_000; // 10 minutes
+
+/**
+ * How often the reaper job fires.
+ * Expressed as an ISO-8601 duration so it can be stored in sys_job.schedule.
+ */
+export const REAPER_SCHEDULE = "PT1M"; // every 1 minute
+
+// ── HistoryPruner defaults ────────────────────────────────────────────────────
+
+/**
+ * Succeeded and failed sys_job_run rows older than this are eligible for
+ * deletion. Shorter than the dead-run window to keep the table lean while
+ * the recent-success audit trail is retained.
+ */
+export const PRUNER_SUCCEEDED_RETENTION_MS = 7 * 24 * 60 * 60 * 1_000; // 7 days
+
+/**
+ * Dead sys_job_run rows older than this are eligible for deletion.
+ * Dead runs are kept longer than succeeded ones to aid post-mortem diagnosis.
+ */
+export const PRUNER_DEAD_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000; // 30 days
+
+/**
+ * How often the pruner job fires.
+ * Expressed as an ISO-8601 duration so it can be stored in sys_job.schedule.
+ */
+export const PRUNER_SCHEDULE = "P1D"; // every 1 day
+
+// ── JobMetrics defaults ───────────────────────────────────────────────────────
+
+/**
+ * When a job's consecutive-failure count crosses this threshold, a structured
+ * warning log entry is emitted so operators can act before the run goes dead.
+ */
+export const METRICS_CONSECUTIVE_FAILURE_ALERT_THRESHOLD = 3;
+
+// ── Built-in system job ids ───────────────────────────────────────────────────
+
+/** Handler/job id for the stale-run reaper built-in job. */
+export const SYS_JOB_REAPER_ID = "sys.jobs.reap";
+
+/** Handler/job id for the history pruner built-in job. */
+export const SYS_JOB_PRUNER_ID = "sys.jobs.prune";
+
+/** Role required by system self-management jobs. */
+export const SYS_SCHEDULER_ROLE = "sys.scheduler";
+
+/**
+ * Attempt cap for built-in system jobs (reaper, pruner). They are idempotent,
+ * so a few retries absorb transient DB hiccups before a run goes dead.
+ */
+export const SYS_JOB_MAX_ATTEMPTS = 5;
+
 // ── RoleManager defaults ──────────────────────────────────────────────────────
 
 /** Default lease TTL. A process must renew within this window or lose its slot. */

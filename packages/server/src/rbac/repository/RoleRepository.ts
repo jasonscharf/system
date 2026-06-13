@@ -32,6 +32,13 @@ export interface RoleInheritanceArgs {
     parentRoleIri: string;
 }
 
+/**
+ * Data-access layer for Role entities in the rbac bounded context.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design (TRN-205); authorization is enforced one level up by RbacService.
+ * The `_sec` argument is threaded for signature symmetry only.
+ */
 export class RoleRepository {
     private readonly _store: TripleStore;
     private readonly _es: EntityStore;
@@ -41,7 +48,7 @@ export class RoleRepository {
         this._es = new EntityStore(store);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async create(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -55,7 +62,7 @@ export class RoleRepository {
         return toRole(rec);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async findById(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -65,7 +72,7 @@ export class RoleRepository {
         return rec ? toRole(rec) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async findByIri(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -74,7 +81,7 @@ export class RoleRepository {
         return this.findById(ctx, sec, { id: idFromIri(args.iriStr) });
     }
 
-    /** @insecure @nochecks Grant a permission to a role (rbac:grants edge). */
+    /** @dataLayer — no checks here; RbacService enforces. Grant a permission to a role (rbac:grants edge). */
     async addPermission(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -88,7 +95,7 @@ export class RoleRepository {
         });
     }
 
-    /** @insecure @nochecks Remove a permission from a role. */
+    /** @dataLayer — no checks here; RbacService enforces. Remove a permission from a role. */
     async removePermission(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -102,7 +109,7 @@ export class RoleRepository {
         });
     }
 
-    /** @insecure @nochecks List permission IRIs directly granted by this role (does not include inherited). */
+    /** @dataLayer — no checks here; RbacService enforces. List permission IRIs directly granted by this role (does not include inherited). */
     async listPermissions(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -116,7 +123,7 @@ export class RoleRepository {
         return quads.map((q) => iriValue(q.object)).filter((v): v is string => v != null);
     }
 
-    /** @insecure @nochecks Add an inheritance relationship: roleIri inherits all permissions from parentRoleIri. */
+    /** @dataLayer — no checks here; RbacService enforces. Add an inheritance relationship: roleIri inherits all permissions from parentRoleIri. */
     async addInheritance(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -130,7 +137,7 @@ export class RoleRepository {
         });
     }
 
-    /** @insecure @nochecks Remove an inheritance relationship. */
+    /** @dataLayer — no checks here; RbacService enforces. Remove an inheritance relationship. */
     async removeInheritance(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -144,7 +151,7 @@ export class RoleRepository {
         });
     }
 
-    /** @insecure @nochecks List parent role IRIs that this role directly inherits from. */
+    /** @dataLayer — no checks here; RbacService enforces. List parent role IRIs that this role directly inherits from. */
     async listParentRoles(
         ctx: ServerContext,
         sec: SecurityContext,

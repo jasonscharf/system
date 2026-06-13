@@ -50,6 +50,14 @@ export interface PrincipalIriArgs {
     principalIri: string;
 }
 
+/**
+ * Data-access layer for UserGroup entities and membership edges in the rbac
+ * bounded context.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design (TRN-205); authorization is enforced one level up by RbacService.
+ * The `_sec` argument is threaded for signature symmetry only.
+ */
 export class UserGroupRepository {
     private readonly _store: TripleStore;
     private readonly _es: EntityStore;
@@ -61,7 +69,7 @@ export class UserGroupRepository {
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async create(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -75,7 +83,7 @@ export class UserGroupRepository {
         return toGroup(rec);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async findById(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -85,7 +93,7 @@ export class UserGroupRepository {
         return rec ? toGroup(rec) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async findByIri(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -94,7 +102,7 @@ export class UserGroupRepository {
         return this.findById(ctx, sec, { id: idFromIri(args.iriStr) });
     }
 
-    /** @insecure @nochecks Find a group by its human-readable name, optionally scoped to a tenant. */
+    /** @dataLayer — no checks here; RbacService enforces. Find a group by its human-readable name, optionally scoped to a tenant. */
     async findByName(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -112,7 +120,7 @@ export class UserGroupRepository {
         return null;
     }
 
-    /** @insecure @nochecks List all user groups, optionally filtered to a tenant. */
+    /** @dataLayer — no checks here; RbacService enforces. List all user groups, optionally filtered to a tenant. */
     async listAll(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -125,7 +133,7 @@ export class UserGroupRepository {
         return recs.map(toGroup);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async listForTenant(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -137,7 +145,7 @@ export class UserGroupRepository {
         return recs.map(toGroup);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async update(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -157,7 +165,7 @@ export class UserGroupRepository {
         });
     }
 
-    /** @insecure @nochecks Removes the group and all its membership/grant edges. */
+    /** @dataLayer — no checks here; RbacService enforces. Removes the group and all its membership/grant edges. */
     async delete(ctx: ServerContext, sec: SecurityContext, args: IdArgs): Promise<void> {
         return this._store.withTransaction(ctx, async (txCtx) => {
             await this._es.delete(txCtx, UserGroupSchema, args.id);
@@ -171,7 +179,7 @@ export class UserGroupRepository {
 
     // ── Membership (raw edges on arbitrary principal IRIs) ──────────────────────
 
-    /** @insecure @nochecks Add a member to a group. The member may be any principal IRI. */
+    /** @dataLayer — no checks here; RbacService enforces. Add a member to a group. The member may be any principal IRI. */
     async addMember(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -185,7 +193,7 @@ export class UserGroupRepository {
         });
     }
 
-    /** @insecure @nochecks Remove a member from a group. */
+    /** @dataLayer — no checks here; RbacService enforces. Remove a member from a group. */
     async removeMember(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -199,7 +207,7 @@ export class UserGroupRepository {
         });
     }
 
-    /** @insecure @nochecks List IRIs of all direct members of a group. */
+    /** @dataLayer — no checks here; RbacService enforces. List IRIs of all direct members of a group. */
     async listMembers(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -213,7 +221,7 @@ export class UserGroupRepository {
         return quads.map((q) => (q.subject as IRI).value);
     }
 
-    /** @insecure @nochecks List the group IRIs that a principal directly belongs to. */
+    /** @dataLayer — no checks here; RbacService enforces. List the group IRIs that a principal directly belongs to. */
     async listGroupsForPrincipal(
         ctx: ServerContext,
         sec: SecurityContext,

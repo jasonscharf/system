@@ -30,6 +30,15 @@ export interface FindGrantsArgs {
     scopeIris?: string[];
 }
 
+/**
+ * Data-access layer for PolicyGrant entities in the rbac bounded context.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design (TRN-205); authorization is enforced one level up by RbacService.
+ * `findForPrincipals` is also the read the AccessChecker itself runs (on
+ * `systemSec`) to evaluate authorization — it must not require a check. The
+ * `_sec` argument is threaded for signature symmetry only.
+ */
 export class PolicyGrantRepository {
     private readonly _store: TripleStore;
     private readonly _es: EntityStore;
@@ -39,7 +48,7 @@ export class PolicyGrantRepository {
         this._es = new EntityStore(store);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async create(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -58,13 +67,13 @@ export class PolicyGrantRepository {
         return toGrant(rec);
     }
 
-    /** @insecure @nochecks Soft-delete a grant by IRI (revokes the assignment). */
+    /** @dataLayer — no checks here; RbacService enforces. Soft-delete a grant by IRI (revokes the assignment). */
     async revoke(ctx: ServerContext, sec: SecurityContext, args: GrantIriArgs): Promise<void> {
         await this._store.delete(ctx, { subject: new IRI(args.grantIri), graph: tenantGraph(ctx) });
     }
 
     /**
-     * @insecure @nochecks
+     * @dataLayer — no checks here; RbacService enforces (see class doc).
      * Find all active grants whose hasPrincipal is in the given principal set.
      * Optionally restrict to grants whose hasScope is one of the provided scope
      * IRIs (or has no scope, i.e. system-wide).  One reverse edge query, no loop.

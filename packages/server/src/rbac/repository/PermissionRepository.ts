@@ -20,6 +20,13 @@ export interface KeyArgs {
     key: string;
 }
 
+/**
+ * Data-access layer for Permission entities in the rbac bounded context.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design (TRN-205); authorization is enforced one level up by RbacService.
+ * The `_sec` argument is threaded for signature symmetry only.
+ */
 export class PermissionRepository {
     private readonly _store: TripleStore;
     private readonly _es: EntityStore;
@@ -29,7 +36,7 @@ export class PermissionRepository {
         this._es = new EntityStore(store);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async create(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -41,7 +48,7 @@ export class PermissionRepository {
         return toPermission(rec);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async findById(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -51,7 +58,7 @@ export class PermissionRepository {
         return rec ? toPermission(rec) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async findByIri(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -60,7 +67,7 @@ export class PermissionRepository {
         return this.findById(ctx, sec, { id: idFromIri(args.iriStr) });
     }
 
-    /** @insecure @nochecks Find a permission by its dot-separated key (e.g. "invoice.read"). */
+    /** @dataLayer — no checks here; RbacService enforces. Find a permission by its dot-separated key (e.g. "invoice.read"). */
     async findByKey(
         ctx: ServerContext,
         sec: SecurityContext,

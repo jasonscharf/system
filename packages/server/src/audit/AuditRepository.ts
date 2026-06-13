@@ -42,6 +42,11 @@ export interface AuditEntry {
  * Persistence runs through the typed EntityStore/EntityQuery (AuditEventSchema),
  * which pins the system-level AUDIT_GRAPH so the trail stays a single, non
  * tenant-scoped log (see AuditEventSchema for why this graph pin is correct).
+ *
+ * This is the trusted persistence layer and performs NO access checks by design
+ * (TRN-205); whether a caller may write or read the audit trail is enforced one
+ * level up by the owning service. The `_sec` argument is threaded for signature
+ * symmetry only.
  */
 export class AuditRepository {
     private readonly _store: TripleStore;
@@ -57,7 +62,7 @@ export class AuditRepository {
         return this._store;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; the owning service enforces (see class doc). */
     async record(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -74,7 +79,7 @@ export class AuditRepository {
         return toEntry(record);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; the owning service enforces (see class doc). */
     async list(
         ctx: ServerContext,
         _sec: SecurityContext,

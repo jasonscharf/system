@@ -27,6 +27,13 @@ export interface SetParentArgs {
     parentIri: string;
 }
 
+/**
+ * Data-access layer for ResourceNode entities in the rbac bounded context.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design (TRN-205); authorization is enforced one level up by RbacService.
+ * The `_sec` argument is threaded for signature symmetry only.
+ */
 export class ResourceNodeRepository {
     private readonly _es: EntityStore;
 
@@ -34,7 +41,7 @@ export class ResourceNodeRepository {
         this._es = new EntityStore(store);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async create(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -48,7 +55,7 @@ export class ResourceNodeRepository {
         return toResource(rec);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async findById(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -58,7 +65,7 @@ export class ResourceNodeRepository {
         return rec ? toResource(rec) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async findByIri(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -67,7 +74,7 @@ export class ResourceNodeRepository {
         return this.findById(ctx, sec, { id: idFromIri(args.iriStr) });
     }
 
-    /** @insecure @nochecks Set the parent of a resource (replaces the existing hasParent edge). */
+    /** @dataLayer — no checks here; RbacService enforces. Set the parent of a resource (replaces the existing hasParent edge). */
     async setParent(ctx: ServerContext, sec: SecurityContext, args: SetParentArgs): Promise<void> {
         await this._es.update(ctx, ResourceNodeSchema, idFromIri(args.resourceIri), {
             hasParent: args.parentIri,

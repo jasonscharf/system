@@ -16,6 +16,13 @@ export interface IriStrArgs {
     iriStr: string;
 }
 
+/**
+ * Data-access layer for ServiceAccount entities in the rbac bounded context.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design (TRN-205); authorization is enforced one level up by RbacService.
+ * The `_sec` argument is threaded for signature symmetry only.
+ */
 export class ServiceAccountRepository {
     private readonly _es: EntityStore;
 
@@ -23,7 +30,7 @@ export class ServiceAccountRepository {
         this._es = new EntityStore(store);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async create(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -38,7 +45,7 @@ export class ServiceAccountRepository {
         return toServiceAccount(rec);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async findById(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -48,7 +55,7 @@ export class ServiceAccountRepository {
         return rec ? toServiceAccount(rec) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async findByIri(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -57,7 +64,7 @@ export class ServiceAccountRepository {
         return this.findById(ctx, sec, { id: idFromIri(args.iriStr) });
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async deactivate(ctx: ServerContext, sec: SecurityContext, args: IdArgs): Promise<void> {
         await this._es.update(ctx, ServiceAccountSchema, args.id, {
             serviceAccountIsActive: false,

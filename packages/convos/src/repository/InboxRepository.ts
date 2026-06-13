@@ -1,23 +1,11 @@
-import { IRI, literal } from "@jasonscharf/core";
-import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
+import type { TripleStore } from "@jasonscharf/data";
+import type { EntityRecord } from "@jasonscharf/entities";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import {
-    CONVOS_GRAPH,
-    grantedAtIRI,
-    InboxClassIRI,
-    InboxMembershipClassIRI,
-    inboxCreatedByIRI,
-    inboxNameIRI,
-    memberInboxIRI,
-    memberUserIRI,
-    RDF_TYPE,
-    roleIRI,
-    subjectIriIRI,
-    XSD_DATETIME,
-    XSD_STRING,
-} from "../constants.js";
+import { EntityQuery, EntityStore } from "@jasonscharf/server";
+import { InboxMembershipSchema } from "../entities/InboxMembershipSchema.js";
+import { InboxSchema } from "../entities/InboxSchema.js";
 import type { InboxEntity, InboxMembershipEntity, InboxRole } from "../types.js";
-import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
+import { idFrom, iriFor, newId } from "./util.js";
 
 export interface IdArgs {
     id: string;
@@ -48,9 +36,15 @@ export interface UserIdArgs {
 
 export class InboxRepository {
     private readonly _store: TripleStore;
+    private readonly _entities: EntityStore;
 
     constructor(store: TripleStore) {
         this._store = store;
+        this._entities = new EntityStore(store);
+    }
+
+    get store(): TripleStore {
+        return this._store;
     }
 
     /** @insecure @nochecks */
@@ -59,42 +53,17 @@ export class InboxRepository {
         _sec: SecurityContext,
         args: Pick<InboxEntity, "subjectIri" | "name" | "createdBy">,
     ): Promise<InboxEntity> {
-        const id = newId();
-        const sub = iriFor("inbox", id);
-
-        return this._store.withTransaction(ctx, async (ctx) => {
-            await this._store.insertMany(ctx, [
-                { subject: sub, predicate: RDF_TYPE, object: InboxClassIRI, graph: CONVOS_GRAPH },
-                {
-                    subject: sub,
-                    predicate: subjectIriIRI,
-                    object: literal(args.subjectIri, XSD_STRING),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: inboxNameIRI,
-                    object: literal(args.name, XSD_STRING),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: inboxCreatedByIRI,
-                    object: new IRI(args.createdBy),
-                    graph: CONVOS_GRAPH,
-                },
-            ]);
-
-            const ts = await this._timestamps(ctx, sub);
-            return {
-                id,
-                iri: sub.value,
+        const record = await this._entities.create(
+            ctx,
+            InboxSchema,
+            {
                 subjectIri: args.subjectIri,
                 name: args.name,
                 createdBy: args.createdBy,
-                createdAt: ts.createdAt,
-            };
-        });
+            },
+            newId(),
+        );
+        return this._toEntity(record);
     }
 
     /** @insecure @nochecks */
@@ -103,11 +72,8 @@ export class InboxRepository {
         _sec: SecurityContext,
         args: IdArgs,
     ): Promise<InboxEntity | null> {
-        const sub = iriFor("inbox", args.id);
-        const quads = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
-        return quads.length === 0
-            ? null
-            : this._fromQuads(args.id, quads, await this._timestamps(ctx, sub));
+        const record = await this._entities.findById(ctx, InboxSchema, args.id);
+        return record ? this._toEntity(record) : null;
     }
 
     /** @insecure @nochecks */
@@ -116,40 +82,10 @@ export class InboxRepository {
         _sec: SecurityContext,
         args: SubjectIriArgs,
     ): Promise<InboxEntity[]> {
-        const quads = await this._store.find(ctx, {
-            predicate: subjectIriIRI,
-            object: literal(args.subjectIri, XSD_STRING),
-            graph: CONVOS_GRAPH,
-        });
-
-        const seen = new Set<string>();
-        const subjects = quads
-            .map((q) => q.subject as IRI)
-            .filter((s) => {
-                if (!s.value.includes(":inbox:") || seen.has(s.value)) {
-                    return false;
-                }
-                seen.add(s.value);
-                return true;
-            });
-
-        if (subjects.length === 0) {
-            return [];
-        }
-
-        const bySubject = await this._store.findForSubjects(ctx, subjects, CONVOS_GRAPH);
-        const tsBySubject = await this._store.entityTimestamps(ctx, subjects, CONVOS_GRAPH);
-        const inboxes: InboxEntity[] = [];
-
-        for (const [subjIri, all] of bySubject) {
-            if (all.length > 0) {
-                inboxes.push(
-                    this._fromQuads(idFrom(subjIri), all, tsBySubject.get(subjIri) ?? this._now()),
-                );
-            }
-        }
-
-        return inboxes;
+        const records = await EntityQuery.from(this._store, InboxSchema)
+            .where("subjectIri", "=", args.subjectIri)
+            .all(ctx);
+        return records.map((r) => this._toEntity(r));
     }
 
     /** @insecure @nochecks */
@@ -166,51 +102,18 @@ export class InboxRepository {
             return existing;
         }
 
-        const id = newId();
-        const now = new Date();
-        const sub = iriFor("membership", id);
-
-        await this._store.insertMany(ctx, [
+        const record = await this._entities.create(
+            ctx,
+            InboxMembershipSchema,
             {
-                subject: sub,
-                predicate: RDF_TYPE,
-                object: InboxMembershipClassIRI,
-                graph: CONVOS_GRAPH,
+                memberInbox: iriFor("inbox", args.inboxId).value,
+                memberUser: args.userId,
+                role: args.role,
+                grantedAt: new Date(),
             },
-            {
-                subject: sub,
-                predicate: memberInboxIRI,
-                object: iriFor("inbox", args.inboxId),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: memberUserIRI,
-                object: new IRI(args.userId),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: roleIRI,
-                object: literal(args.role, XSD_STRING),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: grantedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: CONVOS_GRAPH,
-            },
-        ]);
-
-        return {
-            id,
-            iri: sub.value,
-            inboxId: args.inboxId,
-            userId: args.userId,
-            role: args.role,
-            grantedAt: now,
-        };
+            newId(),
+        );
+        return this._membershipToEntity(record);
     }
 
     /** @insecure @nochecks */
@@ -223,10 +126,7 @@ export class InboxRepository {
         if (!membership) {
             return;
         }
-        await this._store.delete(ctx, {
-            subject: iriFor("membership", membership.id),
-            graph: CONVOS_GRAPH,
-        });
+        await this._entities.delete(ctx, InboxMembershipSchema, membership.id);
     }
 
     /** @insecure @nochecks */
@@ -245,27 +145,10 @@ export class InboxRepository {
         _sec: SecurityContext,
         args: InboxIdArgs,
     ): Promise<InboxMembershipEntity[]> {
-        const quads = await this._store.find(ctx, {
-            predicate: memberInboxIRI,
-            object: iriFor("inbox", args.inboxId),
-            graph: CONVOS_GRAPH,
-        });
-
-        if (quads.length === 0) {
-            return [];
-        }
-
-        const subjects = quads.map((q) => q.subject as IRI);
-        const bySubject = await this._store.findForSubjects(ctx, subjects, CONVOS_GRAPH);
-        const members: InboxMembershipEntity[] = [];
-
-        for (const [subjIri, all] of bySubject) {
-            if (all.length > 0) {
-                members.push(this._memberFromQuads(idFrom(subjIri), all));
-            }
-        }
-
-        return members;
+        const records = await EntityQuery.from(this._store, InboxMembershipSchema)
+            .where("memberInbox", "=", iriFor("inbox", args.inboxId).value)
+            .all(ctx);
+        return records.map((r) => this._membershipToEntity(r));
     }
 
     /** @insecure @nochecks */
@@ -274,113 +157,57 @@ export class InboxRepository {
         _sec: SecurityContext,
         args: UserIdArgs,
     ): Promise<InboxMembershipEntity[]> {
-        const quads = await this._store.find(ctx, {
-            predicate: memberUserIRI,
-            object: new IRI(args.userId),
-            graph: CONVOS_GRAPH,
-        });
-
-        if (quads.length === 0) {
-            return [];
-        }
-
-        const subjects = quads.map((q) => q.subject as IRI);
-        const bySubject = await this._store.findForSubjects(ctx, subjects, CONVOS_GRAPH);
-        const memberships: InboxMembershipEntity[] = [];
-
-        for (const [subjIri, all] of bySubject) {
-            if (all.length > 0) {
-                memberships.push(this._memberFromQuads(idFrom(subjIri), all));
-            }
-        }
-
-        return memberships;
+        const records = await EntityQuery.from(this._store, InboxMembershipSchema)
+            .where("memberUser", "=", args.userId)
+            .all(ctx);
+        return records.map((r) => this._membershipToEntity(r));
     }
 
-    private _now(): EntityTimestamps {
-        const now = new Date();
-        return { createdAt: now, updatedAt: now };
-    }
-
-    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
-    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
-        return (
-            (await this._store.entityTimestamps(ctx, [sub], CONVOS_GRAPH)).get(sub.value) ??
-            this._now()
-        );
-    }
-
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-        ts: EntityTimestamps,
-    ): InboxEntity {
-        const getLit = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? literalValue(q.object) : undefined;
-        };
-        const getIri = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? iriValue(q.object) : undefined;
-        };
-
-        const subjectIri = getLit(subjectIriIRI);
+    private _toEntity(record: EntityRecord): InboxEntity {
+        const subjectIri = record.props.subjectIri;
         if (subjectIri == null) {
-            throw new Error(`InboxRepository: missing subjectIri for id "${id}"`);
+            throw new Error(`InboxRepository: missing subjectIri for id "${record.id}"`);
         }
-        const name = getLit(inboxNameIRI);
+        const name = record.props.name;
         if (name == null) {
-            throw new Error(`InboxRepository: missing name for id "${id}"`);
+            throw new Error(`InboxRepository: missing name for id "${record.id}"`);
         }
-        const createdByIri = getIri(inboxCreatedByIRI);
-        if (createdByIri == null) {
-            throw new Error(`InboxRepository: missing createdBy for id "${id}"`);
+        const createdBy = record.props.createdBy;
+        if (createdBy == null) {
+            throw new Error(`InboxRepository: missing createdBy for id "${record.id}"`);
         }
 
         return {
-            id,
-            iri: iriFor("inbox", id).value,
-            subjectIri,
-            name,
-            createdBy: createdByIri,
-            createdAt: ts.createdAt,
+            id: record.id,
+            iri: record.iri,
+            subjectIri: String(subjectIri),
+            name: String(name),
+            createdBy: String(createdBy),
+            createdAt: record.createdAt ?? new Date(),
         };
     }
 
-    private _memberFromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-    ): InboxMembershipEntity {
-        const getLit = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? literalValue(q.object) : undefined;
-        };
-        const getIri = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? iriValue(q.object) : undefined;
-        };
-
-        const inboxIri = getIri(memberInboxIRI);
-        if (inboxIri == null) {
-            throw new Error(`InboxRepository: missing inbox for membership "${id}"`);
+    private _membershipToEntity(record: EntityRecord): InboxMembershipEntity {
+        const inbox = record.props.memberInbox;
+        if (inbox == null) {
+            throw new Error(`InboxRepository: missing inbox for membership "${record.id}"`);
         }
-        const userIri = getIri(memberUserIRI);
-        if (userIri == null) {
-            throw new Error(`InboxRepository: missing user for membership "${id}"`);
+        const user = record.props.memberUser;
+        if (user == null) {
+            throw new Error(`InboxRepository: missing user for membership "${record.id}"`);
         }
-        const role = getLit(roleIRI) ?? "member";
-        const grantedAtStr = getLit(grantedAtIRI);
-        if (grantedAtStr == null) {
-            throw new Error(`InboxRepository: missing grantedAt for membership "${id}"`);
+        const grantedAt = record.props.grantedAt;
+        if (grantedAt == null) {
+            throw new Error(`InboxRepository: missing grantedAt for membership "${record.id}"`);
         }
 
         return {
-            id,
-            iri: iriFor("membership", id).value,
-            inboxId: idFrom(inboxIri),
-            userId: userIri,
-            role: role as InboxRole,
-            grantedAt: new Date(grantedAtStr),
+            id: record.id,
+            iri: record.iri,
+            inboxId: idFrom(String(inbox)),
+            userId: String(user),
+            role: String(record.props.role ?? "member") as InboxRole,
+            grantedAt: grantedAt instanceof Date ? grantedAt : new Date(String(grantedAt)),
         };
     }
 }

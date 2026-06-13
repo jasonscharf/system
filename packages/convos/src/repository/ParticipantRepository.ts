@@ -1,19 +1,10 @@
-import { IRI, literal } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
+import type { EntityRecord } from "@jasonscharf/entities";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import {
-    CONVOS_GRAPH,
-    conversationRefIRI,
-    joinedAtIRI,
-    ParticipantClassIRI,
-    participantUserIRI,
-    RDF_TYPE,
-    roleIRI,
-    XSD_DATETIME,
-    XSD_STRING,
-} from "../constants.js";
+import { EntityQuery, EntityStore } from "@jasonscharf/server";
+import { ParticipantSchema } from "../entities/ParticipantSchema.js";
 import type { ParticipantEntity, ParticipantRole } from "../types.js";
-import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
+import { idFrom, iriFor, newId } from "./util.js";
 
 export interface ConversationIdArgs {
     conversationId: string;
@@ -35,9 +26,15 @@ export interface IdArgs {
 
 export class ParticipantRepository {
     private readonly _store: TripleStore;
+    private readonly _entities: EntityStore;
 
     constructor(store: TripleStore) {
         this._store = store;
+        this._entities = new EntityStore(store);
+    }
+
+    get store(): TripleStore {
+        return this._store;
     }
 
     /** @insecure @nochecks */
@@ -54,51 +51,18 @@ export class ParticipantRepository {
             return existing;
         }
 
-        const id = newId();
-        const now = new Date();
-        const sub = iriFor("participant", id);
-
-        await this._store.insertMany(ctx, [
+        const record = await this._entities.create(
+            ctx,
+            ParticipantSchema,
             {
-                subject: sub,
-                predicate: RDF_TYPE,
-                object: ParticipantClassIRI,
-                graph: CONVOS_GRAPH,
+                conversation: iriFor("conversation", args.conversationId).value,
+                participantUser: args.userId,
+                role: args.role,
+                joinedAt: new Date(),
             },
-            {
-                subject: sub,
-                predicate: conversationRefIRI,
-                object: iriFor("conversation", args.conversationId),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: participantUserIRI,
-                object: new IRI(args.userId),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: roleIRI,
-                object: literal(args.role, XSD_STRING),
-                graph: CONVOS_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: joinedAtIRI,
-                object: literal(now.toISOString(), XSD_DATETIME),
-                graph: CONVOS_GRAPH,
-            },
-        ]);
-
-        return {
-            id,
-            iri: sub.value,
-            conversationId: args.conversationId,
-            userId: args.userId,
-            role: args.role,
-            joinedAt: now,
-        };
+            newId(),
+        );
+        return this._toEntity(record);
     }
 
     /** @insecure @nochecks */
@@ -107,30 +71,10 @@ export class ParticipantRepository {
         _sec: SecurityContext,
         args: ConversationIdArgs,
     ): Promise<ParticipantEntity[]> {
-        const quads = await this._store.find(ctx, {
-            predicate: conversationRefIRI,
-            object: iriFor("conversation", args.conversationId),
-            graph: CONVOS_GRAPH,
-        });
-
-        const subjects = quads
-            .map((q) => q.subject as IRI)
-            .filter((s) => s.value.includes(":participant:"));
-
-        if (subjects.length === 0) {
-            return [];
-        }
-
-        const bySubject = await this._store.findForSubjects(ctx, subjects, CONVOS_GRAPH);
-        const participants: ParticipantEntity[] = [];
-
-        for (const [subjIri, all] of bySubject) {
-            if (all.length > 0) {
-                participants.push(this._fromQuads(idFrom(subjIri), all));
-            }
-        }
-
-        return participants;
+        const records = await EntityQuery.from(this._store, ParticipantSchema)
+            .where("conversation", "=", iriFor("conversation", args.conversationId).value)
+            .all(ctx);
+        return records.map((r) => this._toEntity(r));
     }
 
     /** @insecure @nochecks */
@@ -152,71 +96,42 @@ export class ParticipantRepository {
         args: UpdateRoleArgs,
     ): Promise<ParticipantEntity | null> {
         return this._store.withTransaction(ctx, async (ctx) => {
-            const sub = iriFor("participant", args.id);
-            const quads = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
-            if (quads.length === 0) {
+            const record = await this._entities.findById(ctx, ParticipantSchema, args.id);
+            if (!record) {
                 return null;
             }
-
-            await this._store.delete(ctx, {
-                subject: sub,
-                predicate: roleIRI,
-                graph: CONVOS_GRAPH,
-            });
-            await this._store.insert(ctx, {
-                subject: sub,
-                predicate: roleIRI,
-                object: literal(args.newRole, XSD_STRING),
-                graph: CONVOS_GRAPH,
-            });
-
-            const updated = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
-            return this._fromQuads(args.id, updated);
+            await this._entities.update(ctx, ParticipantSchema, args.id, { role: args.newRole });
+            const updated = await this._entities.findById(ctx, ParticipantSchema, args.id);
+            return updated ? this._toEntity(updated) : null;
         });
     }
 
     /** @insecure @nochecks */
     async remove(ctx: ServerContext, _sec: SecurityContext, args: IdArgs): Promise<void> {
-        await this._store.delete(ctx, {
-            subject: iriFor("participant", args.id),
-            graph: CONVOS_GRAPH,
-        });
+        await this._entities.delete(ctx, ParticipantSchema, args.id);
     }
 
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-    ): ParticipantEntity {
-        const getLit = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? literalValue(q.object) : undefined;
-        };
-        const getIri = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? iriValue(q.object) : undefined;
-        };
-
-        const conversationIri = getIri(conversationRefIRI);
-        if (conversationIri == null) {
-            throw new Error(`ParticipantRepository: missing conversation for id "${id}"`);
+    private _toEntity(record: EntityRecord): ParticipantEntity {
+        const conversation = record.props.conversation;
+        if (conversation == null) {
+            throw new Error(`ParticipantRepository: missing conversation for id "${record.id}"`);
         }
-        const userIri = getIri(participantUserIRI);
-        if (userIri == null) {
-            throw new Error(`ParticipantRepository: missing user for id "${id}"`);
+        const user = record.props.participantUser;
+        if (user == null) {
+            throw new Error(`ParticipantRepository: missing user for id "${record.id}"`);
         }
-        const role = getLit(roleIRI) ?? "member";
-        const joinedAtStr = getLit(joinedAtIRI);
-        if (joinedAtStr == null) {
-            throw new Error(`ParticipantRepository: missing joinedAt for id "${id}"`);
+        const joinedAt = record.props.joinedAt;
+        if (joinedAt == null) {
+            throw new Error(`ParticipantRepository: missing joinedAt for id "${record.id}"`);
         }
 
         return {
-            id,
-            iri: iriFor("participant", id).value,
-            conversationId: idFrom(conversationIri),
-            userId: userIri,
-            role: role as ParticipantRole,
-            joinedAt: new Date(joinedAtStr),
+            id: record.id,
+            iri: record.iri,
+            conversationId: idFrom(String(conversation)),
+            userId: String(user),
+            role: String(record.props.role ?? "member") as ParticipantRole,
+            joinedAt: joinedAt instanceof Date ? joinedAt : new Date(String(joinedAt)),
         };
     }
 }

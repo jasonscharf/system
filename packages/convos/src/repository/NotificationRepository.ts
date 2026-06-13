@@ -1,22 +1,10 @@
-import { IRI, literal, type Quad } from "@jasonscharf/core";
-import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
+import type { TripleStore } from "@jasonscharf/data";
+import type { EntityRecord } from "@jasonscharf/entities";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import {
-    CONVOS_GRAPH,
-    isDismissedIRI,
-    isReadIRI,
-    NotificationClassIRI,
-    notifTypeIRI,
-    notifUserIRI,
-    payloadIRI,
-    RDF_TYPE,
-    sourceIriIRI,
-    templateKeyIRI,
-    XSD_BOOLEAN,
-    XSD_STRING,
-} from "../constants.js";
+import { EntityQuery, EntityStore } from "@jasonscharf/server";
+import { NotificationSchema } from "../entities/NotificationSchema.js";
 import type { NotificationEntity, NotificationType } from "../types.js";
-import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
+import { newId } from "./util.js";
 
 export interface CreateNotificationInput {
     userId: string;
@@ -53,9 +41,15 @@ export interface FanOutArgs {
 
 export class NotificationRepository {
     private readonly _store: TripleStore;
+    private readonly _entities: EntityStore;
 
     constructor(store: TripleStore) {
         this._store = store;
+        this._entities = new EntityStore(store);
+    }
+
+    get store(): TripleStore {
+        return this._store;
     }
 
     /** @insecure @nochecks */
@@ -64,86 +58,21 @@ export class NotificationRepository {
         _sec: SecurityContext,
         args: CreateNotificationInput,
     ): Promise<NotificationEntity> {
-        const id = newId();
-        const sub = iriFor("notification", id);
-
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const quads = [
-                {
-                    subject: sub,
-                    predicate: RDF_TYPE,
-                    object: NotificationClassIRI,
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: notifUserIRI,
-                    object: new IRI(args.userId),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: notifTypeIRI,
-                    object: literal(args.notifType, XSD_STRING),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: isReadIRI,
-                    object: literal("false", XSD_BOOLEAN),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: isDismissedIRI,
-                    object: literal("false", XSD_BOOLEAN),
-                    graph: CONVOS_GRAPH,
-                },
-            ];
-
-            if (args.sourceIri) {
-                quads.push({
-                    subject: sub,
-                    predicate: sourceIriIRI,
-                    object: literal(args.sourceIri, XSD_STRING),
-                    graph: CONVOS_GRAPH,
-                });
-            }
-
-            if (args.templateKey) {
-                quads.push({
-                    subject: sub,
-                    predicate: templateKeyIRI,
-                    object: literal(args.templateKey, XSD_STRING),
-                    graph: CONVOS_GRAPH,
-                });
-            }
-
-            if (args.payload) {
-                quads.push({
-                    subject: sub,
-                    predicate: payloadIRI,
-                    object: literal(JSON.stringify(args.payload), XSD_STRING),
-                    graph: CONVOS_GRAPH,
-                });
-            }
-
-            await this._store.insertMany(ctx, quads);
-
-            const ts = await this._timestamps(ctx, sub);
-            return {
-                id,
-                iri: sub.value,
-                userId: args.userId,
+        const record = await this._entities.create(
+            ctx,
+            NotificationSchema,
+            {
+                notifUser: args.userId,
                 notifType: args.notifType,
+                isRead: false,
+                isDismissed: false,
                 sourceIri: args.sourceIri,
                 templateKey: args.templateKey,
                 payload: args.payload ? JSON.stringify(args.payload) : undefined,
-                isRead: false,
-                isDismissed: false,
-                createdAt: ts.createdAt,
-            };
-        });
+            },
+            newId(),
+        );
+        return this._toEntity(record);
     }
 
     /** @insecure @nochecks */
@@ -152,11 +81,8 @@ export class NotificationRepository {
         _sec: SecurityContext,
         args: IdArgs,
     ): Promise<NotificationEntity | null> {
-        const sub = iriFor("notification", args.id);
-        const quads = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
-        return quads.length === 0
-            ? null
-            : this._fromQuads(args.id, quads, await this._timestamps(ctx, sub));
+        const record = await this._entities.findById(ctx, NotificationSchema, args.id);
+        return record ? this._toEntity(record) : null;
     }
 
     /** @insecure @nochecks */
@@ -165,36 +91,12 @@ export class NotificationRepository {
         _sec: SecurityContext,
         args: FindByUserArgs,
     ): Promise<NotificationEntity[]> {
-        const quads = await this._store.find(ctx, {
-            predicate: notifUserIRI,
-            object: new IRI(args.userId),
-            graph: CONVOS_GRAPH,
-        });
-
-        if (quads.length === 0) {
-            return [];
-        }
-
-        const subjects = quads.map((q) => q.subject as IRI);
-        const bySubject = await this._store.findForSubjects(ctx, subjects, CONVOS_GRAPH);
-        const tsBySubject = await this._store.entityTimestamps(ctx, subjects, CONVOS_GRAPH);
-
-        const notifications: NotificationEntity[] = [];
-        for (const [subjIri, all] of bySubject) {
-            if (all.length === 0) {
-                continue;
-            }
-            const n = this._fromQuads(
-                idFrom(subjIri),
-                all,
-                tsBySubject.get(subjIri) ?? this._now(),
-            );
-            if (args.unreadOnly && n.isRead) {
-                continue;
-            }
-            notifications.push(n);
-        }
-
+        const records = await EntityQuery.from(this._store, NotificationSchema)
+            .where("notifUser", "=", args.userId)
+            .all(ctx);
+        const notifications = records
+            .map((r) => this._toEntity(r))
+            .filter((n) => !(args.unreadOnly && n.isRead));
         notifications.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
         return notifications;
     }
@@ -209,45 +111,18 @@ export class NotificationRepository {
         _sec: SecurityContext,
         args: TemplateKeyArgs,
     ): Promise<NotificationEntity[]> {
-        const quads = await this._store.find(ctx, {
-            predicate: templateKeyIRI,
-            object: literal(args.templateKey, XSD_STRING),
-            graph: CONVOS_GRAPH,
-        });
-
-        if (quads.length === 0) {
-            return [];
-        }
-
-        const subjects = quads.map((q) => q.subject as IRI);
-        const bySubject = await this._store.findForSubjects(ctx, subjects, CONVOS_GRAPH);
-        const tsBySubject = await this._store.entityTimestamps(ctx, subjects, CONVOS_GRAPH);
-
-        const results: NotificationEntity[] = [];
-        for (const [subjIri, all] of bySubject) {
-            if (all.length === 0) {
-                continue;
-            }
-            const entity = this._fromQuads(
-                idFrom(subjIri),
-                all,
-                tsBySubject.get(subjIri) ?? this._now(),
-            );
-            if (entity.userId === args.userId) {
-                results.push(entity);
-            }
-        }
-
+        const records = await EntityQuery.from(this._store, NotificationSchema)
+            .where("templateKey", "=", args.templateKey)
+            .all(ctx);
+        const results = records
+            .map((r) => this._toEntity(r))
+            .filter((n) => n.userId === args.userId);
         results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
         return results;
     }
 
     /** @insecure @nochecks */
-    async countUnread(
-        ctx: ServerContext,
-        sec: SecurityContext,
-        args: UserIdArgs,
-    ): Promise<number> {
+    async countUnread(ctx: ServerContext, sec: SecurityContext, args: UserIdArgs): Promise<number> {
         const all = await this.findByUser(ctx, sec, { userId: args.userId, unreadOnly: true });
         return all.filter((n) => !n.isDismissed).length;
     }
@@ -258,7 +133,7 @@ export class NotificationRepository {
         sec: SecurityContext,
         args: IdArgs,
     ): Promise<NotificationEntity | null> {
-        return this._setBooleanFlag(ctx, sec, args.id, isReadIRI, true);
+        return this._setBooleanFlag(ctx, sec, args.id, "isRead", true);
     }
 
     /** @insecure @nochecks */
@@ -281,7 +156,7 @@ export class NotificationRepository {
         sec: SecurityContext,
         args: IdArgs,
     ): Promise<NotificationEntity | null> {
-        return this._setBooleanFlag(ctx, sec, args.id, isDismissedIRI, true);
+        return this._setBooleanFlag(ctx, sec, args.id, "isDismissed", true);
     }
 
     /** @insecure @nochecks Fan-out: create a notification for each recipient, skipping the excluded user. */
@@ -291,81 +166,25 @@ export class NotificationRepository {
         args: FanOutArgs,
     ): Promise<NotificationEntity[]> {
         return this._store.withTransaction(ctx, async (ctx) => {
-            const pending: { sub: IRI; userId: string }[] = [];
-            const allQuads: Quad[] = [];
+            const recipients = args.recipientIds.filter((userId) => userId !== args.excludeUserId);
 
-            for (const userId of args.recipientIds) {
-                if (userId === args.excludeUserId) {
-                    continue;
-                }
-                const id = newId();
-                const sub = iriFor("notification", id);
-                pending.push({ sub, userId });
-
-                allQuads.push(
+            const notifications: NotificationEntity[] = [];
+            for (const userId of recipients) {
+                const record = await this._entities.create(
+                    ctx,
+                    NotificationSchema,
                     {
-                        subject: sub,
-                        predicate: RDF_TYPE,
-                        object: NotificationClassIRI,
-                        graph: CONVOS_GRAPH,
+                        notifUser: userId,
+                        notifType: args.notifType,
+                        isRead: false,
+                        isDismissed: false,
+                        sourceIri: args.sourceIri,
                     },
-                    {
-                        subject: sub,
-                        predicate: notifUserIRI,
-                        object: new IRI(userId),
-                        graph: CONVOS_GRAPH,
-                    },
-                    {
-                        subject: sub,
-                        predicate: notifTypeIRI,
-                        object: literal(args.notifType, XSD_STRING),
-                        graph: CONVOS_GRAPH,
-                    },
-                    {
-                        subject: sub,
-                        predicate: isReadIRI,
-                        object: literal("false", XSD_BOOLEAN),
-                        graph: CONVOS_GRAPH,
-                    },
-                    {
-                        subject: sub,
-                        predicate: isDismissedIRI,
-                        object: literal("false", XSD_BOOLEAN),
-                        graph: CONVOS_GRAPH,
-                    },
-                    {
-                        subject: sub,
-                        predicate: sourceIriIRI,
-                        object: literal(args.sourceIri, XSD_STRING),
-                        graph: CONVOS_GRAPH,
-                    },
+                    newId(),
                 );
+                notifications.push(this._toEntity(record));
             }
-
-            if (allQuads.length === 0) {
-                return [];
-            }
-
-            await this._store.insertMany(ctx, allQuads);
-
-            const tsBySubject = await this._store.entityTimestamps(
-                ctx,
-                pending.map((p) => p.sub),
-                CONVOS_GRAPH,
-            );
-
-            return pending.map(({ sub, userId }) => ({
-                id: idFrom(sub.value),
-                iri: sub.value,
-                userId,
-                notifType: args.notifType,
-                sourceIri: args.sourceIri,
-                templateKey: undefined,
-                payload: undefined,
-                isRead: false,
-                isDismissed: false,
-                createdAt: (tsBySubject.get(sub.value) ?? this._now()).createdAt,
-            }));
+            return notifications;
         });
     }
 
@@ -373,79 +192,45 @@ export class NotificationRepository {
         ctx: ServerContext,
         _sec: SecurityContext,
         id: string,
-        predicate: IRI,
+        prop: "isRead" | "isDismissed",
         value: boolean,
     ): Promise<NotificationEntity | null> {
         return this._store.withTransaction(ctx, async (ctx) => {
-            const sub = iriFor("notification", id);
-            const quads = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
-            if (quads.length === 0) {
+            const record = await this._entities.findById(ctx, NotificationSchema, id);
+            if (!record) {
                 return null;
             }
-
-            await this._store.delete(ctx, { subject: sub, predicate, graph: CONVOS_GRAPH });
-            await this._store.insert(ctx, {
-                subject: sub,
-                predicate,
-                object: literal(String(value), XSD_BOOLEAN),
-                graph: CONVOS_GRAPH,
-            });
-
-            const updated = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
-            return this._fromQuads(id, updated, await this._timestamps(ctx, sub));
+            await this._entities.update(ctx, NotificationSchema, id, { [prop]: value });
+            const updated = await this._entities.findById(ctx, NotificationSchema, id);
+            return updated ? this._toEntity(updated) : null;
         });
     }
 
-    private _now(): EntityTimestamps {
-        const now = new Date();
-        return { createdAt: now, updatedAt: now };
-    }
-
-    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
-    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
-        return (
-            (await this._store.entityTimestamps(ctx, [sub], CONVOS_GRAPH)).get(sub.value) ??
-            this._now()
-        );
-    }
-
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-        ts: EntityTimestamps,
-    ): NotificationEntity {
-        const getLit = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? literalValue(q.object) : undefined;
-        };
-        const getIri = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? iriValue(q.object) : undefined;
-        };
-
-        const userIri = getIri(notifUserIRI);
-        if (userIri == null) {
-            throw new Error(`NotificationRepository: missing user for id "${id}"`);
+    private _toEntity(record: EntityRecord): NotificationEntity {
+        const user = record.props.notifUser;
+        if (user == null) {
+            throw new Error(`NotificationRepository: missing user for id "${record.id}"`);
         }
-        const notifType = getLit(notifTypeIRI);
+        const notifType = record.props.notifType;
         if (notifType == null) {
-            throw new Error(`NotificationRepository: missing notifType for id "${id}"`);
+            throw new Error(`NotificationRepository: missing notifType for id "${record.id}"`);
         }
 
-        const isReadStr = getLit(isReadIRI) ?? "false";
-        const isDismissedStr = getLit(isDismissedIRI) ?? "false";
+        const sourceIri = record.props.sourceIri;
+        const templateKey = record.props.templateKey;
+        const payload = record.props.payload;
 
         return {
-            id,
-            iri: iriFor("notification", id).value,
-            userId: userIri,
-            notifType: notifType as NotificationType,
-            sourceIri: getLit(sourceIriIRI),
-            templateKey: getLit(templateKeyIRI),
-            payload: getLit(payloadIRI),
-            isRead: isReadStr === "true",
-            isDismissed: isDismissedStr === "true",
-            createdAt: ts.createdAt,
+            id: record.id,
+            iri: record.iri,
+            userId: String(user),
+            notifType: String(notifType) as NotificationType,
+            sourceIri: sourceIri != null ? String(sourceIri) : undefined,
+            templateKey: templateKey != null ? String(templateKey) : undefined,
+            payload: payload != null ? String(payload) : undefined,
+            isRead: record.props.isRead === true,
+            isDismissed: record.props.isDismissed === true,
+            createdAt: record.createdAt ?? new Date(),
         };
     }
 }

@@ -1,18 +1,10 @@
-import { IRI, literal } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
+import type { EntityRecord } from "@jasonscharf/entities";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import {
-    CONVOS_GRAPH,
-    lastReadAtIRI,
-    lastReadMessageIRI,
-    RDF_TYPE,
-    ReadReceiptClassIRI,
-    receiptConversationIRI,
-    receiptUserIRI,
-    XSD_DATETIME,
-} from "../constants.js";
+import { EntityQuery, EntityStore } from "@jasonscharf/server";
+import { ReadReceiptSchema } from "../entities/ReadReceiptSchema.js";
 import type { ReadReceiptEntity } from "../types.js";
-import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
+import { idFrom, iriFor, newId } from "./util.js";
 
 export interface UpsertReceiptArgs {
     conversationId: string;
@@ -31,9 +23,15 @@ export interface ConversationIdArgs {
 
 export class ReadReceiptRepository {
     private readonly _store: TripleStore;
+    private readonly _entities: EntityStore;
 
     constructor(store: TripleStore) {
         this._store = store;
+        this._entities = new EntityStore(store);
+    }
+
+    get store(): TripleStore {
+        return this._store;
     }
 
     /**
@@ -54,28 +52,9 @@ export class ReadReceiptRepository {
             const now = new Date();
 
             if (existing) {
-                const sub = iriFor("receipt", existing.id);
-                await this._store.delete(ctx, {
-                    subject: sub,
-                    predicate: lastReadMessageIRI,
-                    graph: CONVOS_GRAPH,
-                });
-                await this._store.insert(ctx, {
-                    subject: sub,
-                    predicate: lastReadMessageIRI,
-                    object: iriFor("message", args.lastReadMessageId),
-                    graph: CONVOS_GRAPH,
-                });
-                await this._store.delete(ctx, {
-                    subject: sub,
-                    predicate: lastReadAtIRI,
-                    graph: CONVOS_GRAPH,
-                });
-                await this._store.insert(ctx, {
-                    subject: sub,
-                    predicate: lastReadAtIRI,
-                    object: literal(now.toISOString(), XSD_DATETIME),
-                    graph: CONVOS_GRAPH,
+                await this._entities.update(ctx, ReadReceiptSchema, existing.id, {
+                    lastReadMessage: iriFor("message", args.lastReadMessageId).value,
+                    lastReadAt: now,
                 });
                 return {
                     ...existing,
@@ -84,84 +63,31 @@ export class ReadReceiptRepository {
                 };
             }
 
-            const id = newId();
-            const sub = iriFor("receipt", id);
-
-            await this._store.insertMany(ctx, [
+            const record = await this._entities.create(
+                ctx,
+                ReadReceiptSchema,
                 {
-                    subject: sub,
-                    predicate: RDF_TYPE,
-                    object: ReadReceiptClassIRI,
-                    graph: CONVOS_GRAPH,
+                    receiptConversation: iriFor("conversation", args.conversationId).value,
+                    receiptUser: args.userId,
+                    lastReadMessage: iriFor("message", args.lastReadMessageId).value,
+                    lastReadAt: now,
                 },
-                {
-                    subject: sub,
-                    predicate: receiptConversationIRI,
-                    object: iriFor("conversation", args.conversationId),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: receiptUserIRI,
-                    object: new IRI(args.userId),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: lastReadMessageIRI,
-                    object: iriFor("message", args.lastReadMessageId),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: lastReadAtIRI,
-                    object: literal(now.toISOString(), XSD_DATETIME),
-                    graph: CONVOS_GRAPH,
-                },
-            ]);
-
-            return {
-                id,
-                iri: sub.value,
-                conversationId: args.conversationId,
-                userId: args.userId,
-                lastReadMessageId: args.lastReadMessageId,
-                lastReadAt: now,
-            };
+                newId(),
+            );
+            return this._toEntity(record);
         });
     }
 
     /** @insecure @nochecks */
     async findByConversationAndUser(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: ConversationUserArgs,
     ): Promise<ReadReceiptEntity | null> {
-        const quads = await this._store.find(ctx, {
-            predicate: receiptConversationIRI,
-            object: iriFor("conversation", args.conversationId),
-            graph: CONVOS_GRAPH,
+        const all = await this.findByConversation(ctx, sec, {
+            conversationId: args.conversationId,
         });
-
-        for (const q of quads) {
-            const subjIri = (q.subject as IRI).value;
-            if (!subjIri.includes(":receipt:")) {
-                continue;
-            }
-            const all = await this._store.find(ctx, {
-                subject: q.subject as IRI,
-                graph: CONVOS_GRAPH,
-            });
-            if (all.length === 0) {
-                continue;
-            }
-            const entity = this._fromQuads(idFrom(subjIri), all);
-            if (entity.userId === args.userId) {
-                return entity;
-            }
-        }
-
-        return null;
+        return all.find((r) => r.userId === args.userId) ?? null;
     }
 
     /** @insecure @nochecks */
@@ -170,68 +96,37 @@ export class ReadReceiptRepository {
         _sec: SecurityContext,
         args: ConversationIdArgs,
     ): Promise<ReadReceiptEntity[]> {
-        const quads = await this._store.find(ctx, {
-            predicate: receiptConversationIRI,
-            object: iriFor("conversation", args.conversationId),
-            graph: CONVOS_GRAPH,
-        });
-
-        const receipts: ReadReceiptEntity[] = [];
-
-        for (const q of quads) {
-            const subjIri = (q.subject as IRI).value;
-            if (!subjIri.includes(":receipt:")) {
-                continue;
-            }
-            const all = await this._store.find(ctx, {
-                subject: q.subject as IRI,
-                graph: CONVOS_GRAPH,
-            });
-            if (all.length > 0) {
-                receipts.push(this._fromQuads(idFrom(subjIri), all));
-            }
-        }
-
-        return receipts;
+        const records = await EntityQuery.from(this._store, ReadReceiptSchema)
+            .where("receiptConversation", "=", iriFor("conversation", args.conversationId).value)
+            .all(ctx);
+        return records.map((r) => this._toEntity(r));
     }
 
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-    ): ReadReceiptEntity {
-        const getLit = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? literalValue(q.object) : undefined;
-        };
-        const getIri = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? iriValue(q.object) : undefined;
-        };
-
-        const conversationIri = getIri(receiptConversationIRI);
-        if (conversationIri == null) {
-            throw new Error(`ReadReceiptRepository: missing conversation for id "${id}"`);
+    private _toEntity(record: EntityRecord): ReadReceiptEntity {
+        const conversation = record.props.receiptConversation;
+        if (conversation == null) {
+            throw new Error(`ReadReceiptRepository: missing conversation for id "${record.id}"`);
         }
-        const userIri = getIri(receiptUserIRI);
-        if (userIri == null) {
-            throw new Error(`ReadReceiptRepository: missing user for id "${id}"`);
+        const user = record.props.receiptUser;
+        if (user == null) {
+            throw new Error(`ReadReceiptRepository: missing user for id "${record.id}"`);
         }
-        const msgIri = getIri(lastReadMessageIRI);
-        if (msgIri == null) {
-            throw new Error(`ReadReceiptRepository: missing lastReadMessage for id "${id}"`);
+        const msg = record.props.lastReadMessage;
+        if (msg == null) {
+            throw new Error(`ReadReceiptRepository: missing lastReadMessage for id "${record.id}"`);
         }
-        const lastReadAtStr = getLit(lastReadAtIRI);
-        if (lastReadAtStr == null) {
-            throw new Error(`ReadReceiptRepository: missing lastReadAt for id "${id}"`);
+        const lastReadAt = record.props.lastReadAt;
+        if (lastReadAt == null) {
+            throw new Error(`ReadReceiptRepository: missing lastReadAt for id "${record.id}"`);
         }
 
         return {
-            id,
-            iri: iriFor("receipt", id).value,
-            conversationId: idFrom(conversationIri),
-            userId: userIri,
-            lastReadMessageId: idFrom(msgIri),
-            lastReadAt: new Date(lastReadAtStr),
+            id: record.id,
+            iri: record.iri,
+            conversationId: idFrom(String(conversation)),
+            userId: String(user),
+            lastReadMessageId: idFrom(String(msg)),
+            lastReadAt: lastReadAt instanceof Date ? lastReadAt : new Date(String(lastReadAt)),
         };
     }
 }

@@ -1,19 +1,10 @@
-import { IRI, literal } from "@jasonscharf/core";
-import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
+import type { TripleStore } from "@jasonscharf/data";
+import type { EntityRecord } from "@jasonscharf/entities";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import {
-    authorIRI,
-    CONVOS_GRAPH,
-    contentIRI,
-    contentTypeIRI,
-    conversationRefIRI,
-    DraftClassIRI,
-    RDF_TYPE,
-    replyToIRI,
-    XSD_STRING,
-} from "../constants.js";
+import { EntityQuery, EntityStore } from "@jasonscharf/server";
+import { DraftSchema } from "../entities/DraftSchema.js";
 import type { ContentType, DraftEntity } from "../types.js";
-import { idFrom, iriFor, iriValue, literalValue, newId } from "./util.js";
+import { idFrom, iriFor, newId } from "./util.js";
 
 export interface IdArgs {
     id: string;
@@ -35,9 +26,15 @@ export interface UpdateDraftArgs {
 
 export class DraftRepository {
     private readonly _store: TripleStore;
+    private readonly _entities: EntityStore;
 
     constructor(store: TripleStore) {
         this._store = store;
+        this._entities = new EntityStore(store);
+    }
+
+    get store(): TripleStore {
+        return this._store;
     }
 
     /** @insecure @nochecks */
@@ -48,62 +45,19 @@ export class DraftRepository {
             replyToId?: string;
         },
     ): Promise<DraftEntity> {
-        const id = newId();
-        const sub = iriFor("draft", id);
-
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const quads = [
-                { subject: sub, predicate: RDF_TYPE, object: DraftClassIRI, graph: CONVOS_GRAPH },
-                {
-                    subject: sub,
-                    predicate: conversationRefIRI,
-                    object: iriFor("conversation", args.conversationId),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: authorIRI,
-                    object: new IRI(args.authorId),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: contentIRI,
-                    object: literal(args.content, XSD_STRING),
-                    graph: CONVOS_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: contentTypeIRI,
-                    object: literal(args.contentType, XSD_STRING),
-                    graph: CONVOS_GRAPH,
-                },
-            ];
-
-            if (args.replyToId) {
-                quads.push({
-                    subject: sub,
-                    predicate: replyToIRI,
-                    object: iriFor("message", args.replyToId),
-                    graph: CONVOS_GRAPH,
-                });
-            }
-
-            await this._store.insertMany(ctx, quads);
-
-            const ts = await this._timestamps(ctx, sub);
-            return {
-                id,
-                iri: sub.value,
-                conversationId: args.conversationId,
-                authorId: args.authorId,
-                replyToId: args.replyToId ?? null,
+        const record = await this._entities.create(
+            ctx,
+            DraftSchema,
+            {
+                conversation: iriFor("conversation", args.conversationId).value,
+                author: args.authorId,
                 content: args.content,
                 contentType: args.contentType,
-                createdAt: ts.createdAt,
-                updatedAt: ts.updatedAt,
-            };
-        });
+                replyTo: args.replyToId ? iriFor("message", args.replyToId).value : undefined,
+            },
+            newId(),
+        );
+        return this._toEntity(record);
     }
 
     /** @insecure @nochecks */
@@ -112,11 +66,8 @@ export class DraftRepository {
         _sec: SecurityContext,
         args: IdArgs,
     ): Promise<DraftEntity | null> {
-        const sub = iriFor("draft", args.id);
-        const quads = await this._store.find(ctx, { subject: sub, graph: CONVOS_GRAPH });
-        return quads.length === 0
-            ? null
-            : this._fromQuads(args.id, quads, await this._timestamps(ctx, sub));
+        const record = await this._entities.findById(ctx, DraftSchema, args.id);
+        return record ? this._toEntity(record) : null;
     }
 
     /** @insecure @nochecks */
@@ -125,32 +76,10 @@ export class DraftRepository {
         _sec: SecurityContext,
         args: AuthorIdArgs,
     ): Promise<DraftEntity[]> {
-        const quads = await this._store.find(ctx, {
-            predicate: authorIRI,
-            object: new IRI(args.authorId),
-            graph: CONVOS_GRAPH,
-        });
-
-        const drafts: DraftEntity[] = [];
-
-        for (const q of quads) {
-            const subjIri = (q.subject as IRI).value;
-            if (!subjIri.includes(":draft:")) {
-                continue;
-            }
-            const draftId = idFrom(subjIri);
-            const all = await this._store.find(ctx, {
-                subject: q.subject as IRI,
-                graph: CONVOS_GRAPH,
-            });
-            if (all.length > 0) {
-                drafts.push(
-                    this._fromQuads(draftId, all, await this._timestamps(ctx, q.subject as IRI)),
-                );
-            }
-        }
-
-        return drafts;
+        const records = await EntityQuery.from(this._store, DraftSchema)
+            .where("author", "=", args.authorId)
+            .all(ctx);
+        return records.map((r) => this._toEntity(r));
     }
 
     /** @insecure @nochecks */
@@ -174,80 +103,38 @@ export class DraftRepository {
             if (!existing) {
                 return null;
             }
-
-            const sub = iriFor("draft", args.id);
-
-            await this._store.delete(ctx, {
-                subject: sub,
-                predicate: contentIRI,
-                graph: CONVOS_GRAPH,
-            });
-            await this._store.insert(ctx, {
-                subject: sub,
-                predicate: contentIRI,
-                object: literal(args.content, XSD_STRING),
-                graph: CONVOS_GRAPH,
-            });
-
+            await this._entities.update(ctx, DraftSchema, args.id, { content: args.content });
             return this.findById(ctx, sec, { id: args.id });
         });
     }
 
     /** @insecure @nochecks */
     async delete(ctx: ServerContext, _sec: SecurityContext, args: IdArgs): Promise<void> {
-        await this._store.delete(ctx, { subject: iriFor("draft", args.id), graph: CONVOS_GRAPH });
+        await this._entities.delete(ctx, DraftSchema, args.id);
     }
 
-    private _now(): EntityTimestamps {
-        const now = new Date();
-        return { createdAt: now, updatedAt: now };
-    }
-
-    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
-    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
-        return (
-            (await this._store.entityTimestamps(ctx, [sub], CONVOS_GRAPH)).get(sub.value) ??
-            this._now()
-        );
-    }
-
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-        ts: EntityTimestamps,
-    ): DraftEntity {
-        const getLit = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? literalValue(q.object) : undefined;
-        };
-        const getIri = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? iriValue(q.object) : undefined;
-        };
-
-        const conversationIri = getIri(conversationRefIRI);
-        if (conversationIri == null) {
-            throw new Error(`DraftRepository: missing conversation for id "${id}"`);
+    private _toEntity(record: EntityRecord): DraftEntity {
+        const conversation = record.props.conversation;
+        if (conversation == null) {
+            throw new Error(`DraftRepository: missing conversation for id "${record.id}"`);
         }
-        const authorIriVal = getIri(authorIRI);
-        if (authorIriVal == null) {
-            throw new Error(`DraftRepository: missing author for id "${id}"`);
+        const author = record.props.author;
+        if (author == null) {
+            throw new Error(`DraftRepository: missing author for id "${record.id}"`);
         }
-        const content = getLit(contentIRI) ?? "";
-        const contentType = getLit(contentTypeIRI) ?? "text/markdown";
 
-        const replyToIriVal = getIri(replyToIRI);
+        const replyTo = record.props.replyTo;
 
         return {
-            id,
-            iri: iriFor("draft", id).value,
-            conversationId: idFrom(conversationIri),
-            authorId: authorIriVal,
-            replyToId: replyToIriVal ? idFrom(replyToIriVal) : null,
-            content,
-            contentType: contentType as ContentType,
-            createdAt: ts.createdAt,
-            updatedAt: ts.updatedAt,
+            id: record.id,
+            iri: record.iri,
+            conversationId: idFrom(String(conversation)),
+            authorId: String(author),
+            replyToId: replyTo != null ? idFrom(String(replyTo)) : null,
+            content: String(record.props.content ?? ""),
+            contentType: String(record.props.contentType ?? "text/markdown") as ContentType,
+            createdAt: record.createdAt ?? new Date(),
+            updatedAt: record.updatedAt ?? new Date(),
         };
     }
 }

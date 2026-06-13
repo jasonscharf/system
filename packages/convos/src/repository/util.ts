@@ -1,5 +1,5 @@
-import { randomBytes } from "node:crypto";
-import { IRI, makeUri } from "@jasonscharf/core";
+import type { IRI } from "@jasonscharf/core";
+import { entityIri, idFromIri, newId } from "@jasonscharf/entities";
 import { CONVOS_NS } from "../constants.js";
 
 export type ConvosEntityType =
@@ -13,34 +13,16 @@ export type ConvosEntityType =
     | "receipt"
     | "revision";
 
-export function newId(): string {
-    return randomBytes(16).toString("hex");
-}
+// The strict-throwing id helpers (newId, entityIri, idFromIri) now live in
+// @jasonscharf/entities and are the single source other bounded contexts adopt.
+// This module re-exports them under the convos-local names and keeps the
+// convos-specific `iriFor(type, id)` convenience that pins the CONVOS_NS namespace.
+
+export { newId };
+
+/** Strict-throwing id extractor from an entity IRI (re-exported from entities). */
+export const idFrom: (iriStr: string) => string = idFromIri;
 
 export function iriFor(type: ConvosEntityType, id: string): IRI {
-    return new IRI(makeUri(CONVOS_NS, type, id));
-}
-
-export function idFrom(iriStr: string): string {
-    const seg = iriStr.match(/[^:/#]+$/)?.[0];
-    if (seg == null) {
-        throw new Error(`idFrom: could not extract id from IRI "${iriStr}"`);
-    }
-    return seg;
-}
-
-/** Extract a string literal value from a quad object. */
-export function literalValue(obj: unknown): string | undefined {
-    if (obj != null && typeof obj === "object" && "value" in obj) {
-        return String((obj as { value: unknown }).value);
-    }
-    return undefined;
-}
-
-/** Extract an IRI string from a quad object. Returns undefined for literal nodes. */
-export function iriValue(obj: unknown): string | undefined {
-    if (obj != null && typeof obj === "object" && "value" in obj && !("termType" in obj)) {
-        return String((obj as { value: unknown }).value);
-    }
-    return undefined;
+    return entityIri(CONVOS_NS, type, id);
 }

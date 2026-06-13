@@ -19,6 +19,9 @@ export const C = {
     dt: "dt",
     lang: "lang",
     valueJson: "value_json",
+    // at-rest encryption (literal nodes): flag + id of the key that encrypted `value`
+    isEncrypted: "is_encrypted",
+    keyId: "key_id",
     // edges
     subject: "subject",
     predicate: "predicate",

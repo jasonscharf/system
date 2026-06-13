@@ -21,6 +21,18 @@ export const SYS_GRANT_IRI = makeUri(RBAC_NS, "grant", SYS_GRANT_ID);
 
 export const WILDCARD_PERMISSION = "*";
 
+/**
+ * Capability required to administer RBAC itself — create/update/delete tenants,
+ * groups, roles, permissions, grants, resources, service accounts, manage
+ * membership and impersonation, and introspect RBAC configuration.
+ *
+ * Enforced by RbacService on every admin method (TRN-206). Held implicitly by
+ * the Superadmin role via the wildcard "*" permission, so the system-seeded
+ * superusers group already satisfies it; grant it to additional roles to
+ * delegate RBAC administration.
+ */
+export const RBAC_ADMIN_PERMISSION = "tern.rbac:admin";
+
 export const RDF_TYPE = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
 export const XSD_NS = "http://www.w3.org/2001/XMLSchema#";
 export const XSD_STRING = new IRI(`${XSD_NS}string`);

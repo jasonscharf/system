@@ -1693,6 +1693,102 @@ for (const provider of providers) {
                 ); // no scope = denied
             });
         });
+
+        // ── Admin enforcement (TRN-206) ─────────────────────────────────────────
+        //
+        // RbacService admin methods now require RBAC_ADMIN_PERMISSION. A member of
+        // the seeded superusers group holds the wildcard "*" and so passes; a plain
+        // principal with no grants is denied. `systemSec` bypasses the checker and
+        // is used everywhere above to set up fixtures, so those suites stay green.
+
+        describe("admin enforcement (TRN-206)", () => {
+            async function makeAdmin(principalIri: string): Promise<void> {
+                await rbac.addMember(ctx, systemSec, {
+                    groupIri: SYS_SUPERUSERS_IRI,
+                    memberIri: principalIri,
+                });
+            }
+
+            it("non-admin is denied createRole", async () => {
+                await expect(
+                    rbac.createRole(ctx, secFor(BOB), { roleName: "Sneaky" }),
+                ).rejects.toThrow(/Access denied/);
+            });
+
+            it("admin (superuser) is allowed createRole", async () => {
+                await makeAdmin(ALICE);
+                const role = await rbac.createRole(ctx, secFor(ALICE), { roleName: "Editors" });
+                expect(role.iri).toBeTruthy();
+            });
+
+            it("non-admin is denied grant", async () => {
+                const role = await rbac.createRole(ctx, systemSec, { roleName: "R" });
+                await expect(
+                    rbac.grant(ctx, secFor(BOB), { principalIri: CHARLIE, roleIri: role.iri }),
+                ).rejects.toThrow(/Access denied/);
+            });
+
+            it("admin is allowed grant", async () => {
+                await makeAdmin(ALICE);
+                const role = await rbac.createRole(ctx, systemSec, { roleName: "R" });
+                const g = await rbac.grant(ctx, secFor(ALICE), {
+                    principalIri: CHARLIE,
+                    roleIri: role.iri,
+                });
+                expect(g.iri).toBeTruthy();
+            });
+
+            it("non-admin is denied addMember", async () => {
+                const group = await rbac.createUserGroup(ctx, systemSec, { groupName: "G" });
+                await expect(
+                    rbac.addMember(ctx, secFor(BOB), {
+                        groupIri: group.iri,
+                        memberIri: CHARLIE,
+                    }),
+                ).rejects.toThrow(/Access denied/);
+            });
+
+            it("admin is allowed addMember", async () => {
+                await makeAdmin(ALICE);
+                const group = await rbac.createUserGroup(ctx, systemSec, { groupName: "G" });
+                await rbac.addMember(ctx, secFor(ALICE), {
+                    groupIri: group.iri,
+                    memberIri: CHARLIE,
+                });
+                const members = await rbac.listMembers(ctx, systemSec, { groupIri: group.iri });
+                expect(members).toContain(CHARLIE);
+            });
+
+            it("non-admin is denied createUserGroup and createPermission", async () => {
+                await expect(
+                    rbac.createUserGroup(ctx, secFor(BOB), { groupName: "Nope" }),
+                ).rejects.toThrow(/Access denied/);
+                await expect(
+                    rbac.createPermission(ctx, secFor(BOB), { key: "nope.read" }),
+                ).rejects.toThrow(/Access denied/);
+            });
+
+            it("anonymous principal is denied admin mutations", async () => {
+                await expect(
+                    rbac.createRole(ctx, secFor(""), { roleName: "Anon" }),
+                ).rejects.toThrow(/Access denied/);
+            });
+
+            it("inspector introspection is admin-gated", async () => {
+                const inspector = rbac.inspector();
+                await expect(
+                    inspector.listEffectivePermissions(ctx, secFor(BOB), {
+                        principalIri: CHARLIE,
+                    }),
+                ).rejects.toThrow(/Access denied/);
+
+                await makeAdmin(ALICE);
+                const perms = await inspector.listEffectivePermissions(ctx, secFor(ALICE), {
+                    principalIri: ALICE,
+                });
+                expect(perms.has("*")).toBe(true);
+            });
+        });
     });
 }
 

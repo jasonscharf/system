@@ -12,6 +12,7 @@ import { type SecurityContext, systemSec } from "../SecurityContext.js";
 import type { ServerContext } from "../ServerContext.js";
 import { tenantGraph } from "../tenancy.js";
 import type { AccessChecker } from "./AccessChecker.js";
+import { RBAC_ADMIN_PERMISSION } from "./constants.js";
 import { iriValue, literalValue } from "./repository/helpers.js";
 import type { PolicyGrantRepository } from "./repository/PolicyGrantRepository.js";
 import type { UserGroupRepository } from "./repository/UserGroupRepository.js";
@@ -93,8 +94,12 @@ export interface TenantFilterArgs {
 /**
  * Read-only inspection utilities for debugging and introspecting RBAC state.
  *
- * All methods are safe to call from any context — they only read from the
- * store and never mutate it.
+ * These never mutate the store, but they expose the full authorization graph —
+ * effective permissions, grant paths, group membership — so reading them is an
+ * administrative capability. Every public method asserts the caller holds
+ * {@link RBAC_ADMIN_PERMISSION} (TRN-206); `systemSec` bypasses the check, so
+ * internal callers (RbacService, diagnostics) are unaffected. The internal
+ * graph walks below intentionally use `systemSec` once the caller is authorized.
  */
 export class RbacInspector {
     private readonly _store: TripleStore;
@@ -116,21 +121,41 @@ export class RbacInspector {
 
     // ── Permission inspection ─────────────────────────────────────────────────
 
-    /** @insecure @nochecks Alias for AccessChecker.resolvePermissions. */
+    /**
+     * Asserts the caller holds the RBAC admin capability. Shared guard for every
+     * introspection method. `systemSec` bypasses the AccessChecker (see class doc).
+     */
+    private async _assertAdmin(ctx: ServerContext, sec: SecurityContext): Promise<void> {
+        const allowed =
+            sec.principalIri != null &&
+            (await this._checker.check(ctx, {
+                principal: sec.principalIri,
+                permission: RBAC_ADMIN_PERMISSION,
+                actingAs: sec.isImpersonating ? sec.actingAsIri : undefined,
+            }));
+        if (!allowed) {
+            const who = sec.principalIri ?? "anonymous";
+            throw new Error(`Access denied: "${who}" lacks "${RBAC_ADMIN_PERMISSION}".`);
+        }
+    }
+
+    /** Enforced: requires RBAC_ADMIN_PERMISSION. Alias for AccessChecker.resolvePermissions. */
     async listEffectivePermissions(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: PrincipalScopeArgs,
     ): Promise<Set<string>> {
+        await this._assertAdmin(ctx, sec);
         return this._checker.resolvePermissions(ctx, args.principalIri, args.scopeIri);
     }
 
-    /** @insecure @nochecks Explains why a principal does or does not have a permission. */
+    /** Enforced: requires RBAC_ADMIN_PERMISSION. Explains a principal's permission decision. */
     async explain(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         opts: { principal: string; permission: string; scope?: string },
     ): Promise<PermissionExplanation> {
+        await this._assertAdmin(ctx, sec);
         const principals = await this._resolvePrincipalSet(ctx, opts.principal);
         const scopeChain = opts.scope ? await this._resolveScopeChain(ctx, opts.scope) : [];
 
@@ -186,14 +211,16 @@ export class RbacInspector {
     // ── Group / membership inspection ─────────────────────────────────────────
 
     /**
-     * @insecure @nochecks Returns all UserGroups the principal directly belongs to.
-     * Pass `transitive: true` to also include groups-of-groups.
+     * Enforced: requires RBAC_ADMIN_PERMISSION. Returns all UserGroups the
+     * principal directly belongs to. Pass `transitive: true` to also include
+     * groups-of-groups.
      */
     async listGroupMemberships(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: PrincipalTransitiveArgs,
     ): Promise<UserGroupEntity[]> {
+        await this._assertAdmin(ctx, sec);
         if (args.transitive) {
             const allIris = await this._resolvePrincipalSet(ctx, args.principalIri);
             allIris.delete(args.principalIri);
@@ -213,14 +240,15 @@ export class RbacInspector {
     }
 
     /**
-     * @insecure @nochecks Returns all member IRIs of the given group.
-     * Pass `transitive: true` to recursively expand nested groups.
+     * Enforced: requires RBAC_ADMIN_PERMISSION. Returns all member IRIs of the
+     * given group. Pass `transitive: true` to recursively expand nested groups.
      */
     async listGroupMembers(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: GroupTransitiveArgs,
     ): Promise<string[]> {
+        await this._assertAdmin(ctx, sec);
         if (!args.transitive) {
             return this._groups.listMembers(ctx, systemSec, { groupIri: args.groupIri });
         }
@@ -251,13 +279,15 @@ export class RbacInspector {
     }
 
     /**
-     * @insecure @nochecks Returns each UserGroup in the tenant along with its direct member IRIs.
+     * Enforced: requires RBAC_ADMIN_PERMISSION. Returns each UserGroup in the
+     * tenant along with its direct member IRIs.
      */
     async listGroupsWithMembers(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: TenantFilterArgs = {},
     ): Promise<UserGroupWithMembers[]> {
+        await this._assertAdmin(ctx, sec);
         const groups = await this._groups.listAll(ctx, systemSec, { tenantId: args.tenantId });
         const memberLists = await Promise.all(
             groups.map((g) => this._groups.listMembers(ctx, systemSec, { groupIri: g.iri })),

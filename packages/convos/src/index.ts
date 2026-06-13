@@ -3,7 +3,7 @@
 // ── Service ───────────────────────────────────────────────────────────────────
 export type { ConvoServiceOptions } from "./ConvoService.js";
 export { ConvoService } from "./ConvoService.js";
-export { CONVOS_GRAPH, CONVOS_NS } from "./constants.js";
+export { CONVOS_NS } from "./constants.js";
 // ── Extension lifecycle ───────────────────────────────────────────────────────
 export {
     CONVOS_EXTENSION_NAME,

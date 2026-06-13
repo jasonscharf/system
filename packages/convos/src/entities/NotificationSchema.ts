@@ -1,6 +1,5 @@
 import { EntitySchema } from "@jasonscharf/entities";
 import {
-    CONVOS_GRAPH,
     CONVOS_NS,
     isDismissedIRI,
     isReadIRI,
@@ -15,7 +14,6 @@ import {
 export const NotificationSchema = new EntitySchema({
     typeIRI: NotificationClassIRI,
     ns: CONVOS_NS,
-    graphIri: CONVOS_GRAPH,
     properties: {
         notifUser: notifUserIRI,
         notifType: notifTypeIRI,

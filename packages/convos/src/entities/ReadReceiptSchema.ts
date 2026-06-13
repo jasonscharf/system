@@ -1,6 +1,5 @@
 import { EntitySchema } from "@jasonscharf/entities";
 import {
-    CONVOS_GRAPH,
     CONVOS_NS,
     lastReadAtIRI,
     lastReadMessageIRI,
@@ -12,7 +11,6 @@ import {
 export const ReadReceiptSchema = new EntitySchema({
     typeIRI: ReadReceiptClassIRI,
     ns: CONVOS_NS,
-    graphIri: CONVOS_GRAPH,
     // Stored IRI segment is "receipt", not the lowercased "readreceipt".
     idSegment: "receipt",
     properties: {

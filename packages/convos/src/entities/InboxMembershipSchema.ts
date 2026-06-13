@@ -1,6 +1,5 @@
 import { EntitySchema } from "@jasonscharf/entities";
 import {
-    CONVOS_GRAPH,
     CONVOS_NS,
     grantedAtIRI,
     InboxMembershipClassIRI,
@@ -12,7 +11,6 @@ import {
 export const InboxMembershipSchema = new EntitySchema({
     typeIRI: InboxMembershipClassIRI,
     ns: CONVOS_NS,
-    graphIri: CONVOS_GRAPH,
     // Stored IRI segment is "membership", not the lowercased "inboxmembership".
     idSegment: "membership",
     properties: {

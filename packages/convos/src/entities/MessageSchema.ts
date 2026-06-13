@@ -1,7 +1,6 @@
 import { EntitySchema } from "@jasonscharf/entities";
 import {
     authorIRI,
-    CONVOS_GRAPH,
     CONVOS_NS,
     contentIRI,
     contentTypeIRI,
@@ -15,7 +14,6 @@ import {
 export const MessageSchema = new EntitySchema({
     typeIRI: MessageClassIRI,
     ns: CONVOS_NS,
-    graphIri: CONVOS_GRAPH,
     properties: {
         conversation: conversationRefIRI,
         replyTo: replyToIRI,

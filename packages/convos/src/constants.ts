@@ -1,7 +1,6 @@
 import { IRI, makeUri, NS_EXT } from "@jasonscharf/core";
 
 export const CONVOS_NS = makeUri(NS_EXT, "convos");
-export const CONVOS_GRAPH = new IRI(makeUri(CONVOS_NS, "graph"));
 
 export const RDF_TYPE = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
 export const XSD_NS = "http://www.w3.org/2001/XMLSchema#";

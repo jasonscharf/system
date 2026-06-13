@@ -1,6 +1,5 @@
 import { EntitySchema } from "@jasonscharf/entities";
 import {
-    CONVOS_GRAPH,
     CONVOS_NS,
     InboxClassIRI,
     inboxCreatedByIRI,
@@ -11,7 +10,6 @@ import {
 export const InboxSchema = new EntitySchema({
     typeIRI: InboxClassIRI,
     ns: CONVOS_NS,
-    graphIri: CONVOS_GRAPH,
     properties: {
         subjectIri: subjectIriIRI,
         name: inboxNameIRI,

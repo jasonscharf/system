@@ -83,7 +83,15 @@ export class MessageRepository {
             .where("conversation", "=", iriFor("conversation", args.conversationId).value)
             .all(ctx);
         const messages = records.map((r) => this._toEntity(r));
-        messages.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+        // Primary order is creation time; tiebreak on id so equal-precision PG
+        // timestamps still yield a single deterministic order (find() is unordered).
+        messages.sort((a, b) => {
+            const byTime = a.createdAt.getTime() - b.createdAt.getTime();
+            if (byTime !== 0) {
+                return byTime;
+            }
+            return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+        });
         return messages;
     }
 

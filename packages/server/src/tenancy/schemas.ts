@@ -8,8 +8,12 @@ import {
     hasOrgIRI,
     OrganizationIRI,
     orgNameIRI,
+    orgOwnerIRI,
+    orgTenantIRI,
+    orgUserIRI,
     TenantIRI,
     tenantNameIRI,
+    tenantUserIRI,
 } from "@jasonscharf/core/tenancy";
 import { EntitySchema } from "@jasonscharf/entities";
 import { registerTopology } from "../topology.js";
@@ -26,6 +30,12 @@ import { TENANCY_NS } from "./constants.js";
  * anyURI literals, so they can be joined/traversed. The `member` edge is
  * polymorphic (no target schema) to avoid a tenancy→auth import cycle — the leaf
  * schema (UserSchema) is supplied at the query terminal.
+ *
+ * The `users` collection properties (tenantUser / orgUser anyURI literals) carry
+ * the legacy flat membership lists the repositories expose; they are distinct
+ * from the traversable `member` containment edge and preserve the prior storage
+ * shape. The `tenant` / `owner` edges replace the org's foreign-key scalars; they
+ * are deliberately NOT containment edges, so they never widen a scope chain.
  */
 
 export const DomainSchema = new EntitySchema({
@@ -39,21 +49,53 @@ export const DomainSchema = new EntitySchema({
     },
 });
 
-export const OrgSchema = new EntitySchema({
+interface OrgProps extends Record<string, unknown> {
+    name: string;
+    users: string | string[];
+}
+
+export const OrgSchema: EntitySchema<OrgProps> = new EntitySchema<OrgProps>({
     typeIRI: OrganizationIRI,
     ns: TENANCY_NS,
     idSegment: "org",
-    properties: { name: orgNameIRI },
+    properties: {
+        name: orgNameIRI,
+        users: orgUserIRI,
+    },
     edges: {
-        member: { predicate: hasMemberIRI, cardinality: "many", direction: "out", containment: true },
+        member: {
+            predicate: hasMemberIRI,
+            cardinality: "many",
+            direction: "out",
+            containment: true,
+        },
+        tenant: {
+            predicate: orgTenantIRI,
+            target: () => TenantSchema,
+            cardinality: "one",
+            direction: "out",
+        },
+        owner: {
+            predicate: orgOwnerIRI,
+            cardinality: "one",
+            direction: "out",
+        },
     },
 });
 
-export const TenantSchema = new EntitySchema({
+interface TenantProps extends Record<string, unknown> {
+    name: string;
+    users: string | string[];
+}
+
+export const TenantSchema: EntitySchema<TenantProps> = new EntitySchema<TenantProps>({
     typeIRI: TenantIRI,
     ns: TENANCY_NS,
     idSegment: "tenant",
-    properties: { name: tenantNameIRI },
+    properties: {
+        name: tenantNameIRI,
+        users: tenantUserIRI,
+    },
     edges: {
         org: {
             predicate: hasOrgIRI,

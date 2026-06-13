@@ -1,17 +1,12 @@
-import { IRI, literal } from "@jasonscharf/core";
-import {
-    OrganizationIRI,
-    orgNameIRI,
-    orgOwnerIRI,
-    orgTenantIRI,
-    orgUserIRI,
-} from "@jasonscharf/core/tenancy";
-import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
+import type { TripleStore } from "@jasonscharf/data";
+import type { EntityRecord } from "@jasonscharf/entities";
+import { EntityQuery } from "../EntityQuery.js";
+import { EntityStore } from "../EntityStore.js";
 import type { SecurityContext } from "../SecurityContext.js";
 import type { ServerContext } from "../ServerContext.js";
-import { RDF_TYPE, TENANCY_GRAPH, XSD_ANY_URI, XSD_STRING } from "./constants.js";
+import { OrgSchema } from "./schemas.js";
 import type { OrganizationEntity } from "./types.js";
-import { idFrom, iriFor, newId } from "./util.js";
+import { iriFor, newId } from "./util.js";
 
 export interface CreateOrgArgs {
     name: string;
@@ -41,234 +36,134 @@ export interface RenameOrgArgs {
     name: string;
 }
 
-// NOTE: Queries a special "tenancy graph"
+/**
+ * Data-access layer for Organization entities.
+ *
+ * Like the Tenant repo, org entities are NOT pinned to a fixed graph — they live
+ * in the per-tenant graph the EntityStore derives from ctx, preserving tenant
+ * isolation. The `tenant` / `owner` foreign-key scalars are modelled as
+ * (non-containment) object-property edges so they stay traversable by IRI.
+ *
+ * Repositories perform NO access checks; authorization is enforced one level up
+ * (RbacService). `_sec` is threaded for signature symmetry only.
+ */
 export class OrganizationRepository {
-    constructor(private readonly _store: TripleStore) {}
+    private readonly _store: TripleStore;
+    private readonly _entities: EntityStore;
 
+    constructor(store: TripleStore) {
+        this._store = store;
+        this._entities = new EntityStore(store);
+    }
+
+    get store(): TripleStore {
+        return this._store;
+    }
+
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async create(
         ctx: ServerContext,
         _sec: SecurityContext,
         args: CreateOrgArgs,
     ): Promise<OrganizationEntity> {
-        const id = newId();
-        const sub = iriFor("org", id);
-
-        return this._store.withTransaction(ctx, async (ctx) => {
-            await this._store.insertMany(ctx, [
-                {
-                    subject: sub,
-                    predicate: RDF_TYPE,
-                    object: OrganizationIRI,
-                    graph: TENANCY_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: orgNameIRI,
-                    object: literal(args.name, XSD_STRING),
-                    graph: TENANCY_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: orgTenantIRI,
-                    object: new IRI(args.tenantIri),
-                    graph: TENANCY_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: orgOwnerIRI,
-                    object: new IRI(args.ownerIri),
-                    graph: TENANCY_GRAPH,
-                },
-            ]);
-
-            const ts = await this._timestamps(ctx, sub);
-            return {
-                id,
-                iri: sub.value,
-                name: args.name,
-                tenantIri: args.tenantIri,
-                ownerIri: args.ownerIri,
-                createdAt: ts.createdAt,
-                updatedAt: ts.updatedAt,
-            };
-        });
+        const record = await this._entities.create(
+            ctx,
+            OrgSchema,
+            { name: args.name, tenant: args.tenantIri, owner: args.ownerIri },
+            newId(),
+        );
+        return this._toEntity(record);
     }
 
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async findById(
         ctx: ServerContext,
         _sec: SecurityContext,
         args: OrgIdArgs,
     ): Promise<OrganizationEntity | null> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const sub = iriFor("org", args.id);
-            const quads = await this._store.find(ctx, { subject: sub, graph: TENANCY_GRAPH });
-            if (quads.length === 0) {
-                return null;
-            }
-            return this._fromQuads(args.id, quads, await this._timestamps(ctx, sub));
-        });
+        const record = await this._entities.findById(ctx, OrgSchema, args.id);
+        return record ? this._toEntity(record) : null;
     }
 
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async addUser(ctx: ServerContext, _sec: SecurityContext, args: OrgUserArgs): Promise<void> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            await this._store.insert(ctx, {
-                subject: iriFor("org", args.orgId),
-                predicate: orgUserIRI,
-                object: literal(args.userIri, XSD_ANY_URI),
-                graph: TENANCY_GRAPH,
-            });
-        });
+        await this._entities.collectionPush(ctx, OrgSchema, args.orgId, "users", args.userIri);
     }
 
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async removeUser(ctx: ServerContext, _sec: SecurityContext, args: OrgUserArgs): Promise<void> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            await this._store.delete(ctx, {
-                subject: iriFor("org", args.orgId),
-                predicate: orgUserIRI,
-                object: literal(args.userIri, XSD_ANY_URI),
-                graph: TENANCY_GRAPH,
-            });
-        });
+        await this._entities.collectionRemove(ctx, OrgSchema, args.orgId, "users", args.userIri);
     }
 
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async findUsers(ctx: ServerContext, _sec: SecurityContext, args: OrgIdArgs): Promise<string[]> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const quads = await this._store.find(ctx, {
-                subject: iriFor("org", args.id),
-                predicate: orgUserIRI,
-                graph: TENANCY_GRAPH,
-            });
-            return quads.map((q) => String((q.object as { value: string }).value));
-        });
+        const users = await this._entities.collectionGet(ctx, OrgSchema, args.id, "users");
+        return users.map(String);
     }
 
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async findByUserIri(
         ctx: ServerContext,
         _sec: SecurityContext,
         args: OrgIriArgs,
     ): Promise<OrganizationEntity[]> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const quads = await this._store.find(ctx, {
-                predicate: orgUserIRI,
-                object: literal(args.userIri, XSD_ANY_URI),
-                graph: TENANCY_GRAPH,
-            });
-            const entities: OrganizationEntity[] = [];
-            for (const q of quads) {
-                const id = idFrom((q.subject as IRI).value);
-                const entity = await this.findById(ctx, _sec, { id });
-                if (entity) {
-                    entities.push(entity);
-                }
-            }
-            return entities;
-        });
+        const records = await EntityQuery.from(this._store, OrgSchema)
+            .where("users", "=", args.userIri)
+            .all(ctx);
+        return records.map((r) => this._toEntity(r));
     }
 
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async listAll(ctx: ServerContext, _sec: SecurityContext): Promise<OrganizationEntity[]> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const quads = await this._store.find(ctx, {
-                predicate: RDF_TYPE,
-                object: OrganizationIRI,
-                graph: TENANCY_GRAPH,
-            });
-            const entities: OrganizationEntity[] = [];
-            for (const q of quads) {
-                const id = idFrom((q.subject as IRI).value);
-                const entity = await this.findById(ctx, _sec, { id });
-                if (entity) {
-                    entities.push(entity);
-                }
-            }
-            return entities;
-        });
+        const records = await EntityQuery.from(this._store, OrgSchema).all(ctx);
+        return records.map((r) => this._toEntity(r));
     }
 
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async findByTenant(
         ctx: ServerContext,
         _sec: SecurityContext,
         args: OrgTenantArgs,
     ): Promise<OrganizationEntity[]> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const quads = await this._store.find(ctx, {
-                predicate: orgTenantIRI,
-                object: new IRI(args.tenantIri),
-                graph: TENANCY_GRAPH,
-            });
-            const entities: OrganizationEntity[] = [];
-            for (const q of quads) {
-                const id = idFrom((q.subject as IRI).value);
-                const entity = await this.findById(ctx, _sec, { id });
-                if (entity) {
-                    entities.push(entity);
-                }
-            }
-            return entities;
-        });
+        const records = await EntityQuery.from(this._store, OrgSchema)
+            .connectedTo("tenant", args.tenantIri)
+            .all(ctx);
+        return records.map((r) => this._toEntity(r));
     }
 
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async update(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: RenameOrgArgs,
     ): Promise<OrganizationEntity | null> {
-        const existing = await this.findById(ctx, _sec, { id: args.id });
-        if (!existing) {
-            return null;
-        }
-
-        const sub = iriFor("org", args.id);
-
-        await this._store.delete(ctx, {
-            subject: sub,
-            predicate: orgNameIRI,
-            graph: TENANCY_GRAPH,
+        return this._store.withTransaction(ctx, async (ctx) => {
+            const existing = await this._entities.findById(ctx, OrgSchema, args.id);
+            if (!existing) {
+                return null;
+            }
+            await this._entities.update(ctx, OrgSchema, args.id, { name: args.name });
+            return this.findById(ctx, sec, { id: args.id });
         });
-        await this._store.insert(ctx, {
-            subject: sub,
-            predicate: orgNameIRI,
-            object: literal(args.name, XSD_STRING),
-            graph: TENANCY_GRAPH,
-        });
-
-        return this.findById(ctx, _sec, { id: args.id });
     }
 
+    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
     async delete(ctx: ServerContext, _sec: SecurityContext, args: OrgIdArgs): Promise<void> {
-        await this._store.delete(ctx, { subject: iriFor("org", args.id), graph: TENANCY_GRAPH });
+        await this._entities.delete(ctx, OrgSchema, args.id);
     }
 
-    private _now(): EntityTimestamps {
+    private _toEntity(record: EntityRecord): OrganizationEntity {
         const now = new Date();
-        return { createdAt: now, updatedAt: now };
-    }
-
-    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
-    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
-        return (
-            (await this._store.entityTimestamps(ctx, [sub], TENANCY_GRAPH)).get(sub.value) ??
-            this._now()
-        );
-    }
-
-    private _fromQuads(
-        id: string,
-        quads: ReturnType<TripleStore["find"]> extends Promise<infer T> ? T : never,
-        ts: EntityTimestamps,
-    ): OrganizationEntity {
-        const get = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q !== undefined ? String((q.object as { value: string }).value) : undefined;
-        };
-
+        const tenantEdge = record.edges?.tenant;
+        const ownerEdge = record.edges?.owner;
         return {
-            id,
-            iri: iriFor("org", id).value,
-            name: get(orgNameIRI) ?? "",
-            tenantIri: get(orgTenantIRI) ?? "",
-            ownerIri: get(orgOwnerIRI) ?? "",
-            createdAt: ts.createdAt,
-            updatedAt: ts.updatedAt,
+            id: record.id,
+            iri: iriFor("org", record.id).value,
+            name: record.props.name != null ? String(record.props.name) : "",
+            tenantIri: tenantEdge && "iri" in tenantEdge ? tenantEdge.iri : "",
+            ownerIri: ownerEdge && "iri" in ownerEdge ? ownerEdge.iri : "",
+            createdAt: record.createdAt ?? now,
+            updatedAt: record.updatedAt ?? now,
         };
     }
 }

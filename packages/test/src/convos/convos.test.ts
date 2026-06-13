@@ -32,6 +32,7 @@ import {
     ParticipantRepository,
     PERM_CONVO_CLOSE,
     PERM_CONVO_CREATE,
+    PERM_CONVO_READ,
     PERM_INBOX_CREATE,
     PERM_MESSAGE_EDIT_ANY,
     PERM_MESSAGE_EDIT_OWN,
@@ -1641,6 +1642,125 @@ for (const provider of providers) {
                     })
                 ).name,
             ).toBe("Inbox");
+        });
+
+        // ── Read enforcement (participant-gated reads) ──────────────────────────
+        //
+        // A non-participant must not read a conversation, its messages,
+        // participants, or read receipts. ConvoService gates these reads on
+        // conversation membership, OR on PERM_CONVO_READ scoped to the
+        // conversation IRI (the moderator / cross-conversation reader grant).
+
+        async function grantPerms(principalIri: string, keys: string[]): Promise<void> {
+            const role = await rbac.createRole(ctx, systemSec, {
+                roleName: `role-${principalIri}-${keys.join("-")}`,
+                tenantId: null,
+            });
+            for (const key of keys) {
+                const p = await rbac.createPermission(ctx, systemSec, { key: key });
+                await rbac.addPermissionToRole(ctx, systemSec, {
+                    roleIri: role.iri,
+                    permissionIri: p.iri,
+                });
+            }
+            await rbac.grant(ctx, systemSec, { principalIri: principalIri, roleIri: role.iri });
+        }
+
+        async function seedConversationWithMessage(): Promise<{ id: string; iri: string }> {
+            await grantPerms(ALICE, [PERM_CONVO_CREATE, PERM_MESSAGE_POST]);
+            const { conversation } = await svc.createConversation(ctx, secFor(ALICE), {
+                subjectIri: CONTRACT_IRI,
+                title: "private thread",
+            });
+            await svc.postMessage(ctx, secFor(ALICE), {
+                conversationId: conversation.id,
+                content: "secret",
+            });
+            return { id: conversation.id, iri: conversation.iri };
+        }
+
+        it("getConversation denied for a non-participant without PERM_CONVO_READ", async () => {
+            const conv = await seedConversationWithMessage();
+            await expect(
+                svc.getConversation(ctx, secFor(CHARLIE), { conversationId: conv.id }),
+            ).rejects.toThrow(/Access denied/);
+        });
+
+        it("getMessagesForConversation denied for a non-participant", async () => {
+            const conv = await seedConversationWithMessage();
+            await expect(
+                svc.getMessagesForConversation(ctx, secFor(CHARLIE), { conversationId: conv.id }),
+            ).rejects.toThrow(/Access denied/);
+        });
+
+        it("getParticipants denied for a non-participant", async () => {
+            const conv = await seedConversationWithMessage();
+            await expect(
+                svc.getParticipants(ctx, secFor(CHARLIE), { conversationId: conv.id }),
+            ).rejects.toThrow(/Access denied/);
+        });
+
+        it("getReadReceiptsForConversation denied for a non-participant", async () => {
+            const conv = await seedConversationWithMessage();
+            await expect(
+                svc.getReadReceiptsForConversation(ctx, secFor(CHARLIE), {
+                    conversationId: conv.id,
+                }),
+            ).rejects.toThrow(/Access denied/);
+        });
+
+        it("getUnreadMessageCount denied for a non-participant", async () => {
+            const conv = await seedConversationWithMessage();
+            await expect(
+                svc.getUnreadMessageCount(ctx, secFor(CHARLIE), {
+                    conversationId: conv.id,
+                    userId: CHARLIE,
+                }),
+            ).rejects.toThrow(/Access denied/);
+        });
+
+        it("a participant may read the conversation and its messages without PERM_CONVO_READ", async () => {
+            await grantPerms(ALICE, [PERM_CONVO_CREATE, PERM_MESSAGE_POST]);
+            const { conversation } = await svc.createConversation(ctx, secFor(ALICE), {
+                subjectIri: CONTRACT_IRI,
+                title: "team thread",
+                participantIds: [BOB],
+            });
+            await svc.postMessage(ctx, secFor(ALICE), {
+                conversationId: conversation.id,
+                content: "hello bob",
+            });
+
+            // ALICE (owner) reads her own conversation.
+            expect(
+                (await svc.getConversation(ctx, secFor(ALICE), { conversationId: conversation.id }))
+                    ?.title,
+            ).toBe("team thread");
+
+            // BOB is a participant with no convos permissions at all, yet may read.
+            const msgs = await svc.getMessagesForConversation(ctx, secFor(BOB), {
+                conversationId: conversation.id,
+            });
+            expect(msgs).toHaveLength(1);
+            expect(msgs[0].content).toBe("hello bob");
+            expect(
+                await svc.getParticipants(ctx, secFor(BOB), { conversationId: conversation.id }),
+            ).toHaveLength(2);
+        });
+
+        it("a non-participant holding PERM_CONVO_READ may read (moderator path)", async () => {
+            const conv = await seedConversationWithMessage();
+            await grantPerms(CHARLIE, [PERM_CONVO_READ]);
+
+            expect(
+                (await svc.getConversation(ctx, secFor(CHARLIE), { conversationId: conv.id }))
+                    ?.title,
+            ).toBe("private thread");
+            const msgs = await svc.getMessagesForConversation(ctx, secFor(CHARLIE), {
+                conversationId: conv.id,
+            });
+            expect(msgs).toHaveLength(1);
+            expect(msgs[0].content).toBe("secret");
         });
     });
 

@@ -24,6 +24,16 @@ export interface IdArgs {
     id: string;
 }
 
+/**
+ * Data-access layer for conversation Participant entities.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design — the same split TRN-203 established for the auth bounded context.
+ * Authorization is enforced one level up, at the ConvoService boundary, which
+ * asserts PERM_PARTICIPANT_MANAGE on writes and consults membership here when
+ * gating sensitive reads. The `sec` argument is threaded through for signature
+ * symmetry and a possible future row-level policy, but is not consulted here.
+ */
 export class ParticipantRepository {
     private readonly _store: TripleStore;
     private readonly _entities: EntityStore;
@@ -37,7 +47,7 @@ export class ParticipantRepository {
         return this._store;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async create(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -65,7 +75,7 @@ export class ParticipantRepository {
         return this._toEntity(record);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findByConversation(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -77,7 +87,7 @@ export class ParticipantRepository {
         return records.map((r) => this._toEntity(r));
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findByConversationAndUser(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -89,7 +99,7 @@ export class ParticipantRepository {
         return all.find((p) => p.userId === args.userId) ?? null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async updateRole(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -106,7 +116,7 @@ export class ParticipantRepository {
         });
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async remove(ctx: ServerContext, _sec: SecurityContext, args: IdArgs): Promise<void> {
         await this._entities.delete(ctx, ParticipantSchema, args.id);
     }

@@ -39,6 +39,18 @@ export interface FanOutArgs {
     excludeUserId?: string;
 }
 
+/**
+ * Data-access layer for per-user notifications.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design — the same split TRN-203 established for the auth bounded context.
+ * Authorization lives one level up, at the service boundary: ConvoService
+ * fans out / reads notifications on behalf of an already-authorized caller, and
+ * NotificationService drives the dedupe policies. Notifications are addressed by
+ * the owning userId, so the service supplies that userId; this layer never makes
+ * a trust decision. The `sec` argument is threaded through for signature
+ * symmetry and a possible future row-level policy, but is not consulted here.
+ */
 export class NotificationRepository {
     private readonly _store: TripleStore;
     private readonly _entities: EntityStore;
@@ -52,7 +64,7 @@ export class NotificationRepository {
         return this._store;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async create(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -75,7 +87,7 @@ export class NotificationRepository {
         return this._toEntity(record);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findById(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -85,7 +97,7 @@ export class NotificationRepository {
         return record ? this._toEntity(record) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findByUser(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -102,7 +114,7 @@ export class NotificationRepository {
     }
 
     /**
-     * @insecure @nochecks
+     * @dataLayer — no checks here; ConvoService / NotificationService enforce.
      * Return all notifications for a user with the given templateKey.
      * Used by NotificationService to evaluate deduplication policies.
      */
@@ -121,13 +133,13 @@ export class NotificationRepository {
         return results;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async countUnread(ctx: ServerContext, sec: SecurityContext, args: UserIdArgs): Promise<number> {
         const all = await this.findByUser(ctx, sec, { userId: args.userId, unreadOnly: true });
         return all.filter((n) => !n.isDismissed).length;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async markRead(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -136,7 +148,7 @@ export class NotificationRepository {
         return this._setBooleanFlag(ctx, sec, args.id, "isRead", true);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async markAllReadForUser(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -150,7 +162,7 @@ export class NotificationRepository {
         return unread.length;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async dismiss(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -159,7 +171,10 @@ export class NotificationRepository {
         return this._setBooleanFlag(ctx, sec, args.id, "isDismissed", true);
     }
 
-    /** @insecure @nochecks Fan-out: create a notification for each recipient, skipping the excluded user. */
+    /**
+     * @dataLayer — no checks here; ConvoService enforces (see class doc).
+     * Fan-out: create a notification for each recipient, skipping the excluded user.
+     */
     async fanOut(
         ctx: ServerContext,
         _sec: SecurityContext,

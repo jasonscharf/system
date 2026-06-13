@@ -34,6 +34,16 @@ export interface UserIdArgs {
     userId: string;
 }
 
+/**
+ * Data-access layer for shared Inbox entities and their memberships.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design — the same split TRN-203 established for the auth bounded context.
+ * Authorization is enforced one level up, at the ConvoService boundary, which
+ * asserts PERM_INBOX_CREATE / PERM_INBOX_MANAGE before delegating here. The
+ * `sec` argument is threaded through for signature symmetry and a possible
+ * future row-level policy, but is intentionally not consulted in this layer.
+ */
 export class InboxRepository {
     private readonly _store: TripleStore;
     private readonly _entities: EntityStore;
@@ -47,7 +57,7 @@ export class InboxRepository {
         return this._store;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async create(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -66,7 +76,7 @@ export class InboxRepository {
         return this._toEntity(record);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findById(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -76,7 +86,7 @@ export class InboxRepository {
         return record ? this._toEntity(record) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findBySubject(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -88,7 +98,7 @@ export class InboxRepository {
         return records.map((r) => this._toEntity(r));
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async addMember(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -116,7 +126,7 @@ export class InboxRepository {
         return this._membershipToEntity(record);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async removeMember(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -129,7 +139,7 @@ export class InboxRepository {
         await this._entities.delete(ctx, InboxMembershipSchema, membership.id);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findMembership(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -139,7 +149,7 @@ export class InboxRepository {
         return members.find((m) => m.userId === args.userId) ?? null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async listMembers(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -151,7 +161,7 @@ export class InboxRepository {
         return records.map((r) => this._membershipToEntity(r));
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async listInboxesForUser(
         ctx: ServerContext,
         _sec: SecurityContext,

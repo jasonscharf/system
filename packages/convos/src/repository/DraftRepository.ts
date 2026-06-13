@@ -24,6 +24,16 @@ export interface UpdateDraftArgs {
     content: string;
 }
 
+/**
+ * Data-access layer for message Draft entities.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design — the same split TRN-203 established for the auth bounded context.
+ * Authorization is enforced one level up, at the ConvoService boundary, which
+ * asserts PERM_MESSAGE_POST when a draft is promoted to a message before
+ * delegating here. The `sec` argument is threaded through for signature
+ * symmetry and a possible future row-level policy, but is not consulted here.
+ */
 export class DraftRepository {
     private readonly _store: TripleStore;
     private readonly _entities: EntityStore;
@@ -37,7 +47,7 @@ export class DraftRepository {
         return this._store;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async create(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -60,7 +70,7 @@ export class DraftRepository {
         return this._toEntity(record);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findById(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -70,7 +80,7 @@ export class DraftRepository {
         return record ? this._toEntity(record) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findByAuthor(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -82,7 +92,7 @@ export class DraftRepository {
         return records.map((r) => this._toEntity(r));
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findByAuthorAndConversation(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -92,7 +102,7 @@ export class DraftRepository {
         return all.filter((d) => d.conversationId === args.conversationId);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async update(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -108,7 +118,7 @@ export class DraftRepository {
         });
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async delete(ctx: ServerContext, _sec: SecurityContext, args: IdArgs): Promise<void> {
         await this._entities.delete(ctx, DraftSchema, args.id);
     }

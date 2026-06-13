@@ -28,6 +28,17 @@ export interface UpdateAssignmentArgs {
     assignedTo: string | null;
 }
 
+/**
+ * Data-access layer for Conversation entities.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design — the same split TRN-203 established for the auth bounded context.
+ * Authorization is enforced one level up, at the ConvoService boundary, which
+ * asserts the relevant RBAC permission (create / close / archive / assign) or
+ * gates reads on conversation membership / PERM_CONVO_READ before delegating
+ * here. The `sec` argument is threaded through for signature symmetry and a
+ * possible future row-level policy, but is intentionally not consulted here.
+ */
 export class ConversationRepository {
     private readonly _store: TripleStore;
     private readonly _entities: EntityStore;
@@ -41,7 +52,7 @@ export class ConversationRepository {
         return this._store;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async create(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -66,7 +77,7 @@ export class ConversationRepository {
         return this._toEntity(record);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findById(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -76,7 +87,7 @@ export class ConversationRepository {
         return record ? this._toEntity(record) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findBySubject(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -88,7 +99,7 @@ export class ConversationRepository {
         return records.map((r) => this._toEntity(r));
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findByInbox(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -100,7 +111,7 @@ export class ConversationRepository {
         return records.map((r) => this._toEntity(r));
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async updateStatus(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -116,7 +127,7 @@ export class ConversationRepository {
         });
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async updateAssignment(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -136,7 +147,7 @@ export class ConversationRepository {
         });
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async delete(ctx: ServerContext, _sec: SecurityContext, args: IdArgs): Promise<void> {
         await this._entities.delete(ctx, ConversationSchema, args.id);
     }

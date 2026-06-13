@@ -4,6 +4,7 @@ import {
     PERM_CONVO_ASSIGN,
     PERM_CONVO_CLOSE,
     PERM_CONVO_CREATE,
+    PERM_CONVO_READ,
     PERM_INBOX_CREATE,
     PERM_INBOX_MANAGE,
     PERM_MESSAGE_DELETE_ANY,
@@ -237,7 +238,14 @@ export class ConvoService {
         sec: SecurityContext,
         args: ConversationIdArgs,
     ): Promise<ConversationEntity | null> {
-        return this._conversations.findById(ctx, sec, { id: args.conversationId });
+        const conversation = await this._conversations.findById(ctx, sec, {
+            id: args.conversationId,
+        });
+        if (!conversation) {
+            return null;
+        }
+        await this._assertCanRead(ctx, sec, conversation);
+        return conversation;
     }
 
     async getConversationsForSubject(
@@ -360,6 +368,7 @@ export class ConvoService {
         sec: SecurityContext,
         args: ConversationIdArgs,
     ): Promise<MessageEntity[]> {
+        await this._assertCanRead(ctx, sec, args.conversationId);
         return this._messages.findByConversation(ctx, sec, args);
     }
 
@@ -368,6 +377,11 @@ export class ConvoService {
         sec: SecurityContext,
         args: MessageIdArgs,
     ): Promise<MessageRevisionEntity[]> {
+        const message = await this._messages.findById(ctx, sec, { id: args.messageId });
+        if (!message) {
+            return [];
+        }
+        await this._assertCanRead(ctx, sec, message.conversationId);
         return this._messages.findRevisionsForMessage(ctx, sec, args);
     }
 
@@ -399,6 +413,7 @@ export class ConvoService {
         sec: SecurityContext,
         args: ConversationIdArgs,
     ): Promise<ParticipantEntity[]> {
+        await this._assertCanRead(ctx, sec, args.conversationId);
         return this._participants.findByConversation(ctx, sec, args);
     }
 
@@ -594,6 +609,7 @@ export class ConvoService {
         sec: SecurityContext,
         args: ConversationUserArgs,
     ): Promise<ReadReceiptEntity | null> {
+        await this._assertCanRead(ctx, sec, args.conversationId);
         return this._receipts.findByConversationAndUser(ctx, sec, args);
     }
 
@@ -602,6 +618,7 @@ export class ConvoService {
         sec: SecurityContext,
         args: ConversationIdArgs,
     ): Promise<ReadReceiptEntity[]> {
+        await this._assertCanRead(ctx, sec, args.conversationId);
         return this._receipts.findByConversation(ctx, sec, args);
     }
 
@@ -613,6 +630,7 @@ export class ConvoService {
         sec: SecurityContext,
         args: ConversationUserArgs,
     ): Promise<number> {
+        await this._assertCanRead(ctx, sec, args.conversationId);
         const receipt = await this._receipts.findByConversationAndUser(ctx, sec, args);
         const messages = await this._messages.findByConversation(ctx, sec, {
             conversationId: args.conversationId,
@@ -695,6 +713,51 @@ export class ConvoService {
         }
 
         await this._rbac.assert(ctx, sec, { permission, scope });
+    }
+
+    /**
+     * Gate a sensitive read on conversation membership.
+     *
+     * Reads of a conversation, its messages, participants, or read receipts are
+     * restricted to people who belong to the conversation. A caller is allowed
+     * when they are a participant, or when they hold PERM_CONVO_READ scoped to
+     * the conversation IRI (the moderator / cross-conversation reader grant).
+     * The internal system principal passes the PERM_CONVO_READ check because
+     * AccessChecker bypasses RBAC for systemSec. When the service is constructed
+     * without an RbacService (the un-guarded embedding) reads stay open, matching
+     * how the mutation asserts also no-op without _rbac.
+     */
+    private async _assertCanRead(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        conversation: ConversationEntity | string,
+    ): Promise<void> {
+        if (!this._rbac) {
+            return;
+        }
+
+        let conv: ConversationEntity | null;
+        if (typeof conversation === "string") {
+            conv = await this._conversations.findById(ctx, sec, { id: conversation });
+        } else {
+            conv = conversation;
+        }
+        if (!conv) {
+            return;
+        }
+
+        const callerIri = sec.principalIri ?? "";
+        if (callerIri) {
+            const membership = await this._participants.findByConversationAndUser(ctx, sec, {
+                conversationId: conv.id,
+                userId: callerIri,
+            });
+            if (membership) {
+                return;
+            }
+        }
+
+        await this._rbac.assert(ctx, sec, { permission: PERM_CONVO_READ, scope: conv.iri });
     }
 
     private async _assertEditPermission(

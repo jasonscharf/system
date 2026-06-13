@@ -21,6 +21,17 @@ export interface ConversationIdArgs {
     conversationId: string;
 }
 
+/**
+ * Data-access layer for read-receipt watermarks.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design — the same split TRN-203 established for the auth bounded context.
+ * Authorization is enforced one level up, at the ConvoService boundary, which
+ * asserts the relevant RBAC permission (PERM_CONVO_READ for receipt reads) or
+ * gates on conversation membership before delegating here. The `sec` argument
+ * is threaded through for signature symmetry and so a future row-level policy
+ * could hook in, but is intentionally not consulted in this layer.
+ */
 export class ReadReceiptRepository {
     private readonly _store: TripleStore;
     private readonly _entities: EntityStore;
@@ -35,7 +46,7 @@ export class ReadReceiptRepository {
     }
 
     /**
-     * @insecure @nochecks
+     * @dataLayer — no checks here; ConvoService enforces (see class doc).
      * Upsert: create a receipt if none exists, otherwise advance it forward.
      * Silently ignores attempts to move the receipt backward.
      */
@@ -78,7 +89,7 @@ export class ReadReceiptRepository {
         });
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findByConversationAndUser(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -90,7 +101,7 @@ export class ReadReceiptRepository {
         return all.find((r) => r.userId === args.userId) ?? null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findByConversation(
         ctx: ServerContext,
         _sec: SecurityContext,

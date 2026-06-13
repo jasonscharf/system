@@ -25,6 +25,17 @@ export interface MessageIdArgs {
     messageId: string;
 }
 
+/**
+ * Data-access layer for Message entities and their revision history.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design — the same split TRN-203 established for the auth bounded context.
+ * Authorization is enforced one level up, at the ConvoService boundary, which
+ * asserts PERM_MESSAGE_POST / edit / delete on writes and gates reads on
+ * conversation membership / PERM_CONVO_READ before delegating here. The `sec`
+ * argument is threaded through for signature symmetry and a possible future
+ * row-level policy, but is intentionally not consulted in this layer.
+ */
 export class MessageRepository {
     private readonly _store: TripleStore;
     private readonly _entities: EntityStore;
@@ -38,7 +49,7 @@ export class MessageRepository {
         return this._store;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async create(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -63,7 +74,7 @@ export class MessageRepository {
         return this._toEntity(record);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findById(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -73,7 +84,7 @@ export class MessageRepository {
         return record ? this._toEntity(record) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findByConversation(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -95,7 +106,7 @@ export class MessageRepository {
         return messages;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async edit(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -144,7 +155,7 @@ export class MessageRepository {
         });
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async softDelete(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -160,7 +171,7 @@ export class MessageRepository {
         });
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; ConvoService enforces (see class doc). */
     async findRevisionsForMessage(
         ctx: ServerContext,
         _sec: SecurityContext,

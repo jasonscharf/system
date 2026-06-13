@@ -1,15 +1,8 @@
-import {
-    deviceNameIRI,
-    devicePlatformIRI,
-    deviceUserAgentIRI,
-    deviceUserIRI,
-    type IRI,
-    literal,
-    UserDeviceIRI,
-} from "@jasonscharf/core";
-import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
+import type { TripleStore } from "@jasonscharf/data";
+import type { EntityRecord } from "@jasonscharf/entities";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import { AUTH_GRAPH, RDF_TYPE, XSD_STRING } from "../constants.js";
+import { EntityQuery, EntityStore } from "@jasonscharf/server";
+import { UserDeviceSchema } from "../entities/UserDeviceSchema.js";
 import type { DeviceInfo, UserDeviceEntity } from "../types.js";
 import { idFrom, iriFor, newId } from "./util.js";
 
@@ -28,9 +21,15 @@ export interface UserIdArgs {
 
 export class UserDeviceRepository {
     private readonly _store: TripleStore;
+    private readonly _entities: EntityStore;
 
     constructor(store: TripleStore) {
         this._store = store;
+        this._entities = new EntityStore(store);
+    }
+
+    get store(): TripleStore {
+        return this._store;
     }
 
     /** @insecure @nochecks */
@@ -44,61 +43,18 @@ export class UserDeviceRepository {
             return existing;
         }
 
-        const id = newId();
-        const sub = iriFor("device", id);
-
-        return this._store.withTransaction(ctx, async (ctx) => {
-            await this._store.insertMany(ctx, [
-                { subject: sub, predicate: RDF_TYPE, object: UserDeviceIRI, graph: AUTH_GRAPH },
-                {
-                    subject: sub,
-                    predicate: deviceUserIRI,
-                    object: iriFor("user", args.userId),
-                    graph: AUTH_GRAPH,
-                },
-                ...(args.info.name
-                    ? [
-                          {
-                              subject: sub,
-                              predicate: deviceNameIRI,
-                              object: literal(args.info.name, XSD_STRING),
-                              graph: AUTH_GRAPH,
-                          },
-                      ]
-                    : []),
-                ...(args.info.platform
-                    ? [
-                          {
-                              subject: sub,
-                              predicate: devicePlatformIRI,
-                              object: literal(args.info.platform, XSD_STRING),
-                              graph: AUTH_GRAPH,
-                          },
-                      ]
-                    : []),
-                ...(args.info.userAgent
-                    ? [
-                          {
-                              subject: sub,
-                              predicate: deviceUserAgentIRI,
-                              object: literal(args.info.userAgent, XSD_STRING),
-                              graph: AUTH_GRAPH,
-                          },
-                      ]
-                    : []),
-            ]);
-
-            const ts = await this._timestamps(ctx, sub);
-            return {
-                id,
-                iri: sub.value,
-                userId: args.userId,
+        const record = await this._entities.create(
+            ctx,
+            UserDeviceSchema,
+            {
+                deviceUser: iriFor("user", args.userId).value,
                 deviceName: args.info.name,
                 devicePlatform: args.info.platform,
                 deviceUserAgent: args.info.userAgent,
-                createdAt: ts.createdAt,
-            };
-        });
+            },
+            newId(),
+        );
+        return this._toEntity(record);
     }
 
     /** @insecure @nochecks */
@@ -107,12 +63,8 @@ export class UserDeviceRepository {
         _sec: SecurityContext,
         args: IdArgs,
     ): Promise<UserDeviceEntity | null> {
-        const sub = iriFor("device", args.id);
-        const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-        if (quads.length === 0) {
-            return null;
-        }
-        return this._fromQuads(args.id, quads, await this._timestamps(ctx, sub));
+        const record = await this._entities.findById(ctx, UserDeviceSchema, args.id);
+        return record ? this._toEntity(record) : null;
     }
 
     /** @insecure @nochecks */
@@ -121,22 +73,10 @@ export class UserDeviceRepository {
         _sec: SecurityContext,
         args: UserIdArgs,
     ): Promise<UserDeviceEntity[]> {
-        const userIri = iriFor("user", args.userId);
-        const byUser = await this._store.find(ctx, {
-            predicate: deviceUserIRI,
-            object: userIri,
-            graph: AUTH_GRAPH,
-        });
-        const subs = byUser.map((q) => q.subject as IRI);
-        const tsBySubject = await this._store.entityTimestamps(ctx, subs, AUTH_GRAPH);
-        const results: UserDeviceEntity[] = [];
-
-        for (const sub of subs) {
-            const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-            const ts = tsBySubject.get(sub.value) ?? this._now();
-            results.push(this._fromQuads(idFrom(sub.value), quads, ts));
-        }
-        return results;
+        const records = await EntityQuery.from(this._store, UserDeviceSchema)
+            .where("deviceUser", "=", iriFor("user", args.userId).value)
+            .all(ctx);
+        return records.map((r) => this._toEntity(r));
     }
 
     private async _findByUserAndAgent(
@@ -153,45 +93,21 @@ export class UserDeviceRepository {
         return devices.find((d) => d.deviceUserAgent === userAgent) ?? null;
     }
 
-    private _now(): EntityTimestamps {
-        const now = new Date();
-        return { createdAt: now, updatedAt: now };
-    }
-
-    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
-    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
-        return (
-            (await this._store.entityTimestamps(ctx, [sub], AUTH_GRAPH)).get(sub.value) ??
-            this._now()
-        );
-    }
-
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-        ts: EntityTimestamps,
-    ): UserDeviceEntity {
-        const get = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? String((q.object as { value: string }).value) : undefined;
-        };
-        const getIri = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? (q.object as IRI).value : undefined;
-        };
-
-        const deviceUserIriVal = getIri(deviceUserIRI);
-        if (deviceUserIriVal == null) {
-            throw new Error(`UserDeviceRepository: missing deviceUserIRI for device id "${id}"`);
+    private _toEntity(record: EntityRecord): UserDeviceEntity {
+        const deviceUserIri = record.props.deviceUser;
+        if (deviceUserIri == null) {
+            throw new Error(
+                `UserDeviceRepository: missing deviceUser for device id "${record.id}"`,
+            );
         }
         return {
-            id,
-            iri: iriFor("device", id).value,
-            userId: idFrom(deviceUserIriVal),
-            deviceName: get(deviceNameIRI),
-            devicePlatform: get(devicePlatformIRI),
-            deviceUserAgent: get(deviceUserAgentIRI),
-            createdAt: ts.createdAt,
+            id: record.id,
+            iri: record.iri,
+            userId: idFrom(String(deviceUserIri)),
+            deviceName: record.props.deviceName as string | undefined,
+            devicePlatform: record.props.devicePlatform as string | undefined,
+            deviceUserAgent: record.props.deviceUserAgent as string | undefined,
+            createdAt: record.createdAt ?? new Date(),
         };
     }
 }

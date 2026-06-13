@@ -23,6 +23,7 @@ export type {
 export { SessionComponent } from "./components/SessionComponent.js";
 export { LoginAttemptSchema } from "./entities/LoginAttemptSchema.js";
 export { UserDeviceSchema } from "./entities/UserDeviceSchema.js";
+export { UserIdentitySchema } from "./entities/UserIdentitySchema.js";
 export { UserSchema } from "./entities/UserSchema.js";
 export { UserSessionSchema } from "./entities/UserSessionSchema.js";
 export { GitHubProvider } from "./oauth/GitHubProvider.js";

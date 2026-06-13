@@ -1,18 +1,8 @@
-import {
-    accessTokenIRI,
-    type IRI,
-    identityOfIRI,
-    literal,
-    providerEmailIRI,
-    providerIRI,
-    providerUserIdIRI,
-    refreshTokenIRI,
-    tokenExpiresAtIRI,
-    UserIdentityIRI,
-} from "@jasonscharf/core";
-import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
+import type { TripleStore } from "@jasonscharf/data";
+import type { EntityRecord } from "@jasonscharf/entities";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import { AUTH_GRAPH, RDF_TYPE, XSD_DATETIME, XSD_STRING } from "../constants.js";
+import { EntityQuery, EntityStore } from "@jasonscharf/server";
+import { UserIdentitySchema } from "../entities/UserIdentitySchema.js";
 import type { OAuthProvider, UserIdentityEntity } from "../types.js";
 import { idFrom, iriFor, newId } from "./util.js";
 
@@ -32,9 +22,15 @@ export interface UpdateTokensArgs {
 
 export class UserIdentityRepository {
     private readonly _store: TripleStore;
+    private readonly _entities: EntityStore;
 
     constructor(store: TripleStore) {
         this._store = store;
+        this._entities = new EntityStore(store);
+    }
+
+    get store(): TripleStore {
+        return this._store;
     }
 
     /** @insecure @nochecks */
@@ -43,70 +39,21 @@ export class UserIdentityRepository {
         _sec: SecurityContext,
         args: Omit<UserIdentityEntity, "id" | "iri" | "createdAt" | "updatedAt">,
     ): Promise<UserIdentityEntity> {
-        const id = newId();
-        const sub = iriFor("identity", id);
-        const userIri = iriFor("user", args.userId);
-
-        const quads = [
-            { subject: sub, predicate: RDF_TYPE, object: UserIdentityIRI, graph: AUTH_GRAPH },
+        const record = await this._entities.create(
+            ctx,
+            UserIdentitySchema,
             {
-                subject: sub,
-                predicate: providerIRI,
-                object: literal(args.provider, XSD_STRING),
-                graph: AUTH_GRAPH,
+                provider: args.provider,
+                providerUserId: args.providerUserId,
+                providerEmail: args.providerEmail,
+                accessToken: args.accessToken,
+                refreshToken: args.refreshToken,
+                tokenExpiresAt: args.tokenExpiresAt,
+                identityOf: iriFor("user", args.userId).value,
             },
-            {
-                subject: sub,
-                predicate: providerUserIdIRI,
-                object: literal(args.providerUserId, XSD_STRING),
-                graph: AUTH_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: providerEmailIRI,
-                object: literal(args.providerEmail, XSD_STRING),
-                graph: AUTH_GRAPH,
-            },
-            {
-                subject: sub,
-                predicate: accessTokenIRI,
-                object: literal(args.accessToken, XSD_STRING),
-                graph: AUTH_GRAPH,
-            },
-            { subject: sub, predicate: identityOfIRI, object: userIri, graph: AUTH_GRAPH },
-            ...(args.refreshToken
-                ? [
-                      {
-                          subject: sub,
-                          predicate: refreshTokenIRI,
-                          object: literal(args.refreshToken, XSD_STRING),
-                          graph: AUTH_GRAPH,
-                      },
-                  ]
-                : []),
-            ...(args.tokenExpiresAt
-                ? [
-                      {
-                          subject: sub,
-                          predicate: tokenExpiresAtIRI,
-                          object: literal(args.tokenExpiresAt.toISOString(), XSD_DATETIME),
-                          graph: AUTH_GRAPH,
-                      },
-                  ]
-                : []),
-        ];
-
-        return this._store.withTransaction(ctx, async (ctx) => {
-            await this._store.insertMany(ctx, quads);
-            const ts = await this._timestamps(ctx, sub);
-            return {
-                id,
-                iri: sub.value,
-                ...args,
-                createdAt: ts.createdAt,
-                updatedAt: ts.updatedAt,
-            };
-        });
+            newId(),
+        );
+        return this._toEntity(record);
     }
 
     /** @insecure @nochecks */
@@ -115,35 +62,11 @@ export class UserIdentityRepository {
         _sec: SecurityContext,
         args: FindByProviderArgs,
     ): Promise<UserIdentityEntity | null> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const byProvider = await this._store.find(ctx, {
-                predicate: providerIRI,
-                object: literal(args.provider, XSD_STRING),
-                graph: AUTH_GRAPH,
-            });
-
-            for (const q of byProvider) {
-                const sub = q.subject as IRI;
-                const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-                const isIdentity = quads.some(
-                    (quad) =>
-                        (quad.predicate as IRI).value === RDF_TYPE.value &&
-                        (quad.object as IRI).value === UserIdentityIRI.value,
-                );
-                if (!isIdentity) {
-                    continue;
-                }
-                const entity = this._fromQuads(
-                    idFrom(sub.value),
-                    quads,
-                    await this._timestamps(ctx, sub),
-                );
-                if (entity.providerUserId === args.providerUserId) {
-                    return entity;
-                }
-            }
-            return null;
-        });
+        const record = await EntityQuery.from(this._store, UserIdentitySchema)
+            .where("provider", "=", args.provider)
+            .where("providerUserId", "=", args.providerUserId)
+            .first(ctx);
+        return record ? this._toEntity(record) : null;
     }
 
     /** @insecure @nochecks */
@@ -152,24 +75,10 @@ export class UserIdentityRepository {
         _sec: SecurityContext,
         args: UserIdArgs,
     ): Promise<UserIdentityEntity[]> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const userIri = iriFor("user", args.userId);
-            const byUser = await this._store.find(ctx, {
-                predicate: identityOfIRI,
-                object: userIri,
-                graph: AUTH_GRAPH,
-            });
-            const subs = byUser.map((q) => q.subject as IRI);
-            const tsBySubject = await this._store.entityTimestamps(ctx, subs, AUTH_GRAPH);
-            const results: UserIdentityEntity[] = [];
-
-            for (const sub of subs) {
-                const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-                const ts = tsBySubject.get(sub.value) ?? this._now();
-                results.push(this._fromQuads(idFrom(sub.value), quads, ts));
-            }
-            return results;
-        });
+        const records = await EntityQuery.from(this._store, UserIdentitySchema)
+            .where("identityOf", "=", iriFor("user", args.userId).value)
+            .all(ctx);
+        return records.map((r) => this._toEntity(r));
     }
 
     /** @insecure @nochecks */
@@ -178,121 +87,66 @@ export class UserIdentityRepository {
         _sec: SecurityContext,
         args: UpdateTokensArgs,
     ): Promise<void> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const sub = iriFor("identity", args.id);
-
-            await this._store.delete(ctx, {
-                subject: sub,
-                predicate: accessTokenIRI,
-                graph: AUTH_GRAPH,
-            });
-            await this._store.delete(ctx, {
-                subject: sub,
-                predicate: refreshTokenIRI,
-                graph: AUTH_GRAPH,
-            });
-            await this._store.delete(ctx, {
-                subject: sub,
-                predicate: tokenExpiresAtIRI,
-                graph: AUTH_GRAPH,
-            });
-
-            await this._store.insert(ctx, {
-                subject: sub,
-                predicate: accessTokenIRI,
-                object: literal(args.tokens.accessToken, XSD_STRING),
-                graph: AUTH_GRAPH,
-            });
-            if (args.tokens.refreshToken) {
-                await this._store.insert(ctx, {
-                    subject: sub,
-                    predicate: refreshTokenIRI,
-                    object: literal(args.tokens.refreshToken, XSD_STRING),
-                    graph: AUTH_GRAPH,
-                });
-            }
-            if (args.tokens.tokenExpiresAt) {
-                await this._store.insert(ctx, {
-                    subject: sub,
-                    predicate: tokenExpiresAtIRI,
-                    object: literal(args.tokens.tokenExpiresAt.toISOString(), XSD_DATETIME),
-                    graph: AUTH_GRAPH,
-                });
-            }
+        // A patch of all three token props: update() clears each predicate then
+        // re-inserts only the defined values, so an absent refreshToken /
+        // tokenExpiresAt is removed — matching the prior delete-then-insert flow.
+        await this._entities.update(ctx, UserIdentitySchema, args.id, {
+            accessToken: args.tokens.accessToken,
+            refreshToken: args.tokens.refreshToken,
+            tokenExpiresAt: args.tokens.tokenExpiresAt,
         });
     }
 
-    private _now(): EntityTimestamps {
-        const now = new Date();
-        return { createdAt: now, updatedAt: now };
-    }
-
-    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
-    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
-        return (
-            (await this._store.entityTimestamps(ctx, [sub], AUTH_GRAPH)).get(sub.value) ??
-            this._now()
-        );
-    }
-
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-        ts: EntityTimestamps,
-    ): UserIdentityEntity {
-        const get = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? String((q.object as { value: string }).value) : undefined;
-        };
-        const getIri = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? (q.object as IRI).value : undefined;
-        };
-
-        const userIriStr = getIri(identityOfIRI);
-        if (userIriStr == null) {
+    private _toEntity(record: EntityRecord): UserIdentityEntity {
+        const identityOf = record.props.identityOf;
+        if (identityOf == null) {
             throw new Error(
-                `UserIdentityRepository: missing identityOfIRI for identity id "${id}"`,
+                `UserIdentityRepository: missing identityOf for identity id "${record.id}"`,
             );
         }
-        const userId = idFrom(userIriStr);
-
-        const provider = get(providerIRI);
+        const provider = record.props.provider;
         if (provider == null) {
-            throw new Error(`UserIdentityRepository: missing providerIRI for identity id "${id}"`);
+            throw new Error(
+                `UserIdentityRepository: missing provider for identity id "${record.id}"`,
+            );
         }
-        const providerUserId = get(providerUserIdIRI);
+        const providerUserId = record.props.providerUserId;
         if (providerUserId == null) {
             throw new Error(
-                `UserIdentityRepository: missing providerUserIdIRI for identity id "${id}"`,
+                `UserIdentityRepository: missing providerUserId for identity id "${record.id}"`,
             );
         }
-        const providerEmail = get(providerEmailIRI);
+        const providerEmail = record.props.providerEmail;
         if (providerEmail == null) {
             throw new Error(
-                `UserIdentityRepository: missing providerEmailIRI for identity id "${id}"`,
+                `UserIdentityRepository: missing providerEmail for identity id "${record.id}"`,
             );
         }
-        const accessToken = get(accessTokenIRI);
+        const accessToken = record.props.accessToken;
         if (accessToken == null) {
             throw new Error(
-                `UserIdentityRepository: missing accessTokenIRI for identity id "${id}"`,
+                `UserIdentityRepository: missing accessToken for identity id "${record.id}"`,
             );
         }
-        const tokenExpiresAtStr = get(tokenExpiresAtIRI);
-
+        const tokenExpiresAt = record.props.tokenExpiresAt;
+        const now = new Date();
         return {
-            id,
-            iri: iriFor("identity", id).value,
-            provider: provider as OAuthProvider,
-            providerUserId,
-            providerEmail,
-            accessToken,
-            refreshToken: get(refreshTokenIRI),
-            tokenExpiresAt: tokenExpiresAtStr ? new Date(tokenExpiresAtStr) : undefined,
-            userId,
-            createdAt: ts.createdAt,
-            updatedAt: ts.updatedAt,
+            id: record.id,
+            iri: record.iri,
+            provider: String(provider) as OAuthProvider,
+            providerUserId: String(providerUserId),
+            providerEmail: String(providerEmail),
+            accessToken: String(accessToken),
+            refreshToken: record.props.refreshToken as string | undefined,
+            tokenExpiresAt:
+                tokenExpiresAt == null
+                    ? undefined
+                    : tokenExpiresAt instanceof Date
+                      ? tokenExpiresAt
+                      : new Date(String(tokenExpiresAt)),
+            userId: idFrom(String(identityOf)),
+            createdAt: record.createdAt ?? now,
+            updatedAt: record.updatedAt ?? now,
         };
     }
 }

@@ -6,11 +6,12 @@ import {
     UserDeviceIRI,
 } from "@jasonscharf/core";
 import { EntitySchema } from "@jasonscharf/entities";
-import { AUTH_NS } from "../constants.js";
+import { AUTH_GRAPH, AUTH_NS } from "../constants.js";
 
 export const UserDeviceSchema = new EntitySchema({
     typeIRI: UserDeviceIRI,
     ns: AUTH_NS,
+    graphIri: AUTH_GRAPH,
     properties: {
         deviceName: deviceNameIRI,
         devicePlatform: devicePlatformIRI,

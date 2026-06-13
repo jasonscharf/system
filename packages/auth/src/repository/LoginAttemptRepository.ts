@@ -1,23 +1,8 @@
-import {
-    attemptUserIRI,
-    authRedirectUrlIRI,
-    claimIRI,
-    errorCodeIRI,
-    type IRI,
-    ipAddressIRI,
-    LoginAttemptIRI,
-    literal,
-    nonceIRI,
-    providerIRI,
-    statusIRI,
-    userAgentIRI,
-    utmCampaignIRI,
-    utmMediumIRI,
-    utmSourceIRI,
-} from "@jasonscharf/core";
-import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
+import type { TripleStore } from "@jasonscharf/data";
+import type { EntityRecord } from "@jasonscharf/entities";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import { AUTH_GRAPH, RDF_TYPE, XSD_ANY_URI, XSD_DATETIME, XSD_STRING } from "../constants.js";
+import { EntityQuery, EntityStore } from "@jasonscharf/server";
+import { LoginAttemptSchema } from "../entities/LoginAttemptSchema.js";
 import type { LoginAttemptEntity, LoginAttemptStatus, OAuthProvider } from "../types.js";
 import { idFrom, iriFor, newId } from "./util.js";
 
@@ -46,9 +31,15 @@ export interface UpdateStatusArgs {
 
 export class LoginAttemptRepository {
     private readonly _store: TripleStore;
+    private readonly _entities: EntityStore;
 
     constructor(store: TripleStore) {
         this._store = store;
+        this._entities = new EntityStore(store);
+    }
+
+    get store(): TripleStore {
+        return this._store;
     }
 
     /** @insecure @nochecks */
@@ -57,44 +48,10 @@ export class LoginAttemptRepository {
         _sec: SecurityContext,
         args: CreateLoginAttemptArgs,
     ): Promise<LoginAttemptEntity> {
-        const id = newId();
-        const sub = iriFor("loginattempt", id);
-
-        const str = (predicate: IRI, value: string) => ({
-            subject: sub,
-            predicate,
-            object: literal(value, XSD_STRING),
-            graph: AUTH_GRAPH,
-        });
-
-        return this._store.withTransaction(ctx, async (ctx) => {
-            await this._store.insertMany(ctx, [
-                { subject: sub, predicate: RDF_TYPE, object: LoginAttemptIRI, graph: AUTH_GRAPH },
-                str(providerIRI, args.provider),
-                str(statusIRI, "pending"),
-                str(nonceIRI, args.nonce),
-                ...(args.ipAddress ? [str(ipAddressIRI, args.ipAddress)] : []),
-                ...(args.userAgent ? [str(userAgentIRI, args.userAgent)] : []),
-                ...(args.claim ? [str(claimIRI, args.claim)] : []),
-                ...(args.utmSource ? [str(utmSourceIRI, args.utmSource)] : []),
-                ...(args.utmMedium ? [str(utmMediumIRI, args.utmMedium)] : []),
-                ...(args.utmCampaign ? [str(utmCampaignIRI, args.utmCampaign)] : []),
-                ...(args.authRedirectUrl
-                    ? [
-                          {
-                              subject: sub,
-                              predicate: authRedirectUrlIRI,
-                              object: literal(args.authRedirectUrl, XSD_ANY_URI),
-                              graph: AUTH_GRAPH,
-                          },
-                      ]
-                    : []),
-            ]);
-
-            const ts = await this._timestamps(ctx, sub);
-            return {
-                id,
-                iri: sub.value,
+        const record = await this._entities.create(
+            ctx,
+            LoginAttemptSchema,
+            {
                 provider: args.provider,
                 status: "pending",
                 nonce: args.nonce,
@@ -105,10 +62,10 @@ export class LoginAttemptRepository {
                 utmMedium: args.utmMedium,
                 utmCampaign: args.utmCampaign,
                 authRedirectUrl: args.authRedirectUrl,
-                createdAt: ts.createdAt,
-                updatedAt: ts.updatedAt,
-            };
-        });
+            },
+            newId(),
+        );
+        return this._toEntity(record);
     }
 
     /** @insecure @nochecks */
@@ -117,19 +74,10 @@ export class LoginAttemptRepository {
         _sec: SecurityContext,
         args: NonceArgs,
     ): Promise<LoginAttemptEntity | null> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const matches = await this._store.find(ctx, {
-                predicate: nonceIRI,
-                object: literal(args.nonce, XSD_STRING),
-                graph: AUTH_GRAPH,
-            });
-            if (matches.length === 0) {
-                return null;
-            }
-            const sub = matches[0].subject as IRI;
-            const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-            return this._fromQuads(idFrom(sub.value), quads, await this._timestamps(ctx, sub));
-        });
+        const record = await EntityQuery.from(this._store, LoginAttemptSchema)
+            .where("nonce", "=", args.nonce)
+            .first(ctx);
+        return record ? this._toEntity(record) : null;
     }
 
     /** @insecure @nochecks */
@@ -138,79 +86,42 @@ export class LoginAttemptRepository {
         _sec: SecurityContext,
         args: UpdateStatusArgs,
     ): Promise<void> {
-        const sub = iriFor("loginattempt", args.id);
-
-        await this._store.withTransaction(ctx, async (ctx) => {
-            await this._replace(ctx, sub, statusIRI, literal(args.status, XSD_STRING));
-            if (args.userId) {
-                await this._replace(ctx, sub, attemptUserIRI, iriFor("user", args.userId));
-            }
-            if (args.errorCode) {
-                await this._replace(ctx, sub, errorCodeIRI, literal(args.errorCode, XSD_STRING));
-            }
-        });
-    }
-
-    private async _replace(
-        ctx: ServerContext,
-        subject: IRI,
-        predicate: IRI,
-        object: IRI | ReturnType<typeof literal>,
-    ): Promise<void> {
-        await this._store.delete(ctx, { subject, predicate, graph: AUTH_GRAPH });
-        await this._store.insert(ctx, { subject, predicate, object, graph: AUTH_GRAPH });
-    }
-
-    private _now(): EntityTimestamps {
-        const now = new Date();
-        return { createdAt: now, updatedAt: now };
-    }
-
-    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
-    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
-        return (
-            (await this._store.entityTimestamps(ctx, [sub], AUTH_GRAPH)).get(sub.value) ??
-            this._now()
-        );
-    }
-
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-        ts: EntityTimestamps,
-    ): LoginAttemptEntity {
-        const get = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? String((q.object as { value: string }).value) : undefined;
-        };
-        const getIri = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? (q.object as IRI).value : undefined;
-        };
-
-        const nonce = get(nonceIRI);
-        if (nonce == null) {
-            throw new Error(`LoginAttemptRepository: missing nonceIRI for attempt id "${id}"`);
+        // Only the supplied fields are patched; update() replaces just those
+        // predicates and leaves the rest of the attempt untouched.
+        const patch: Record<string, unknown> = { status: args.status };
+        if (args.userId) {
+            patch.attemptUser = iriFor("user", args.userId).value;
         }
-        const attemptUserIri = getIri(attemptUserIRI);
+        if (args.errorCode) {
+            patch.errorCode = args.errorCode;
+        }
+        await this._entities.update(ctx, LoginAttemptSchema, args.id, patch);
+    }
 
+    private _toEntity(record: EntityRecord): LoginAttemptEntity {
+        const nonce = record.props.nonce;
+        if (nonce == null) {
+            throw new Error(`LoginAttemptRepository: missing nonce for attempt id "${record.id}"`);
+        }
+        const attemptUser = record.props.attemptUser;
+        const now = new Date();
         return {
-            id,
-            iri: iriFor("loginattempt", id).value,
-            provider: (get(providerIRI) ?? "google") as OAuthProvider,
-            status: (get(statusIRI) ?? "pending") as LoginAttemptStatus,
-            nonce,
-            userId: attemptUserIri ? idFrom(attemptUserIri) : undefined,
-            errorCode: get(errorCodeIRI),
-            ipAddress: get(ipAddressIRI),
-            userAgent: get(userAgentIRI),
-            claim: get(claimIRI),
-            utmSource: get(utmSourceIRI),
-            utmMedium: get(utmMediumIRI),
-            utmCampaign: get(utmCampaignIRI),
-            authRedirectUrl: get(authRedirectUrlIRI),
-            createdAt: ts.createdAt,
-            updatedAt: ts.updatedAt,
+            id: record.id,
+            iri: record.iri,
+            provider: (record.props.provider ?? "google") as OAuthProvider,
+            status: (record.props.status ?? "pending") as LoginAttemptStatus,
+            nonce: String(nonce),
+            userId: attemptUser != null ? idFrom(String(attemptUser)) : undefined,
+            errorCode: record.props.errorCode as string | undefined,
+            ipAddress: record.props.ipAddress as string | undefined,
+            userAgent: record.props.userAgent as string | undefined,
+            claim: record.props.claim as string | undefined,
+            utmSource: record.props.utmSource as string | undefined,
+            utmMedium: record.props.utmMedium as string | undefined,
+            utmCampaign: record.props.utmCampaign as string | undefined,
+            authRedirectUrl: record.props.authRedirectUrl as string | undefined,
+            createdAt: record.createdAt ?? now,
+            updatedAt: record.updatedAt ?? now,
         };
     }
 }

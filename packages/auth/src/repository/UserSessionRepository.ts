@@ -1,17 +1,8 @@
-import {
-    expiresAtIRI,
-    type IRI,
-    ipAddressIRI,
-    isActiveIRI,
-    literal,
-    sessionDeviceIRI,
-    sessionTokenIRI,
-    sessionUserIRI,
-    UserSessionIRI,
-} from "@jasonscharf/core";
-import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
+import type { TripleStore } from "@jasonscharf/data";
+import type { EntityRecord } from "@jasonscharf/entities";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import { AUTH_GRAPH, RDF_TYPE, XSD_BOOLEAN, XSD_DATETIME, XSD_STRING } from "../constants.js";
+import { EntityQuery, EntityStore } from "@jasonscharf/server";
+import { UserSessionSchema } from "../entities/UserSessionSchema.js";
 import type { UserSessionEntity } from "../types.js";
 import { idFrom, iriFor, newId, newSessionToken } from "./util.js";
 
@@ -32,9 +23,15 @@ export interface UserIdArgs {
 
 export class UserSessionRepository {
     private readonly _store: TripleStore;
+    private readonly _entities: EntityStore;
 
     constructor(store: TripleStore) {
         this._store = store;
+        this._entities = new EntityStore(store);
+    }
+
+    get store(): TripleStore {
+        return this._store;
     }
 
     /** @insecure @nochecks */
@@ -43,68 +40,21 @@ export class UserSessionRepository {
         _sec: SecurityContext,
         args: CreateSessionArgs,
     ): Promise<UserSessionEntity> {
-        const id = newId();
         const token = newSessionToken();
-        const sub = iriFor("session", id);
-
-        return this._store.withTransaction(ctx, async (ctx) => {
-            await this._store.insertMany(ctx, [
-                { subject: sub, predicate: RDF_TYPE, object: UserSessionIRI, graph: AUTH_GRAPH },
-                {
-                    subject: sub,
-                    predicate: sessionTokenIRI,
-                    object: literal(token, XSD_STRING),
-                    graph: AUTH_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: sessionUserIRI,
-                    object: iriFor("user", args.userId),
-                    graph: AUTH_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: sessionDeviceIRI,
-                    object: iriFor("device", args.deviceId),
-                    graph: AUTH_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: expiresAtIRI,
-                    object: literal(args.expiresAt.toISOString(), XSD_DATETIME),
-                    graph: AUTH_GRAPH,
-                },
-                {
-                    subject: sub,
-                    predicate: isActiveIRI,
-                    object: literal("true", XSD_BOOLEAN),
-                    graph: AUTH_GRAPH,
-                },
-                ...(args.ipAddress
-                    ? [
-                          {
-                              subject: sub,
-                              predicate: ipAddressIRI,
-                              object: literal(args.ipAddress, XSD_STRING),
-                              graph: AUTH_GRAPH,
-                          },
-                      ]
-                    : []),
-            ]);
-
-            const ts = await this._timestamps(ctx, sub);
-            return {
-                id,
-                iri: sub.value,
+        const record = await this._entities.create(
+            ctx,
+            UserSessionSchema,
+            {
                 sessionToken: token,
-                userId: args.userId,
-                deviceId: args.deviceId,
+                sessionUser: iriFor("user", args.userId).value,
+                sessionDevice: iriFor("device", args.deviceId).value,
                 expiresAt: args.expiresAt,
                 isActive: true,
                 ipAddress: args.ipAddress,
-                createdAt: ts.createdAt,
-            };
-        });
+            },
+            newId(),
+        );
+        return this._toEntity(record);
     }
 
     /** @insecure @nochecks */
@@ -113,19 +63,10 @@ export class UserSessionRepository {
         _sec: SecurityContext,
         args: TokenArgs,
     ): Promise<UserSessionEntity | null> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const quads = await this._store.find(ctx, {
-                predicate: sessionTokenIRI,
-                object: literal(args.token, XSD_STRING),
-                graph: AUTH_GRAPH,
-            });
-            if (quads.length === 0) {
-                return null;
-            }
-            const sub = quads[0].subject as IRI;
-            const allQuads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-            return this._fromQuads(idFrom(sub.value), allQuads, await this._timestamps(ctx, sub));
-        });
+        const record = await EntityQuery.from(this._store, UserSessionSchema)
+            .where("sessionToken", "=", args.token)
+            .first(ctx);
+        return record ? this._toEntity(record) : null;
     }
 
     /** @insecure @nochecks */
@@ -134,24 +75,10 @@ export class UserSessionRepository {
         _sec: SecurityContext,
         args: UserIdArgs,
     ): Promise<UserSessionEntity[]> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const userIri = iriFor("user", args.userId);
-            const byUser = await this._store.find(ctx, {
-                predicate: sessionUserIRI,
-                object: userIri,
-                graph: AUTH_GRAPH,
-            });
-            const subs = byUser.map((q) => q.subject as IRI);
-            const tsBySubject = await this._store.entityTimestamps(ctx, subs, AUTH_GRAPH);
-            const results: UserSessionEntity[] = [];
-
-            for (const sub of subs) {
-                const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-                const ts = tsBySubject.get(sub.value) ?? this._now();
-                results.push(this._fromQuads(idFrom(sub.value), quads, ts));
-            }
-            return results;
-        });
+        const records = await EntityQuery.from(this._store, UserSessionSchema)
+            .where("sessionUser", "=", iriFor("user", args.userId).value)
+            .all(ctx);
+        return records.map((r) => this._toEntity(r));
     }
 
     /** @insecure @nochecks */
@@ -161,19 +88,7 @@ export class UserSessionRepository {
             if (!session) {
                 return false;
             }
-
-            const sub = iriFor("session", session.id);
-            await this._store.delete(ctx, {
-                subject: sub,
-                predicate: isActiveIRI,
-                graph: AUTH_GRAPH,
-            });
-            await this._store.insert(ctx, {
-                subject: sub,
-                predicate: isActiveIRI,
-                object: literal("false", XSD_BOOLEAN),
-                graph: AUTH_GRAPH,
-            });
+            await this._entities.update(ctx, UserSessionSchema, session.id, { isActive: false });
             return true;
         });
     }
@@ -184,95 +99,68 @@ export class UserSessionRepository {
         sec: SecurityContext,
         args: UserIdArgs,
     ): Promise<number> {
-        const sessions = await this.findByUserId(ctx, sec, args);
-        let count = 0;
-        for (const s of sessions) {
-            if (s.isActive) {
-                await this.revoke(ctx, sec, { token: s.sessionToken });
-                count++;
+        return this._store.withTransaction(ctx, async (ctx) => {
+            // One batched query for all the user's sessions — no per-session find.
+            const sessions = await this.findByUserId(ctx, sec, args);
+            const active = sessions.filter((s) => s.isActive);
+            for (const s of active) {
+                await this._entities.update(ctx, UserSessionSchema, s.id, { isActive: false });
             }
-        }
-        return count;
+            return active.length;
+        });
     }
 
     /** @insecure @nochecks */
     async deleteExpired(ctx: ServerContext, _sec: SecurityContext): Promise<number> {
-        const allByToken = await this._store.find(ctx, {
-            predicate: sessionTokenIRI,
-            graph: AUTH_GRAPH,
-        });
-        let count = 0;
-        const now = Date.now();
-
-        for (const q of allByToken) {
-            const sub = q.subject as IRI;
-            const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-            const entity = this._fromQuads(idFrom(sub.value), quads, this._now());
-            if (entity.expiresAt.getTime() < now) {
-                await this._store.delete(ctx, { subject: sub, graph: AUTH_GRAPH });
-                count++;
+        return this._store.withTransaction(ctx, async (ctx) => {
+            // One batched query for every session — no per-session find inside the loop.
+            const sessions = await EntityQuery.from(this._store, UserSessionSchema).all(ctx);
+            const now = Date.now();
+            const expired = sessions
+                .map((s) => this._toEntity(s))
+                .filter((s) => s.expiresAt.getTime() < now);
+            for (const s of expired) {
+                await this._entities.delete(ctx, UserSessionSchema, s.id);
             }
-        }
-        return count;
+            return expired.length;
+        });
     }
 
-    private _now(): EntityTimestamps {
-        const now = new Date();
-        return { createdAt: now, updatedAt: now };
-    }
-
-    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
-    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
-        return (
-            (await this._store.entityTimestamps(ctx, [sub], AUTH_GRAPH)).get(sub.value) ??
-            this._now()
-        );
-    }
-
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-        ts: EntityTimestamps,
-    ): UserSessionEntity {
-        const get = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? String((q.object as { value: string }).value) : undefined;
-        };
-        const getIri = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? (q.object as IRI).value : undefined;
-        };
-
-        const sessionToken = get(sessionTokenIRI);
+    private _toEntity(record: EntityRecord): UserSessionEntity {
+        const sessionToken = record.props.sessionToken;
         if (sessionToken == null) {
             throw new Error(
-                `UserSessionRepository: missing sessionTokenIRI for session id "${id}"`,
+                `UserSessionRepository: missing sessionToken for session id "${record.id}"`,
             );
         }
-        const sessionUserIriVal = getIri(sessionUserIRI);
-        if (sessionUserIriVal == null) {
-            throw new Error(`UserSessionRepository: missing sessionUserIRI for session id "${id}"`);
-        }
-        const sessionDeviceIriVal = getIri(sessionDeviceIRI);
-        if (sessionDeviceIriVal == null) {
+        const sessionUser = record.props.sessionUser;
+        if (sessionUser == null) {
             throw new Error(
-                `UserSessionRepository: missing sessionDeviceIRI for session id "${id}"`,
+                `UserSessionRepository: missing sessionUser for session id "${record.id}"`,
             );
         }
-        const expiresAtStr = get(expiresAtIRI);
-        if (expiresAtStr == null) {
-            throw new Error(`UserSessionRepository: missing expiresAtIRI for session id "${id}"`);
+        const sessionDevice = record.props.sessionDevice;
+        if (sessionDevice == null) {
+            throw new Error(
+                `UserSessionRepository: missing sessionDevice for session id "${record.id}"`,
+            );
+        }
+        const expiresAt = record.props.expiresAt;
+        if (expiresAt == null) {
+            throw new Error(
+                `UserSessionRepository: missing expiresAt for session id "${record.id}"`,
+            );
         }
         return {
-            id,
-            iri: iriFor("session", id).value,
-            sessionToken,
-            userId: idFrom(sessionUserIriVal),
-            deviceId: idFrom(sessionDeviceIriVal),
-            expiresAt: new Date(expiresAtStr),
-            isActive: get(isActiveIRI) === "true",
-            ipAddress: get(ipAddressIRI),
-            createdAt: ts.createdAt,
+            id: record.id,
+            iri: record.iri,
+            sessionToken: String(sessionToken),
+            userId: idFrom(String(sessionUser)),
+            deviceId: idFrom(String(sessionDevice)),
+            expiresAt: expiresAt instanceof Date ? expiresAt : new Date(String(expiresAt)),
+            isActive: record.props.isActive === true,
+            ipAddress: record.props.ipAddress as string | undefined,
+            createdAt: record.createdAt ?? new Date(),
         };
     }
 }

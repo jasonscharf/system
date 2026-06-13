@@ -1,16 +1,10 @@
-import {
-    avatarUrlIRI,
-    displayNameIRI,
-    emailIRI,
-    type IRI,
-    literal,
-    UserIRI,
-} from "@jasonscharf/core";
-import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
+import type { TripleStore } from "@jasonscharf/data";
+import type { EntityRecord } from "@jasonscharf/entities";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import { AUTH_GRAPH, RDF_TYPE, XSD_STRING } from "../constants.js";
+import { EntityQuery, EntityStore } from "@jasonscharf/server";
+import { UserSchema } from "../entities/UserSchema.js";
 import type { UserEntity } from "../types.js";
-import { idFrom, iriFor, newId } from "./util.js";
+import { newId } from "./util.js";
 
 export interface IdArgs {
     id: string;
@@ -27,9 +21,11 @@ export interface UpdateUserArgs {
 
 export class UserRepository {
     private readonly _store: TripleStore;
+    private readonly _entities: EntityStore;
 
     constructor(store: TripleStore) {
         this._store = store;
+        this._entities = new EntityStore(store);
     }
 
     get store(): TripleStore {
@@ -42,49 +38,8 @@ export class UserRepository {
         _sec: SecurityContext,
         args: Pick<UserEntity, "email" | "displayName" | "avatarUrl">,
     ): Promise<UserEntity> {
-        const id = newId();
-        const sub = iriFor("user", id);
-
-        return this._store.withTransaction(ctx, async (ctx) => {
-            await this._store.insertMany(ctx, [
-                { subject: sub, predicate: RDF_TYPE, object: UserIRI, graph: AUTH_GRAPH },
-                {
-                    subject: sub,
-                    predicate: emailIRI,
-                    object: literal(args.email, XSD_STRING),
-                    graph: AUTH_GRAPH,
-                },
-                ...(args.displayName
-                    ? [
-                          {
-                              subject: sub,
-                              predicate: displayNameIRI,
-                              object: literal(args.displayName, XSD_STRING),
-                              graph: AUTH_GRAPH,
-                          },
-                      ]
-                    : []),
-                ...(args.avatarUrl
-                    ? [
-                          {
-                              subject: sub,
-                              predicate: avatarUrlIRI,
-                              object: literal(args.avatarUrl, XSD_STRING),
-                              graph: AUTH_GRAPH,
-                          },
-                      ]
-                    : []),
-            ]);
-
-            const ts = await this._timestamps(ctx, sub);
-            return {
-                id,
-                iri: sub.value,
-                ...args,
-                createdAt: ts.createdAt,
-                updatedAt: ts.updatedAt,
-            };
-        });
+        const record = await this._entities.create(ctx, UserSchema, args, newId());
+        return this._toEntity(record);
     }
 
     /** @insecure @nochecks */
@@ -93,14 +48,8 @@ export class UserRepository {
         _sec: SecurityContext,
         args: IdArgs,
     ): Promise<UserEntity | null> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const sub = iriFor("user", args.id);
-            const quads = await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH });
-            if (quads.length === 0) {
-                return null;
-            }
-            return this._fromQuads(args.id, quads, await this._timestamps(ctx, sub));
-        });
+        const record = await this._entities.findById(ctx, UserSchema, args.id);
+        return record ? this._toEntity(record) : null;
     }
 
     /** @insecure @nochecks */
@@ -109,23 +58,10 @@ export class UserRepository {
         _sec: SecurityContext,
         args: EmailArgs,
     ): Promise<UserEntity | null> {
-        return this._store.withTransaction(ctx, async (ctx) => {
-            const quads = await this._store.find(ctx, {
-                predicate: emailIRI,
-                object: literal(args.email, XSD_STRING),
-                graph: AUTH_GRAPH,
-            });
-            if (quads.length === 0) {
-                return null;
-            }
-            const sub = quads[0].subject as IRI;
-            const id = idFrom(sub.value);
-            return this._fromQuads(
-                id,
-                await this._store.find(ctx, { subject: sub, graph: AUTH_GRAPH }),
-                await this._timestamps(ctx, sub),
-            );
-        });
+        const record = await EntityQuery.from(this._store, UserSchema)
+            .where("email", "=", args.email)
+            .first(ctx);
+        return record ? this._toEntity(record) : null;
     }
 
     /** @insecure @nochecks */
@@ -135,90 +71,44 @@ export class UserRepository {
         args: UpdateUserArgs,
     ): Promise<UserEntity | null> {
         return this._store.withTransaction(ctx, async (ctx) => {
-            const existing = await this.findById(ctx, sec, { id: args.id });
+            const existing = await this._entities.findById(ctx, UserSchema, args.id);
             if (!existing) {
                 return null;
             }
-
-            const sub = iriFor("user", args.id);
-
+            const patch: Record<string, unknown> = {};
             if (args.patch.email !== undefined) {
-                await this._store.delete(ctx, {
-                    subject: sub,
-                    predicate: emailIRI,
-                    graph: AUTH_GRAPH,
-                });
-                await this._store.insert(ctx, {
-                    subject: sub,
-                    predicate: emailIRI,
-                    object: literal(args.patch.email, XSD_STRING),
-                    graph: AUTH_GRAPH,
-                });
+                patch.email = args.patch.email;
             }
             if (args.patch.displayName !== undefined) {
-                await this._store.delete(ctx, {
-                    subject: sub,
-                    predicate: displayNameIRI,
-                    graph: AUTH_GRAPH,
-                });
-                await this._store.insert(ctx, {
-                    subject: sub,
-                    predicate: displayNameIRI,
-                    object: literal(args.patch.displayName, XSD_STRING),
-                    graph: AUTH_GRAPH,
-                });
+                patch.displayName = args.patch.displayName;
             }
             if (args.patch.avatarUrl !== undefined) {
-                await this._store.delete(ctx, {
-                    subject: sub,
-                    predicate: avatarUrlIRI,
-                    graph: AUTH_GRAPH,
-                });
-                await this._store.insert(ctx, {
-                    subject: sub,
-                    predicate: avatarUrlIRI,
-                    object: literal(args.patch.avatarUrl, XSD_STRING),
-                    graph: AUTH_GRAPH,
-                });
+                patch.avatarUrl = args.patch.avatarUrl;
             }
+            await this._entities.update(ctx, UserSchema, args.id, patch);
             return this.findById(ctx, sec, { id: args.id });
         });
     }
 
     /** @insecure @nochecks */
     async delete(ctx: ServerContext, _sec: SecurityContext, args: IdArgs): Promise<void> {
-        await this._store.delete(ctx, { subject: iriFor("user", args.id), graph: AUTH_GRAPH });
+        await this._entities.delete(ctx, UserSchema, args.id);
     }
 
-    /** Entity-level timestamps from the store's DB-managed edge columns (not triples). */
-    private async _timestamps(ctx: ServerContext, sub: IRI): Promise<EntityTimestamps> {
-        const ts = (await this._store.entityTimestamps(ctx, [sub], AUTH_GRAPH)).get(sub.value);
-        const now = new Date();
-        return ts ?? { createdAt: now, updatedAt: now };
-    }
-
-    private _fromQuads(
-        id: string,
-        quads: Awaited<ReturnType<TripleStore["find"]>>,
-        ts: EntityTimestamps,
-    ): UserEntity {
-        const get = (pred: IRI): string | undefined => {
-            const q = quads.find((q) => (q.predicate as IRI).value === pred.value);
-            return q ? String((q.object as { value: string }).value) : undefined;
-        };
-
-        const email = get(emailIRI);
+    private _toEntity(record: EntityRecord): UserEntity {
+        const email = record.props.email;
         if (email == null) {
-            throw new Error(`UserRepository: missing emailIRI for user id "${id}"`);
+            throw new Error(`UserRepository: missing email for user id "${record.id}"`);
         }
+        const now = new Date();
         return {
-            id,
-            iri: iriFor("user", id).value,
-            email,
-            displayName: get(displayNameIRI),
-            avatarUrl: get(avatarUrlIRI),
-            createdAt: ts.createdAt,
-            updatedAt: ts.updatedAt,
+            id: record.id,
+            iri: record.iri,
+            email: String(email),
+            displayName: record.props.displayName as string | undefined,
+            avatarUrl: record.props.avatarUrl as string | undefined,
+            createdAt: record.createdAt ?? now,
+            updatedAt: record.updatedAt ?? now,
         };
     }
 }

@@ -9,11 +9,12 @@ import {
     UserSessionIRI,
 } from "@jasonscharf/core";
 import { EntitySchema } from "@jasonscharf/entities";
-import { AUTH_NS } from "../constants.js";
+import { AUTH_GRAPH, AUTH_NS } from "../constants.js";
 
 export const UserSessionSchema = new EntitySchema({
     typeIRI: UserSessionIRI,
     ns: AUTH_NS,
+    graphIri: AUTH_GRAPH,
     properties: {
         sessionToken: sessionTokenIRI,
         expiresAt: expiresAtIRI,

@@ -1,20 +1,20 @@
 import {
+    grantsIRI,
     groupNameIRI,
     IRI,
     inheritsFromIRI,
     isMemberOfIRI,
     permissionKeyIRI,
-    grantsIRI,
     roleNameIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import { type SecurityContext, systemSec } from "../SecurityContext.js";
 import type { ServerContext } from "../ServerContext.js";
-import type { AccessChecker } from "./AccessChecker.js";
 import { tenantGraph } from "../tenancy.js";
+import type { AccessChecker } from "./AccessChecker.js";
+import { iriValue, literalValue } from "./repository/helpers.js";
 import type { PolicyGrantRepository } from "./repository/PolicyGrantRepository.js";
 import type { UserGroupRepository } from "./repository/UserGroupRepository.js";
-import { iriValue, literalValue } from "./repository/util.js";
 import type { PolicyGrantEntity, UserGroupEntity } from "./types.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────

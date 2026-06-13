@@ -18,9 +18,3 @@ export const auditActionIRI = new IRI(makeUri(AUDIT_NS, "action"));
 export const auditTargetIRI = new IRI(makeUri(AUDIT_NS, "target"));
 /** ISO-8601 timestamp the action was recorded. */
 export const auditAtIRI = new IRI(makeUri(AUDIT_NS, "at"));
-
-export const RDF_TYPE = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
-const XSD_NS = "http://www.w3.org/2001/XMLSchema#";
-export const XSD_STRING = new IRI(`${XSD_NS}string`);
-export const XSD_DATETIME = new IRI(`${XSD_NS}dateTime`);
-export const XSD_ANY_URI = new IRI(`${XSD_NS}anyURI`);

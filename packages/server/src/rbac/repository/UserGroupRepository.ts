@@ -1,6 +1,7 @@
 import { IRI, isMemberOfIRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import type { EntityRecord } from "@jasonscharf/entities";
+import { idFromIri } from "@jasonscharf/entities";
 import { EntityQuery } from "../../EntityQuery.js";
 import { EntityStore } from "../../EntityStore.js";
 import type { SecurityContext } from "../../SecurityContext.js";
@@ -8,7 +9,7 @@ import type { ServerContext } from "../../ServerContext.js";
 import { tenantGraph, tenantGraphForInsert } from "../../tenancy.js";
 import { UserGroupSchema } from "../schemas.generated.js";
 import type { UserGroupEntity } from "../types.js";
-import { edgeRefOf, idFrom, iriFor } from "./util.js";
+import { edgeRefOf, iriFor } from "./helpers.js";
 
 export interface IdArgs {
     id: string;
@@ -90,7 +91,7 @@ export class UserGroupRepository {
         sec: SecurityContext,
         args: IriStrArgs,
     ): Promise<UserGroupEntity | null> {
-        return this.findById(ctx, sec, { id: idFrom(args.iriStr) });
+        return this.findById(ctx, sec, { id: idFromIri(args.iriStr) });
     }
 
     /** @insecure @nochecks Find a group by its human-readable name, optionally scoped to a tenant. */

@@ -1,13 +1,14 @@
-import { IRI, inheritsFromIRI, grantsIRI } from "@jasonscharf/core";
+import { grantsIRI, IRI, inheritsFromIRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import type { EntityRecord } from "@jasonscharf/entities";
+import { idFromIri } from "@jasonscharf/entities";
 import { EntityStore } from "../../EntityStore.js";
 import type { SecurityContext } from "../../SecurityContext.js";
 import type { ServerContext } from "../../ServerContext.js";
 import { tenantGraph, tenantGraphForInsert } from "../../tenancy.js";
 import { RoleSchema } from "../schemas.generated.js";
 import type { RoleEntity } from "../types.js";
-import { edgeRefOf, idFrom, iriFor, iriValue } from "./util.js";
+import { edgeRefOf, iriFor, iriValue } from "./helpers.js";
 
 export interface IdArgs {
     id: string;
@@ -70,7 +71,7 @@ export class RoleRepository {
         sec: SecurityContext,
         args: IriStrArgs,
     ): Promise<RoleEntity | null> {
-        return this.findById(ctx, sec, { id: idFrom(args.iriStr) });
+        return this.findById(ctx, sec, { id: idFromIri(args.iriStr) });
     }
 
     /** @insecure @nochecks Grant a permission to a role (rbac:grants edge). */

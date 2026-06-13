@@ -1,11 +1,12 @@
 import type { TripleStore } from "@jasonscharf/data";
 import type { EntityRecord } from "@jasonscharf/entities";
+import { idFromIri } from "@jasonscharf/entities";
 import { EntityStore } from "../../EntityStore.js";
 import type { SecurityContext } from "../../SecurityContext.js";
 import type { ServerContext } from "../../ServerContext.js";
 import { ServiceAccountSchema } from "../schemas.generated.js";
 import type { ServiceAccountEntity } from "../types.js";
-import { edgeRefOf, idFrom, iriFor } from "./util.js";
+import { edgeRefOf, iriFor } from "./helpers.js";
 
 export interface IdArgs {
     id: string;
@@ -53,12 +54,14 @@ export class ServiceAccountRepository {
         sec: SecurityContext,
         args: IriStrArgs,
     ): Promise<ServiceAccountEntity | null> {
-        return this.findById(ctx, sec, { id: idFrom(args.iriStr) });
+        return this.findById(ctx, sec, { id: idFromIri(args.iriStr) });
     }
 
     /** @insecure @nochecks */
     async deactivate(ctx: ServerContext, sec: SecurityContext, args: IdArgs): Promise<void> {
-        await this._es.update(ctx, ServiceAccountSchema, args.id, { serviceAccountIsActive: false });
+        await this._es.update(ctx, ServiceAccountSchema, args.id, {
+            serviceAccountIsActive: false,
+        });
     }
 }
 

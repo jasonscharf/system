@@ -1,3 +1,4 @@
+export { AuditEventSchema } from "./AuditEventSchema.js";
 export type { AuditEntry, ListAuditArgs, RecordAuditArgs } from "./AuditRepository.js";
 export { AuditRepository } from "./AuditRepository.js";
 export {

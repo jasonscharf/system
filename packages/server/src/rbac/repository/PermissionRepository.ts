@@ -1,12 +1,12 @@
 import type { TripleStore } from "@jasonscharf/data";
 import type { EntityRecord } from "@jasonscharf/entities";
+import { idFromIri } from "@jasonscharf/entities";
 import { EntityQuery } from "../../EntityQuery.js";
 import { EntityStore } from "../../EntityStore.js";
 import type { SecurityContext } from "../../SecurityContext.js";
 import type { ServerContext } from "../../ServerContext.js";
 import { PermissionSchema } from "../schemas.generated.js";
 import type { PermissionEntity } from "../types.js";
-import { idFrom } from "./util.js";
 
 export interface IdArgs {
     id: string;
@@ -57,7 +57,7 @@ export class PermissionRepository {
         sec: SecurityContext,
         args: IriStrArgs,
     ): Promise<PermissionEntity | null> {
-        return this.findById(ctx, sec, { id: idFrom(args.iriStr) });
+        return this.findById(ctx, sec, { id: idFromIri(args.iriStr) });
     }
 
     /** @insecure @nochecks Find a permission by its dot-separated key (e.g. "invoice.read"). */

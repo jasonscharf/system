@@ -8,7 +8,7 @@ import type { ServerContext } from "../../ServerContext.js";
 import { tenantGraph } from "../../tenancy.js";
 import { PolicyGrantSchema } from "../schemas.generated.js";
 import type { PolicyGrantEntity } from "../types.js";
-import { edgeRefOf } from "./util.js";
+import { edgeRefOf } from "./helpers.js";
 
 export interface CreateGrantInput {
     principalIri: string;

@@ -1,19 +1,19 @@
 import {
     actsForIRI,
+    grantsIRI,
     hasParentIRI,
     IRI,
     inheritsFromIRI,
     isMemberOfIRI,
     permissionKeyIRI,
-    grantsIRI,
 } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import { systemSec } from "../SecurityContext.js";
 import type { ServerContext } from "../ServerContext.js";
 import { tenantGraph } from "../tenancy.js";
 import { WILDCARD_PERMISSION } from "./constants.js";
+import { iriValue, literalValue } from "./repository/helpers.js";
 import type { PolicyGrantRepository } from "./repository/PolicyGrantRepository.js";
-import { iriValue, literalValue } from "./repository/util.js";
 import type { CheckOptions, PolicyGrantEntity } from "./types.js";
 
 /**
@@ -66,8 +66,7 @@ export class AccessChecker {
         // A precomputed chain (e.g. resolved over the entity topology) wins; otherwise
         // fall back to walking the rbac:parentResource tree from `scope`.
         const scopeChain =
-            opts.scopeChain ??
-            (opts.scope ? await this._resolveScopeChain(ctx, opts.scope) : []);
+            opts.scopeChain ?? (opts.scope ? await this._resolveScopeChain(ctx, opts.scope) : []);
 
         const grants = await this._grants.findForPrincipals(ctx, systemSec, {
             principalIris: Array.from(principals),

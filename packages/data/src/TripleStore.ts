@@ -293,6 +293,16 @@ export interface StoreStats {
  *   - Nodes are interned on first use and never deleted.
  *   - Edges are soft-deleted (is_deleted=true + deleted_at timestamp) rather than
  *     physically removed.  findHistory() returns the full audit trail.
+ *
+ * @internal
+ * TripleStore is the low-level quad store and is NOT the public data-access API.
+ * The public surface is EntityStore / EntityQuery (built on top of this in
+ * @jasonscharf/server), which add domain entities, schema-aware projection, PII
+ * decryption, and rooted-traversal queries.  Do NOT add new direct importers of
+ * TripleStore from application or bounded-context code — the architecture gate
+ * test (packages/test/src/architecture/triplestore-internal.test.ts) enforces
+ * this.  Only the entity infrastructure, migrations, documented host-side
+ * `get store()` seams, and sandbox demos use it directly.
  */
 export class TripleStore {
     private readonly _knex: Knex;

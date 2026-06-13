@@ -1,0 +1,122 @@
+/* Classic global CSS, low specificity, target classnames. No Tailwind, no
+   CSS-in-JS. */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --bg: #0f0f13;
+    --surface: #1a1a22;
+    --border: #2e2e3a;
+    --text: #e2e2e8;
+    --muted: #7c7c94;
+    --accent: #7c6af7;
+    --font: system-ui, sans-serif;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100dvh;
+    padding: 1.5rem;
+}
+
+.shell {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.shell__header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1rem;
+}
+
+.shell__body {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.shell__nav {
+    min-width: 180px;
+}
+
+.shell__main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.shell__footer {
+    border-top: 1px solid var(--border);
+    padding-top: 1rem;
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    color: var(--muted);
+}
+
+.shell__empty {
+    color: var(--muted);
+    font-style: italic;
+}
+
+.menu__group {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.menu__group--root {
+    gap: 0.5rem;
+}
+
+.menu__link {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.4rem 0.75rem;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+}
+
+.menu__link:hover {
+    border-color: var(--accent);
+}
+
+.view-header {
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.view-counter {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+}
+
+.view-flagged {
+    background: var(--surface);
+    border: 1px dashed var(--accent);
+    border-radius: 6px;
+    padding: 0.75rem;
+}
+
+button {
+    font-family: inherit;
+}

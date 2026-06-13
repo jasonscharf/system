@@ -27,9 +27,11 @@ export type { EdgeHandle, EdgeRef, EdgeSet } from "./EdgeHandle.js";
 export type { EntityRecord } from "./EntityRecord.js";
 export { type DefaultValue, EntitySchema, type PropertyDef, propIri } from "./EntitySchema.js";
 export { EntityValidationError } from "./EntityValidationError.js";
+export type { IFieldCipher } from "./FieldCipher.js";
 export type { FilterOp } from "./FilterOp.js";
 export { TernAggregate } from "./TernAggregate.js";
 export {
+    type EncryptedLiteral,
     entityIri,
     entityIriFor,
     fromLiteral,
@@ -38,5 +40,6 @@ export {
     localName,
     newId,
     propertyMapFor,
+    toEncryptedLiteral,
     toLiteral,
 } from "./util.js";

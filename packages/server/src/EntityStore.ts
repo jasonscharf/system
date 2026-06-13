@@ -7,6 +7,7 @@ import type {
     EdgeSet,
     EntityRecord,
     EntitySchema,
+    IFieldCipher,
     PropertyDef,
 } from "@jasonscharf/entities";
 import {
@@ -18,6 +19,7 @@ import {
     propIri,
     propertyMapFor,
     RDF_TYPE,
+    toEncryptedLiteral,
     toLiteral,
 } from "@jasonscharf/entities";
 import { validate } from "@jasonscharf/gen";
@@ -40,11 +42,75 @@ export class EntityStore {
     constructor(
         private readonly _store: TripleStore,
         private readonly _registry?: SchemaRegistry,
+        private readonly _cipher?: IFieldCipher,
     ) {}
 
     /** The underlying TripleStore — for raw quad access or EntityQuery builder. */
     get store(): TripleStore {
         return this._store;
+    }
+
+    /**
+     * Resolves the field cipher for the current operation: the context cipher
+     * wins (request-scoped wiring), else the one bound at construction.  Returns
+     * null when neither is set.
+     */
+    private _cipherFor(ctx: ServerContext): IFieldCipher | null {
+        return ctx.cipher ?? this._cipher ?? null;
+    }
+
+    /** True when a property is PII (must be encrypted at rest). */
+    private _isPii(prop: IRI | PropertyDef): boolean {
+        return typeof prop === "object" && "pii" in prop && prop.pii === true;
+    }
+
+    /**
+     * Turns a property value into a quad object literal, encrypting it when the
+     * property is PII.  Encryption is mandatory for PII: with no cipher available
+     * this throws rather than persisting cleartext — encryption is the default at
+     * rest, never silently skipped.
+     */
+    private _propObject(
+        ctx: ServerContext,
+        prop: IRI | PropertyDef,
+        value: unknown,
+    ): ReturnType<typeof toLiteral> {
+        if (!this._isPii(prop)) {
+            return toLiteral(value);
+        }
+        const cipher = this._cipherFor(ctx);
+        if (!cipher) {
+            throw new Error(
+                `EntityStore: property ${propIri(prop).value} is PII but no field cipher is ` +
+                    "available on the context or store; cannot persist PII as cleartext.",
+            );
+        }
+        return toEncryptedLiteral(value, cipher);
+    }
+
+    /**
+     * Decrypts a PII property value loaded from the store.  The stored literal
+     * holds ciphertext; this returns the plaintext.  Non-PII values pass through
+     * untouched.
+     *
+     * Decryption uses the cipher's current key id.  TripleStore.find() projects a
+     * Quad and does not surface the node's `key_id` column, so a value encrypted
+     * under a rotated-out key cannot be addressed by id here yet.  That is fine
+     * for this seam (single active key); full lazy rotation will surface the node
+     * key id on read.  The cipher stays deterministic so that work is possible.
+     */
+    private _decryptValue(ctx: ServerContext, prop: IRI | PropertyDef, value: unknown): unknown {
+        if (!this._isPii(prop) || typeof value !== "string") {
+            return value;
+        }
+        const cipher = this._cipherFor(ctx);
+        if (!cipher) {
+            throw new Error(
+                `EntityStore: property ${propIri(prop).value} is PII but no field cipher is ` +
+                    "available on the context or store; cannot decrypt stored ciphertext.",
+            );
+        }
+        return cipher.decrypt(cipher.currentKeyId, value);
     }
 
     // ── Transaction helpers ───────────────────────────────────────────────────
@@ -104,7 +170,7 @@ export class EntityStore {
             type InsertQuad = Parameters<TripleStore["insertMany"]>[1][number];
             const quads: InsertQuad[] = [
                 { subject: ent, predicate: RDF_TYPE, object: schema.typeIRI, graph },
-                ...this._propQuads(ent, schema, withDefs, graph),
+                ...this._propQuads(txCtx, ent, schema, withDefs, graph),
                 ...edgeQuads(ent, edgeTargets, graph),
             ];
             if (schemaVersion) {
@@ -203,7 +269,7 @@ export class EntityStore {
                         return {
                             subject: ent,
                             predicate: propIri(p),
-                            object: toLiteral(value),
+                            object: this._propObject(txCtx, p, value),
                             graph: insertGraph,
                         };
                     }),
@@ -301,7 +367,9 @@ export class EntityStore {
                 predicate: propIri(propDef),
                 graph: this._filterGraph(txCtx, schema),
             });
-            return quads.map((q) => fromLiteral(q.object)).filter((v) => v !== undefined);
+            return quads
+                .map((q) => this._decryptValue(txCtx, propDef, fromLiteral(q.object)))
+                .filter((v) => v !== undefined);
         });
     }
 
@@ -328,7 +396,7 @@ export class EntityStore {
                 values.map((v) => ({
                     subject: ent,
                     predicate: predIri,
-                    object: toLiteral(v),
+                    object: this._propObject(txCtx, propDef, v),
                     graph,
                 })),
             );
@@ -359,7 +427,7 @@ export class EntityStore {
             const count = await this._store.delete(txCtx, {
                 subject: ent,
                 predicate: predIri,
-                object: toLiteral(value),
+                object: this._propObject(txCtx, propDef, value),
                 graph: this._filterGraph(txCtx, schema),
             });
             deleted = count > 0;
@@ -422,7 +490,7 @@ export class EntityStore {
                     values.map((v) => ({
                         subject: ent,
                         predicate: predIri,
-                        object: toLiteral(v),
+                        object: this._propObject(txCtx, propDef, v),
                         graph: insertGraph,
                     })),
                 );
@@ -491,6 +559,7 @@ export class EntityStore {
             const tsBySubject = await this._store.entityTimestamps(txCtx, subjects, graph);
             return iris.map((iri) =>
                 this._recordFromQuads(
+                    txCtx,
                     schema,
                     idFromIri(iri),
                     iri,
@@ -628,17 +697,23 @@ export class EntityStore {
         const entNode = { value: entIri } as IRI;
         const quads = await this._store.find(ctx, { subject: entNode, graph });
         const ts = await this._store.entityTimestamps(ctx, [entNode], graph);
-        return this._recordFromQuads(schema, id, entIri, quads, ts.get(entIri));
+        return this._recordFromQuads(ctx, schema, id, entIri, quads, ts.get(entIri));
     }
 
-    /** Builds an EntityRecord from a subject's quads — pure, no DB access. */
+    /**
+     * Builds an EntityRecord from a subject's quads — no DB access.  PII
+     * properties are decrypted here (the only place loaded literals become typed
+     * props), so callers receive cleartext while the store keeps ciphertext.
+     */
     private _recordFromQuads<Props extends Record<string, unknown>>(
+        ctx: ServerContext,
         schema: EntitySchema<Props>,
         id: string,
         entIri: string,
         quads: Quad[],
         timestamps?: EntityTimestamps,
     ): EntityRecord<Props> {
+        const propByName = schema.properties as Record<string, IRI | PropertyDef>;
         const iriToName = invertPropertyMap(schema.properties);
         const edgePredToName = outEdgePredMap(schema);
 
@@ -673,7 +748,9 @@ export class EntityStore {
             if (!raw[propName]) {
                 raw[propName] = [];
             }
-            raw[propName]?.push(fromLiteral(q.object));
+            const propDef = propByName[propName];
+            const value = fromLiteral(q.object);
+            raw[propName]?.push(propDef ? this._decryptValue(ctx, propDef, value) : value);
         }
 
         const props: Record<string, unknown> = {};
@@ -757,6 +834,7 @@ export class EntityStore {
     }
 
     private _propQuads(
+        ctx: ServerContext,
         ent: IRI,
         schema: EntitySchema,
         data: Record<string, unknown>,
@@ -774,7 +852,7 @@ export class EntityStore {
                     results.push({
                         subject: ent,
                         predicate: predIri,
-                        object: toLiteral(v),
+                        object: this._propObject(ctx, propValue, v),
                         graph,
                     });
                 }
@@ -782,7 +860,7 @@ export class EntityStore {
                 results.push({
                     subject: ent,
                     predicate: predIri,
-                    object: toLiteral(value),
+                    object: this._propObject(ctx, propValue, value),
                     graph,
                 });
             }

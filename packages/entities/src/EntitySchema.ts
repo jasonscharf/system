@@ -12,6 +12,15 @@ export type DefaultValue<T> = T | (() => T);
 export interface PropertyDef {
     iri: IRI;
     range?: IRI;
+    /**
+     * Marks this property as PII that must be encrypted at rest.  When set,
+     * EntityStore encrypts the literal value with the field cipher before insert
+     * (the underlying node holds ciphertext and is flagged is_encrypted) and
+     * decrypts it transparently on read, so typed-entity consumers only ever see
+     * cleartext while raw TripleStore access stays ciphertext.  Emitted by codegen
+     * from the `urn:tern:core:pii` ontology annotation.
+     */
+    pii?: boolean;
 }
 
 /**

@@ -33,6 +33,7 @@
         "@jasonscharf/events": "workspace:^",
         "@jasonscharf/flow": "workspace:^",
         "@jasonscharf/gen": "workspace:^",
+        "@jasonscharf/sandbox-labs": "workspace:^",
         "@jasonscharf/server": "workspace:^",
         "@jasonscharf/vaults": "workspace:^",
         "@jasonscharf/worker": "workspace:^",

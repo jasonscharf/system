@@ -178,7 +178,13 @@ function renderClass(
 
     lines.push(`    properties: {`);
     for (const prop of dataProps) {
-        lines.push(`        ${prop.name}: new IRI("${prop.iri}"),`);
+        // A PII-marked property is emitted as a PropertyDef carrying pii: true so
+        // EntityStore encrypts it at rest; plain properties stay bare IRIs.
+        if (prop.pii) {
+            lines.push(`        ${prop.name}: { iri: new IRI("${prop.iri}"), pii: true },`);
+        } else {
+            lines.push(`        ${prop.name}: new IRI("${prop.iri}"),`);
+        }
     }
     lines.push(`    },`);
 

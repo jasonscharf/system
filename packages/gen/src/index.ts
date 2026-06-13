@@ -2,7 +2,7 @@ export type { BaseOntologyConfig, GenConfig } from "./generate.js";
 export { generate, generateFromConfig } from "./generate.js";
 export { parseNTriples } from "./NTriplesParser.js";
 export type { Ontology, OntologyClass, OntologyProperty } from "./OntologyReader.js";
-export { readOntology } from "./OntologyReader.js";
+export { PII_MARKER_IRI, readOntology } from "./OntologyReader.js";
 export type { SchemaGenConfig } from "./SchemaGenerator.js";
 export { CONTAINS_IRI, generateSchemas } from "./SchemaGenerator.js";
 export type { ShaclNodeShape, ShaclPropertyShape, ShaclShapes } from "./ShaclReader.js";

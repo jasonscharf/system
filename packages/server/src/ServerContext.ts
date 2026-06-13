@@ -1,6 +1,6 @@
 import { type ApplicationContext, defaultCtx, type UserSession } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
-import type { EntityRecord, EntitySchema } from "@jasonscharf/entities";
+import type { EntityRecord, EntitySchema, IFieldCipher } from "@jasonscharf/entities";
 import type { Knex } from "knex";
 import { EntityQuery } from "./EntityQuery.js";
 import { EntityStore } from "./EntityStore.js";
@@ -46,6 +46,14 @@ export interface ServerContext extends ApplicationContext {
     /** The underlying quad store for this context. */
     store: TripleStore;
     /**
+     * Field cipher for at-rest PII.  When present, EntityStore encrypts
+     * `pii`-flagged properties before insert and decrypts them on read; raw
+     * TripleStore access still returns ciphertext.  Absent ⇒ no PII property may
+     * be written (EntityStore throws) — encryption is the default at rest, never
+     * silently skipped.  Built from SecretsManager at app startup.
+     */
+    cipher?: IFieldCipher;
+    /**
      * Typed entity query builder (flat, un-rooted — being superseded by `graph`).
      * Usage: ctx.entities(MySchema).where('field', '=', value).first(ctx)
      * @deprecated Use `ctx.graph(sec)` — every domain query must traverse from the
@@ -79,7 +87,7 @@ export function buildServerContext(
         entities: (schema) => new EntityQuery(store, schema),
         graph: (sec) => new GraphQuery(ctx, sec),
         related: (sources, schema, edgeName) =>
-            new EntityStore(store).related(ctx, sources, schema, edgeName),
+            new EntityStore(store, undefined, ctx.cipher).related(ctx, sources, schema, edgeName),
     };
     return ctx;
 }

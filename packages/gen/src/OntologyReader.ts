@@ -11,6 +11,16 @@ const RDFS_LABEL = new IRI("http://www.w3.org/2000/01/rdf-schema#label");
 const RDFS_COMMENT = new IRI("http://www.w3.org/2000/01/rdf-schema#comment");
 const RDFS_SUBPROPERTYOF = new IRI("http://www.w3.org/2000/01/rdf-schema#subPropertyOf");
 
+/**
+ * Well-known annotation marking a datatype property as at-rest PII.  A property
+ * carrying `<urn:tern:core:pii> "true"` is emitted by the SchemaGenerator with
+ * `pii: true`, which drives EntityStore's encrypt-on-write / decrypt-on-read
+ * seam.  Owned here so TRN-194 can mark the real auth predicates with the same
+ * predicate.
+ */
+export const PII_MARKER_IRI = "urn:tern:core:pii";
+const PII_MARKER = new IRI(PII_MARKER_IRI);
+
 export interface OntologyProperty {
     iri: string;
     name: string;
@@ -23,6 +33,12 @@ export interface OntologyProperty {
      * chain includes the well-known `contains` marker is a containment edge.
      */
     superProperties: string[];
+    /**
+     * True when the property is annotated `urn:tern:core:pii "true"` in the
+     * ontology — at-rest PII that EntityStore encrypts on write and decrypts on
+     * read.  The SchemaGenerator emits this as `pii: true` on the PropertyDef.
+     */
+    pii: boolean;
 }
 
 export interface OntologyClass {
@@ -96,6 +112,7 @@ export function readOntology(triples: Triple[]): Ontology {
                     comment: null,
                     kind: objIRI.equals(OWL_DATATYPE_PROP) ? "data" : "object",
                     superProperties: [],
+                    pii: false,
                 });
             }
         }
@@ -150,6 +167,13 @@ export function readOntology(triples: Triple[]): Ontology {
             const superIRI = asIRI(object);
             if (prop && superIRI && !prop.superProperties.includes(superIRI.value)) {
                 prop.superProperties.push(superIRI.value);
+            }
+        }
+
+        if (predicate.equals(PII_MARKER)) {
+            const prop = properties.get(subjectIRI);
+            if (prop && literalValue(object) === "true") {
+                prop.pii = true;
             }
         }
     }

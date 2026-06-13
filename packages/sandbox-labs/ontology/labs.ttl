@@ -14,6 +14,7 @@
 @prefix xsd:       <http://www.w3.org/2001/XMLSchema#> .
 @prefix auth:      <urn:sys:core:auth:> .
 @prefix labs:      <urn:sys:ext:labs:> .
+@prefix tern:      <urn:tern:core:> .
 
 # ── New class ─────────────────────────────────────────────────────────────────
 
@@ -54,6 +55,15 @@ labs:isActive a owl:DatatypeProperty ;
     rdfs:domain labs:Project ;
     rdfs:range  xsd:boolean ;
     rdfs:comment "Whether this project is currently active." .
+
+# At-rest PII: tern:pii "true" makes EntityStore encrypt this value before insert
+# and decrypt it on read.  The node row holds ciphertext; raw TripleStore access
+# returns ciphertext.  This is the test property proving the TRN-196 seam.
+labs:contactEmail a owl:DatatypeProperty ;
+    rdfs:domain labs:Project ;
+    rdfs:range  xsd:string ;
+    tern:pii    true ;
+    rdfs:comment "Owner contact email — at-rest PII, encrypted by the field cipher." .
 
 # ── Property group: Project relationships ─────────────────────────────────────
 # Object properties cross namespace boundaries — range is auth:User.

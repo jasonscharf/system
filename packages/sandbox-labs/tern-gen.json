@@ -10,5 +10,6 @@
     "shapes": ["./ontology/labs.shacl.ttl"],
     "localNamespace": "urn:sys:ext:labs:",
     "out": "./src/labs/types.generated.ts",
-    "shapesOut": "./src/labs/shapes.generated.ts"
+    "shapesOut": "./src/labs/shapes.generated.ts",
+    "schemasOut": "./src/labs/schemas.generated.ts"
 }

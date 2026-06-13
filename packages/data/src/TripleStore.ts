@@ -45,6 +45,30 @@ interface EdgeRow {
 
 type RdfTerm = IRI | BlankNode | Literal;
 
+/**
+ * A literal whose lexical `value` already holds ciphertext.  The entity layer
+ * produces these for PII properties: it encrypts the plaintext before the value
+ * ever reaches the store, then tags the term with the key id so internment can
+ * persist the `is_encrypted` / `key_id` columns on the node row.  The store
+ * stays oblivious to plaintext — it never encrypts or decrypts, it only records
+ * that the interned value is ciphertext.  The extra fields are in-process hints
+ * on the quad object and are never written as RDF.
+ */
+interface EncryptedLiteral extends Literal {
+    /** Marks `value` as ciphertext. */
+    encrypted: true;
+    /** Id of the key that produced the ciphertext (persisted for rotation). */
+    keyId: string;
+}
+
+function isEncryptedLiteral(term: RdfTerm): term is EncryptedLiteral {
+    return (
+        "termType" in term &&
+        term.termType === "Literal" &&
+        (term as Partial<EncryptedLiteral>).encrypted === true
+    );
+}
+
 // ── Module-level constants ────────────────────────────────────────────────────
 
 const DEFAULT_GRAPH_NODE = makeIRI(DEFAULT_GRAPH_IRI);
@@ -392,12 +416,15 @@ export class TripleStore {
         }
 
         const jsonPayload = makeLiteralJson(term.value, dtIri, term.language);
+        const encrypted = isEncryptedLiteral(term);
         return this._insert(ctx, T.nodes, {
             [C.kind]: "literal",
             [C.value]: term.value,
             [C.dt]: dtIri,
             [C.lang]: term.language ?? null,
             [C.valueJson]: JSON.stringify(jsonPayload),
+            [C.isEncrypted]: encrypted,
+            [C.keyId]: encrypted ? term.keyId : null,
         });
     }
 

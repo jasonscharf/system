@@ -1334,7 +1334,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@jasonscharf/sandbox-labs@workspace:packages/sandbox-labs":
+"@jasonscharf/sandbox-labs@workspace:^, @jasonscharf/sandbox-labs@workspace:packages/sandbox-labs":
   version: 0.0.0-use.local
   resolution: "@jasonscharf/sandbox-labs@workspace:packages/sandbox-labs"
   dependencies:
@@ -1407,6 +1407,7 @@ __metadata:
     "@jasonscharf/events": "workspace:^"
     "@jasonscharf/flow": "workspace:^"
     "@jasonscharf/gen": "workspace:^"
+    "@jasonscharf/sandbox-labs": "workspace:^"
     "@jasonscharf/server": "workspace:^"
     "@jasonscharf/vaults": "workspace:^"
     "@jasonscharf/worker": "workspace:^"

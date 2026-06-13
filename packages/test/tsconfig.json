@@ -26,6 +26,7 @@
         { "path": "../entities" },
         { "path": "../flow" },
         { "path": "../gen" },
+        { "path": "../sandbox-labs" },
         { "path": "../server" },
         { "path": "../vaults" },
         { "path": "../worker" }

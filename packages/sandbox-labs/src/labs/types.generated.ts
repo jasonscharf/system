@@ -11,6 +11,8 @@ export interface Project {
     projectSlug: string;
     /** Whether this project is currently active. */
     isActive?: boolean;
+    /** Owner contact email — at-rest PII, encrypted by the field cipher. */
+    contactEmail?: string;
     /** The user who created and owns this project. */
     projectOwner: User;
     /** A collaborator with access to this project (0 or more). */
@@ -36,5 +38,6 @@ export const consentedToTrackingIRI = new IRI("urn:sys:ext:labs:consentedToTrack
 export const projectNameIRI = new IRI("urn:sys:ext:labs:projectName");
 export const projectSlugIRI = new IRI("urn:sys:ext:labs:projectSlug");
 export const isActiveIRI = new IRI("urn:sys:ext:labs:isActive");
+export const contactEmailIRI = new IRI("urn:sys:ext:labs:contactEmail");
 export const projectOwnerIRI = new IRI("urn:sys:ext:labs:projectOwner");
 export const projectMemberIRI = new IRI("urn:sys:ext:labs:projectMember");

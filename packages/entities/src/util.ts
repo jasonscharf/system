@@ -4,6 +4,7 @@ import { IRI, literal, makeUri } from "@jasonscharf/core";
 import { XSD_BOOLEAN, XSD_DATETIME, XSD_DECIMAL, XSD_INTEGER, XSD_STRING } from "./constants.js";
 import type { PropertyDef } from "./EntitySchema.js";
 import { propIri } from "./EntitySchema.js";
+import type { IFieldCipher } from "./FieldCipher.js";
 
 export function newId(): string {
     return randomBytes(16).toString("hex");
@@ -59,6 +60,41 @@ export function toLiteral(value: unknown): Literal {
         return literal(value.toISOString(), XSD_DATETIME);
     }
     return literal(String(value), XSD_STRING);
+}
+
+/**
+ * A literal whose lexical `value` holds ciphertext, tagged so the store persists
+ * the node's `is_encrypted` / `key_id` columns.  Produced by the entity layer
+ * for PII properties; the store records it as ciphertext without ever seeing
+ * plaintext.  Structurally compatible with the store's internal EncryptedLiteral.
+ */
+export interface EncryptedLiteral extends Literal {
+    encrypted: true;
+    keyId: string;
+}
+
+/**
+ * Encrypt a value and wrap its ciphertext as an xsd:string literal tagged for
+ * at-rest storage.  The plaintext is lexicalized the same way toLiteral would,
+ * so a decrypted PII value round-trips to its original string form.
+ */
+export function toEncryptedLiteral(value: unknown, cipher: IFieldCipher): EncryptedLiteral {
+    const { keyId, ciphertext } = cipher.encrypt(lexicalForm(value));
+    return {
+        termType: "Literal",
+        value: ciphertext,
+        datatype: XSD_STRING,
+        encrypted: true,
+        keyId,
+    };
+}
+
+/** The lexical string form toLiteral would assign to a value (sans datatype). */
+function lexicalForm(value: unknown): string {
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+    return String(value);
 }
 
 /** Convert an RDF term back to a JS value. */

@@ -7,11 +7,13 @@
  */
 
 export { projectPropertyMap, userPropertyMap } from "./labs/propertyMaps.js";
+export { ProjectSchema, UserSchema } from "./labs/schemas.generated.js";
 export { shapes } from "./labs/shapes.generated.js";
 export type { Project } from "./labs/types.generated.js";
 export {
     analyticsRoleIRI,
     consentedToTrackingIRI,
+    contactEmailIRI,
     isActiveIRI,
     lastActiveAtIRI,
     ProjectIRI,

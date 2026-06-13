@@ -14,6 +14,7 @@ import type { UserDeviceRepository } from "./repository/UserDeviceRepository.js"
 import type { UserIdentityRepository } from "./repository/UserIdentityRepository.js";
 import type { UserRepository } from "./repository/UserRepository.js";
 import type { UserSessionRepository } from "./repository/UserSessionRepository.js";
+import { hashSessionToken } from "./repository/util.js";
 import type { ISessionStore } from "./session/ISessionStore.js";
 import type {
     DeviceInfo,
@@ -70,6 +71,15 @@ export class AuthService {
 
     get store() {
         return this._users.store;
+    }
+
+    /**
+     * Fast-path session-store (Redis/memory) cache key for a raw token.  The
+     * token is hashed first so the raw bearer credential never lands in a cache
+     * key either — only its sha256, matching the at-rest representation.
+     */
+    private _sessionCacheKey(token: string): string {
+        return makeUri(NS_CORE, "session", hashSessionToken(token));
     }
 
     getProvider(name: OAuthProvider): IOAuthProvider {
@@ -192,7 +202,8 @@ export class AuthService {
         );
 
         await this._store.set(
-            makeUri(NS_CORE, "session", session.sessionToken),
+            // session.sessionToken here is the raw token returned by create().
+            this._sessionCacheKey(session.sessionToken),
             JSON.stringify({
                 userId: user.id,
                 deviceId: session.deviceId,
@@ -271,7 +282,7 @@ export class AuthService {
         _sec: SecurityContext,
         args: TokenArgs,
     ): Promise<UserEntity | null> {
-        const key = makeUri(NS_CORE, "session", args.token);
+        const key = this._sessionCacheKey(args.token);
         const cached = await this._store.get(key);
 
         if (cached === NEG_CACHE_SENTINEL) {
@@ -302,7 +313,7 @@ export class AuthService {
     /** @insecure @nochecks */
     async revokeToken(ctx: ServerContext, _sec: SecurityContext, args: TokenArgs): Promise<void> {
         await Promise.all([
-            this._store.del(makeUri(NS_CORE, "session", args.token)),
+            this._store.del(this._sessionCacheKey(args.token)),
             this._sessions.revoke(ctx, systemSec, { token: args.token }),
         ]);
     }
@@ -332,6 +343,8 @@ export class AuthService {
         });
         const active = sessions.filter((s) => s.isActive);
 
+        // s.sessionToken from findByUserId is the stored hash, which is already
+        // exactly the cache-key component, so build the URI directly (no re-hash).
         await Promise.all(
             active.map((s) => this._store.del(makeUri(NS_CORE, "session", s.sessionToken))),
         );
@@ -351,7 +364,6 @@ export class AuthService {
         return {
             principalIri: opts.user.iri,
             sessionId: opts.session.id,
-            sessionToken: opts.session.sessionToken,
             isImpersonating: false,
         };
     }

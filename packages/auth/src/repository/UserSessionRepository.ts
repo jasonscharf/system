@@ -4,7 +4,7 @@ import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import { EntityQuery, EntityStore } from "@jasonscharf/server";
 import { UserSessionSchema } from "../entities/UserSessionSchema.js";
 import type { UserSessionEntity } from "../types.js";
-import { idFrom, iriFor, newId, newSessionToken } from "./util.js";
+import { hashSessionToken, idFrom, iriFor, newId, newSessionToken } from "./util.js";
 
 export interface CreateSessionArgs {
     userId: string;
@@ -40,12 +40,15 @@ export class UserSessionRepository {
         _sec: SecurityContext,
         args: CreateSessionArgs,
     ): Promise<UserSessionEntity> {
+        // The raw token is handed back to the caller (cookie / fast-path cache)
+        // exactly once, here.  Only its one-way hash is ever persisted, so the
+        // raw token never lands in the nodes table.
         const token = newSessionToken();
         const record = await this._entities.create(
             ctx,
             UserSessionSchema,
             {
-                sessionToken: token,
+                sessionToken: hashSessionToken(token),
                 sessionUser: iriFor("user", args.userId).value,
                 sessionDevice: iriFor("device", args.deviceId).value,
                 expiresAt: args.expiresAt,
@@ -54,7 +57,9 @@ export class UserSessionRepository {
             },
             newId(),
         );
-        return this._toEntity(record);
+        // Overlay the raw token onto the returned entity so the caller can issue
+        // it.  Every other read path (findByToken/findByUserId) returns the hash.
+        return { ...this._toEntity(record), sessionToken: token };
     }
 
     /** @insecure @nochecks */
@@ -63,8 +68,10 @@ export class UserSessionRepository {
         _sec: SecurityContext,
         args: TokenArgs,
     ): Promise<UserSessionEntity | null> {
+        // Look up by the hash of the incoming raw token — a single indexed
+        // equality match, never a full session scan.
         const record = await EntityQuery.from(this._store, UserSessionSchema)
-            .where("sessionToken", "=", args.token)
+            .where("sessionToken", "=", hashSessionToken(args.token))
             .first(ctx);
         return record ? this._toEntity(record) : null;
     }

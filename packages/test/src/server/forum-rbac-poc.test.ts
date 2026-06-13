@@ -88,7 +88,7 @@ const TenantWithForums = new EntitySchema({
 const PERM = "post.update";
 
 function secFor(principalIri: string): SecurityContext {
-    return { principalIri, sessionId: null, sessionToken: null, isImpersonating: false };
+    return { principalIri, sessionId: null, isImpersonating: false };
 }
 function makeRbac(store: TripleStore): RbacService {
     return new RbacService({

@@ -18,6 +18,7 @@ import {
     AuthRouterComponent,
     AuthService,
     AuthThrottle,
+    hashSessionToken,
     type IOAuthProvider,
     LoginAttemptRepository,
     MemorySessionStore,
@@ -252,7 +253,7 @@ for (const db of dbProviders) {
             expect(result).toBeNull();
 
             // SEAM: the negative-cache entry now exists in the session store.
-            const key = makeUri(NS_CORE, "session", "garbage-token");
+            const key = makeUri(NS_CORE, "session", hashSessionToken("garbage-token"));
             expect(await memStore.get(key)).toBe(NEG_CACHE_SENTINEL);
         });
     });

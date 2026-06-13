@@ -44,7 +44,6 @@ function secFor(principalIri: string): SecurityContext {
     return {
         principalIri,
         sessionId: null,
-        sessionToken: null,
         isImpersonating: false,
     };
 }
@@ -53,7 +52,6 @@ function secActingAs(principalIri: string, actingAsIri: string): SecurityContext
     return {
         principalIri,
         sessionId: null,
-        sessionToken: null,
         isImpersonating: true,
         actingAsIri,
     };

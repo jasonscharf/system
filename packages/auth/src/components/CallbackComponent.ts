@@ -7,6 +7,7 @@ import type { UserDeviceRepository } from "../repository/UserDeviceRepository.js
 import type { UserIdentityRepository } from "../repository/UserIdentityRepository.js";
 import type { UserRepository } from "../repository/UserRepository.js";
 import type { UserSessionRepository } from "../repository/UserSessionRepository.js";
+import { hashSessionToken } from "../repository/util.js";
 import type { ISessionStore } from "../session/ISessionStore.js";
 import type { DeviceInfo, OAuthProvider, UserEntity, UserSessionEntity } from "../types.js";
 
@@ -156,7 +157,9 @@ export class CallbackComponent extends FlowComponent {
             });
 
             await this._sessions.set(
-                makeUri(NS_CORE, "session", session.sessionToken),
+                // session.sessionToken is the raw token from create(); hash it so
+                // the cache key matches validateToken and no raw token is cached.
+                makeUri(NS_CORE, "session", hashSessionToken(session.sessionToken)),
                 JSON.stringify({
                     userId: user.id,
                     deviceId: device.id,

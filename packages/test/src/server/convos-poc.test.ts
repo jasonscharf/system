@@ -66,7 +66,7 @@ const OrgWithConvos = new EntitySchema({
 const PERM = "conversation.update";
 
 function secFor(principalIri: string): SecurityContext {
-    return { principalIri, sessionId: null, sessionToken: null, isImpersonating: false };
+    return { principalIri, sessionId: null, isImpersonating: false };
 }
 
 function makeRbac(store: TripleStore): RbacService {

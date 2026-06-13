@@ -26,6 +26,7 @@ import type { UserDeviceRepository } from "../repository/UserDeviceRepository.js
 import type { UserIdentityRepository } from "../repository/UserIdentityRepository.js";
 import type { UserRepository } from "../repository/UserRepository.js";
 import type { UserSessionRepository } from "../repository/UserSessionRepository.js";
+import { hashSessionToken } from "../repository/util.js";
 import { AuthThrottle } from "../session/AuthThrottle.js";
 import type { ISessionStore } from "../session/ISessionStore.js";
 import type { OAuthProvider, UserEntity } from "../types.js";
@@ -261,7 +262,12 @@ export class AuthRouterComponent extends FlowComponent {
                         systemSec,
                         { userId: user.id },
                     );
-                    const session = sessions.find((s) => s.sessionToken === token && s.isActive);
+                    // Stored sessionToken is the hash, so match the cookie/bearer
+                    // token by its hash rather than the raw value.
+                    const tokenHash = hashSessionToken(token);
+                    const session = sessions.find(
+                        (s) => s.sessionToken === tokenHash && s.isActive,
+                    );
                     ctx.user = user;
                     ctx.sec = session
                         ? AuthService.buildSecurityContext({ user, session })

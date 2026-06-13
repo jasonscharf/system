@@ -1,10 +1,8 @@
 export interface SecurityContext {
     /** IRI of the authenticated principal (User or ServiceAccount). null = anonymous. */
     principalIri: string | null;
-    /** Session entity ID. null for system / service calls. */
+    /** Session entity ID. null for system / service calls. Revocation keys off this. */
     sessionId: string | null;
-    /** Raw session token, kept for fast-path revocation. null for system calls. */
-    sessionToken: string | null;
     /** True when the principal is acting on behalf of another via rbac:actsFor. */
     isImpersonating: boolean;
     /** The IRI being acted as. Only set when isImpersonating is true. */
@@ -15,7 +13,6 @@ export interface SecurityContext {
 export const systemSec: SecurityContext = Object.freeze({
     principalIri: "urn:sys:core:system",
     sessionId: null,
-    sessionToken: null,
     isImpersonating: false,
 });
 
@@ -23,6 +20,5 @@ export const systemSec: SecurityContext = Object.freeze({
 export const anonymousSec: SecurityContext = Object.freeze({
     principalIri: null,
     sessionId: null,
-    sessionToken: null,
     isImpersonating: false,
 });

@@ -64,7 +64,7 @@ const PERM_UPDATE = "post.update";
 const PERM_CREATE = "post.create";
 
 function secFor(iri: string): SecurityContext {
-    return { principalIri: iri, sessionId: null, sessionToken: null, isImpersonating: false };
+    return { principalIri: iri, sessionId: null, isImpersonating: false };
 }
 function makeRbac(store: TripleStore): RbacService {
     return new RbacService({

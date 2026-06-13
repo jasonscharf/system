@@ -23,6 +23,7 @@
 import {
     AuthService,
     GoogleProvider,
+    hashSessionToken,
     MemorySessionStore,
     UserDeviceRepository,
     UserIdentityRepository,
@@ -214,7 +215,10 @@ for (const db of providers) {
             expect(devices).toHaveLength(1); // reused — same UA
             expect(sessions).toHaveLength(2); // two sessions on same device
             expect(sessions.every((s) => s.isActive)).toBe(true);
-            expect(sessions.some((s) => s.sessionToken === s2.sessionToken)).toBe(true);
+            // Stored sessionToken is the hash; s2.sessionToken is the raw token.
+            expect(sessions.some((s) => s.sessionToken === hashSessionToken(s2.sessionToken))).toBe(
+                true,
+            );
         });
     });
 
@@ -316,14 +320,17 @@ for (const db of providers) {
         });
 
         it("revokeAllSessions clears the fast-path session store", async () => {
+            // Cache keys are keyed by the token hash, not the raw token.
+            const pcKey = makeUri(NS_CORE, "session", hashSessionToken(pcToken));
+            const phoneKey = makeUri(NS_CORE, "session", hashSessionToken(phoneToken));
             // Both tokens should be cached in the session store
-            expect(await ctx.memStore.get(makeUri(NS_CORE, "session", pcToken))).not.toBeNull();
-            expect(await ctx.memStore.get(makeUri(NS_CORE, "session", phoneToken))).not.toBeNull();
+            expect(await ctx.memStore.get(pcKey)).not.toBeNull();
+            expect(await ctx.memStore.get(phoneKey)).not.toBeNull();
 
             await ctx.service.revokeAllSessions(buildServerContext(ctx.store), systemSec, { userId });
 
-            expect(await ctx.memStore.get(makeUri(NS_CORE, "session", pcToken))).toBeNull();
-            expect(await ctx.memStore.get(makeUri(NS_CORE, "session", phoneToken))).toBeNull();
+            expect(await ctx.memStore.get(pcKey)).toBeNull();
+            expect(await ctx.memStore.get(phoneKey)).toBeNull();
         });
     });
 
@@ -433,7 +440,7 @@ for (const db of providers) {
         });
 
         it("revokeToken removes token from the session store cache", async () => {
-            const key = makeUri(NS_CORE, "session", token);
+            const key = makeUri(NS_CORE, "session", hashSessionToken(token));
             expect(await ctx.memStore.get(key)).not.toBeNull();
             await ctx.service.revokeToken(buildServerContext(ctx.store), systemSec, { token });
             expect(await ctx.memStore.get(key)).toBeNull();

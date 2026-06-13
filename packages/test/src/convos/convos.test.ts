@@ -136,7 +136,7 @@ function makeServiceWithRbac(store: TripleStore, rbac: RbacService): ConvoServic
 // ═════════════════════════════════════════════════════════════════════════════
 
 function secFor(principalIri: string): SecurityContext {
-    return { principalIri, sessionId: null, sessionToken: null, isImpersonating: false };
+    return { principalIri, sessionId: null, isImpersonating: false };
 }
 
 for (const provider of providers) {

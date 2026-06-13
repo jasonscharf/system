@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { IRI } from "@jasonscharf/core";
 import { entityIri, idFromIri, newId } from "@jasonscharf/entities";
 import { AUTH_NS } from "../constants.js";
@@ -22,4 +22,18 @@ export function iriFor(
 
 export function newSessionToken(): string {
     return randomBytes(32).toString("hex");
+}
+
+/**
+ * One-way hash of a raw session token for at-rest storage and lookup.
+ *
+ * Session tokens are bearer credentials that are only ever compared, never read
+ * back, so we persist sha256(token) (hex) rather than the raw token.  A leak of
+ * the nodes table / a backup / a replica therefore cannot hand over live
+ * sessions.  This is intentionally a plain unsalted sha256: the input is 256
+ * bits of CSPRNG output, so it is not guessable and needs no per-row salt, and
+ * lookup must be deterministic (a single indexed equality match, no table scan).
+ */
+export function hashSessionToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
 }

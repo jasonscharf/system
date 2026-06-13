@@ -17,6 +17,7 @@ import {
     findUserWithRecentActivity,
     GitHubProvider,
     GoogleProvider,
+    hashSessionToken,
     type IOAuthProvider,
     LoginAttemptRepository,
     listActiveSessions,
@@ -36,7 +37,6 @@ import {
     UserSessionRepository,
     UserSessionSchema,
 } from "@jasonscharf/auth";
-import { TEST_CIPHER } from "./testCipher.js";
 import { makeUri, NS_CORE } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import {
@@ -55,6 +55,7 @@ import {
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";
+import { TEST_CIPHER } from "./testCipher.js";
 
 function startServer(
     handler: (req: IncomingMessage, res: ServerResponse) => void,
@@ -784,6 +785,42 @@ describe("AuthService", () => {
         expect(user.email).toBe("svc@test.com");
         expect(session.sessionToken).toHaveLength(64);
         expect(session.isActive).toBe(true);
+    });
+
+    it("never persists the raw session token — only its hash is at rest", async () => {
+        vi.stubGlobal("fetch", makeGoogleFetch());
+
+        const { user, session } = await service.handleCallback({
+            provider: "google",
+            code: "code",
+            redirectUri: "http://localhost/cb",
+            device: { userAgent: "Chrome", platform: "web" },
+        });
+        const rawToken = session.sessionToken;
+        const tokenHash = hashSessionToken(rawToken);
+
+        // Full quad-store dump: the raw bearer token must never appear; only its
+        // one-way hash is stored.
+        const ctx = buildServerContext(store, { trx });
+        const raw = JSON.stringify(await store.find(ctx, {}));
+        expect(raw).not.toContain(rawToken);
+        expect(raw).toContain(tokenHash);
+
+        // The raw token still resolves the session (hashed lookup) ...
+        const validated = await service.validateToken(
+            buildServerContext(store, { trx }),
+            systemSec,
+            {
+                token: rawToken,
+            },
+        );
+        expect(validated?.id).toBe(user.id);
+
+        // ... and a wrong token does not.
+        const wrong = await service.validateToken(buildServerContext(store, { trx }), systemSec, {
+            token: `${rawToken}-tampered`,
+        });
+        expect(wrong).toBeNull();
     });
 
     it("handleCallback() returns existing user on second login", async () => {

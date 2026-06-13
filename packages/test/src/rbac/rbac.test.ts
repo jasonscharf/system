@@ -73,14 +73,13 @@ const DAVE = "urn:sys:core:auth:user:test-dave"; // Globex user
 // ── SecurityContext helpers ───────────────────────────────────────────────────
 
 function secFor(principalIri: string): SecurityContext {
-    return { principalIri, sessionId: null, sessionToken: null, isImpersonating: false };
+    return { principalIri, sessionId: null, isImpersonating: false };
 }
 
 function secActingAs(principalIri: string, actingAsIri: string): SecurityContext {
     return {
         principalIri,
         sessionId: null,
-        sessionToken: null,
         isImpersonating: true,
         actingAsIri,
     };

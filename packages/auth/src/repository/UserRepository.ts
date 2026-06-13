@@ -1,5 +1,5 @@
 import type { TripleStore } from "@jasonscharf/data";
-import type { EntityRecord } from "@jasonscharf/entities";
+import type { EntityRecord, IFieldCipher } from "@jasonscharf/entities";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import { EntityQuery, EntityStore } from "@jasonscharf/server";
 import { UserSchema } from "../entities/UserSchema.js";
@@ -22,10 +22,16 @@ export interface UpdateUserArgs {
 export class UserRepository {
     private readonly _store: TripleStore;
     private readonly _entities: EntityStore;
+    private readonly _cipher?: IFieldCipher;
 
-    constructor(store: TripleStore) {
+    constructor(store: TripleStore, cipher?: IFieldCipher) {
         this._store = store;
-        this._entities = new EntityStore(store);
+        // The cipher is bound to the EntityStore (and to every EntityQuery this
+        // repo opens) so the PII props displayName / avatarUrl are encrypted on
+        // write and decrypted on read even when the caller's ctx carries no
+        // cipher.  ctx.cipher still takes precedence when present.
+        this._cipher = cipher;
+        this._entities = new EntityStore(store, undefined, cipher);
     }
 
     get store(): TripleStore {
@@ -58,7 +64,7 @@ export class UserRepository {
         _sec: SecurityContext,
         args: EmailArgs,
     ): Promise<UserEntity | null> {
-        const record = await EntityQuery.from(this._store, UserSchema)
+        const record = await EntityQuery.from(this._store, UserSchema, this._cipher)
             .where("email", "=", args.email)
             .first(ctx);
         return record ? this._toEntity(record) : null;

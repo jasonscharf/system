@@ -29,6 +29,7 @@ import {
     UserRepository,
     UserSessionRepository,
 } from "@jasonscharf/auth";
+import { TEST_CIPHER } from "./testCipher.js";
 import { makeUri, NS_CORE } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import { buildServerContext, systemSec } from "@jasonscharf/server";
@@ -98,8 +99,8 @@ async function setup(db: DbProvider) {
     // rather than new connection-level transactions (avoids SQLite deadlock).
     const store = new TripleStore(trx as unknown as import("knex").Knex);
     const memStore = new MemorySessionStore();
-    const users = new UserRepository(store);
-    const identities = new UserIdentityRepository(store);
+    const users = new UserRepository(store, TEST_CIPHER);
+    const identities = new UserIdentityRepository(store, TEST_CIPHER);
     const sessions = new UserSessionRepository(store);
     const devices = new UserDeviceRepository(store);
     const service = new AuthService({

@@ -36,7 +36,7 @@ import {
     WebSocketServer,
 } from "@jasonscharf/flow";
 import { buildServerContext, getRbacService, rbacExtension } from "@jasonscharf/server";
-import { SecretsManager } from "@jasonscharf/vaults";
+import { FieldCipher, SecretsManager } from "@jasonscharf/vaults";
 import { MessageDecoder } from "./components/MessageDecoder.js";
 import { MessageEncoder } from "./components/MessageEncoder.js";
 import { MessageRouter } from "./components/MessageRouter.js";
@@ -122,9 +122,28 @@ async function main(): Promise<void> {
         console.log("[sandbox-server] Session store: in-memory (dev only)");
     }
 
+    // ── Field cipher (at-rest PII) ────────────────────────────────────────────
+    // Closes TRN-169: OAuth access/refresh tokens and user display name / avatar
+    // are encrypted at rest.  Key material is read from the SecretsManager
+    // (vault > env), so SYS_FIELD_ENC_KEYS (JSON keyId->base64 key) and
+    // SYS_FIELD_ENC_CURRENT (active key id) must be configured.  We fail closed:
+    // if no key is configured the server refuses to start rather than silently
+    // persisting PII as cleartext.
+    let cipher: FieldCipher;
+    try {
+        cipher = await FieldCipher.fromSecrets(secrets);
+    } catch (err) {
+        throw new Error(
+            "[sandbox-server] Field encryption key is not configured. Set SYS_FIELD_ENC_KEYS " +
+                "(JSON keyId->base64 32-byte key) and SYS_FIELD_ENC_CURRENT (active key id) in the " +
+                `vault or environment. Encryption of at-rest PII cannot be disabled. Cause: ${err}`,
+        );
+    }
+    console.log("[sandbox-server] Field cipher: enabled (at-rest PII encryption)");
+
     // ── Auth repositories ─────────────────────────────────────────────────────
-    const users = new UserRepository(store);
-    const identities = new UserIdentityRepository(store);
+    const users = new UserRepository(store, cipher);
+    const identities = new UserIdentityRepository(store, cipher);
     const sessions = new UserSessionRepository(store);
     const devices = new UserDeviceRepository(store);
 

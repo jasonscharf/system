@@ -6,6 +6,7 @@
 @prefix owl:  <http://www.w3.org/2002/07/owl#> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
 @prefix auth: <urn:sys:core:auth:> .
+@prefix tern: <urn:tern:core:> .
 
 # ── Classes ───────────────────────────────────────────────────────────────────
 
@@ -25,11 +26,13 @@ auth:email a owl:DatatypeProperty ;
 auth:displayName a owl:DatatypeProperty ;
     rdfs:domain auth:User ;
     rdfs:range  xsd:string ;
+    tern:pii    true ;
     rdfs:comment "Human-readable display name." .
 
 auth:avatarUrl a owl:DatatypeProperty ;
     rdfs:domain auth:User ;
     rdfs:range  xsd:anyURI ;
+    tern:pii    true ;
     rdfs:comment "URL of the user's avatar image." .
 
 # ── UserIdentity properties ───────────────────────────────────────────────────
@@ -52,11 +55,13 @@ auth:providerEmail a owl:DatatypeProperty ;
 auth:accessToken a owl:DatatypeProperty ;
     rdfs:domain auth:UserIdentity ;
     rdfs:range  xsd:string ;
+    tern:pii    true ;
     rdfs:comment "Current OAuth access token." .
 
 auth:refreshToken a owl:DatatypeProperty ;
     rdfs:domain auth:UserIdentity ;
     rdfs:range  xsd:string ;
+    tern:pii    true ;
     rdfs:comment "OAuth refresh token (may be absent for some providers)." .
 
 auth:tokenExpiresAt a owl:DatatypeProperty ;

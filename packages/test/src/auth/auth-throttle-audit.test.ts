@@ -27,6 +27,7 @@ import {
     UserRepository,
     UserSessionRepository,
 } from "@jasonscharf/auth";
+import { TEST_CIPHER } from "./testCipher.js";
 import { makeUri, NS_CORE } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import { FlowContext, type HttpResponseDraft, type ParsedHttpRequest } from "@jasonscharf/flow";
@@ -174,8 +175,8 @@ for (const db of dbProviders) {
             service = new AuthService({
                 providers: [new TestOAuthProvider()],
                 sessionStore: memStore,
-                users: new UserRepository(store),
-                identities: new UserIdentityRepository(store),
+                users: new UserRepository(store, TEST_CIPHER),
+                identities: new UserIdentityRepository(store, TEST_CIPHER),
                 sessions: new UserSessionRepository(store),
                 devices: new UserDeviceRepository(store),
                 attempts,
@@ -220,8 +221,8 @@ for (const db of dbProviders) {
             const failing = new AuthService({
                 providers: [new FailingProvider()],
                 sessionStore: memStore,
-                users: new UserRepository(store),
-                identities: new UserIdentityRepository(store),
+                users: new UserRepository(store, TEST_CIPHER),
+                identities: new UserIdentityRepository(store, TEST_CIPHER),
                 sessions: new UserSessionRepository(store),
                 devices: new UserDeviceRepository(store),
                 attempts,
@@ -286,8 +287,8 @@ describe("AuthService.validateToken — neg-cache avoids the triple store", () =
         const svc = new AuthService({
             providers: [new TestOAuthProvider()],
             sessionStore: memStore,
-            users: new UserRepository(store),
-            identities: new UserIdentityRepository(store),
+            users: new UserRepository(store, TEST_CIPHER),
+            identities: new UserIdentityRepository(store, TEST_CIPHER),
             sessions: new CountingSessionRepository(store),
             devices: new UserDeviceRepository(store),
         });
@@ -340,8 +341,8 @@ describe("AuthRouterComponent — throttle / trusted-proxy / audit", () => {
             context: new FlowContext(),
             providers: [new TestOAuthProvider()],
             sessionStore: memStore,
-            users: new UserRepository(store),
-            identities: new UserIdentityRepository(store),
+            users: new UserRepository(store, TEST_CIPHER),
+            identities: new UserIdentityRepository(store, TEST_CIPHER),
             sessions: new UserSessionRepository(store),
             devices: new UserDeviceRepository(store),
             attempts,

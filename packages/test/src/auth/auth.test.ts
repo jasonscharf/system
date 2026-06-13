@@ -36,6 +36,7 @@ import {
     UserSessionRepository,
     UserSessionSchema,
 } from "@jasonscharf/auth";
+import { TEST_CIPHER } from "./testCipher.js";
 import { makeUri, NS_CORE } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import {
@@ -257,7 +258,7 @@ for (const db of dbProviders) {
             trx = await knex.transaction();
             ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
-            repo = new UserRepository(store);
+            repo = new UserRepository(store, TEST_CIPHER);
         });
         afterEach(async () => {
             await trx.rollback();
@@ -336,7 +337,7 @@ for (const db of dbProviders) {
             trx = await knex.transaction();
             ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
-            userRepo = new UserRepository(store);
+            userRepo = new UserRepository(store, TEST_CIPHER);
             repo = new LoginAttemptRepository(store);
         });
         afterEach(async () => {
@@ -432,8 +433,8 @@ for (const db of dbProviders) {
             trx = await knex.transaction();
             ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
-            userRepo = new UserRepository(store);
-            idRepo = new UserIdentityRepository(store);
+            userRepo = new UserRepository(store, TEST_CIPHER);
+            idRepo = new UserIdentityRepository(store, TEST_CIPHER);
         });
         afterEach(async () => {
             await trx.rollback();
@@ -543,7 +544,7 @@ for (const db of dbProviders) {
             trx = await knex.transaction();
             ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
-            userRepo = new UserRepository(store);
+            userRepo = new UserRepository(store, TEST_CIPHER);
             devRepo = new UserDeviceRepository(store);
         });
         afterEach(async () => {
@@ -611,7 +612,7 @@ for (const db of dbProviders) {
             trx = await knex.transaction();
             ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
-            userRepo = new UserRepository(store);
+            userRepo = new UserRepository(store, TEST_CIPHER);
             devRepo = new UserDeviceRepository(store);
             sessRepo = new UserSessionRepository(store);
         });
@@ -757,8 +758,8 @@ describe("AuthService", () => {
         service = new AuthService({
             providers: [new GoogleProvider("cid", "cs")],
             sessionStore: new MemorySessionStore(),
-            users: new UserRepository(store),
-            identities: new UserIdentityRepository(store),
+            users: new UserRepository(store, TEST_CIPHER),
+            identities: new UserIdentityRepository(store, TEST_CIPHER),
             sessions: new UserSessionRepository(store),
             devices: new UserDeviceRepository(store),
         });
@@ -934,7 +935,7 @@ describe("SessionComponent", () => {
             name: "session",
             context: new FlowContext(),
             sessionStore: memStore,
-            users: new UserRepository(store),
+            users: new UserRepository(store, TEST_CIPHER),
             sessions: new UserSessionRepository(store),
         });
     });
@@ -977,7 +978,7 @@ describe("SessionComponent", () => {
     });
 
     it("validateIn → valid:true via slow path when session is in TripleStore (lines 111-114)", async () => {
-        const userRepo = new UserRepository(store);
+        const userRepo = new UserRepository(store, TEST_CIPHER);
         const sessRepo = new UserSessionRepository(store);
         const ctx = buildServerContext(store);
         const user = await userRepo.create(ctx, systemSec, {
@@ -998,7 +999,7 @@ describe("SessionComponent", () => {
     });
 
     it("validateIn → valid:true via fast path when cache hit with valid session (lines 90-102)", async () => {
-        const userRepo = new UserRepository(store);
+        const userRepo = new UserRepository(store, TEST_CIPHER);
         const sessRepo = new UserSessionRepository(store);
         const ctx = buildServerContext(store);
         const user = await userRepo.create(ctx, systemSec, {
@@ -1029,7 +1030,7 @@ describe("SessionComponent", () => {
             name: "session-throw",
             context: new FlowContext(),
             sessionStore: new ThrowingSessionStore(),
-            users: new UserRepository(store),
+            users: new UserRepository(store, TEST_CIPHER),
             sessions: new UserSessionRepository(store),
         });
         throwingComp.revokeIn.put({ token: "any-token", requestId: "r6" });
@@ -1088,8 +1089,8 @@ describe("CallbackComponent (FBP)", () => {
             context: new FlowContext(),
             providers: [new TestOAuthProvider()],
             sessionStore: memStore,
-            users: new UserRepository(store),
-            identities: new UserIdentityRepository(store),
+            users: new UserRepository(store, TEST_CIPHER),
+            identities: new UserIdentityRepository(store, TEST_CIPHER),
             sessions: new UserSessionRepository(store),
             devices: new UserDeviceRepository(store),
         });
@@ -1159,7 +1160,7 @@ describe("AuthService.validateToken — fallback path", () => {
         const knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
         const store = new TripleStore(knex);
         const memStore = new MemorySessionStore();
-        const users = new UserRepository(store);
+        const users = new UserRepository(store, TEST_CIPHER);
         const devices = new UserDeviceRepository(store);
         const sessRepo = new UserSessionRepository(store);
 
@@ -1167,7 +1168,7 @@ describe("AuthService.validateToken — fallback path", () => {
             providers: [new GoogleProvider("c", "s")],
             sessionStore: memStore,
             users,
-            identities: new UserIdentityRepository(store),
+            identities: new UserIdentityRepository(store, TEST_CIPHER),
             sessions: sessRepo,
             devices,
         });
@@ -1217,8 +1218,8 @@ describe("AuthRouterComponent.sessionMiddleware()", () => {
         const svc = new AuthService({
             providers: [new GoogleProvider("c", "s")],
             sessionStore: memStore,
-            users: new UserRepository(store),
-            identities: new UserIdentityRepository(store),
+            users: new UserRepository(store, TEST_CIPHER),
+            identities: new UserIdentityRepository(store, TEST_CIPHER),
             sessions: new UserSessionRepository(store),
             devices: new UserDeviceRepository(store),
         });
@@ -1253,8 +1254,8 @@ describe("AuthRouterComponent.sessionMiddleware()", () => {
             context: ctx,
             providers: [new GoogleProvider("c", "s")],
             sessionStore: memStore,
-            users: new UserRepository(store),
-            identities: new UserIdentityRepository(store),
+            users: new UserRepository(store, TEST_CIPHER),
+            identities: new UserIdentityRepository(store, TEST_CIPHER),
             sessions: new UserSessionRepository(store),
             devices: new UserDeviceRepository(store),
             baseUrl: "http://localhost:3000",
@@ -1337,8 +1338,8 @@ describe("AuthRouterComponent HTTP routes", () => {
             context: new FlowContext(),
             providers: [new TestOAuthProvider()],
             sessionStore: memStore,
-            users: new UserRepository(store),
-            identities: new UserIdentityRepository(store),
+            users: new UserRepository(store, TEST_CIPHER),
+            identities: new UserIdentityRepository(store, TEST_CIPHER),
             sessions: new UserSessionRepository(store),
             devices: new UserDeviceRepository(store),
             baseUrl: "http://localhost:3000",
@@ -1533,8 +1534,8 @@ describe("AuthRouterComponent HTTP routes", () => {
             context: new FlowContext(),
             providers: [new ErrorOAuthProvider()],
             sessionStore: memStore,
-            users: new UserRepository(store),
-            identities: new UserIdentityRepository(store),
+            users: new UserRepository(store, TEST_CIPHER),
+            identities: new UserIdentityRepository(store, TEST_CIPHER),
             sessions: new UserSessionRepository(store),
             devices: new UserDeviceRepository(store),
             baseUrl: "http://localhost:3000",
@@ -1604,7 +1605,7 @@ describe("AuthService.validateToken — cache hit", () => {
         const knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
         const store = new TripleStore(knex);
         const memStore = new MemorySessionStore();
-        const users = new UserRepository(store);
+        const users = new UserRepository(store, TEST_CIPHER);
 
         // Create a real user so findById can resolve it
         vi.stubGlobal(
@@ -1629,7 +1630,7 @@ describe("AuthService.validateToken — cache hit", () => {
             providers: [new GoogleProvider("c", "s")],
             sessionStore: memStore,
             users,
-            identities: new UserIdentityRepository(store),
+            identities: new UserIdentityRepository(store, TEST_CIPHER),
             sessions: new UserSessionRepository(store),
             devices: new UserDeviceRepository(store),
         });
@@ -1660,8 +1661,8 @@ describe("AuthService.validateToken — cache hit", () => {
         const svc = new AuthService({
             providers: [new GoogleProvider("c", "s")],
             sessionStore: memStore,
-            users: new UserRepository(store),
-            identities: new UserIdentityRepository(store),
+            users: new UserRepository(store, TEST_CIPHER),
+            identities: new UserIdentityRepository(store, TEST_CIPHER),
             sessions: new UserSessionRepository(store),
             devices: new UserDeviceRepository(store),
         });
@@ -1702,7 +1703,7 @@ for (const db of dbProviders) {
             trx = await knex.transaction();
             ctx = buildServerContext(store, { trx });
             store = new TripleStore(knex);
-            userRepo = new UserRepository(store);
+            userRepo = new UserRepository(store, TEST_CIPHER);
             devRepo = new UserDeviceRepository(store);
             sessRepo = new UserSessionRepository(store);
             es = new EntityStore(store);

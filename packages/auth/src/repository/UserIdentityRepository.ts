@@ -1,5 +1,5 @@
 import type { TripleStore } from "@jasonscharf/data";
-import type { EntityRecord } from "@jasonscharf/entities";
+import type { EntityRecord, IFieldCipher } from "@jasonscharf/entities";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
 import { EntityQuery, EntityStore } from "@jasonscharf/server";
 import { UserIdentitySchema } from "../entities/UserIdentitySchema.js";
@@ -23,10 +23,16 @@ export interface UpdateTokensArgs {
 export class UserIdentityRepository {
     private readonly _store: TripleStore;
     private readonly _entities: EntityStore;
+    private readonly _cipher?: IFieldCipher;
 
-    constructor(store: TripleStore) {
+    constructor(store: TripleStore, cipher?: IFieldCipher) {
         this._store = store;
-        this._entities = new EntityStore(store);
+        // The cipher is bound to the EntityStore (and to every EntityQuery this
+        // repo opens) so accessToken / refreshToken are encrypted on write and
+        // decrypted on read even when the caller's ctx carries no cipher.
+        // ctx.cipher still takes precedence when present.
+        this._cipher = cipher;
+        this._entities = new EntityStore(store, undefined, cipher);
     }
 
     get store(): TripleStore {
@@ -62,7 +68,7 @@ export class UserIdentityRepository {
         _sec: SecurityContext,
         args: FindByProviderArgs,
     ): Promise<UserIdentityEntity | null> {
-        const record = await EntityQuery.from(this._store, UserIdentitySchema)
+        const record = await EntityQuery.from(this._store, UserIdentitySchema, this._cipher)
             .where("provider", "=", args.provider)
             .where("providerUserId", "=", args.providerUserId)
             .first(ctx);
@@ -75,7 +81,7 @@ export class UserIdentityRepository {
         _sec: SecurityContext,
         args: UserIdArgs,
     ): Promise<UserIdentityEntity[]> {
-        const records = await EntityQuery.from(this._store, UserIdentitySchema)
+        const records = await EntityQuery.from(this._store, UserIdentitySchema, this._cipher)
             .where("identityOf", "=", iriFor("user", args.userId).value)
             .all(ctx);
         return records.map((r) => this._toEntity(r));

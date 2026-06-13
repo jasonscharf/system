@@ -60,5 +60,8 @@
         "react-dom": "^19.2.3",
         "vite": "^6.0.0",
         "vitest": "^4.0.16"
+    },
+    "dependencies": {
+        "react-native-web": "^0.21.2"
     }
 }

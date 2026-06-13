@@ -1,4 +1,5 @@
 import type React from "react";
+import { View } from "react-native";
 import { bindView } from "../views.js";
 import { useComposition, useRevision } from "./context.js";
 
@@ -33,14 +34,14 @@ export function RegionHost(props: RegionHostProps): React.ReactElement {
 
     if (views.length === 0) {
         return (
-            <div className={className} data-region={name} data-empty="true">
+            <View className={className} dataSet={{ region: name, empty: "true" }}>
                 {fallback ?? null}
-            </div>
+            </View>
         );
     }
 
     return (
-        <div className={className} data-region={name}>
+        <View className={className} dataSet={{ region: name }}>
             {views.map((view) => {
                 const bound = bindView<
                     Record<string, unknown>,
@@ -48,11 +49,11 @@ export function RegionHost(props: RegionHostProps): React.ReactElement {
                     React.ReactNode
                 >(view, composition.dispatch);
                 return (
-                    <div key={bound.id} className="region-host__view" data-view={bound.id}>
+                    <View key={bound.id} className="region-host__view" dataSet={{ view: bound.id }}>
                         {bound.render()}
-                    </div>
+                    </View>
                 );
             })}
-        </div>
+        </View>
     );
 }

@@ -9,6 +9,7 @@ import {
 import type React from "react";
 import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { flaggedContribution, homeContribution, widgetsContribution } from "./contributions.js";
 import "./style.css";
 
@@ -56,35 +57,38 @@ function App(): React.ReactElement {
     return (
         <CompositionProvider composition={composition}>
             <RevisionProvider revision={revision}>
-                <div className="shell">
-                    <header className="shell__header">
+                <View className="shell">
+                    <View className="shell__header" role="banner">
                         <RegionHost name="header" className="shell__region" />
-                    </header>
-                    <div className="shell__body">
+                    </View>
+                    <View className="shell__body">
                         <MenuView className="shell__nav" />
-                        <main className="shell__main">
+                        <ScrollView className="shell__main" role="main">
                             <RegionHost
                                 name="main"
                                 className="shell__region"
-                                fallback={<p className="shell__empty">No views contributed.</p>}
+                                fallback={
+                                    <Text className="shell__empty">No views contributed.</Text>
+                                }
                             />
-                        </main>
-                    </div>
-                    <footer className="shell__footer">
-                        <button
-                            type="button"
-                            data-testid="toggle-flag"
-                            onClick={() => {
+                        </ScrollView>
+                    </View>
+                    <View className="shell__footer" role="contentinfo">
+                        <Pressable
+                            className="shell__toggle"
+                            role="button"
+                            testID="toggle-flag"
+                            onPress={() => {
                                 setFlag((f) => !f);
                                 revision.bump();
                             }}
                         >
-                            Toggle conditional view
-                        </button>
-                        <span data-testid="last-event">last-event: {lastEvent}</span>
-                        <span data-testid="counter-total">counter: {counter}</span>
-                    </footer>
-                </div>
+                            <Text>Toggle conditional view</Text>
+                        </Pressable>
+                        <Text testID="last-event">last-event: {lastEvent}</Text>
+                        <Text testID="counter-total">counter: {counter}</Text>
+                    </View>
+                </View>
             </RevisionProvider>
         </CompositionProvider>
     );

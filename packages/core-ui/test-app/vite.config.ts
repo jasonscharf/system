@@ -10,6 +10,11 @@ export default defineConfig({
     plugins: [react()],
     resolve: {
         alias: {
+            // Resolve bare `react-native` imports to react-native-web so the
+            // shell renders RNW primitives (View/Text/Pressable/ScrollView) to
+            // DOM. Styling stays in classic .css via className, which RNW passes
+            // through on web.
+            "react-native": "react-native-web",
             // Resolve the library to source so the test app tracks edits without
             // a build step.
             "@jasonscharf/core-ui/react": path.resolve(__dirname, "../src/react/index.ts"),

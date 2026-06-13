@@ -1,5 +1,6 @@
 import type { InMemoryDispatch, UiContribution } from "@jasonscharf/core-ui";
 import type React from "react";
+import { Pressable, Text, View } from "react-native";
 
 // Fixtures simulating product packages that contribute UI into the shell by
 // configuration. Nothing here imports the shell; it only describes regions,
@@ -32,9 +33,9 @@ export function homeContribution(): UiContribution {
                         greeting: (ctx.params as { greeting: string }).greeting,
                     }),
                     render: (model): React.ReactNode => (
-                        <h1 className="view-header" data-testid="header-view">
+                        <Text className="view-header" role="heading" testID="header-view">
                             {model.greeting}
-                        </h1>
+                        </Text>
                     ),
                 },
             },
@@ -81,16 +82,16 @@ export function widgetsContribution(): UiContribution {
                         bump: () => ctx.dispatch.command("counter.bump").exec({ delta: 1 }),
                     }),
                     render: (model): React.ReactNode => (
-                        <button
-                            type="button"
+                        <Pressable
                             className="view-counter"
-                            data-testid="counter-view"
-                            onClick={() => {
+                            role="button"
+                            testID="counter-view"
+                            onPress={() => {
                                 void model.bump();
                             }}
                         >
-                            {model.label}
-                        </button>
+                            <Text>{model.label}</Text>
+                        </Pressable>
                     ),
                 },
             },
@@ -124,9 +125,9 @@ export function flaggedContribution(isOn: () => boolean): UiContribution {
                     id: "flagged.panel",
                     viewModel: () => ({}),
                     render: (): React.ReactNode => (
-                        <div className="view-flagged" data-testid="flagged-view">
-                            Conditionally contributed panel
-                        </div>
+                        <View className="view-flagged" testID="flagged-view">
+                            <Text>Conditionally contributed panel</Text>
+                        </View>
                     ),
                 },
             },

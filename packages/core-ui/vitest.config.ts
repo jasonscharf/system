@@ -22,7 +22,12 @@ export default defineConfig({
         },
     },
     resolve: {
+        // Resolve bare `react-native` imports to react-native-web so the React
+        // binding layer runs against the web implementation under jsdom. RNW is
+        // the platform-agnostic UI direction; styling stays in classic .css via
+        // className (RNW passes className through on web).
         alias: {
+            "react-native": "react-native-web",
             "@jasonscharf/core-ui": path.resolve(__dirname, "src"),
             "@system/core": pkg("core"),
             "@system/gen": pkg("gen"),

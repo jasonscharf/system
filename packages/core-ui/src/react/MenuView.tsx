@@ -1,4 +1,5 @@
 import type React from "react";
+import { Pressable, Text, View } from "react-native";
 import type { MenuNode } from "../menu.js";
 import { useComposition, useRevision } from "./context.js";
 
@@ -22,17 +23,17 @@ function MenuNodeView(props: MenuNodeViewProps): React.ReactElement {
     const { node, onSelect, depth } = props;
     const hasChildren = node.children.length > 0;
     return (
-        <li className="menu__item" data-menu-item={node.item.id} data-depth={depth}>
-            <button
-                type="button"
+        <View className="menu__item" role="listitem" dataSet={{ menuItem: node.item.id, depth }}>
+            <Pressable
                 className="menu__link"
-                data-command={node.item.command ?? ""}
-                onClick={() => onSelect(node.item.id)}
+                role="button"
+                dataSet={{ command: node.item.command ?? "" }}
+                onPress={() => onSelect(node.item.id)}
             >
-                {node.item.label}
-            </button>
+                <Text className="menu__label">{node.item.label}</Text>
+            </Pressable>
             {hasChildren ? (
-                <ul className="menu__group">
+                <View className="menu__group" role="list">
                     {node.children.map((child) => (
                         <MenuNodeView
                             key={child.item.id}
@@ -41,9 +42,9 @@ function MenuNodeView(props: MenuNodeViewProps): React.ReactElement {
                             depth={depth + 1}
                         />
                     ))}
-                </ul>
+                </View>
             ) : null}
-        </li>
+        </View>
     );
 }
 
@@ -73,8 +74,8 @@ export function MenuView(props: MenuViewProps): React.ReactElement {
     };
 
     return (
-        <nav className={className} aria-label="Primary">
-            <ul className="menu__group menu__group--root">
+        <View className={className} role="navigation" aria-label="Primary">
+            <View className="menu__group menu__group--root" role="list">
                 {tree.map((node) => (
                     <MenuNodeView
                         key={node.item.id}
@@ -83,8 +84,8 @@ export function MenuView(props: MenuViewProps): React.ReactElement {
                         depth={0}
                     />
                 ))}
-            </ul>
-        </nav>
+            </View>
+        </View>
     );
 }
 

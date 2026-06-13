@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, render, screen } from "@testing-library/react";
 import type React from "react";
+import { Text, View } from "react-native";
 import { afterEach, describe, expect, it } from "vitest";
 import { Composition } from "../composition.js";
 import type { ViewDefinition } from "../views.js";
@@ -12,7 +13,7 @@ function reactView(id: string, label: string): ViewDefinition<{ label: string }>
     return {
         id,
         viewModel: () => ({ label }),
-        render: (model): React.ReactNode => <span className="probe">{model.label}</span>,
+        render: (model): React.ReactNode => <Text className="probe">{model.label}</Text>,
     };
 }
 
@@ -24,10 +25,10 @@ function Shell(props: {
     return (
         <CompositionProvider composition={composition}>
             <RevisionProvider revision={revision}>
-                <div className="shell">
+                <View className="shell">
                     <MenuView className="shell__nav" />
-                    <RegionHost name="main" className="shell__main" fallback={<em>empty</em>} />
-                </div>
+                    <RegionHost name="main" className="shell__main" fallback={<Text>empty</Text>} />
+                </View>
             </RevisionProvider>
         </CompositionProvider>
     );
@@ -50,7 +51,7 @@ describe("React composition shell", () => {
         const empty = new Composition();
         render(
             <CompositionProvider composition={empty}>
-                <RegionHost name="ghost" fallback={<em>nothing here</em>} />
+                <RegionHost name="ghost" fallback={<Text>nothing here</Text>} />
             </CompositionProvider>,
         );
         expect(screen.getByText("nothing here")).toBeTruthy();

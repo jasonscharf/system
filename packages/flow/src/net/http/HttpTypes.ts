@@ -22,6 +22,8 @@ export interface HttpRequest {
     url: string;
     headers: HttpHeaders;
     body?: string | Uint8Array;
+    /** Socket peer address, set by HttpServer. Used for trusted-proxy IP resolution. */
+    remoteAddress?: string;
 }
 
 /** An HTTP response as it travels the network or exits the Flow graph. */
@@ -72,6 +74,8 @@ export interface ParsedHttpRequest {
     headers: HttpHeaders;
     body?: unknown;
     contentType?: string;
+    /** Socket peer address, set by HttpServer. Used for trusted-proxy IP resolution. */
+    remoteAddress?: string;
 }
 
 /** HttpResponse after body decoding; the body is a parsed JS value. */

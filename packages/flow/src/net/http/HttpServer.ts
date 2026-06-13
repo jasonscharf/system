@@ -216,6 +216,7 @@ export class HttpServer extends FlowComponent {
                 method: (req.method ?? "GET") as HttpMethod,
                 url: req.url ?? "/",
                 headers: flattenHeaders(req.headers),
+                remoteAddress: req.socket?.remoteAddress ?? undefined,
                 body:
                     raw.length > 0
                         ? new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength)

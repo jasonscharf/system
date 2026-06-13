@@ -14,12 +14,19 @@ import {
     systemSec,
 } from "@jasonscharf/server";
 import { AuthService } from "../AuthService.js";
-import { OAUTH_STATE_COOKIE, SESSION_COOKIE, SESSION_TTL_SECS } from "../constants.js";
+import {
+    AUTH_TRUSTED_PROXIES,
+    OAUTH_STATE_COOKIE,
+    SESSION_COOKIE,
+    SESSION_TTL_SECS,
+} from "../constants.js";
 import type { IOAuthProvider } from "../oauth/types.js";
+import type { LoginAttemptRepository } from "../repository/LoginAttemptRepository.js";
 import type { UserDeviceRepository } from "../repository/UserDeviceRepository.js";
 import type { UserIdentityRepository } from "../repository/UserIdentityRepository.js";
 import type { UserRepository } from "../repository/UserRepository.js";
 import type { UserSessionRepository } from "../repository/UserSessionRepository.js";
+import { AuthThrottle } from "../session/AuthThrottle.js";
 import type { ISessionStore } from "../session/ISessionStore.js";
 import type { OAuthProvider, UserEntity } from "../types.js";
 import { CallbackComponent } from "./CallbackComponent.js";
@@ -33,12 +40,19 @@ export interface AuthRouterOptions extends FlowComponentOptions {
     identities: UserIdentityRepository;
     sessions: UserSessionRepository;
     devices: UserDeviceRepository;
+    /** Optional. When provided, login attempts are recorded for audit (TRN-171). */
+    attempts?: LoginAttemptRepository;
     /** Base URL of this server, e.g. http://localhost:3000 */
     baseUrl: string;
     /** Where to redirect after successful login (default: '/'). */
     loginSuccess?: string;
     /** Where to redirect on login failure (default: '/auth/error'). */
     loginFailure?: string;
+    /**
+     * IP allowlist of trusted reverse proxies. Only when the socket peer is in
+     * this list is x-forwarded-for honored. Defaults to AUTH_TRUSTED_PROXIES.
+     */
+    trustedProxies?: string[];
 }
 
 // ── Cookie helpers ────────────────────────────────────────────────────────────
@@ -110,6 +124,8 @@ export class AuthRouterComponent extends FlowComponent {
     private readonly _failure: string;
     /** Set automatically when baseUrl starts with https:// — adds Secure to session cookies. */
     private readonly _secure: boolean;
+    private readonly _throttle: AuthThrottle;
+    private readonly _trustedProxies: Set<string>;
 
     constructor(options: AuthRouterOptions) {
         super(options);
@@ -120,6 +136,8 @@ export class AuthRouterComponent extends FlowComponent {
         this._success = options.loginSuccess ?? "/";
         this._failure = options.loginFailure ?? "/auth/error";
         this._secure = this._baseUrl.startsWith("https://");
+        this._throttle = new AuthThrottle(options.sessionStore);
+        this._trustedProxies = new Set(options.trustedProxies ?? AUTH_TRUSTED_PROXIES);
 
         this._service = new AuthService({
             providers: options.providers,
@@ -128,6 +146,7 @@ export class AuthRouterComponent extends FlowComponent {
             identities: options.identities,
             sessions: options.sessions,
             devices: options.devices,
+            attempts: options.attempts,
         });
 
         // ── Child FBP components (for standalone pipeline use) ────────────────
@@ -192,6 +211,29 @@ export class AuthRouterComponent extends FlowComponent {
         return this._service.validateToken(buildServerContext(this._service.store), systemSec, {
             token,
         });
+    }
+
+    /**
+     * Resolves the caller's IP for throttling/audit. x-forwarded-for is only
+     * honored when the socket peer is a configured trusted proxy; otherwise the
+     * socket peer address is used. This prevents trivial per-IP-throttle bypass
+     * by spoofing the header. When the socket peer is unknown (e.g. some test
+     * transports) the leftmost XFF entry is used as a best-effort fallback.
+     */
+    private _clientIp(req: ParsedHttpRequest): string | null {
+        const peer = req.remoteAddress ?? null;
+        const xffRaw = req.headers["x-forwarded-for"];
+        const xff = Array.isArray(xffRaw) ? xffRaw[0] : xffRaw;
+        const firstXff = xff ? (xff.split(",")[0]?.trim() ?? null) : null;
+
+        if (peer) {
+            if (this._trustedProxies.has(peer) && firstXff) {
+                return firstXff;
+            }
+            return peer;
+        }
+        // No socket peer available — fall back to XFF only if proxies are configured.
+        return this._trustedProxies.size > 0 ? firstXff : null;
     }
 
     /**
@@ -371,6 +413,12 @@ export class AuthRouterComponent extends FlowComponent {
                 return;
             }
 
+            // Begin route has no identity to bind to — throttle per IP only.
+            const ip = this._clientIp(ctx.req);
+            if (await this._throttled(ctx, { ip })) {
+                return;
+            }
+
             const redirectUri = `${this._baseUrl}/auth/${prov}/callback`;
             const { url, state } = this._service.buildAuthUrl(prov as OAuthProvider, redirectUri);
 
@@ -390,23 +438,34 @@ export class AuthRouterComponent extends FlowComponent {
                 OAUTH_STATE_COOKIE,
             );
 
+            const ua = (() => {
+                const h = ctx.req.headers["user-agent"];
+                return Array.isArray(h) ? h[0] : (h ?? undefined);
+            })();
+            const ip = this._clientIp(ctx.req);
+
+            // Throttle every callback hit (keyed by IP and by provider+state) so
+            // the unauthenticated callback path cannot be hammered.
+            if (await this._throttled(ctx, { ip, identity: `cb:${prov}:${state}` })) {
+                return;
+            }
+
             if (!code || !savedState || savedState !== state) {
+                // State mismatch / missing code is a rejected (possibly forged)
+                // login — record it for the audit trail.
+                await this._service.recordAttempt({
+                    provider: prov,
+                    status: "error",
+                    nonce: state || null,
+                    ipAddress: ip,
+                    userAgent: ua,
+                    errorCode: "state_mismatch",
+                });
                 ctx.status = 302;
                 ctx.headers.location = this._failure;
                 ctx.body = null;
                 return;
             }
-
-            const ua = (() => {
-                const h = ctx.req.headers["user-agent"];
-                return Array.isArray(h) ? h[0] : (h ?? undefined);
-            })();
-
-            const ip = (() => {
-                const h = ctx.req.headers["x-forwarded-for"];
-                const s = Array.isArray(h) ? h[0] : h;
-                return s ? s.split(",")[0]?.trim() : undefined;
-            })();
 
             try {
                 const { session } = await this._service.handleCallback({
@@ -414,7 +473,8 @@ export class AuthRouterComponent extends FlowComponent {
                     code,
                     redirectUri: `${this._baseUrl}/auth/${prov}/callback`,
                     device: { userAgent: ua, platform: "web" },
-                    ipAddress: ip,
+                    ipAddress: ip ?? undefined,
+                    nonce: state,
                 });
 
                 ctx.status = 302;
@@ -425,10 +485,29 @@ export class AuthRouterComponent extends FlowComponent {
                 ];
                 ctx.body = null;
             } catch {
+                // handleCallback already recorded the failure attempt.
                 ctx.status = 302;
                 ctx.headers.location = this._failure;
                 ctx.body = null;
             }
         });
+    }
+
+    /**
+     * Runs the throttle for one request. When over a limit, writes a 429 to the
+     * response and returns true so the caller can short-circuit.
+     */
+    private async _throttled(
+        ctx: { status: number; headers: Record<string, string | string[]>; body: unknown },
+        args: { ip: string | null; identity?: string | null },
+    ): Promise<boolean> {
+        const { allowed, retryAfterSecs } = await this._throttle.check(args);
+        if (allowed) {
+            return false;
+        }
+        ctx.status = 429;
+        ctx.headers["retry-after"] = String(retryAfterSecs);
+        ctx.body = { error: "Too Many Requests" };
+        return true;
     }
 }

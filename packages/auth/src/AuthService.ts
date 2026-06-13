@@ -7,14 +7,21 @@ import {
     type ServerContext,
     systemSec,
 } from "@jasonscharf/server";
-import { SESSION_TTL_SECS } from "./constants.js";
+import { AUTH_NEG_CACHE_TTL_SECS, NEG_CACHE_SENTINEL, SESSION_TTL_SECS } from "./constants.js";
 import type { IOAuthProvider } from "./oauth/types.js";
+import type { LoginAttemptRepository } from "./repository/LoginAttemptRepository.js";
 import type { UserDeviceRepository } from "./repository/UserDeviceRepository.js";
 import type { UserIdentityRepository } from "./repository/UserIdentityRepository.js";
 import type { UserRepository } from "./repository/UserRepository.js";
 import type { UserSessionRepository } from "./repository/UserSessionRepository.js";
 import type { ISessionStore } from "./session/ISessionStore.js";
-import type { DeviceInfo, OAuthProvider, UserEntity, UserSessionEntity } from "./types.js";
+import type {
+    DeviceInfo,
+    LoginAttemptStatus,
+    OAuthProvider,
+    UserEntity,
+    UserSessionEntity,
+} from "./types.js";
 
 export interface LoginResult {
     user: UserEntity;
@@ -40,6 +47,7 @@ export class AuthService {
     private readonly _identities: UserIdentityRepository;
     private readonly _sessions: UserSessionRepository;
     private readonly _devices: UserDeviceRepository;
+    private readonly _attempts: LoginAttemptRepository | null;
 
     constructor(opts: {
         providers: IOAuthProvider[];
@@ -48,6 +56,8 @@ export class AuthService {
         identities: UserIdentityRepository;
         sessions: UserSessionRepository;
         devices: UserDeviceRepository;
+        /** Optional. When provided, login attempts are recorded for audit. */
+        attempts?: LoginAttemptRepository;
     }) {
         this._providers = new Map(opts.providers.map((p) => [p.name, p]));
         this._store = opts.sessionStore;
@@ -55,6 +65,7 @@ export class AuthService {
         this._identities = opts.identities;
         this._sessions = opts.sessions;
         this._devices = opts.devices;
+        this._attempts = opts.attempts ?? null;
     }
 
     get store() {
@@ -80,6 +91,32 @@ export class AuthService {
         redirectUri: string;
         device: DeviceInfo;
         ipAddress?: string;
+        /** OAuth state value, used as the login-attempt nonce for the audit trail. */
+        nonce?: string;
+    }): Promise<LoginResult> {
+        try {
+            return await this._handleCallbackInner(opts);
+        } catch (err) {
+            // Audit the failure, then re-throw so callers keep their existing behavior.
+            await this._recordAttempt({
+                provider: opts.provider,
+                nonce: opts.nonce,
+                ipAddress: opts.ipAddress,
+                userAgent: opts.device.userAgent,
+                status: "error",
+                errorCode: err instanceof Error ? err.message : "unknown_error",
+            });
+            throw err;
+        }
+    }
+
+    private async _handleCallbackInner(opts: {
+        provider: OAuthProvider;
+        code: string;
+        redirectUri: string;
+        device: DeviceInfo;
+        ipAddress?: string;
+        nonce?: string;
     }): Promise<LoginResult> {
         const { profile, tokens } = await this.getProvider(opts.provider).exchangeCode(
             opts.code,
@@ -164,7 +201,68 @@ export class AuthService {
             SESSION_TTL_SECS,
         );
 
+        await this._recordAttempt({
+            provider: opts.provider,
+            nonce: opts.nonce,
+            ipAddress: opts.ipAddress,
+            userAgent: opts.device.userAgent,
+            status: "success",
+            userId: user.id,
+        });
+
         return { user, session };
+    }
+
+    /**
+     * Records a login attempt for the audit trail. No-op when no
+     * LoginAttemptRepository was supplied. A missing nonce is filled with a
+     * synthetic value so the audit row is still queryable. Audit failures never
+     * break the auth flow — they are swallowed.
+     */
+    async recordAttempt(args: {
+        provider: OAuthProvider;
+        status: LoginAttemptStatus;
+        nonce?: string | null;
+        ipAddress?: string | null;
+        userAgent?: string | null;
+        userId?: string | null;
+        errorCode?: string | null;
+    }): Promise<void> {
+        await this._recordAttempt(args);
+    }
+
+    private async _recordAttempt(args: {
+        provider: OAuthProvider;
+        status: LoginAttemptStatus;
+        nonce?: string | null;
+        ipAddress?: string | null;
+        userAgent?: string | null;
+        userId?: string | null;
+        errorCode?: string | null;
+    }): Promise<void> {
+        if (!this._attempts) {
+            return;
+        }
+        try {
+            const ctx = buildServerContext(this._users.store);
+            const nonce = args.nonce ?? `synthetic:${randomBytes(8).toString("hex")}`;
+            const created = await this._attempts.create(ctx, systemSec, {
+                provider: args.provider,
+                nonce,
+                ipAddress: args.ipAddress ?? undefined,
+                userAgent: args.userAgent ?? undefined,
+            });
+            if (args.status !== "pending") {
+                await this._attempts.updateStatus(ctx, systemSec, {
+                    id: created.id,
+                    status: args.status,
+                    userId: args.userId ?? undefined,
+                    errorCode: args.errorCode ?? undefined,
+                });
+            }
+        } catch {
+            // Audit must never break the auth flow.
+        }
     }
 
     /** @insecure @nochecks */
@@ -175,6 +273,11 @@ export class AuthService {
     ): Promise<UserEntity | null> {
         const key = makeUri(NS_CORE, "session", args.token);
         const cached = await this._store.get(key);
+
+        if (cached === NEG_CACHE_SENTINEL) {
+            // Known-bad token — short-circuit without touching the triple store.
+            return null;
+        }
 
         if (cached) {
             const data = JSON.parse(cached) as { userId: string; expiresAt: number };
@@ -188,6 +291,11 @@ export class AuthService {
         if (session?.isActive && session.expiresAt.getTime() > Date.now()) {
             return this._users.findById(ctx, systemSec, { id: session.userId });
         }
+
+        // Negative-cache the miss so repeated garbage tokens stop hitting the
+        // triple store. Short TTL bounds the window where a token that becomes
+        // valid (it never does — tokens are minted, not guessed) would be denied.
+        await this._store.set(key, NEG_CACHE_SENTINEL, AUTH_NEG_CACHE_TTL_SECS);
         return null;
     }
 
@@ -224,7 +332,9 @@ export class AuthService {
         });
         const active = sessions.filter((s) => s.isActive);
 
-        await Promise.all(active.map((s) => this._store.del(makeUri(NS_CORE, "session", s.sessionToken))));
+        await Promise.all(
+            active.map((s) => this._store.del(makeUri(NS_CORE, "session", s.sessionToken))),
+        );
         return this._sessions.revokeAllForUser(ctx, systemSec, { userId: args.userId });
     }
 

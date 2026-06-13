@@ -58,6 +58,7 @@ export class HttpDecoder extends FlowComponent {
                 pathname,
                 searchParams,
                 headers: req.headers,
+                remoteAddress: req.remoteAddress,
                 body: decodeBody(req.body, ct),
                 contentType: ct || undefined,
             });

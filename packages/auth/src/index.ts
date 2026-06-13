@@ -51,6 +51,9 @@ export { UserDeviceRepository } from "./repository/UserDeviceRepository.js";
 export { UserIdentityRepository } from "./repository/UserIdentityRepository.js";
 export { UserRepository } from "./repository/UserRepository.js";
 export { UserSessionRepository } from "./repository/UserSessionRepository.js";
+export type { AuthThrottleOptions } from "./session/AuthThrottle.js";
+// ── Auth throttle ──────────────────────────────────────────────────────────────
+export { AuthThrottle } from "./session/AuthThrottle.js";
 export type { ISessionStore } from "./session/ISessionStore.js";
 export { MemorySessionStore } from "./session/MemorySessionStore.js";
 // ── Session stores ────────────────────────────────────────────────────────────

@@ -11,6 +11,17 @@ const _defaults = {
     GOOGLE_CLIENT_SECRET: "placeholder_google_client_secret",
     GITHUB_CLIENT_ID: "placeholder_github_client_id",
     GITHUB_CLIENT_SECRET: "placeholder_github_client_secret",
+    // Auth abuse controls (TRN-171).
+    // Sliding-window throttle on auth endpoints; counts are kept in the session store.
+    AUTH_THROTTLE_WINDOW_SECS: String(60),
+    AUTH_THROTTLE_MAX_PER_IP: String(20),
+    AUTH_THROTTLE_MAX_PER_IDENTITY: String(10),
+    // Comma-separated IP allowlist of trusted reverse proxies. Only when the
+    // socket peer is in this list is the x-forwarded-for header honored.
+    AUTH_TRUSTED_PROXIES: "",
+    // Short TTL for negative-caching invalid session tokens so repeated garbage
+    // tokens do not fall through to the triple store.
+    AUTH_NEG_CACHE_TTL_SECS: String(30),
 };
 
 export const authEnv: Record<keyof typeof _defaults, string> = { ..._defaults };

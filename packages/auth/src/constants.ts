@@ -22,3 +22,18 @@ export const GOOGLE_CLIENT_ID = authEnv.GOOGLE_CLIENT_ID;
 export const GOOGLE_CLIENT_SECRET = authEnv.GOOGLE_CLIENT_SECRET;
 export const GITHUB_CLIENT_ID = authEnv.GITHUB_CLIENT_ID;
 export const GITHUB_CLIENT_SECRET = authEnv.GITHUB_CLIENT_SECRET;
+
+// ── Auth abuse controls (TRN-171) ──────────────────────────────────────────────
+
+export const AUTH_THROTTLE_WINDOW_SECS = parseInt(authEnv.AUTH_THROTTLE_WINDOW_SECS, 10);
+export const AUTH_THROTTLE_MAX_PER_IP = parseInt(authEnv.AUTH_THROTTLE_MAX_PER_IP, 10);
+export const AUTH_THROTTLE_MAX_PER_IDENTITY = parseInt(authEnv.AUTH_THROTTLE_MAX_PER_IDENTITY, 10);
+export const AUTH_NEG_CACHE_TTL_SECS = parseInt(authEnv.AUTH_NEG_CACHE_TTL_SECS, 10);
+
+/** Parsed allowlist of trusted reverse-proxy IPs (empty = trust none, use socket peer). */
+export const AUTH_TRUSTED_PROXIES: string[] = authEnv.AUTH_TRUSTED_PROXIES.split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+
+/** Sentinel value stored in the session store to mark a token as known-invalid. */
+export const NEG_CACHE_SENTINEL = "__neg__";

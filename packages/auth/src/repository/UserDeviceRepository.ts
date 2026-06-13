@@ -19,6 +19,15 @@ export interface UserIdArgs {
     userId: string;
 }
 
+/**
+ * Data-access layer for UserDevice entities.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design — like the convos repositories. Device records are written during
+ * the OAuth callback (a documented system/bootstrap path) and otherwise read
+ * via AuthService, which owns authorization. The `_sec` argument is threaded for
+ * signature symmetry but not consulted here.
+ */
 export class UserDeviceRepository {
     private readonly _store: TripleStore;
     private readonly _entities: EntityStore;
@@ -32,7 +41,7 @@ export class UserDeviceRepository {
         return this._store;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService / OAuth callback enforces (see class doc). */
     async findOrCreate(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -57,7 +66,7 @@ export class UserDeviceRepository {
         return this._toEntity(record);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService / OAuth callback enforces (see class doc). */
     async findById(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -67,7 +76,7 @@ export class UserDeviceRepository {
         return record ? this._toEntity(record) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService / OAuth callback enforces (see class doc). */
     async findByUserId(
         ctx: ServerContext,
         _sec: SecurityContext,

@@ -21,6 +21,15 @@ export interface UserIdArgs {
     userId: string;
 }
 
+/**
+ * Data-access layer for UserSession entities.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design — like the convos repositories. Session authorization is enforced
+ * one level up: AuthService gates cross-user session administration via RBAC,
+ * and self-service session ops authenticate by possession of the raw token.
+ * The `_sec` argument is threaded for signature symmetry but not consulted here.
+ */
 export class UserSessionRepository {
     private readonly _store: TripleStore;
     private readonly _entities: EntityStore;
@@ -34,7 +43,7 @@ export class UserSessionRepository {
         return this._store;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService enforces (see class doc). */
     async create(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -62,7 +71,7 @@ export class UserSessionRepository {
         return { ...this._toEntity(record), sessionToken: token };
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService enforces (see class doc). */
     async findByToken(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -76,7 +85,7 @@ export class UserSessionRepository {
         return record ? this._toEntity(record) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService enforces (see class doc). */
     async findByUserId(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -88,7 +97,7 @@ export class UserSessionRepository {
         return records.map((r) => this._toEntity(r));
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService enforces (see class doc). */
     async revoke(ctx: ServerContext, sec: SecurityContext, args: TokenArgs): Promise<boolean> {
         return this._store.withTransaction(ctx, async (ctx) => {
             const session = await this.findByToken(ctx, sec, args);
@@ -100,7 +109,7 @@ export class UserSessionRepository {
         });
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService enforces (see class doc). */
     async revokeAllForUser(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -117,7 +126,7 @@ export class UserSessionRepository {
         });
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService enforces (see class doc). */
     async deleteExpired(ctx: ServerContext, _sec: SecurityContext): Promise<number> {
         return this._store.withTransaction(ctx, async (ctx) => {
             // One batched query for every session — no per-session find inside the loop.

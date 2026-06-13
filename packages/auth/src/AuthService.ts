@@ -3,18 +3,20 @@ import { makeUri, NS_CORE } from "@jasonscharf/core";
 import {
     anonymousSec,
     buildServerContext,
+    type RbacService,
     type SecurityContext,
     type ServerContext,
     systemSec,
 } from "@jasonscharf/server";
 import { AUTH_NEG_CACHE_TTL_SECS, NEG_CACHE_SENTINEL, SESSION_TTL_SECS } from "./constants.js";
 import type { IOAuthProvider } from "./oauth/types.js";
+import { PERM_SESSION_LIST_ANY, PERM_SESSION_REVOKE_ANY } from "./permissions.js";
 import type { LoginAttemptRepository } from "./repository/LoginAttemptRepository.js";
 import type { UserDeviceRepository } from "./repository/UserDeviceRepository.js";
 import type { UserIdentityRepository } from "./repository/UserIdentityRepository.js";
 import type { UserRepository } from "./repository/UserRepository.js";
 import type { UserSessionRepository } from "./repository/UserSessionRepository.js";
-import { hashSessionToken } from "./repository/util.js";
+import { hashSessionToken, iriFor } from "./repository/util.js";
 import type { ISessionStore } from "./session/ISessionStore.js";
 import type {
     DeviceInfo,
@@ -49,6 +51,7 @@ export class AuthService {
     private readonly _sessions: UserSessionRepository;
     private readonly _devices: UserDeviceRepository;
     private readonly _attempts: LoginAttemptRepository | null;
+    private readonly _rbac: RbacService | null;
 
     constructor(opts: {
         providers: IOAuthProvider[];
@@ -59,6 +62,13 @@ export class AuthService {
         devices: UserDeviceRepository;
         /** Optional. When provided, login attempts are recorded for audit. */
         attempts?: LoginAttemptRepository;
+        /**
+         * Optional. When provided, cross-user session administration
+         * (listSessions / revokeAllSessions for a userId other than the
+         * caller's own) is gated by RBAC. When absent, those operations are
+         * unchecked — wire it in production.
+         */
+        rbac?: RbacService;
     }) {
         this._providers = new Map(opts.providers.map((p) => [p.name, p]));
         this._store = opts.sessionStore;
@@ -67,6 +77,7 @@ export class AuthService {
         this._sessions = opts.sessions;
         this._devices = opts.devices;
         this._attempts = opts.attempts ?? null;
+        this._rbac = opts.rbac ?? null;
     }
 
     get store() {
@@ -276,7 +287,45 @@ export class AuthService {
         }
     }
 
-    /** @insecure @nochecks */
+    /**
+     * Gate a session-administration operation that targets `userId`.
+     *
+     * Allowed without any grant when the caller IS the target user (self-service
+     * over their own sessions). Otherwise the caller must hold `permission`
+     * (e.g. tern.auth:session.revoke.any). The internal system principal always
+     * passes via AccessChecker's bypass, so token-resolved edge callers — which
+     * use systemSec after resolving the token to its owner — are unaffected.
+     *
+     * No-op when no RbacService was wired: the data layer stays unchecked and
+     * callers are responsible for supplying one in production.
+     */
+    private async _assertSessionAdmin(
+        ctx: ServerContext,
+        sec: SecurityContext,
+        userId: string,
+        permission: string,
+    ): Promise<void> {
+        if (!this._rbac) {
+            return;
+        }
+        if (sec.principalIri === systemSec.principalIri) {
+            return;
+        }
+        const targetIri = iriFor("user", userId).value;
+        if (sec.principalIri === targetIri) {
+            return;
+        }
+        await this._rbac.assert(ctx, sec, { permission });
+    }
+
+    /**
+     * System/bootstrap path: resolves a raw session token to its owning user.
+     * Possession of the token IS the credential — this runs at the unauthenticated
+     * edge (cookie/Bearer validation) before any principal exists, so it
+     * deliberately uses the internal system principal rather than the caller's
+     * `sec`. It only ever reads back the user the token already belongs to; it
+     * grants no cross-user access.
+     */
     async validateToken(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -310,7 +359,12 @@ export class AuthService {
         return null;
     }
 
-    /** @insecure @nochecks */
+    /**
+     * System/bootstrap path: revokes a single session by its raw token. The
+     * token itself is the bearer credential, so the holder is implicitly
+     * authorized to invalidate it (self-service logout). No principal-scoped
+     * check applies — there is nothing to check beyond possession of the token.
+     */
     async revokeToken(ctx: ServerContext, _sec: SecurityContext, args: TokenArgs): Promise<void> {
         await Promise.all([
             this._store.del(this._sessionCacheKey(args.token)),
@@ -318,26 +372,38 @@ export class AuthService {
         ]);
     }
 
-    /** @insecure @nochecks Returns all sessions (active and inactive) for a user. */
+    /**
+     * Returns all sessions (active and inactive) for a user.
+     *
+     * Self-service for the caller's own userId; reading ANOTHER user's sessions
+     * requires `tern.auth:session.list.any`. The internal system principal
+     * bypasses the check (AccessChecker), so the unauthenticated HTTP edge —
+     * which has already resolved the token to its owner — keeps working.
+     */
     async listSessions(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: UserIdArgs,
     ): Promise<UserSessionEntity[]> {
+        await this._assertSessionAdmin(ctx, sec, args.userId, PERM_SESSION_LIST_ANY);
         return this._sessions.findByUserId(ctx, systemSec, { userId: args.userId });
     }
 
     /**
-     * @insecure @nochecks
      * Revokes all active sessions for the user: removes them from the fast-path
      * session store AND marks them inactive in the triple store.
      * Returns the count of sessions that were revoked.
+     *
+     * Self-service for the caller's own userId; revoking ANOTHER user's sessions
+     * requires `tern.auth:session.revoke.any`. The internal system principal
+     * bypasses the check, preserving the token-resolved HTTP edge path.
      */
     async revokeAllSessions(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: UserIdArgs,
     ): Promise<number> {
+        await this._assertSessionAdmin(ctx, sec, args.userId, PERM_SESSION_REVOKE_ANY);
         const sessions = await this._sessions.findByUserId(ctx, systemSec, {
             userId: args.userId,
         });

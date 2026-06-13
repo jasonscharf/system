@@ -30,6 +30,12 @@ export { GitHubProvider } from "./oauth/GitHubProvider.js";
 // ── OAuth providers ───────────────────────────────────────────────────────────
 export { GoogleProvider } from "./oauth/GoogleProvider.js";
 export type { IOAuthProvider, OAuthProfile, OAuthResult, OAuthTokens } from "./oauth/types.js";
+// ── RBAC permission keys ──────────────────────────────────────────────────────
+export {
+    ALL_AUTH_PERMISSIONS,
+    PERM_SESSION_LIST_ANY,
+    PERM_SESSION_REVOKE_ANY,
+} from "./permissions.js";
 export type { UserWithActivity } from "./queries.js";
 // ── Entity queries (list, join) ───────────────────────────────────────────────
 export {

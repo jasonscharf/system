@@ -19,6 +19,16 @@ export interface UpdateUserArgs {
     patch: Partial<Pick<UserEntity, "displayName" | "avatarUrl" | "email">>;
 }
 
+/**
+ * Data-access layer for User entities.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design — exactly like the convos repositories. Authorization is enforced
+ * one level up, at the service boundary (AuthService / OAuth callback), which
+ * either asserts an RBAC permission or runs a documented system/bootstrap path.
+ * The `_sec` argument is threaded through for signature symmetry and so a future
+ * row-level policy could hook in, but is intentionally not consulted here.
+ */
 export class UserRepository {
     private readonly _store: TripleStore;
     private readonly _entities: EntityStore;
@@ -38,7 +48,7 @@ export class UserRepository {
         return this._store;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService enforces (see class doc). */
     async create(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -48,7 +58,7 @@ export class UserRepository {
         return this._toEntity(record);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService enforces (see class doc). */
     async findById(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -58,7 +68,7 @@ export class UserRepository {
         return record ? this._toEntity(record) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService enforces (see class doc). */
     async findByEmail(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -70,7 +80,7 @@ export class UserRepository {
         return record ? this._toEntity(record) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService enforces (see class doc). */
     async update(
         ctx: ServerContext,
         sec: SecurityContext,
@@ -96,7 +106,7 @@ export class UserRepository {
         });
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService enforces (see class doc). */
     async delete(ctx: ServerContext, _sec: SecurityContext, args: IdArgs): Promise<void> {
         await this._entities.delete(ctx, UserSchema, args.id);
     }

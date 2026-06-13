@@ -29,6 +29,15 @@ export interface UpdateStatusArgs {
     errorCode?: string;
 }
 
+/**
+ * Data-access layer for LoginAttempt audit entities.
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design — like the convos repositories. Login attempts are recorded by the
+ * OAuth callback / AuthService audit path (a documented system/bootstrap path
+ * that runs before any principal exists). The `_sec` argument is threaded for
+ * signature symmetry but not consulted here.
+ */
 export class LoginAttemptRepository {
     private readonly _store: TripleStore;
     private readonly _entities: EntityStore;
@@ -42,7 +51,7 @@ export class LoginAttemptRepository {
         return this._store;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService / OAuth callback enforces (see class doc). */
     async create(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -68,7 +77,7 @@ export class LoginAttemptRepository {
         return this._toEntity(record);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService / OAuth callback enforces (see class doc). */
     async findByNonce(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -80,7 +89,7 @@ export class LoginAttemptRepository {
         return record ? this._toEntity(record) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService / OAuth callback enforces (see class doc). */
     async updateStatus(
         ctx: ServerContext,
         _sec: SecurityContext,

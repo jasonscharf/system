@@ -20,6 +20,15 @@ export interface UpdateTokensArgs {
     tokens: Pick<UserIdentityEntity, "accessToken" | "refreshToken" | "tokenExpiresAt">;
 }
 
+/**
+ * Data-access layer for UserIdentity entities (OAuth identity + tokens).
+ *
+ * Repositories are the trusted persistence layer and perform NO access checks
+ * by design — like the convos repositories. These methods are reached only from
+ * the OAuth callback (a documented system/bootstrap path that runs before any
+ * principal exists) and from AuthService, which owns authorization. The `_sec`
+ * argument is threaded for signature symmetry but not consulted here.
+ */
 export class UserIdentityRepository {
     private readonly _store: TripleStore;
     private readonly _entities: EntityStore;
@@ -39,7 +48,7 @@ export class UserIdentityRepository {
         return this._store;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService / OAuth callback enforces (see class doc). */
     async create(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -62,7 +71,7 @@ export class UserIdentityRepository {
         return this._toEntity(record);
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService / OAuth callback enforces (see class doc). */
     async findByProvider(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -75,7 +84,7 @@ export class UserIdentityRepository {
         return record ? this._toEntity(record) : null;
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService / OAuth callback enforces (see class doc). */
     async findByUserId(
         ctx: ServerContext,
         _sec: SecurityContext,
@@ -87,7 +96,7 @@ export class UserIdentityRepository {
         return records.map((r) => this._toEntity(r));
     }
 
-    /** @insecure @nochecks */
+    /** @dataLayer — no checks here; AuthService / OAuth callback enforces (see class doc). */
     async updateTokens(
         ctx: ServerContext,
         _sec: SecurityContext,

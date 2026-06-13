@@ -2,7 +2,6 @@ import { IRI, makeUri, NS_CORE } from "@jasonscharf/core";
 import { authEnv } from "./defaults.js";
 
 export const AUTH_NS = makeUri(NS_CORE, "auth");
-export const AUTH_GRAPH = new IRI(makeUri(AUTH_NS, "graph"));
 
 export const RDF_TYPE = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
 export const XSD_NS = "http://www.w3.org/2001/XMLSchema#";

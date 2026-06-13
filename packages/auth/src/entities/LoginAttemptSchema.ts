@@ -14,12 +14,11 @@ import {
     utmSourceIRI,
 } from "@jasonscharf/core";
 import { EntitySchema } from "@jasonscharf/entities";
-import { AUTH_GRAPH, AUTH_NS } from "../constants.js";
+import { AUTH_NS } from "../constants.js";
 
 export const LoginAttemptSchema = new EntitySchema({
     typeIRI: LoginAttemptIRI,
     ns: AUTH_NS,
-    graphIri: AUTH_GRAPH,
     properties: {
         provider: providerIRI,
         status: statusIRI,

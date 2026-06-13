@@ -1,3 +1,4 @@
+import type { IncomingMessage } from "node:http";
 import {
     FlowApp,
     FlowComponent,
@@ -8,9 +9,12 @@ import {
     WebSocketReader,
     WebSocketServer,
     WebSocketWriter,
+    type WsConnection,
     type WsMessage,
+    type WsPrincipal,
 } from "@jasonscharf/flow";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { WebSocket as WsClient } from "ws";
 
 // ── Helper: wait for a port to receive a message ─────────────────────────────
 
@@ -346,6 +350,241 @@ describe("WebSocketClient: binary message handling", () => {
         expect(msg).toBeInstanceOf(Uint8Array);
 
         await client.dispose();
+        await app.stop();
+    });
+});
+
+// ── Upgrade-time auth + origin allow-list (TRN-173) ──────────────────────────
+
+/**
+ * A real downstream component that records the principal it resolves for each
+ * inbound WsMessage by asking the server's connection map. This is the FBP
+ * observability layer for "downstream can resolve the connection's principal" —
+ * not a spy.
+ */
+class PrincipalCollector extends FlowComponent {
+    readonly in: FlowPort<WsMessage>;
+    readonly seen: WsPrincipal[] = [];
+
+    constructor(
+        options: FlowComponentOptions,
+        private readonly _server: WebSocketServer,
+    ) {
+        super(options);
+        this.in = this.addPort<WsMessage>("in", "in");
+    }
+
+    override step(): void {
+        for (;;) {
+            const msg = this.in.read();
+            if (msg === undefined) {
+                break;
+            }
+            const conn = this._server.getConnection(msg.connectionId);
+            if (conn?.principal != null) {
+                this.seen.push(conn.principal);
+            }
+        }
+    }
+}
+
+// A real authenticate implementation: it reads a bearer token from the
+// Authorization header (or an "auth" cookie) and returns a principal for the
+// known token, otherwise null. This is a genuine implementation, not a mock.
+function tokenAuthenticate(req: IncomingMessage): Promise<WsPrincipal | null> {
+    const header = req.headers.authorization ?? null;
+    const cookie = req.headers.cookie ?? null;
+    const bearer = header?.startsWith("Bearer ") ? header.slice(7) : null;
+    const cookieToken =
+        cookie
+            ?.split(";")
+            .map((c) => c.trim())
+            .find((c) => c.startsWith("auth="))
+            ?.slice("auth=".length) ?? null;
+    const token = bearer ?? cookieToken;
+    if (token === "good-token") {
+        return Promise.resolve({ sub: "user-42", token });
+    }
+    return Promise.resolve(null);
+}
+
+async function connectWs(
+    url: string,
+    headers: Record<string, string>,
+): Promise<{ ok: boolean; status: number | null; ws: WsClient | null }> {
+    const ws = new WsClient(url, { headers });
+    return new Promise((resolve) => {
+        ws.on("open", () => resolve({ ok: true, status: 101, ws }));
+        ws.on("unexpected-response", (_req, res) => {
+            ws.terminate();
+            resolve({ ok: false, status: res.statusCode ?? null, ws: null });
+        });
+        ws.on("error", () => resolve({ ok: false, status: null, ws: null }));
+    });
+}
+
+describe("WebSocketServer upgrade authentication (TRN-173)", () => {
+    let app: FlowApp;
+    let server: WebSocketServer;
+    let collector: PrincipalCollector;
+    let port: number;
+
+    beforeEach(async () => {
+        port = await freePort();
+        app = new FlowApp({ mode: "push" });
+        server = new WebSocketServer({
+            name: "server",
+            context: app.context,
+            port,
+            authenticate: tokenAuthenticate,
+            allowedOrigins: ["https://app.example.com"],
+        });
+        collector = new PrincipalCollector({ name: "collector", context: app.context }, server);
+        app.addComponent(server).addComponent(collector).connect(server.received, collector.in);
+        await app.start();
+        app.scheduler.start();
+    });
+
+    afterEach(async () => {
+        await app.stop();
+    });
+
+    it("refuses an upgrade with no credentials (401)", async () => {
+        const result = await connectWs(`ws://127.0.0.1:${port}`, {
+            origin: "https://app.example.com",
+        });
+        expect(result.ok).toBe(false);
+        expect(result.status).toBe(401);
+    });
+
+    it("refuses an upgrade with an invalid token (401)", async () => {
+        const result = await connectWs(`ws://127.0.0.1:${port}`, {
+            origin: "https://app.example.com",
+            authorization: "Bearer wrong-token",
+        });
+        expect(result.ok).toBe(false);
+        expect(result.status).toBe(401);
+    });
+
+    it("accepts a valid token and a downstream component resolves the principal", async () => {
+        const result = await connectWs(`ws://127.0.0.1:${port}`, {
+            origin: "https://app.example.com",
+            authorization: "Bearer good-token",
+        });
+        expect(result.ok).toBe(true);
+        expect(result.ws).not.toBeNull();
+
+        const connId = await waitForMessage(server.connected);
+        expect(typeof connId).toBe("string");
+
+        // The principal is stamped on the connection map at upgrade.
+        const conn = server.getConnection(connId);
+        expect(conn).not.toBeNull();
+        expect((conn as WsConnection).principal).toEqual({
+            sub: "user-42",
+            token: "good-token",
+        });
+        expect(server.getPrincipal(connId)).toEqual({ sub: "user-42", token: "good-token" });
+
+        // A downstream component reading `received` resolves the same principal.
+        result.ws?.send("hello");
+        const deadline = Date.now() + 2000;
+        while (collector.seen.length === 0 && Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 10));
+        }
+        expect(collector.seen).toEqual([{ sub: "user-42", token: "good-token" }]);
+
+        result.ws?.close();
+    });
+
+    it("accepts a valid token presented via cookie", async () => {
+        const result = await connectWs(`ws://127.0.0.1:${port}`, {
+            origin: "https://app.example.com",
+            cookie: "auth=good-token; other=1",
+        });
+        expect(result.ok).toBe(true);
+        result.ws?.close();
+    });
+
+    it("rejects a disallowed Origin (403) before authenticating", async () => {
+        const result = await connectWs(`ws://127.0.0.1:${port}`, {
+            origin: "https://evil.example.com",
+            authorization: "Bearer good-token",
+        });
+        expect(result.ok).toBe(false);
+        expect(result.status).toBe(403);
+    });
+
+    it("rejects a missing Origin when an allow-list is set (403)", async () => {
+        const result = await connectWs(`ws://127.0.0.1:${port}`, {
+            authorization: "Bearer good-token",
+        });
+        expect(result.ok).toBe(false);
+        expect(result.status).toBe(403);
+    });
+});
+
+describe("WebSocketServer open server (no auth, no origin list)", () => {
+    let app: FlowApp;
+    let server: WebSocketServer;
+    let port: number;
+
+    beforeEach(async () => {
+        port = await freePort();
+        app = new FlowApp({ mode: "push" });
+        server = new WebSocketServer({ name: "server", context: app.context, port });
+        app.addComponent(server);
+        await app.start();
+        app.scheduler.start();
+    });
+
+    afterEach(async () => {
+        await app.stop();
+    });
+
+    it("accepts any connection and exposes a null principal", async () => {
+        const result = await connectWs(`ws://127.0.0.1:${port}`, {
+            origin: "https://anywhere.example.com",
+        });
+        expect(result.ok).toBe(true);
+
+        const connId = await waitForMessage(server.connected);
+        const conn = server.getConnection(connId);
+        expect(conn).not.toBeNull();
+        expect((conn as WsConnection).principal).toBeNull();
+        expect(server.getPrincipal(connId)).toBeNull();
+
+        result.ws?.close();
+    });
+
+    it("getConnection returns null for an unknown connection id", () => {
+        expect(server.getConnection("does-not-exist")).toBeNull();
+        expect(server.getPrincipal("does-not-exist")).toBeNull();
+    });
+});
+
+describe("WebSocketServer authenticate that throws is treated as rejection", () => {
+    it("rejects with 401 when the authenticate callback throws", async () => {
+        const port = await freePort();
+        const app = new FlowApp({ mode: "push" });
+        const server = new WebSocketServer({
+            name: "server",
+            context: app.context,
+            port,
+            authenticate: () => {
+                throw new Error("boom");
+            },
+        });
+        app.addComponent(server);
+        await app.start();
+        app.scheduler.start();
+
+        const result = await connectWs(`ws://127.0.0.1:${port}`, {
+            origin: "https://app.example.com",
+        });
+        expect(result.ok).toBe(false);
+        expect(result.status).toBe(401);
+
         await app.stop();
     });
 });

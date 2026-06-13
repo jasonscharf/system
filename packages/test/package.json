@@ -47,11 +47,13 @@
         "@testing-library/react": "^16.3.1",
         "@types/react": "^19",
         "@types/react-dom": "^19",
+        "@types/ws": "^8.5.14",
         "@vitest/coverage-istanbul": "4.0.16",
         "@vitest/coverage-v8": "^4.0.16",
         "jsdom": "^27.4.0",
         "nyc": "^17.1.0",
         "playwright-coverage": "^0.0.1-security",
-        "vitest": "^4.0.16"
+        "vitest": "^4.0.16",
+        "ws": "^8.18.0"
     }
 }

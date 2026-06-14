@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { InMemoryDispatch } from "./dispatch.js";
 
 describe("InMemoryDispatch (the real seam, not a mock)", () => {
-    it("testCommandRoundTrip", async () => {
+    it("test command round trip", async () => {
         const dispatch = new InMemoryDispatch();
         const seen: number[] = [];
         dispatch.register<{ n: number }>("add", (arg) => {
@@ -14,14 +14,14 @@ describe("InMemoryDispatch (the real seam, not a mock)", () => {
         expect(seen).toEqual([7]);
     });
 
-    it("testUnknownCommandRejects", async () => {
+    it("test unknown command rejects", async () => {
         const dispatch = new InMemoryDispatch();
         await expect(dispatch.command("missing").exec(null)).rejects.toThrow(
             /No command registered/,
         );
     });
 
-    it("testEventRoundTripToAllListeners", () => {
+    it("test event round trip to all listeners", () => {
         const dispatch = new InMemoryDispatch();
         const a: string[] = [];
         const b: string[] = [];
@@ -39,13 +39,13 @@ describe("InMemoryDispatch (the real seam, not a mock)", () => {
         expect(b).toEqual(["one"]);
     });
 
-    it("testEventWithNoListenersIsNoop", () => {
+    it("test event with no listeners is noop", () => {
         const dispatch = new InMemoryDispatch();
         expect(() => dispatch.event("silent", 1)).not.toThrow();
         expect(dispatch.listenerCount("silent")).toBe(0);
     });
 
-    it("testReRegisterReplacesImplementation", async () => {
+    it("test re register replaces implementation", async () => {
         const dispatch = new InMemoryDispatch();
         let value = "first";
         dispatch.register("set", () => {

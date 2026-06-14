@@ -11,7 +11,7 @@ const items: MenuItemConfig[] = [
 ];
 
 describe("assembleMenu", () => {
-    it("testAssemblesOrderedTreeFromFlatConfig", () => {
+    it("test assembles ordered tree from flat config", () => {
         const tree = assembleMenu(items, { capabilities: new Set(["admin"]) });
         expect(tree.map((n) => n.item.id)).toEqual(["home", "reports", "admin"]);
 
@@ -19,7 +19,7 @@ describe("assembleMenu", () => {
         expect(reports?.children.map((c) => c.item.id)).toEqual(["reports.kpi", "reports.sales"]);
     });
 
-    it("testGatesItemsAndSubtreesByCapability", () => {
+    it("test gates items and subtrees by capability", () => {
         // Without the admin capability, admin and its child both disappear.
         const tree = assembleMenu(items);
         expect(tree.map((n) => n.item.id)).toEqual(["home", "reports"]);
@@ -27,7 +27,7 @@ describe("assembleMenu", () => {
         expect(flatIds).not.toContain("admin.users");
     });
 
-    it("testDropsOrphansWhoseParentIsMissing", () => {
+    it("test drops orphans whose parent is missing", () => {
         const orphaned: MenuItemConfig[] = [
             { id: "child", label: "Child", parent: "ghost" },
             { id: "top", label: "Top" },
@@ -36,7 +36,7 @@ describe("assembleMenu", () => {
         expect(tree.map((n) => n.item.id)).toEqual(["top"]);
     });
 
-    it("testEmptyConfigYieldsEmptyMenu", () => {
+    it("test empty config yields empty menu", () => {
         expect(assembleMenu([])).toEqual([]);
     });
 });

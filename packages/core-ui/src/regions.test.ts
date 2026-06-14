@@ -12,7 +12,7 @@ function makeView(id: string, text: string): ViewDefinition<{ text: string }> {
 }
 
 describe("RegionRegistry", () => {
-    it("testHostsContributedViewsForRegion", () => {
+    it("test hosts contributed views for region", () => {
         const registry = new RegionRegistry();
         registry.contribute({ region: "sidebar", view: makeView("a", "A") });
         registry.contribute({ region: "sidebar", view: makeView("b", "B") });
@@ -23,13 +23,13 @@ describe("RegionRegistry", () => {
         expect(registry.hasRegion("sidebar")).toBe(true);
     });
 
-    it("testUnknownRegionYieldsEmptyResult", () => {
+    it("test unknown region yields empty result", () => {
         const registry = new RegionRegistry();
         expect(registry.viewsFor("nope")).toEqual([]);
         expect(registry.hasRegion("nope")).toBe(false);
     });
 
-    it("testOrdersByExplicitOrderThenInsertion", () => {
+    it("test orders by explicit order then insertion", () => {
         const registry = new RegionRegistry();
         registry.contribute({ region: "r", view: makeView("late", "L"), order: 10 });
         registry.contribute({ region: "r", view: makeView("early", "E"), order: 1 });
@@ -39,7 +39,7 @@ describe("RegionRegistry", () => {
         expect(registry.viewsFor("r").map((v) => v.id)).toEqual(["mid1", "mid2", "early", "late"]);
     });
 
-    it("testConditionallyContributedViewRespectsWhen", () => {
+    it("test conditionally contributed view respects when", () => {
         const registry = new RegionRegistry();
         let visible = false;
         registry.contribute({ region: "r", view: makeView("cond", "C"), when: () => visible });
@@ -50,7 +50,7 @@ describe("RegionRegistry", () => {
         expect(registry.viewsFor("r").map((v) => v.id)).toEqual(["cond", "always"]);
     });
 
-    it("testDisposerWithdrawsContributionAndRecomposes", () => {
+    it("test disposer withdraws contribution and recomposes", () => {
         const registry = new RegionRegistry();
         const dispose = registry.contribute({ region: "r", view: makeView("a", "A") });
         registry.contribute({ region: "r", view: makeView("b", "B") });
@@ -67,7 +67,7 @@ describe("RegionRegistry", () => {
         disposeB();
     });
 
-    it("testBoundViewRendersThroughViewModel", () => {
+    it("test bound view renders through view model", () => {
         const registry = new RegionRegistry();
         registry.contribute({ region: "r", view: makeView("a", "hello") });
         const dispatch = new InMemoryDispatch();

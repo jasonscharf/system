@@ -9,7 +9,7 @@ interface CounterModel {
 }
 
 describe("view to view-model binding", () => {
-    it("testBindsViewModelWithParamsAndDispatch", () => {
+    it("test binds view model with params and dispatch", () => {
         const dispatch = new InMemoryDispatch();
         const def: ViewDefinition<CounterModel, { label: string }> = {
             id: "counter",
@@ -27,7 +27,7 @@ describe("view to view-model binding", () => {
         expect(bound.render()).toBe("Clicks");
     });
 
-    it("testViewModelIssuesCommandThroughDispatch", async () => {
+    it("test view model issues command through dispatch", async () => {
         const dispatch = new InMemoryDispatch();
         let total = 0;
         dispatch.register<{ by: number }>("counter.inc", (arg) => {
@@ -49,7 +49,7 @@ describe("view to view-model binding", () => {
         expect(total).toBe(4);
     });
 
-    it("testDefaultsParamsToEmptyObject", () => {
+    it("test defaults params to empty object", () => {
         const dispatch = new InMemoryDispatch();
         const def: ViewDefinition = {
             id: "noparams",

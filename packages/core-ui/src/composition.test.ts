@@ -12,7 +12,7 @@ function view(id: string, text: string): ViewDefinition<{ text: string }> {
 }
 
 describe("Composition (config-driven composition root)", () => {
-    it("testAppliesContributionsAndBindsRegions", () => {
+    it("test applies contributions and binds regions", () => {
         const composition = new Composition();
         composition.apply({
             regions: [{ region: "main", view: view("welcome", "hi") }],
@@ -24,7 +24,7 @@ describe("Composition (config-driven composition root)", () => {
         expect(composition.menu().map((n) => n.item.id)).toEqual(["home"]);
     });
 
-    it("testWiresDispatchAndRoundTripsCommand", async () => {
+    it("test wires dispatch and round trips command", async () => {
         const dispatch = new InMemoryDispatch();
         const composition = new Composition({ dispatch });
         const calls: string[] = [];
@@ -42,7 +42,7 @@ describe("Composition (config-driven composition root)", () => {
         expect(calls).toEqual(["x"]);
     });
 
-    it("testDisposingContributionRecomposes", () => {
+    it("test disposing contribution recomposes", () => {
         const composition = new Composition();
         const dispose = composition.apply({
             regions: [{ region: "main", view: view("a", "A") }],
@@ -58,7 +58,7 @@ describe("Composition (config-driven composition root)", () => {
         expect(composition.menu()).toHaveLength(0);
     });
 
-    it("testConditionalViewRecomposesOnStateChange", () => {
+    it("test conditional view recomposes on state change", () => {
         const composition = new Composition();
         let enabled = false;
         composition.apply({
@@ -69,7 +69,7 @@ describe("Composition (config-driven composition root)", () => {
         expect(composition.bindRegion<string>("main").map((b) => b.render())).toEqual(["F"]);
     });
 
-    it("testMenuCapabilityGatingFlowsThroughOptions", () => {
+    it("test menu capability gating flows through options", () => {
         const composition = new Composition({ menu: { capabilities: new Set(["admin"]) } });
         composition.apply({
             menu: [

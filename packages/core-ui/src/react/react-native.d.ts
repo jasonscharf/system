@@ -14,17 +14,13 @@
 declare module "react-native" {
     import type { FunctionComponent, ReactNode } from "react";
 
-    /** Shared web-facing props. RNW maps these onto the rendered DOM element. */
     interface RnwBaseProps {
-        /** Classic CSS hook. RNW forwards `className` to the DOM element on web. */
         readonly className?: string;
-        /** Maps to the DOM `role` attribute (e.g. "button", "navigation"). */
         readonly role?: string;
-        /** Maps to `data-testid`, the hook used by the test/e2e suites. */
         readonly testID?: string;
-        /** Maps each entry to a `data-*` attribute on the DOM element. */
         readonly dataSet?: Record<string, string | number | boolean>;
         readonly "aria-label"?: string;
+        readonly "aria-hidden"?: boolean;
         readonly children?: ReactNode;
     }
 
@@ -39,4 +35,12 @@ declare module "react-native" {
     export const Text: FunctionComponent<TextProps>;
     export const ScrollView: FunctionComponent<ScrollViewProps>;
     export const Pressable: FunctionComponent<PressableProps>;
+
+    /**
+     * Platform detection. On web (react-native-web) OS is always "web".
+     * The platform branch not taken is dead-code-eliminated by the bundler.
+     */
+    export const Platform: {
+        readonly OS: "web" | "ios" | "android" | "windows" | "macos";
+    };
 }

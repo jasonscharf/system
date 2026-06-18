@@ -4,7 +4,8 @@ import type { Composition } from "../composition.js";
 
 /**
  * React context carrying the active Composition. The shell provides it once at
- * the root; region hosts and menu views read it to discover what to render.
+ * the root; region hosts read it to discover what to render (and ui-menus reads
+ * its dispatch seam to activate menu items).
  */
 const CompositionContext = createContext<Composition | null>(null);
 
@@ -15,7 +16,7 @@ export interface CompositionProviderProps {
 
 /**
  * Provides a Composition to the React tree. Everything below can host regions
- * and render the contributed menu purely from configuration.
+ * purely from configuration.
  */
 export function CompositionProvider(props: CompositionProviderProps): React.ReactElement {
     const { composition, children } = props;

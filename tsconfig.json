@@ -20,6 +20,9 @@
             "path": "packages/core-ui"
         },
         {
+            "path": "packages/ui-menus"
+        },
+        {
             "path": "packages/core"
         },
         {

@@ -16,12 +16,10 @@ describe("Composition (config-driven composition root)", () => {
         const composition = new Composition();
         composition.apply({
             regions: [{ region: "main", view: view("welcome", "hi") }],
-            menu: [{ id: "home", label: "Home", command: "nav.home" }],
         });
 
         const bound = composition.bindRegion<string>("main");
         expect(bound.map((b) => b.render())).toEqual(["hi"]);
-        expect(composition.menu().map((n) => n.item.id)).toEqual(["home"]);
     });
 
     it("test wires dispatch and round trips command", async () => {
@@ -35,10 +33,9 @@ describe("Composition (config-driven composition root)", () => {
                     calls.push(arg.id);
                 });
             },
-            menu: [{ id: "go", label: "Go", command: "nav.go", commandArg: { id: "x" } }],
         });
 
-        await composition.dispatch.command<{ id: string }>("nav.go").exec({ id: "x" });
+        await composition.dispatch.command("nav.go").exec({ id: "x" });
         expect(calls).toEqual(["x"]);
     });
 
@@ -46,16 +43,13 @@ describe("Composition (config-driven composition root)", () => {
         const composition = new Composition();
         const dispose = composition.apply({
             regions: [{ region: "main", view: view("a", "A") }],
-            menu: [{ id: "m", label: "M" }],
         });
         composition.apply({ regions: [{ region: "main", view: view("b", "B") }] });
 
         expect(composition.bindRegion("main")).toHaveLength(2);
-        expect(composition.menu()).toHaveLength(1);
 
         dispose();
         expect(composition.bindRegion<string>("main").map((b) => b.render())).toEqual(["B"]);
-        expect(composition.menu()).toHaveLength(0);
     });
 
     it("test conditional view recomposes on state change", () => {
@@ -67,16 +61,5 @@ describe("Composition (config-driven composition root)", () => {
         expect(composition.bindRegion("main")).toHaveLength(0);
         enabled = true;
         expect(composition.bindRegion<string>("main").map((b) => b.render())).toEqual(["F"]);
-    });
-
-    it("test menu capability gating flows through options", () => {
-        const composition = new Composition({ menu: { capabilities: new Set(["admin"]) } });
-        composition.apply({
-            menu: [
-                { id: "home", label: "Home" },
-                { id: "admin", label: "Admin", requires: "admin" },
-            ],
-        });
-        expect(composition.menu().map((n) => n.item.id)).toEqual(["home", "admin"]);
     });
 });

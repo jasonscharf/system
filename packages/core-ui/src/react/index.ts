@@ -7,5 +7,28 @@ export {
     useComposition,
     useRevision,
 } from "./context.js";
-export { MenuView, type MenuViewProps } from "./MenuView.js";
+export {
+    Aside,
+    Button,
+    type ButtonProps,
+    Div,
+    Footer,
+    H1,
+    H2,
+    H3,
+    H4,
+    H5,
+    H6,
+    Header,
+    Hr,
+    Li,
+    Main,
+    Nav,
+    Ol,
+    P,
+    type PrimitiveProps,
+    Section,
+    Span,
+    Ul,
+} from "./primitives.js";
 export { RegionHost, type RegionHostProps } from "./RegionHost.js";

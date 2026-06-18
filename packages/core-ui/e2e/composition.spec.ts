@@ -26,11 +26,6 @@ test.describe("core-ui composition shell", () => {
     test("testCommandAndEventFlowThroughDispatch", async ({ page }) => {
         await page.goto("/");
 
-        // Activating a menu item dispatches its command, which emits an event the
-        // shell observes.
-        await page.getByRole("button", { name: "Reports" }).click();
-        await expect(page.getByTestId("last-event")).toHaveText("last-event: nav.changed:reports");
-
         // The counter view's view-model dispatches a command on click; the
         // resulting event increments the observed total.
         await page.getByTestId("counter-view").click();

@@ -1,15 +1,20 @@
 import { Composition } from "@jasonscharf/core-ui";
 import {
+    Button,
     CompositionProvider,
     CompositionRevision,
-    MenuView,
+    Div,
+    Footer,
+    Header,
+    Main,
+    P,
     RegionHost,
     RevisionProvider,
+    Span,
 } from "@jasonscharf/core-ui/react";
 import type React from "react";
 import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Pressable, ScrollView, Text, View } from "react-native";
 import { flaggedContribution, homeContribution, widgetsContribution } from "./contributions.js";
 import "./style.css";
 
@@ -17,9 +22,7 @@ function buildComposition(flagOn: () => boolean): {
     composition: Composition;
     revision: CompositionRevision;
 } {
-    // Admin capability is granted, so the admin-gated menu item appears. This is
-    // the config-driven gating path; flipping the set recomposes the menu.
-    const composition = new Composition({ menu: { capabilities: new Set(["admin"]) } });
+    const composition = new Composition();
     const revision = new CompositionRevision();
     composition.apply(homeContribution());
     composition.apply(widgetsContribution());
@@ -29,27 +32,18 @@ function buildComposition(flagOn: () => boolean): {
 
 function App(): React.ReactElement {
     const [flag, setFlag] = useState(false);
-    const [lastEvent, setLastEvent] = useState<string>("(none)");
     const [counter, setCounter] = useState(0);
 
-    // The flag ref is read by the conditional contribution's `when` predicate.
     const flagRef = useMemo(() => ({ on: false }), []);
     flagRef.on = flag;
 
     const { composition, revision } = useMemo(() => buildComposition(() => flagRef.on), [flagRef]);
 
-    // Observe dispatch events to prove the round-trip end to end. Subscriptions
-    // live in an effect with cleanup so StrictMode's double-invoke does not leave
-    // duplicate listeners.
     useEffect(() => {
-        const offNav = composition.dispatch.on<{ to: string }>("nav.changed", (p) =>
-            setLastEvent(`nav.changed:${p.to}`),
-        );
-        const offCounter = composition.dispatch.on<{ delta: number }>("counter.bumped", (p) =>
+        const offCounter = composition.dispatch.on("counter.bumped", (p) =>
             setCounter((c) => c + p.delta),
         );
         return () => {
-            offNav();
             offCounter();
         };
     }, [composition]);
@@ -57,38 +51,33 @@ function App(): React.ReactElement {
     return (
         <CompositionProvider composition={composition}>
             <RevisionProvider revision={revision}>
-                <View className="shell">
-                    <View className="shell__header" role="banner">
-                        <RegionHost name="header" className="shell__region" />
-                    </View>
-                    <View className="shell__body">
-                        <MenuView className="shell__nav" />
-                        <ScrollView className="shell__main" role="main">
+                <Div className="app-shell">
+                    <Header className="app-header">
+                        <RegionHost name="header" className="region-slot" />
+                    </Header>
+                    <Div className="app-body">
+                        <Main className="app-main">
                             <RegionHost
                                 name="main"
-                                className="shell__region"
-                                fallback={
-                                    <Text className="shell__empty">No views contributed.</Text>
-                                }
+                                className="region-slot"
+                                fallback={<P className="empty-hint">No views contributed.</P>}
                             />
-                        </ScrollView>
-                    </View>
-                    <View className="shell__footer" role="contentinfo">
-                        <Pressable
-                            className="shell__toggle"
-                            role="button"
+                        </Main>
+                    </Div>
+                    <Footer className="app-footer">
+                        <Button
+                            className="toggle-btn"
                             testID="toggle-flag"
-                            onPress={() => {
+                            onClick={() => {
                                 setFlag((f) => !f);
                                 revision.bump();
                             }}
                         >
-                            <Text>Toggle conditional view</Text>
-                        </Pressable>
-                        <Text testID="last-event">last-event: {lastEvent}</Text>
-                        <Text testID="counter-total">counter: {counter}</Text>
-                    </View>
-                </View>
+                            Toggle conditional view
+                        </Button>
+                        <Span testID="counter-total">counter: {counter}</Span>
+                    </Footer>
+                </Div>
             </RevisionProvider>
         </CompositionProvider>
     );

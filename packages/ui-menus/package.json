@@ -1,0 +1,79 @@
+{
+    "name": "@jasonscharf/ui-menus",
+    "version": "0.1.0",
+    "type": "module",
+    "exports": {
+        ".": {
+            "source": "./src/index.ts",
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./react": {
+            "source": "./src/react/index.ts",
+            "types": "./dist/react/index.d.ts",
+            "import": "./dist/react/index.js"
+        },
+        "./schemas": {
+            "source": "./src/schemas.generated.ts",
+            "types": "./dist/schemas.generated.d.ts",
+            "import": "./dist/schemas.generated.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "files": [
+        "dist",
+        "ontology"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/jasonlscharf/system.git",
+        "directory": "packages/ui-menus"
+    },
+    "publishConfig": {
+        "registry": "https://npm.pkg.github.com",
+        "access": "public"
+    },
+    "scripts": {
+        "build": "yarn compile",
+        "gen": "tern-codegen",
+        "gen:watch": "tern-codegen --watch",
+        "compile": "tsc -b",
+        "clean": "rm -rf dist && rm -f tsconfig.tsbuildinfo",
+        "typecheck": "tsc -p tsconfig.json --noEmit",
+        "test": "vitest run --config vitest.config.ts",
+        "test:watch": "vitest watch --config vitest.config.ts",
+        "lint": "biome check src test-app vitest.config.ts",
+        "dev": "vite --config test-app/vite.config.ts",
+        "e2e": "playwright test --config e2e/playwright.config.ts",
+        "e2e:headed": "playwright test --config e2e/playwright.config.ts --headed"
+    },
+    "peerDependencies": {
+        "react": "^19.0.0"
+    },
+    "peerDependenciesMeta": {
+        "react": {
+            "optional": true
+        }
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.57.0",
+        "@testing-library/dom": "^10.4.1",
+        "@testing-library/react": "^16.3.1",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "@vitejs/plugin-react": "^4.0.0",
+        "jsdom": "^27.4.0",
+        "react": "^19.2.3",
+        "react-dom": "^19.2.3",
+        "vite": "^6.0.0",
+        "vitest": "^4.0.16"
+    },
+    "dependencies": {
+        "@jasonscharf/core": "workspace:^",
+        "@jasonscharf/core-ui": "workspace:^",
+        "@jasonscharf/entities": "workspace:^",
+        "@jasonscharf/gen": "workspace:^",
+        "react-native-web": "^0.21.2"
+    }
+}

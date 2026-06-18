@@ -6,7 +6,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Composition } from "../composition.js";
 import type { ViewDefinition } from "../views.js";
 import { CompositionProvider, CompositionRevision, RevisionProvider } from "./context.js";
-import { MenuView } from "./MenuView.js";
 import { RegionHost } from "./RegionHost.js";
 
 function reactView(id: string, label: string): ViewDefinition<{ label: string }> {
@@ -26,7 +25,6 @@ function Shell(props: {
         <CompositionProvider composition={composition}>
             <RevisionProvider revision={revision}>
                 <View className="shell">
-                    <MenuView className="shell__nav" />
                     <RegionHost name="main" className="shell__main" fallback={<Text>empty</Text>} />
                 </View>
             </RevisionProvider>
@@ -68,27 +66,5 @@ describe("React composition shell", () => {
             revision.bump();
         });
         expect(screen.getByText("Late")).toBeTruthy();
-    });
-
-    it("testMenuRendersConfigAndDispatchesCommandOnActivate", () => {
-        const composition = new Composition();
-        const revision = new CompositionRevision();
-        const activated: string[] = [];
-        composition.apply({
-            wire: (d) => {
-                // The InMemoryDispatch is the real seam.
-                (d as import("../dispatch.js").InMemoryDispatch).register("nav.home", () => {
-                    activated.push("nav.home");
-                });
-            },
-            menu: [{ id: "home", label: "Home", command: "nav.home" }],
-        });
-
-        render(<Shell composition={composition} revision={revision} />);
-        const button = screen.getByText("Home");
-        act(() => {
-            button.click();
-        });
-        expect(activated).toEqual(["nav.home"]);
     });
 });

@@ -4,11 +4,12 @@
 // wiring. The pieces:
 //   - regions:    named placeholders in the shell (RegionRegistry).
 //   - views:      the unit of contributed UI, bound to a view-model.
-//   - menu:       nav assembled from contributed config (assembleMenu).
 //   - composition: the root that applies contributions and the shell reads from.
-//   - dispatch:   the seam to the commands/events layer (TODO(TRN-229)).
+//   - dispatch:   the seam to the commands/queries/operations/events layer
+//                 (TODO(TRN-229)).
 //
-// The React layer (./react) renders regions and menus from a Composition.
+// The React layer (./react) renders regions from a Composition. Menus are a
+// separate, higher-level concern in @jasonscharf/ui-menus.
 
 export {
     Composition,
@@ -19,16 +20,18 @@ export {
     type CommandHandle,
     type CommandImpl,
     type Dispatch,
+    type DispatchKind,
     type EventListener,
     InMemoryDispatch,
+    type RequestHandle,
+    type RequestImpl,
+    type RequestSig,
+    type SystemCommands,
+    type SystemEvents,
+    type SystemOperations,
+    type SystemQueries,
     type Unsubscribe,
 } from "./dispatch.js";
-export {
-    assembleMenu,
-    type MenuAssemblyOptions,
-    type MenuItemConfig,
-    type MenuNode,
-} from "./menu.js";
 export {
     type RegionContribution,
     RegionRegistry,

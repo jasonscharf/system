@@ -1,0 +1,82 @@
+# Tern UI Menus Ontology — Turtle format
+# Namespace: urn:sys:ui:
+#
+# Menus are configuration that, like everything in Tern, is representable as
+# quads. A Menu is an aggregate root that owns MenuItems; items nest via
+# hasParent. A menu item is configured to invoke any dispatch message
+# (command/query/operation/event), not just a command.
+
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix ui:   <urn:sys:ui:> .
+
+# ── Classes ───────────────────────────────────────────────────────────────────
+
+ui:Menu             a owl:Class ;
+    rdfs:comment "A named menu: an aggregate root that owns a set of menu items. The slot keys which placeholder in the shell renders it." .
+
+ui:MenuItem         a owl:Class ;
+    rdfs:comment "A single contributed menu item. Activating it invokes a dispatch message of the configured kind." .
+
+# ── Menu properties ─────────────────────────────────────────────────────────
+
+ui:menuLabel        a owl:DatatypeProperty ;
+    rdfs:domain ui:Menu ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Human-readable, accessible label for the menu (e.g. aria-label)." .
+
+ui:menuSlot         a owl:DatatypeProperty ;
+    rdfs:domain ui:Menu ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Named shell slot this menu targets; absent means the default (unnamed) menu." .
+
+# ── MenuItem properties ───────────────────────────────────────────────────────
+
+ui:label            a owl:DatatypeProperty ;
+    rdfs:domain ui:MenuItem ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Human-readable label rendered for the item." .
+
+ui:order            a owl:DatatypeProperty ;
+    rdfs:domain ui:MenuItem ;
+    rdfs:range  xsd:integer ;
+    rdfs:comment "Ordering within siblings (ascending). Defaults to 0." .
+
+ui:requires         a owl:DatatypeProperty ;
+    rdfs:domain ui:MenuItem ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Optional capability/feature-flag gate; the item (and its subtree) is omitted when the capability is not granted." .
+
+ui:icon             a owl:DatatypeProperty ;
+    rdfs:domain ui:MenuItem ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Optional icon name, resolved by the renderer." .
+
+ui:dispatchKind     a owl:DatatypeProperty ;
+    rdfs:domain ui:MenuItem ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Which dispatch message kind activation invokes: command, query, operation, or event." .
+
+ui:message          a owl:DatatypeProperty ;
+    rdfs:domain ui:MenuItem ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Name of the dispatch message invoked on activation, e.g. 'nav.go'. Absent for pure grouping items." .
+
+ui:messageArg       a owl:DatatypeProperty ;
+    rdfs:domain ui:MenuItem ;
+    rdfs:range  xsd:string ;
+    rdfs:comment "Serialized JSON argument/payload passed with the dispatch message on activation." .
+
+# ── Object properties ─────────────────────────────────────────────────────────
+
+ui:hasItem          a owl:ObjectProperty ;
+    rdfs:domain ui:Menu ;
+    rdfs:range  ui:MenuItem ;
+    rdfs:comment "Outward edge: a Menu contains a MenuItem (root→down)." .
+
+ui:hasParent        a owl:ObjectProperty ;
+    rdfs:domain ui:MenuItem ;
+    rdfs:range  ui:MenuItem ;
+    rdfs:comment "Parent item in the menu tree. Absent means a top-level item." .

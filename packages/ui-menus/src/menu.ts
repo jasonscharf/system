@@ -1,8 +1,13 @@
+import type { DispatchKind } from "@jasonscharf/core-ui";
+
 /**
  * A single contributed menu item. Serializable config — no functions — so menus
  * can be assembled from data (RDF/quads, JSON config, etc.) per the platform's
- * configuration-driven stance. Activation is expressed as a command name +
- * argument that flow through the Dispatch seam, not as an inline handler.
+ * configuration-driven stance. Activation is expressed as a dispatch message
+ * (kind + name + serializable argument) that flows through core-ui's Dispatch
+ * seam, not as an inline handler. This mirrors the generated `MenuItem` entity
+ * (urn:sys:ui:) — `MenuItemConfig` is the runtime/contribution shape; the
+ * generated entity is the persistable one.
  */
 export interface MenuItemConfig {
     readonly id: string;
@@ -12,18 +17,29 @@ export interface MenuItemConfig {
     /** Ordering within siblings (ascending). Defaults to 0. */
     readonly order?: number;
     /**
-     * Command dispatched when the item is activated. Absent for pure grouping
+     * Which dispatch message kind activation invokes. Absent for pure grouping
      * items (e.g. a section header that only contains children).
      */
-    readonly command?: string | null;
-    /** Serializable argument passed to the command on activation. */
-    readonly commandArg?: unknown;
+    readonly kind?: DispatchKind | null;
+    /**
+     * Name of the dispatch message invoked on activation, e.g. "nav.go". Absent
+     * for pure grouping items.
+     */
+    readonly message?: string | null;
+    /** Serializable argument/payload passed with the dispatch message. */
+    readonly arg?: unknown;
     /**
      * Optional capability/feature flag gate. When the assembling caller supplies
      * a set of granted capabilities, an item whose `requires` is not in that set
      * is omitted, enabling config-driven conditional menus.
      */
     readonly requires?: string | null;
+    /**
+     * Named menu slot this item belongs to. When absent or null the item belongs
+     * to the default (unnamed) menu. Allows contributions to target multiple
+     * distinct menus from the same contribution array.
+     */
+    readonly slot?: string | null;
     /** Optional icon name (resolved by the renderer). */
     readonly icon?: string | null;
 }
@@ -47,6 +63,12 @@ export interface MenuAssemblyOptions {
      * gated out.
      */
     readonly capabilities?: ReadonlySet<string>;
+    /**
+     * Named slot to assemble. When provided, only items whose `slot` matches are
+     * included. When omitted, only unslotted items (slot absent or null) are
+     * included, which is the default single-menu behaviour.
+     */
+    readonly slot?: string;
 }
 
 function sortNodes(nodes: MenuNode[]): void {
@@ -71,8 +93,15 @@ export function assembleMenu(
     items: MenuItemConfig[],
     options: MenuAssemblyOptions = {},
 ): MenuNode[] {
-    const capabilities = options.capabilities;
-    const allowed = items.filter((item) => {
+    const { capabilities, slot } = options;
+    const slotted = items.filter((item) => {
+        const itemSlot = item.slot;
+        if (slot !== undefined) {
+            return itemSlot === slot;
+        }
+        return itemSlot === undefined || itemSlot === null;
+    });
+    const allowed = slotted.filter((item) => {
         const requires = item.requires;
         if (requires === undefined || requires === null) {
             return true;

@@ -1,0 +1,11 @@
+# UI Menus SHACL shapes — constrain edge cardinality.
+# A menu item has at most one parent, so codegen emits hasParent as a single
+# edge (an EdgeRef) rather than a set. Menu.hasItem is intentionally many.
+
+@prefix sh:     <http://www.w3.org/ns/shacl#> .
+@prefix ui:     <urn:sys:ui:> .
+@prefix shapes: <urn:sys:ui:shapes:> .
+
+shapes:MenuItemShape a sh:NodeShape ;
+    sh:targetClass ui:MenuItem ;
+    sh:property [ sh:path ui:hasParent ; sh:maxCount 1 ] .

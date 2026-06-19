@@ -35,6 +35,7 @@ import { buildServerContext, EntityStore } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";
+import { TEST_CIPHER } from "../auth/testCipher.js";
 
 // ── DB provider matrix ────────────────────────────────────────────────────────
 
@@ -71,8 +72,8 @@ async function setup(db: DbProvider) {
     // Use trx as the knex instance so es.inTransaction() creates savepoints
     // rather than new connection-level transactions (avoids SQLite deadlock).
     const store = new TripleStore(trx as unknown as import("knex").Knex);
-    const es = new EntityStore(store);
-    return { ...buildServerContext(store, { trx }), knex, trx, es };
+    const es = new EntityStore(store, undefined, TEST_CIPHER);
+    return { ...buildServerContext(store, { trx, cipher: TEST_CIPHER }), knex, trx, es };
 }
 
 async function teardown(ctx: Awaited<ReturnType<typeof setup>>) {

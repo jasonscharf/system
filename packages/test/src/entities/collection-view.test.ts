@@ -25,6 +25,7 @@ import { CollectionViewStore, buildServerContext, EntityStore } from "@jasonscha
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";
+import { TEST_CIPHER } from "../auth/testCipher.js";
 
 // ── Provider matrix ───────────────────────────────────────────────────────────
 
@@ -72,9 +73,9 @@ async function setup(db: DbProvider) {
     const knex = await db.create();
     const trx = await knex.transaction();
     const store = new TripleStore(knex);
-    const es = new EntityStore(store);
+    const es = new EntityStore(store, undefined, TEST_CIPHER);
     const cvs = new CollectionViewStore(store);
-    return { ...buildServerContext(store, { trx }), knex, trx, store, es, cvs };
+    return { ...buildServerContext(store, { trx, cipher: TEST_CIPHER }), knex, trx, store, es, cvs };
 }
 
 async function teardown(ctx: Awaited<ReturnType<typeof setup>>) {

@@ -22,6 +22,7 @@ import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fromLiteral, invertPropertyMap, propertyMapFor } from "../../../entities/src/util.js";
 import { assertEmptyStore } from "../assertEmptyStore.js";
+import { TEST_CIPHER } from "../auth/testCipher.js";
 
 // ── Provider matrix ───────────────────────────────────────────────────────────
 
@@ -81,8 +82,8 @@ async function setup(db: DbProvider) {
     const knex = await db.create();
     const trx = await knex.transaction();
     const store = new TripleStore(knex);
-    const es = new EntityStore(store);
-    return { ...buildServerContext(store, { trx }), knex, trx, store, es };
+    const es = new EntityStore(store, undefined, TEST_CIPHER);
+    return { ...buildServerContext(store, { trx, cipher: TEST_CIPHER }), knex, trx, store, es };
 }
 
 async function teardown(ctx: Awaited<ReturnType<typeof setup>>) {

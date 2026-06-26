@@ -187,16 +187,23 @@ export class GraphQuery {
         data: EntityInput<Props>,
         opts: { requires: string; under?: AttachUnder },
     ): Promise<EntityRecord<Props>> {
-        const anchor = opts.under
-            ? entityIriFor(opts.under.schema, opts.under.id).value
-            : (this._root?.value ?? "");
-        await this._assert(opts.requires, anchor);
-        const es = new EntityStore(this._store);
-        const rec = await es.create<Props>(this._ctx, schema, data);
-        if (opts.under) {
-            await es.addEdge(this._ctx, opts.under.schema, opts.under.id, opts.under.edge, rec.iri);
-        }
-        return rec;
+        // The assert + create + attach-under-parent are ONE unit of work: a crash
+        // between create and addEdge would otherwise leave an entity that is not
+        // attached under its parent and therefore permanently unreachable in the
+        // rooted-traversal model. withTransaction is reentrant, so this also joins
+        // an ambient transaction when the caller already opened one (ctx.tx).
+        return this._store.withTransaction(this._ctx, async (txCtx) => {
+            const anchor = opts.under
+                ? entityIriFor(opts.under.schema, opts.under.id).value
+                : (this._root?.value ?? "");
+            await this._assert(txCtx, opts.requires, anchor);
+            const es = new EntityStore(this._store);
+            const rec = await es.create<Props>(txCtx, schema, data);
+            if (opts.under) {
+                await es.addEdge(txCtx, opts.under.schema, opts.under.id, opts.under.edge, rec.iri);
+            }
+            return rec;
+        });
     }
 
     /** Update an entity after asserting `opts.requires` over its scope chain. */
@@ -206,18 +213,18 @@ export class GraphQuery {
         patch: EntityInput<Props>,
         opts: { requires: string },
     ): Promise<void> {
-        await this._assert(opts.requires, entityIriFor(schema, id).value);
-        await new EntityStore(this._store).update(this._ctx, schema, id, patch);
+        await this._store.withTransaction(this._ctx, async (txCtx) => {
+            await this._assert(txCtx, opts.requires, entityIriFor(schema, id).value);
+            await new EntityStore(this._store).update(txCtx, schema, id, patch);
+        });
     }
 
     /** Delete an entity after asserting `opts.requires` over its scope chain. */
-    async delete(
-        schema: EntitySchema,
-        id: string,
-        opts: { requires: string },
-    ): Promise<void> {
-        await this._assert(opts.requires, entityIriFor(schema, id).value);
-        await new EntityStore(this._store).delete(this._ctx, schema, id);
+    async delete(schema: EntitySchema, id: string, opts: { requires: string }): Promise<void> {
+        await this._store.withTransaction(this._ctx, async (txCtx) => {
+            await this._assert(txCtx, opts.requires, entityIriFor(schema, id).value);
+            await new EntityStore(this._store).delete(txCtx, schema, id);
+        });
     }
 
     private _accessChecker(): AccessChecker {
@@ -228,13 +235,17 @@ export class GraphQuery {
     }
 
     /** Assert `permission` for the caller over `entityIri`'s containment scope chain. */
-    private async _assert(permission: string, entityIri: string): Promise<void> {
+    private async _assert(
+        ctx: ServerContext,
+        permission: string,
+        entityIri: string,
+    ): Promise<void> {
         const principal = this._sec.principalIri;
         if (principal === null) {
             throw new Error(`Access denied: anonymous lacks "${permission}".`);
         }
-        const scopeChain = await scopeChainFor(this._ctx, entityIri);
-        const allowed = await this._accessChecker().check(this._ctx, {
+        const scopeChain = await scopeChainFor(ctx, entityIri);
+        const allowed = await this._accessChecker().check(ctx, {
             principal,
             permission,
             scopeChain,

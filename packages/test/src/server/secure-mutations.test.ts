@@ -12,19 +12,19 @@
  */
 import { IRI } from "@jasonscharf/core";
 import { createDataContext, type Knex, TripleStore } from "@jasonscharf/data";
-import { EntitySchema, entityIriFor } from "@jasonscharf/entities";
+import { EntitySchema, entityIriFor, RDF_TYPE } from "@jasonscharf/entities";
 import {
     buildServerContext,
     EntityStore,
     PermissionRepository,
     PolicyGrantRepository,
     RbacService,
-    registerTopology,
     ResourceNodeRepository,
     RoleRepository,
+    registerTopology,
     type SecurityContext,
-    ServiceAccountRepository,
     type ServerContext,
+    ServiceAccountRepository,
     systemSec,
     TenantRepository,
     TenantSchema,
@@ -88,7 +88,8 @@ describe("PoC — secure-by-default mutations", () => {
     let ctx: ServerContext;
 
     const userIri = (id: string) =>
-        entityIriFor({ ns: "urn:sys:core:auth:", typeIRI: new IRI("urn:sys:core:auth:User") }, id).value;
+        entityIriFor({ ns: "urn:sys:core:auth:", typeIRI: new IRI("urn:sys:core:auth:User") }, id)
+            .value;
     const ALICE = userIri("alice");
     const BOB = userIri("bob");
 
@@ -115,22 +116,38 @@ describe("PoC — secure-by-default mutations", () => {
 
         // Alice is a moderator of the forum (post.update scoped to the forum node).
         const perm = await rbac.createPermission(ctx, systemSec, { key: PERM_UPDATE });
-        const mod = await rbac.createRole(ctx, systemSec, { roleName: "Moderator", tenantId: null });
-        await rbac.addPermissionToRole(ctx, systemSec, { roleIri: mod.iri, permissionIri: perm.iri });
-        await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: mod.iri, scopeIri: forum.iri });
+        const mod = await rbac.createRole(ctx, systemSec, {
+            roleName: "Moderator",
+            tenantId: null,
+        });
+        await rbac.addPermissionToRole(ctx, systemSec, {
+            roleIri: mod.iri,
+            permissionIri: perm.iri,
+        });
+        await rbac.grant(ctx, systemSec, {
+            principalIri: ALICE,
+            roleIri: mod.iri,
+            scopeIri: forum.iri,
+        });
 
         // Bob can't — and there's no way to skip the check; the write never happens.
         await expect(
-            ctx.graph(secFor(BOB)).update(PostSchema, post.id, { body: "hacked" }, { requires: PERM_UPDATE }),
+            ctx
+                .graph(secFor(BOB))
+                .update(PostSchema, post.id, { body: "hacked" }, { requires: PERM_UPDATE }),
         ).rejects.toThrow(/Access denied/);
         expect((await es.findById(ctx, PostSchema, post.id))?.props.body).toBe("hi");
 
         // Alice can — the scope chain (post→forum→tenant) is resolved for her, no manual assert.
-        await ctx.graph(secFor(ALICE)).update(PostSchema, post.id, { body: "edited" }, { requires: PERM_UPDATE });
+        await ctx
+            .graph(secFor(ALICE))
+            .update(PostSchema, post.id, { body: "edited" }, { requires: PERM_UPDATE });
         expect((await es.findById(ctx, PostSchema, post.id))?.props.body).toBe("edited");
 
         // The system principal bypasses RBAC.
-        await ctx.graph(systemSec).update(PostSchema, post.id, { body: "sys" }, { requires: PERM_UPDATE });
+        await ctx
+            .graph(systemSec)
+            .update(PostSchema, post.id, { body: "sys" }, { requires: PERM_UPDATE });
         expect((await es.findById(ctx, PostSchema, post.id))?.props.body).toBe("sys");
     });
 
@@ -140,23 +157,41 @@ describe("PoC — secure-by-default mutations", () => {
         await es.addEdge(ctx, TenantForums, "acme", "forum", forum.iri);
 
         const perm = await rbac.createPermission(ctx, systemSec, { key: PERM_CREATE });
-        const author = await rbac.createRole(ctx, systemSec, { roleName: "Author", tenantId: null });
-        await rbac.addPermissionToRole(ctx, systemSec, { roleIri: author.iri, permissionIri: perm.iri });
-        await rbac.grant(ctx, systemSec, { principalIri: ALICE, roleIri: author.iri, scopeIri: forum.iri });
+        const author = await rbac.createRole(ctx, systemSec, {
+            roleName: "Author",
+            tenantId: null,
+        });
+        await rbac.addPermissionToRole(ctx, systemSec, {
+            roleIri: author.iri,
+            permissionIri: perm.iri,
+        });
+        await rbac.grant(ctx, systemSec, {
+            principalIri: ALICE,
+            roleIri: author.iri,
+            scopeIri: forum.iri,
+        });
 
         // Bob can't create under the forum.
         await expect(
-            ctx.graph(secFor(BOB)).create(PostSchema, { body: "x" }, {
-                requires: PERM_CREATE,
-                under: { schema: ForumSchema, id: forum.id, edge: "post" },
-            }),
+            ctx.graph(secFor(BOB)).create(
+                PostSchema,
+                { body: "x" },
+                {
+                    requires: PERM_CREATE,
+                    under: { schema: ForumSchema, id: forum.id, edge: "post" },
+                },
+            ),
         ).rejects.toThrow(/Access denied/);
 
         // Alice can — and the new post is attached under the forum, so it's reachable.
-        const post = await ctx.graph(secFor(ALICE)).create(PostSchema, { body: "first post" }, {
-            requires: PERM_CREATE,
-            under: { schema: ForumSchema, id: forum.id, edge: "post" },
-        });
+        const post = await ctx.graph(secFor(ALICE)).create(
+            PostSchema,
+            { body: "first post" },
+            {
+                requires: PERM_CREATE,
+                under: { schema: ForumSchema, id: forum.id, edge: "post" },
+            },
+        );
         const reachable = await store.rootedTraverse(ctx, {
             root: entityIriFor(TenantSchema, "acme"),
             graph: tenantGraphOf(ctx),
@@ -174,3 +209,58 @@ describe("PoC — secure-by-default mutations", () => {
 function tenantGraphOf(ctx: ServerContext): IRI {
     return new IRI(`urn:sys:core:tenant:${ctx.tenantId}`);
 }
+
+/**
+ * Atomicity of create-and-attach (no ambient transaction). The bug this guards:
+ * GraphQuery.create used to run `es.create` then `es.addEdge` as two separate
+ * commits, so a failure attaching the entity under its parent left an orphaned
+ * entity persisted but unreachable. With the fix the whole mutation is one
+ * reentrant transaction, so a failed attach rolls the created entity back too.
+ *
+ * This suite must NOT hold an ambient trx (the bug only manifests when
+ * GraphQuery opens its own transaction); writes can auto-commit, so the teardown
+ * clears the tables.
+ */
+describe("PoC — secure mutations are atomic (create + attach-under)", () => {
+    let knex: Knex;
+    let store: TripleStore;
+    let es: EntityStore;
+    let ctx: ServerContext;
+
+    beforeEach(async () => {
+        knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
+        store = new TripleStore(knex);
+        es = new EntityStore(store);
+        ctx = buildServerContext(store, { tenantId: "acme" }); // no ambient trx
+    });
+    afterEach(async () => {
+        for (const t of ["edges", "nodes", "namespaces"]) {
+            await knex(t).del();
+        }
+        await knex.destroy();
+    });
+
+    it("rolls the created entity back when attach-under fails (no orphan)", async () => {
+        await ctx.tx((c) => es.create(c, TenantSchema, { name: "Acme" }, "acme"));
+        const forum = await ctx.tx((c) => es.create(c, ForumSchema, { name: "Community" }));
+        await ctx.tx((c) => es.addEdge(c, TenantForums, "acme", "forum", forum.iri));
+
+        const before = await store.find(ctx, { predicate: RDF_TYPE, object: PostSchema.typeIRI });
+
+        // systemSec bypasses RBAC so _assert passes; a bogus edge name makes the
+        // attach (addEdge) throw AFTER the post has been created within the txn.
+        await expect(
+            ctx.graph(systemSec).create(
+                PostSchema,
+                { body: "orphan" },
+                {
+                    requires: PERM_CREATE,
+                    under: { schema: ForumSchema, id: forum.id, edge: "nonexistent" },
+                },
+            ),
+        ).rejects.toThrow(/no edge/);
+
+        const after = await store.find(ctx, { predicate: RDF_TYPE, object: PostSchema.typeIRI });
+        expect(after.length).toBe(before.length); // the created Post was rolled back
+    });
+});

@@ -307,6 +307,30 @@ export interface StoreStats {
 export class TripleStore {
     private readonly _knex: Knex;
 
+    /**
+     * Process-wide serialization tail for top-level transactions.
+     *
+     * withTransaction is re-entrant: a nested call reuses the ambient ctx.trx, so
+     * a single transaction's one connection is shared by all the work inside it.
+     * That is safe only if no OTHER transaction runs at the same time. This lock
+     * serializes the opening of top-level transactions across the whole process,
+     * so at most one transaction is ever in flight: a reused trx can never be
+     * raced by an independent transaction, and the single-connection (SQLite) and
+     * pooled (Postgres) paths behave identically.
+     *
+     * Re-entrant calls (ctx.trx already set) must NOT take the lock: they run
+     * inside the holder's critical section, and re-acquiring would deadlock the
+     * holder against itself. Likewise, opening a fresh top-level transaction from
+     * inside another transaction (a trx-less ctx used mid-transaction) would
+     * deadlock by design and indicates a context that should have been threaded
+     * through instead.
+     *
+     * Tradeoff: top-level transactions cannot run in parallel within a process (a
+     * long or stuck transaction is head-of-line for the rest). The common path,
+     * nested/re-entrant work under one request transaction, is unaffected.
+     */
+    private static _txTail: Promise<unknown> = Promise.resolve();
+
     constructor(knex: Knex) {
         this._knex = knex;
     }
@@ -358,9 +382,21 @@ export class TripleStore {
         fn: (ctx: C) => Promise<T>,
     ): Promise<T> {
         if (ctx.trx) {
+            // Re-entrant: reuse the ambient transaction. Taking the process-wide
+            // lock here would deadlock, since its holder is awaiting this call.
             return fn(ctx);
         }
-        return this._knex.transaction(async (trx) => fn({ ...ctx, trx } as C));
+        const open = (): Promise<T> =>
+            this._knex.transaction(async (trx) => fn({ ...ctx, trx } as C));
+        // Chain behind any in-flight top-level transaction, running whether the
+        // predecessor committed or rolled back, then advance the tail so the next
+        // top-level transaction waits for this one.
+        const result = TripleStore._txTail.then(open, open);
+        TripleStore._txTail = result.then(
+            () => undefined,
+            () => undefined,
+        );
+        return result;
     }
 
     // ── Namespace registry ────────────────────────────────────────────────────
@@ -1003,8 +1039,7 @@ export class TripleStore {
         }
         const falseLit = this._isPg() ? "false" : "0";
         const scope = (alias: string): string => {
-            const g =
-                graphId === undefined ? "1 = 1" : `${alias}.${C.graph} = ${graphId}`;
+            const g = graphId === undefined ? "1 = 1" : `${alias}.${C.graph} = ${graphId}`;
             return `${g} AND ${alias}.${C.isDeleted} = ${falseLit}`;
         };
 

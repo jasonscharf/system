@@ -159,5 +159,39 @@ for (const db of providers) {
 
             expect(await registry.getVersion(buildServerContext(store), "crm")).toBe("2.0.0");
         });
+
+        it("serializes concurrent top-level transactions process-wide (re-entrancy safety)", async () => {
+            const { store } = env;
+            // Two trx-less contexts: each withTransaction opens its own top-level
+            // transaction, so the process-wide lock must order them, not interleave.
+            const ctx = buildServerContext(store);
+            const events: string[] = [];
+            let releaseA: (() => void) | undefined;
+            const gateA = new Promise<void>((resolve) => {
+                releaseA = resolve;
+            });
+
+            const a = store.withTransaction(ctx, async () => {
+                events.push("A:start");
+                await gateA;
+                events.push("A:end");
+            });
+            const b = store.withTransaction(ctx, async () => {
+                events.push("B:start");
+                events.push("B:end");
+            });
+
+            // Poll until A has entered its critical section (returns as soon as true,
+            // no arbitrary sleep). While A holds the lock parked at the gate, B must
+            // not have started: it is queued strictly behind A.
+            while (!events.includes("A:start")) {
+                await new Promise((resolve) => setImmediate(resolve));
+            }
+            expect(events).not.toContain("B:start");
+
+            releaseA?.();
+            await Promise.all([a, b]);
+            expect(events).toEqual(["A:start", "A:end", "B:start", "B:end"]);
+        });
     });
 }

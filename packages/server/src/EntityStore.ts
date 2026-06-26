@@ -16,8 +16,8 @@ import {
     fromLiteral,
     idFromIri,
     invertPropertyMap,
-    propIri,
     propertyMapFor,
+    propIri,
     RDF_TYPE,
     toEncryptedLiteral,
     toLiteral,
@@ -28,7 +28,7 @@ import { CollectionViewStore } from "./CollectionView.js";
 import {
     type HydratedRecord,
     SCHEMA_VERSION_PREDICATE,
-    SchemaRegistry,
+    type SchemaRegistry,
     type TraversalPlan,
 } from "./SchemaRegistry.js";
 import { buildServerContext, type ServerContext } from "./ServerContext.js";
@@ -343,6 +343,51 @@ export class EntityStore {
                 predicate: def.predicate,
                 object: { value: targetIri } as IRI,
                 graph: this._filterGraph(txCtx, schema),
+            });
+            return n > 0;
+        });
+    }
+
+    /**
+     * Insert a single edge whose target is an arbitrary IRI not described by a
+     * schema edge — an ownership-backbone link (e.g. tenant --hasWorkflow-->
+     * workflow) whose ends are not both modelled as EntitySchema edges.  Mirrors
+     * addEdge but takes the predicate and target IRI directly, so callers stop
+     * hand-building quads against the raw TripleStore.  Idempotent; runs in a
+     * chainable transaction.  The graph defaults to the caller's insert graph
+     * (tenant-scoped, DEFAULT_GRAPH fallback).
+     */
+    async addRawEdge(
+        ctx: ServerContext,
+        fromIri: string,
+        predicate: IRI,
+        toIri: string,
+        graph?: IRI | DefaultGraph,
+    ): Promise<void> {
+        return this._withTrx(ctx, async (txCtx) => {
+            await this._store.insert(txCtx, {
+                subject: { value: fromIri } as IRI,
+                predicate,
+                object: { value: toIri } as IRI,
+                graph: graph ?? tenantGraphForInsert(txCtx, undefined),
+            });
+        });
+    }
+
+    /** Soft-delete a single raw edge (fromIri --predicate--> toIri). */
+    async removeRawEdge(
+        ctx: ServerContext,
+        fromIri: string,
+        predicate: IRI,
+        toIri: string,
+        graph?: IRI | null,
+    ): Promise<boolean> {
+        return this._withTrx(ctx, async (txCtx) => {
+            const n = await this._store.delete(txCtx, {
+                subject: { value: fromIri } as IRI,
+                predicate,
+                object: { value: toIri } as IRI,
+                graph: graph ?? tenantGraph(txCtx),
             });
             return n > 0;
         });
@@ -664,13 +709,18 @@ export class EntityStore {
                 const handle = r.edges?.[step.edgeName];
                 if (step.cardinality === "one") {
                     const iri = handle
-                        ? ("iri" in handle ? handle.iri : handle.iris[0])
+                        ? "iri" in handle
+                            ? handle.iri
+                            : handle.iris[0]
                         : undefined;
                     r.related[step.edgeName] = iri ? (byIri.get(iri) ?? null) : null;
                 } else {
                     const iris = handle && "iris" in handle ? handle.iris : [];
-                    const targets = iris.map((iri) => byIri.get(iri) ?? null).filter(Boolean) as EntityRecord[];
-                    r.related[step.edgeName] = targets.length > 0 ? (targets as unknown as EntityRecord) : null;
+                    const targets = iris
+                        .map((iri) => byIri.get(iri) ?? null)
+                        .filter(Boolean) as EntityRecord[];
+                    r.related[step.edgeName] =
+                        targets.length > 0 ? (targets as unknown as EntityRecord) : null;
                 }
             }
         }
@@ -758,7 +808,12 @@ export class EntityStore {
             props[k] = vals.length === 1 ? vals[0] : vals;
         }
 
-        const record: EntityRecord<Props> = { id, iri: entIri, props: props as Props, schemaVersion };
+        const record: EntityRecord<Props> = {
+            id,
+            iri: entIri,
+            props: props as Props,
+            schemaVersion,
+        };
         const edges = this._buildEdgeHandles(schema, edgeTargets);
         if (edges) {
             record.edges = edges;
@@ -841,7 +896,9 @@ export class EntityStore {
         graph: IRI | DefaultGraph = DEFAULT_GRAPH,
     ) {
         const results: Parameters<TripleStore["insert"]>[1][] = [];
-        for (const [propName, propValue] of Object.entries(schema.properties as Record<string, IRI | PropertyDef>)) {
+        for (const [propName, propValue] of Object.entries(
+            schema.properties as Record<string, IRI | PropertyDef>,
+        )) {
             const value = data[propName];
             if (value === undefined || value === null) {
                 continue;
@@ -889,11 +946,7 @@ export class EntityStore {
         if (!schema.shape) {
             return;
         }
-        const result = validate(
-            data,
-            schema.shape,
-            propertyMapFor(schema.properties),
-        );
+        const result = validate(data, schema.shape, propertyMapFor(schema.properties));
         if (!result.valid) {
             throw new EntityValidationError(result.violations);
         }

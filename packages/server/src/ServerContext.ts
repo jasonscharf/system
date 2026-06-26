@@ -70,6 +70,21 @@ export interface ServerContext extends ApplicationContext {
      * Usage: const byId = await ctx.related(experiments, ExperimentSchema, 'domain')
      */
     related: RelatedLookup;
+    /**
+     * The unit of work.  Runs `fn` inside a chainable (reentrant) transaction:
+     * if this ctx already carries a `trx`, `fn` reuses it; otherwise a new
+     * transaction is opened.  The ctx passed to `fn` carries the `trx` and a
+     * fully-wired graph/entities/related/entityStore bound to it, so every
+     * nested call is atomic by default and callers never reach for the raw store.
+     * Usage: await ctx.tx(async (ctx) => { ...all calls share one transaction... })
+     */
+    tx<T>(fn: (ctx: ServerContext) => Promise<T>): Promise<T>;
+    /**
+     * EntityStore for this context with the field cipher pre-wired from `ctx`.
+     * Use instead of `new EntityStore(ctx.store, undefined, ctx.cipher)` so PII
+     * encryption can never be forgotten and the raw store stays an internal detail.
+     */
+    entityStore: EntityStore;
 }
 
 /**
@@ -78,7 +93,9 @@ export interface ServerContext extends ApplicationContext {
  */
 export function buildServerContext(
     store: TripleStore,
-    base: Partial<Omit<ServerContext, "entities" | "store">> = {},
+    base: Partial<
+        Omit<ServerContext, "entities" | "store" | "graph" | "related" | "tx" | "entityStore">
+    > = {},
 ): ServerContext {
     const ctx: ServerContext = {
         bus: defaultCtx.bus,
@@ -88,6 +105,21 @@ export function buildServerContext(
         graph: (sec) => new GraphQuery(ctx, sec),
         related: (sources, schema, edgeName) =>
             new EntityStore(store, undefined, ctx.cipher).related(ctx, sources, schema, edgeName),
+        // Eager: constructed before `ctx` is assigned (TDZ), so it reads
+        // base.cipher, which equals ctx.cipher at build time.
+        entityStore: new EntityStore(store, undefined, base.cipher),
+        tx<T>(fn: (c: ServerContext) => Promise<T>): Promise<T> {
+            if (ctx.trx) {
+                return fn(ctx);
+            }
+            // Open a new transaction and hand `fn` a freshly-wired ctx whose
+            // graph/entities/related/entityStore all bind to the new trx — not
+            // withTransaction's shallow `{...ctx, trx}`, whose closures still
+            // point at the trx-less parent.
+            return store.withTransaction(ctx, (inner) =>
+                fn(buildServerContext(store, { ...base, trx: inner.trx })),
+            );
+        },
     };
     return ctx;
 }

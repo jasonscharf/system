@@ -675,8 +675,14 @@ export class TripleStore {
         if (subjects.length === 0) {
             return 0;
         }
-        const ids = await Promise.all(subjects.map((s) => this._nodeId(ctx, s as RdfTerm)));
-        const validIds = ids.filter((id): id is number => id !== null);
+        const idMap = await this._nodeIds(ctx, subjects);
+        const validIds = [
+            ...new Set(
+                subjects
+                    .map((s) => idMap.get(this._termKey(s)))
+                    .filter((id): id is number => id !== undefined),
+            ),
+        ];
         if (validIds.length === 0) {
             return 0;
         }
@@ -764,15 +770,19 @@ export class TripleStore {
             return new Map();
         }
 
-        const pairs = await Promise.all(
-            subjects.map(async (s) => [s, await this._nodeId(ctx, s as RdfTerm)] as const),
-        );
-        const validPairs = pairs.filter((p): p is [IRI | BlankNode, number] => p[1] !== null);
+        const idMap = await this._nodeIds(ctx, subjects);
+        const validPairs: Array<[IRI | BlankNode, number]> = [];
+        const idToSubject = new Map<number, IRI | BlankNode>();
+        for (const s of subjects) {
+            const id = idMap.get(this._termKey(s));
+            if (id !== undefined) {
+                validPairs.push([s, id]);
+                idToSubject.set(id, s);
+            }
+        }
         if (validPairs.length === 0) {
             return new Map();
         }
-
-        const idToSubject = new Map(validPairs.map(([term, id]) => [id, term]));
 
         let edgesQ = this._db(ctx)(T.edges)
             .whereIn(
@@ -862,15 +872,19 @@ export class TripleStore {
             return new Map();
         }
 
-        const pairs = await Promise.all(
-            subjects.map(async (s) => [s, await this._nodeId(ctx, s as RdfTerm)] as const),
-        );
-        const validPairs = pairs.filter((p): p is [IRI | BlankNode, number] => p[1] !== null);
+        const idMap = await this._nodeIds(ctx, subjects);
+        const validPairs: Array<[IRI | BlankNode, number]> = [];
+        const idToSubject = new Map<number, IRI | BlankNode>();
+        for (const s of subjects) {
+            const id = idMap.get(this._termKey(s));
+            if (id !== undefined) {
+                validPairs.push([s, id]);
+                idToSubject.set(id, s);
+            }
+        }
         if (validPairs.length === 0) {
             return new Map();
         }
-
-        const idToSubject = new Map(validPairs.map(([term, id]) => [id, term]));
 
         let q = this._db(ctx)(T.edges)
             .whereIn(
@@ -1179,6 +1193,57 @@ export class TripleStore {
             })
             .first<NodeRow>();
         return node?.id ?? null;
+    }
+
+    /** Map key for a subject term: the IRI value, or `_:id` for a blank node. */
+    private _termKey(term: IRI | BlankNode): string {
+        return isIRI(term) ? term.value : `_:${(term as BlankNode).id}`;
+    }
+
+    /**
+     * Batch-resolves IRI and blank-node terms to their node ids in one query per
+     * kind, instead of a SELECT per term. Returns a map keyed by term key (the
+     * IRI value, or `_:id` for a blank node). Terms not interned are absent. This
+     * is the no-N+1 replacement for `Promise.all(terms.map(_nodeId))` in the
+     * batch subject methods (findForSubjects, entityTimestamps, deleteSubjects),
+     * so hydrating N entities resolves their subject ids in one round-trip.
+     */
+    private async _nodeIds(
+        ctx: ServerContext,
+        terms: readonly (IRI | BlankNode)[],
+    ): Promise<Map<string, number>> {
+        const result = new Map<string, number>();
+        if (terms.length === 0) {
+            return result;
+        }
+        const iris = new Set<string>();
+        const blanks = new Set<string>();
+        for (const t of terms) {
+            if (isIRI(t)) {
+                iris.add(t.value);
+            } else {
+                blanks.add((t as BlankNode).id);
+            }
+        }
+        if (iris.size > 0) {
+            const rows = await this._db(ctx)(T.nodes)
+                .where(C.kind, "iri")
+                .whereIn(C.iri, [...iris])
+                .select<{ id: number; iri: string }[]>(C.id, C.iri);
+            for (const r of rows) {
+                result.set(r.iri, r.id);
+            }
+        }
+        if (blanks.size > 0) {
+            const rows = await this._db(ctx)(T.nodes)
+                .where(C.kind, "blank")
+                .whereIn(C.blankId, [...blanks])
+                .select<{ id: number; blank_id: string }[]>(C.id, C.blankId);
+            for (const r of rows) {
+                result.set(`_:${r.blank_id}`, r.id);
+            }
+        }
+        return result;
     }
 
     /**

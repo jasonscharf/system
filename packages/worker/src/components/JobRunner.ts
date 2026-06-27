@@ -19,13 +19,19 @@
  * Execute:
  *   - Resolve the handler (module:// URI → resolveModuleRef; otherwise look up
  *     in the in-process registry).
- *   - Run the handler inside a fresh handler-scoped transaction so a failure
- *     rolls back the handler's own DB work but NOT the run-status bookkeeping.
+ *   - An IN-PROCESS handler runs inside a fresh handler-scoped transaction so a
+ *     failure rolls back the handler's own DB work but NOT the run-status
+ *     bookkeeping. A MODULE:// handler runs WITHOUT an outer transaction: it owns
+ *     its own persistence and may make a long network call mid-run, so holding a
+ *     pooled connection idle across it would starve the small pool and deadlock
+ *     (TRN-403). See _execute for the full rationale.
  *   - Enforce timeoutMs via Promise.race so wedged handlers cannot hang the runner.
  *   - Success → status='succeeded', finished_at=now.
  *   - Failure (throw/timeout) → record error; if attempt < max_attempts, insert
  *     a NEW retry run (status='pending', attempt+1, scheduled_for=now+backoff)
- *     and mark the current run failed; else mark it dead.
+ *     and mark the current run failed; else mark it dead. The retry insert is
+ *     idempotent on (job_id, scheduled_for, attempt) so colliding sibling retries
+ *     fold into one rather than aborting the tick.
  *
  * Injection points for deterministic tests:
  *   - now: () => Date           — injectable clock
@@ -46,6 +52,14 @@ import {
 import type { JobContext, JobHandler, JobHandlers } from "../JobHandlers.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+/** A resolved handler: its callable, bound args, and whether it came from a module:// URI. */
+interface ResolvedHandler {
+    fn: JobHandler;
+    args: Record<string, string>;
+    /** True for a `module://` handler (run without an outer transaction; see _execute). */
+    isModuleRef: boolean;
+}
 
 /** A pending sys_job_run row joined to its parent sys_job. */
 interface ClaimCandidate {
@@ -215,42 +229,42 @@ export class JobRunner extends FlowComponent {
     /**
      * Execute one claimed run.
      *
-     * Resolves the handler reference, runs it inside a fresh handler-scoped
-     * transaction with a timeout guard, and records the outcome.
+     * Resolves the handler reference, runs it under a timeout guard, and records
+     * the outcome.
+     *
+     * Transaction scope depends on the handler KIND, because the two kinds have
+     * opposite needs and a `module://` handler holding an idle outer transaction
+     * is what wedged the durable scheduler on staging (TRN-403):
+     *
+     *   - In-process registered handler (reaper, pruner): wrapped in a fresh
+     *     handler-scoped transaction. These do short, purely-local DB bookkeeping
+     *     and rely on `ctx.trx` for atomicity (mark + re-enqueue must commit
+     *     together). Unchanged behaviour.
+     *
+     *   - `module://` handler (the Switchyard Clock dispatcher): run with NO outer
+     *     transaction — `ctx.trx` is the bare knex handle. A module handler is a
+     *     process-boundary handler that owns its OWN persistence through a
+     *     separate store and may make a multi-second network call mid-run. Holding
+     *     a pooled connection idle across that work starves the small per-process
+     *     pool: the handler then cannot acquire the further connections it needs to
+     *     finish, so it never returns and is killed at the 30s timeout. Not holding
+     *     one keeps the pool free. The JobContext doc already scopes `trx` to a
+     *     handler's "own book-keeping"; a module handler has none here.
      */
     private async _execute(run: ClaimCandidate, claimedAt: Date): Promise<void> {
-        let handlerFn: JobHandler;
-        let handlerArgs: Record<string, string>;
+        let handler: ResolvedHandler;
 
         try {
-            ({ fn: handlerFn, args: handlerArgs } = await this._resolveHandler(run.handler));
+            handler = await this._resolveHandler(run.handler);
         } catch (resolveErr) {
             const errorMsg = resolveErr instanceof Error ? resolveErr.message : String(resolveErr);
             await this._recordFailure(run, claimedAt, errorMsg);
             return;
         }
 
-        let handlerError: string | undefined;
-
-        try {
-            await this._knex.transaction(async (handlerTrx) => {
-                const ctx: JobContext = { knex: this._knex, trx: handlerTrx };
-
-                const timeoutPromise = new Promise<never>((_, reject) => {
-                    setTimeout(() => {
-                        reject(
-                            new Error(
-                                `JobRunner: handler "${run.handler}" timed out after ${this._timeoutMs}ms`,
-                            ),
-                        );
-                    }, this._timeoutMs);
-                });
-
-                await Promise.race([handlerFn(ctx, handlerArgs), timeoutPromise]);
-            });
-        } catch (err) {
-            handlerError = err instanceof Error ? err.message : String(err);
-        }
+        const handlerError = handler.isModuleRef
+            ? await this._runWithoutTransaction(run, handler)
+            : await this._runInTransaction(run, handler);
 
         const finishedAt = this._now();
 
@@ -261,23 +275,99 @@ export class JobRunner extends FlowComponent {
         }
     }
 
+    /**
+     * Run a `module://` handler with the bare knex handle as `ctx.trx` (no outer
+     * transaction held). Returns the error message on failure/timeout, or
+     * undefined on success.
+     */
+    private async _runWithoutTransaction(
+        run: ClaimCandidate,
+        handler: ResolvedHandler,
+    ): Promise<string | undefined> {
+        const ctx: JobContext = {
+            knex: this._knex,
+            trx: this._knex as unknown as Knex.Transaction,
+        };
+        return this._raceHandler(run, handler, ctx);
+    }
+
+    /**
+     * Run an in-process handler inside a fresh handler-scoped transaction. The
+     * transaction commits on success and rolls back on failure/timeout, so the
+     * handler's own DB bookkeeping is atomic while the run-status update (a
+     * separate transaction) is not rolled back with it. Returns the error message
+     * on failure/timeout, or undefined on success.
+     */
+    private async _runInTransaction(
+        run: ClaimCandidate,
+        handler: ResolvedHandler,
+    ): Promise<string | undefined> {
+        let handlerError: string | undefined;
+        try {
+            await this._knex.transaction(async (handlerTrx) => {
+                const ctx: JobContext = { knex: this._knex, trx: handlerTrx };
+                const err = await this._raceHandler(run, handler, ctx);
+                if (err !== undefined) {
+                    // Throw so knex rolls the handler-scoped transaction back; the
+                    // message is recovered below and folded into the run outcome.
+                    throw new Error(err);
+                }
+            });
+        } catch (err) {
+            handlerError = err instanceof Error ? err.message : String(err);
+        }
+        return handlerError;
+    }
+
+    /**
+     * Run the handler against `ctx`, racing it against the per-handler timeout.
+     * Returns the error message on failure/timeout, or undefined on success.
+     */
+    private async _raceHandler(
+        run: ClaimCandidate,
+        handler: ResolvedHandler,
+        ctx: JobContext,
+    ): Promise<string | undefined> {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            timer = setTimeout(() => {
+                reject(
+                    new Error(
+                        `JobRunner: handler "${run.handler}" timed out after ${this._timeoutMs}ms`,
+                    ),
+                );
+            }, this._timeoutMs);
+        });
+        try {
+            await Promise.race([handler.fn(ctx, handler.args), timeoutPromise]);
+            return undefined;
+        } catch (err) {
+            return err instanceof Error ? err.message : String(err);
+        } finally {
+            if (timer !== undefined) {
+                clearTimeout(timer);
+            }
+        }
+    }
+
     // ── Handler resolution ────────────────────────────────────────────────────
 
     /**
-     * Resolve the handler string to a callable + args pair.
+     * Resolve the handler string to a callable + args + kind triple.
      *
-     * If the string starts with `module://` it is forwarded to resolveModuleRef.
-     * Otherwise it is treated as an in-process registered id and looked up in
-     * the handler registry. Throws a descriptive error if neither resolves.
+     * If the string starts with `module://` it is forwarded to resolveModuleRef
+     * and flagged `isModuleRef` (so `_execute` runs it WITHOUT an outer
+     * transaction — see its doc). Otherwise it is treated as an in-process
+     * registered id and looked up in the handler registry. Throws a descriptive
+     * error if neither resolves.
      */
-    private async _resolveHandler(
-        handlerRef: string,
-    ): Promise<{ fn: JobHandler; args: Record<string, string> }> {
+    private async _resolveHandler(handlerRef: string): Promise<ResolvedHandler> {
         if (handlerRef.startsWith("module://")) {
             const resolved = await resolveModuleRef(handlerRef);
             return {
                 fn: resolved.fn as JobHandler,
                 args: resolved.args,
+                isModuleRef: true,
             };
         }
 
@@ -290,7 +380,7 @@ export class JobRunner extends FlowComponent {
             );
         }
 
-        return { fn: registered, args: {} };
+        return { fn: registered, args: {}, isModuleRef: false };
     }
 
     // ── Outcome recording ─────────────────────────────────────────────────────
@@ -309,6 +399,15 @@ export class JobRunner extends FlowComponent {
      * If the run has remaining attempts: mark it `failed` and insert a new
      * retry run with capped exponential backoff.
      * If this was the final attempt: mark it `dead`.
+     *
+     * The retry insert is idempotent on the UNIQUE (job_id, scheduled_for,
+     * attempt) key: when several runs of the SAME attempt fail in the same
+     * backoff window they compute an identical retry slot, so the second insert
+     * collides. That collision means "the retry already exists" — a harmless
+     * no-op, exactly as the JobScheduler treats a racing fire — so it is caught
+     * and swallowed inside the same transaction (the status update still
+     * commits). Letting it throw here would (a) leave THIS run stuck `running`
+     * and (b) abort the whole runner tick, abandoning sibling claimed runs.
      */
     private async _recordFailure(
         run: ClaimCandidate,
@@ -326,18 +425,27 @@ export class JobRunner extends FlowComponent {
                     error,
                 });
 
-            if (hasRetry) {
-                const backoffMs = _computeBackoff(
-                    run.attempt,
-                    RUNNER_BACKOFF_BASE_MS,
-                    this._backoffMaxMs,
-                );
-                // scheduled_for for the retry run is the retry-eligible time,
-                // not the original scheduled_for. The runner's claim scan uses
-                // scheduled_for <= now to gate eligibility.
-                const retryAt = new Date(finishedAt.getTime() + backoffMs);
+            if (!hasRetry) {
+                return;
+            }
 
-                await trx("sys_job_run").insert({
+            const backoffMs = _computeBackoff(
+                run.attempt,
+                RUNNER_BACKOFF_BASE_MS,
+                this._backoffMaxMs,
+            );
+            // scheduled_for for the retry run is the retry-eligible time,
+            // not the original scheduled_for. The runner's claim scan uses
+            // scheduled_for <= now to gate eligibility.
+            const retryAt = new Date(finishedAt.getTime() + backoffMs);
+
+            // Insert-if-absent on the UNIQUE (job_id, scheduled_for, attempt)
+            // key: a concurrent sibling that already queued this exact retry slot
+            // makes this a no-op rather than a unique-violation that aborts the
+            // tick. onConflict().ignore() is portable across the pg and SQLite
+            // backends the worker runs on.
+            await trx("sys_job_run")
+                .insert({
                     id: crypto.randomUUID(),
                     job_id: run.job_id,
                     scheduled_for: retryAt,
@@ -347,8 +455,9 @@ export class JobRunner extends FlowComponent {
                     started_at: null,
                     finished_at: null,
                     error: null,
-                });
-            }
+                })
+                .onConflict(["job_id", "scheduled_for", "attempt"])
+                .ignore();
         });
     }
 }

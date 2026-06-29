@@ -2,10 +2,19 @@ import type {
     CommandDef,
     DispatchDef,
     DispatchKind,
+    DispatchManifestEntry,
     EventDef,
     OperationDef,
     QueryDef,
 } from "./types.js";
+
+// Deterministic kind ordering for describe() — independent of insertion order.
+const _KIND_ORDER: Record<DispatchKind, number> = {
+    command: 0,
+    event: 1,
+    query: 2,
+    operation: 3,
+};
 
 // ── Definition registry ──────────────────────────────────────────────────────────
 //
@@ -56,6 +65,44 @@ export class DefRegistry {
     /** True when a definition exists for the given kind and name. */
     has(kind: DispatchKind, name: string): boolean {
         return this._defs.has(_key(kind, name));
+    }
+
+    /**
+     * Project every registered definition into the runtime dispatch manifest:
+     * the public, JSON-serializable catalog a generic client (CLI, WebSockets,
+     * Switchyard) consumes to discover the dispatch surface.  Server-internal
+     * wiring (module-refs, reducers) is intentionally omitted; only the public
+     * contract (kind, name, optional documentation) is surfaced.
+     *
+     * Sorted deterministically by kind (command, event, query, operation) then
+     * name, so the output is stable across runs and registration order.
+     */
+    describe(): DispatchManifestEntry[] {
+        const entries: DispatchManifestEntry[] = [];
+        for (const def of this._defs.values()) {
+            const entry: DispatchManifestEntry = {
+                kind: def.kind,
+                name: def.name,
+            };
+            if (def.description != null) {
+                (entry as { description?: string }).description = def.description;
+            }
+            if (def.argSchema != null) {
+                (entry as { argSchema?: unknown }).argSchema = def.argSchema;
+            }
+            if ((def.kind === "query" || def.kind === "operation") && def.resultSchema != null) {
+                (entry as { resultSchema?: unknown }).resultSchema = def.resultSchema;
+            }
+            entries.push(entry);
+        }
+        entries.sort((a, b) => {
+            const byKind = _KIND_ORDER[a.kind] - _KIND_ORDER[b.kind];
+            if (byKind !== 0) {
+                return byKind;
+            }
+            return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+        });
+        return entries;
     }
 
     /** Remove every registered definition.  Intended for test isolation. */

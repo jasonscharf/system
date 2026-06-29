@@ -1,3 +1,5 @@
+import type { JsonValue } from "./registry.js";
+
 // ── Dispatch kinds ─────────────────────────────────────────────────────────────
 //
 // The four isomorphic message kinds.  Their semantics:
@@ -37,6 +39,18 @@ export interface DispatchDefBase {
      * All invocations are async.
      */
     readonly invocations: readonly ModuleRef[];
+    /**
+     * Optional human-readable description of what this entry does.  Surfaced by
+     * `describe()` so a generic client (CLI, WebSockets, Switchyard) can present
+     * the dispatch surface.  JSON-serializable.
+     */
+    readonly description?: string;
+    /**
+     * Optional JSON-Schema object describing the single `args` object this entry
+     * accepts.  Surfaced by `describe()` so a client can build/validate inputs.
+     * JSON-serializable (may cross a queue).
+     */
+    readonly argSchema?: JsonValue;
 }
 
 /** Command definition — void-returning; no data, no reducers. */
@@ -58,6 +72,11 @@ export interface QueryDef extends DispatchDefBase {
     readonly kind: "query";
     /** Reducer module-refs, run in order after the main sequence. */
     readonly reducers: readonly ModuleRef[];
+    /**
+     * Optional JSON-Schema object describing the data set this query returns.
+     * Surfaced by `describe()`.  JSON-serializable.
+     */
+    readonly resultSchema?: JsonValue;
 }
 
 /** Operation definition — like a query, but for mutations. */
@@ -65,6 +84,11 @@ export interface OperationDef extends DispatchDefBase {
     readonly kind: "operation";
     /** Reducer module-refs, run in order after the main sequence. */
     readonly reducers: readonly ModuleRef[];
+    /**
+     * Optional JSON-Schema object describing the data set this operation returns.
+     * Surfaced by `describe()`.  JSON-serializable.
+     */
+    readonly resultSchema?: JsonValue;
 }
 
 export type DispatchDef = CommandDef | EventDef | QueryDef | OperationDef;
@@ -101,3 +125,30 @@ export type Invocation = (ctx: InvocationCtx) => Promise<unknown>;
 
 /** Signature every reducer module-ref must satisfy. */
 export type Reducer = (ctx: ReducerCtx) => Promise<unknown>;
+
+// ── Runtime discovery (dispatch manifest) ────────────────────────────────────────
+//
+// A generic client (the future Tern CLI, WebSockets, Switchyard) needs to
+// enumerate and document the whole dispatch surface at runtime so it can
+// auto-build its command tree.  `describe()` projects each registered def into
+// one of these flat, JSON-serializable entries.  It deliberately omits the
+// module-refs / reducers (server-internal wiring) and exposes only the public
+// contract: the name, kind, and optional human/machine documentation.
+
+/**
+ * One entry in the runtime dispatch manifest — the public, JSON-serializable
+ * documentation of a single registered dispatch def.  `resultSchema` is only
+ * present for query/operation defs that declare one.
+ */
+export interface DispatchManifestEntry {
+    /** The kind this entry declares. */
+    readonly kind: DispatchKind;
+    /** The fully-qualified dispatch name, e.g. "view.activate". */
+    readonly name: string;
+    /** Human-readable description, when the def declared one. */
+    readonly description?: string;
+    /** JSON-Schema for the single `args` object, when the def declared one. */
+    readonly argSchema?: JsonValue;
+    /** JSON-Schema for the returned data set (query/operation only). */
+    readonly resultSchema?: JsonValue;
+}

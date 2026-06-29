@@ -42,6 +42,7 @@ const PACKAGES = [
     "core",
     "data",
     "entities",
+    "events",
     "flow",
     "gen",
     "server",

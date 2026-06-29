@@ -7,8 +7,13 @@
  * Each Redis test suite uses a unique prefix so runs never see stale state.
  */
 
-import { makeUri, NS_TEST, type DomainEvent, type ISystemBus } from "@jasonscharf/core";
-import { InMemorySystemBus } from "@jasonscharf/core";
+import {
+    type DomainEvent,
+    InMemorySystemBus,
+    type ISystemBus,
+    makeUri,
+    NS_TEST,
+} from "@jasonscharf/core";
 import { RedisSystemBus } from "@jasonscharf/events";
 import { Redis } from "ioredis";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -44,12 +49,15 @@ async function cleanupRedisKeys(url: string, prefix: string): Promise<void> {
 
 // ── Fixture IRIs ──────────────────────────────────────────────────────────────
 
-const CREATE_WIDGET  = "http://example.com/commands/CreateWidget";
-const GET_WIDGET     = "http://example.com/queries/GetWidget";
-const PROCESS_ORDER  = "http://example.com/operations/ProcessOrder";
+const CREATE_WIDGET = "http://example.com/commands/CreateWidget";
+const GET_WIDGET = "http://example.com/queries/GetWidget";
+const PROCESS_ORDER = "http://example.com/operations/ProcessOrder";
 const WIDGET_CREATED = "http://example.com/events/WidgetCreated";
 
-interface WidgetPayload { widgetId: string; name: string; }
+interface WidgetPayload {
+    widgetId: string;
+    name: string;
+}
 
 // ── Shared ISystemBus contract suite ─────────────────────────────────────────
 
@@ -57,8 +65,12 @@ function systemBusSuite(name: string, factory: () => ISystemBus) {
     describe(name, () => {
         let bus: ISystemBus;
 
-        beforeEach(() => { bus = factory(); });
-        afterEach(async () => { await bus.close(); });
+        beforeEach(() => {
+            bus = factory();
+        });
+        afterEach(async () => {
+            await bus.close();
+        });
 
         // ── Events ────────────────────────────────────────────────────────────
 
@@ -122,7 +134,7 @@ function systemBusSuite(name: string, factory: () => ISystemBus) {
 
         describe("commands", () => {
             it("test command roundtrip returns void", async () => {
-                let processed: unknown = undefined;
+                let processed: unknown;
 
                 await bus.handle(CREATE_WIDGET, "command", async (payload) => {
                     processed = payload;
@@ -168,19 +180,16 @@ function systemBusSuite(name: string, factory: () => ISystemBus) {
                     return { widgetId, name: "Hydrated Widget", createdAt: "2024-01-01" };
                 });
 
-                const result = await bus.query<{ widgetId: string; name: string }>(
-                    GET_WIDGET,
-                    { widgetId: "w4" },
-                );
+                const result = await bus.query<{ widgetId: string; name: string }>(GET_WIDGET, {
+                    widgetId: "w4",
+                });
 
                 expect(result.widgetId).toBe("w4");
                 expect(result.name).toBe("Hydrated Widget");
             });
 
             it("test query with no handler rejects", async () => {
-                await expect(
-                    bus.query("http://example.com/queries/Unknown"),
-                ).rejects.toThrow();
+                await expect(bus.query("http://example.com/queries/Unknown")).rejects.toThrow();
             });
 
             it("test query handler error propagates", async () => {
@@ -245,10 +254,10 @@ function systemBusSuite(name: string, factory: () => ISystemBus) {
 
             it("test operation is distinct from query", async () => {
                 await bus.handle(PROCESS_ORDER, "operation", async () => "from-operation");
-                await bus.handle(PROCESS_ORDER, "query",     async () => "from-query");
+                await bus.handle(PROCESS_ORDER, "query", async () => "from-query");
 
                 const opResult = await bus.operation(PROCESS_ORDER);
-                const qResult  = await bus.query(PROCESS_ORDER);
+                const qResult = await bus.query(PROCESS_ORDER);
 
                 expect(opResult).toBe("from-operation");
                 expect(qResult).toBe("from-query");
@@ -280,17 +289,21 @@ systemBusSuite("InMemorySystemBus", () => new InMemorySystemBus());
 if (process.env.SYS_REDIS_URL) {
     const redisUrl = process.env.SYS_REDIS_URL as string;
 
+    // The bus is handed a Redis connection it does not own, so each connection
+    // created for a bus under test is tracked and quit after every test.
+    const trackedRedis: Redis[] = [];
+    afterEach(async () => {
+        for (const r of trackedRedis.splice(0)) {
+            await r.quit().catch(() => {});
+        }
+    });
+
     function makeRedisBus(prefix: string): RedisSystemBus {
-        return new RedisSystemBus(redisUrl, {
-            streamPrefix:   `${prefix}events:`,
-            rpcPrefix:      `${prefix}rpc:`,
-            // 500 ms keeps "no handler" timeout tests well under vitest's 5 s
-            // default while still being long enough for normal round-trips.
-            rpcTimeoutMs:   500,
-            replyTtlSecs:   10,
-            claimMinIdleMs: 300,
-            claimIntervalMs: 80,
-        });
+        const redis = new Redis(redisUrl);
+        trackedRedis.push(redis);
+        // 500 ms keeps "no handler" timeout tests well under vitest's 5 s
+        // default while still being long enough for normal round-trips.
+        return new RedisSystemBus(redis, { keyPrefix: prefix, requestTimeoutMs: 500 });
     }
 
     // Run the full contract suite against Redis.
@@ -354,15 +367,11 @@ if (process.env.SYS_REDIS_URL) {
         });
 
         it("test query timeout rejects when no handler registered", async () => {
-            const callerBus = new RedisSystemBus(redisUrl, {
-                rpcPrefix:    `${makeUri(NS_TEST, uniqueId())}:rpc:`,
-                rpcTimeoutMs: 300,
-            });
-            buses.push(callerBus);
+            const callerBus = make();
 
-            await expect(
-                callerBus.query("http://example.com/queries/Unhandled"),
-            ).rejects.toThrow(/timeout/i);
+            await expect(callerBus.query("http://example.com/queries/Unhandled")).rejects.toThrow(
+                /timed out/i,
+            );
         }, 5_000);
 
         it("test competing command handlers each request processed once", async () => {
@@ -387,9 +396,10 @@ if (process.env.SYS_REDIS_URL) {
             expect(new Set(processed).size).toBe(6);
         });
     });
-
 } else {
     describe("RedisSystemBus (skipped — set SYS_REDIS_URL to enable)", () => {
-        it("test skipped", () => { /* no-op */ });
+        it("test skipped", () => {
+            /* no-op */
+        });
     });
 }

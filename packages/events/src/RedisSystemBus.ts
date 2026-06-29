@@ -1,103 +1,112 @@
+/**
+ * RedisSystemBus - a Redis-backed ISystemBus for in-process use.
+ *
+ * Runs inside the application process (no separate broker) and uses a Redis
+ * connection as the transport, giving at-least-once, cross-process delivery:
+ *
+ *   Events     - Redis streams + consumer groups. publish() XADDs to a per-type
+ *                stream; subscribe(typeIri, subscriptionName) joins a consumer
+ *                group named after the subscription. Instances sharing a
+ *                subscription name compete for each message (load balanced);
+ *                distinct subscription names each receive every message
+ *                (fan-out) - exactly the IDomainEventBus contract.
+ *
+ *   RPC        - command/query/operation. The caller XADDs a request to a
+ *                per-(kind,type) stream and awaits a reply on its own pub/sub
+ *                inbox; handle() consumes the request stream via a shared
+ *                "handlers" group and publishes the reply to the caller's inbox.
+ *                Request delivery is at-least-once; the reply is best-effort
+ *                (the caller times out and may retry), which is the standard
+ *                RPC-over-bus tradeoff.
+ *
+ * Blocking reads (XREADGROUP / subscribe) each run on their own duplicated
+ * connection so they never tie up the shared command connection.
+ */
+
 import { randomUUID } from "node:crypto";
-import {
-    type DomainEvent,
-    type EventSubscription,
-    type ISystemBus,
-    NS_CORE,
-    type RpcHandler,
-    type RpcKind,
-    makeUri,
+import type {
+    DomainEvent,
+    EventSubscription,
+    ISystemBus,
+    RpcHandler,
+    RpcKind,
 } from "@jasonscharf/core";
-import { Redis } from "ioredis";
-import { RedisStreamEventBus, type RedisStreamEventBusOptions } from "./RedisStreamEventBus.js";
+import type { Redis } from "ioredis";
 
-// ── Options ───────────────────────────────────────────────────────────────────
-
-export interface RedisSystemBusOptions extends RedisStreamEventBusOptions {
-    /**
-     * Prefix for RPC request streams and reply lists.
-     * Default: "urn:sys:core:rpc:"
-     */
-    rpcPrefix?: string;
-    /**
-     * How long (ms) the caller blocks waiting for an RPC reply before timing out.
-     * Default: 10 000 (10 s)
-     */
-    rpcTimeoutMs?: number;
-    /**
-     * TTL (seconds) set on reply keys after a result is pushed.
-     * Prevents orphaned keys when the caller crashes before popping.
-     * Default: 60
-     */
-    replyTtlSecs?: number;
-    /**
-     * Consumer group name used by all handle() listeners on this bus.
-     * Instances sharing the same group compete for each request (load-balanced).
-     * Default: "handlers"
-     */
-    handlerGroup?: string;
+export interface RedisSystemBusOptions {
+    /** Namespace for all bus keys. Default: "bus". */
+    keyPrefix?: string;
+    /** XREADGROUP / subscribe block interval in ms. Default: 1000. */
+    blockMs?: number;
+    /** Approximate cap on each stream's length (MAXLEN ~). Default: 100000. */
+    maxLen?: number;
+    /** Default RPC reply timeout in ms. Default: 10000. */
+    requestTimeoutMs?: number;
 }
 
-// ── Wire types ────────────────────────────────────────────────────────────────
-
-interface RpcRequest {
-    id: string;
-    kind: RpcKind;
-    typeIri: string;
-    payload: string;   // JSON
-    replyTo: string;   // Redis list key for BRPOP
+interface PendingRpc {
+    resolve: (value: unknown) => void;
+    reject: (err: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
 }
 
 interface RpcReply {
+    id: string;
     ok: boolean;
-    data?: unknown;
+    result?: unknown;
     error?: string;
 }
 
-// ── RedisSystemBus ────────────────────────────────────────────────────────────
+interface ConsumeLoop {
+    running: boolean;
+    conn: Redis;
+}
 
-/**
- * Distributed messaging bus backed by Redis.
- *
- * Events:  Redis Streams + consumer groups (inherited from RedisStreamEventBus).
- *          Pub/sub with fan-out across different subscriptionNames.
- *
- * RPC (command/query/operation):
- *   • Caller      XADD  {rpcPrefix}{kind}:{b64(typeIri)}  request fields
- *   • Caller      BRPOP {replyKey} {timeout}
- *   • Handler     XREADGROUP … process → LPUSH {replyKey} {json}
- *                 → EXPIRE {replyKey} {ttl}
- *                 → XACK
- *
- * Competing consumers: all instances that call handle() for the same
- * (typeIri, kind) join the same consumer group.  Each request is processed
- * by exactly one handler.
- */
+const HANDLER_GROUP = "handlers";
+
 export class RedisSystemBus implements ISystemBus {
-    private readonly _eventBus: RedisStreamEventBus;
-    private readonly _publishRedis: Redis;
-    private readonly _rpcPrefix: string;
-    private readonly _rpcTimeoutMs: number;
-    private readonly _replyTtlSecs: number;
-    private readonly _handlerGroup: string;
-    private readonly _url: string;
-    private readonly _handlerSubs: Array<{ cancel: () => Promise<void> }> = [];
+    private readonly _cmd: Redis;
+    private readonly _prefix: string;
+    private readonly _blockMs: number;
+    private readonly _maxLen: number;
+    private readonly _requestTimeoutMs: number;
+    private readonly _instanceId = randomUUID();
+
+    private readonly _loops = new Set<ConsumeLoop>();
+    private readonly _pending = new Map<string, PendingRpc>();
+    /** Active RPC handler loop per "<kind>:<typeIri>" so a second handle() replaces the first. */
+    private readonly _handlers = new Map<string, ConsumeLoop>();
+
+    private _replySub: Redis | null = null;
+    private _replyReady: Promise<void> | null = null;
     private _closed = false;
 
-    constructor(redisUrl: string, options: RedisSystemBusOptions = {}) {
-        this._url = redisUrl;
-        this._rpcPrefix = options.rpcPrefix ?? `${makeUri(NS_CORE, "rpc")}:`;
-        this._rpcTimeoutMs = options.rpcTimeoutMs ?? 10_000;
-        this._replyTtlSecs = options.replyTtlSecs ?? 60;
-        this._handlerGroup = options.handlerGroup ?? "handlers";
-        this._eventBus = new RedisStreamEventBus(redisUrl, options);
-        this._publishRedis = new Redis(redisUrl);
+    constructor(redis: Redis, options: RedisSystemBusOptions = {}) {
+        this._cmd = redis;
+        this._prefix = options.keyPrefix ?? "bus";
+        this._blockMs = options.blockMs ?? 1_000;
+        this._maxLen = options.maxLen ?? 100_000;
+        this._requestTimeoutMs = options.requestTimeoutMs ?? 10_000;
     }
 
-    // ── Events (delegated to RedisStreamEventBus) ─────────────────────────────
+    // ── Key helpers ─────────────────────────────────────────────────────────────
+
+    private _eventStream(typeIri: string): string {
+        return `${this._prefix}:event:${typeIri}`;
+    }
+
+    private _rpcStream(kind: RpcKind, typeIri: string): string {
+        return `${this._prefix}:rpc:${kind}:${typeIri}`;
+    }
+
+    private get _replyChannel(): string {
+        return `${this._prefix}:reply:${this._instanceId}`;
+    }
+
+    // ── Events (IDomainEventBus) ─────────────────────────────────────────────────
 
     async publish<T>(event: DomainEvent<T>): Promise<void> {
-        return this._eventBus.publish(event);
+        await this._xadd(this._eventStream(event.type), "data", JSON.stringify(event));
     }
 
     async subscribe<T>(
@@ -105,195 +114,278 @@ export class RedisSystemBus implements ISystemBus {
         subscriptionName: string,
         handler: (event: DomainEvent<T>) => Promise<void>,
     ): Promise<EventSubscription> {
-        return this._eventBus.subscribe(typeIri, subscriptionName, handler);
+        const stream = this._eventStream(typeIri);
+        await this._ensureGroup(stream, subscriptionName);
+
+        const loop = this._startConsumeLoop(stream, subscriptionName, async (fields) => {
+            const raw = fields.data;
+            if (raw === undefined) {
+                return;
+            }
+            const event = JSON.parse(raw) as DomainEvent<T>;
+            await handler(event);
+        });
+
+        return {
+            typeIri,
+            subscriptionName,
+            cancel: async () => {
+                await this._stopLoop(loop);
+            },
+        };
     }
 
-    // ── RPC — callers ─────────────────────────────────────────────────────────
+    // ── RPC (ISystemBus) ─────────────────────────────────────────────────────────
 
     async command(typeIri: string, payload?: unknown): Promise<void> {
-        await this._rpc("command", typeIri, payload);
+        await this._request("command", typeIri, payload);
     }
 
-    async query<T = unknown>(typeIri: string, payload?: unknown): Promise<T> {
-        return this._rpc("query", typeIri, payload) as Promise<T>;
+    query<T = unknown>(typeIri: string, payload?: unknown): Promise<T> {
+        return this._request("query", typeIri, payload) as Promise<T>;
     }
 
-    async operation<T = unknown>(typeIri: string, payload?: unknown): Promise<T> {
-        return this._rpc("operation", typeIri, payload) as Promise<T>;
+    operation<T = unknown>(typeIri: string, payload?: unknown): Promise<T> {
+        return this._request("operation", typeIri, payload) as Promise<T>;
     }
 
-    private async _rpc(kind: RpcKind, typeIri: string, payload: unknown): Promise<unknown> {
+    async handle(typeIri: string, kind: RpcKind, fn: RpcHandler): Promise<void> {
+        const key = `${kind}:${typeIri}`;
+        const existing = this._handlers.get(key);
+        if (existing) {
+            await this._stopLoop(existing);
+            this._handlers.delete(key);
+        }
+
+        const stream = this._rpcStream(kind, typeIri);
+        await this._ensureGroup(stream, HANDLER_GROUP);
+
+        const loop = this._startConsumeLoop(stream, HANDLER_GROUP, async (fields) => {
+            const id = fields.id;
+            const replyChannel = fields.replyChannel;
+            if (id === undefined || replyChannel === undefined) {
+                return;
+            }
+            const reply: RpcReply = { id, ok: true };
+            try {
+                const payload =
+                    fields.payload === undefined ? undefined : JSON.parse(fields.payload);
+                reply.result = await fn(payload);
+            } catch (err: unknown) {
+                reply.ok = false;
+                reply.error = (err as Error).message;
+            }
+            await this._cmd.publish(replyChannel, JSON.stringify(reply));
+        });
+
+        this._handlers.set(key, loop);
+    }
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────────
+
+    async close(): Promise<void> {
+        this._closed = true;
+        for (const [, p] of this._pending) {
+            clearTimeout(p.timer);
+            p.reject(new Error("RedisSystemBus closed"));
+        }
+        this._pending.clear();
+
+        const loops = [...this._loops];
+        await Promise.all(loops.map((l) => this._stopLoop(l)));
+        this._handlers.clear();
+
+        if (this._replySub) {
+            await this._replySub.quit().catch(() => this._replySub?.disconnect());
+            this._replySub = null;
+        }
+    }
+
+    // ── RPC request/reply plumbing ─────────────────────────────────────────────────
+
+    private async _request(kind: RpcKind, typeIri: string, payload?: unknown): Promise<unknown> {
+        if (this._closed) {
+            throw new Error("RedisSystemBus is closed");
+        }
+        await this._ensureReplySub();
+
         const id = randomUUID();
-        const replyKey = `${this._rpcPrefix}reply:${id}`;
-        const streamKey = this._rpcStreamKey(kind, typeIri);
+        const result = new Promise<unknown>((resolve, reject) => {
+            const timer = setTimeout(() => {
+                this._pending.delete(id);
+                reject(
+                    new Error(`RPC ${kind} ${typeIri} timed out after ${this._requestTimeoutMs}ms`),
+                );
+            }, this._requestTimeoutMs);
+            this._pending.set(id, { resolve, reject, timer });
+        });
 
-        await this._publishRedis.xadd(
-            streamKey, "*",
-            "id", id,
-            "kind", kind,
-            "typeIri", typeIri,
-            "payload", JSON.stringify(payload ?? null),
-            "replyTo", replyKey,
+        await this._xadd(
+            this._rpcStream(kind, typeIri),
+            "id",
+            id,
+            "replyChannel",
+            this._replyChannel,
+            "payload",
+            JSON.stringify(payload ?? null),
         );
 
-        const timeoutSecs = Math.ceil(this._rpcTimeoutMs / 1000);
-        const result = await this._publishRedis.brpop(replyKey, timeoutSecs);
-
-        if (!result) {
-            throw new Error(`RPC timeout (${this._rpcTimeoutMs}ms): ${kind} ${typeIri}`);
-        }
-
-        const reply = JSON.parse(result[1]) as RpcReply;
-        if (!reply.ok) {
-            throw new Error(reply.error ?? `RPC error: ${kind} ${typeIri}`);
-        }
-        return reply.data;
+        return result;
     }
 
-    // ── RPC — handlers ────────────────────────────────────────────────────────
-
-    handle(typeIri: string, kind: RpcKind, fn: RpcHandler): Promise<void> {
-        const streamKey = this._rpcStreamKey(kind, typeIri);
-        const group = this._handlerGroup;
-        const consumerId = randomUUID();
-        const url = this._url;
-        const replyTtlSecs = this._replyTtlSecs;
-
-        const reader = new Redis(url);
-        let running = true;
-
-        let resolveLoopDone!: () => void;
-        const loopDone = new Promise<void>((res) => { resolveLoopDone = res; });
-
-        // Ensure consumer group exists (MKSTREAM creates stream if needed).
-        // Using "0-0" so messages added immediately after handle() returns are
-        // not missed if they were briefly on the stream before the group
-        // creation completed.  For fresh per-test streams this is a no-op.
-        const ready = reader
-            .xgroup("CREATE", streamKey, group, "0-0", "MKSTREAM")
-            .catch((err: unknown) => {
-                if (err instanceof Error && err.message.includes("BUSYGROUP")) {
+    /** Subscribe (once) to this instance's reply inbox. */
+    private _ensureReplySub(): Promise<void> {
+        if (this._replyReady) {
+            return this._replyReady;
+        }
+        this._replyReady = (async () => {
+            const sub = this._cmd.duplicate();
+            sub.on("message", (_channel: string, message: string) => {
+                let reply: RpcReply;
+                try {
+                    reply = JSON.parse(message) as RpcReply;
+                } catch {
                     return;
                 }
-                throw err;
+                const pending = this._pending.get(reply.id);
+                if (!pending) {
+                    return;
+                }
+                clearTimeout(pending.timer);
+                this._pending.delete(reply.id);
+                if (reply.ok) {
+                    pending.resolve(reply.result);
+                } else {
+                    pending.reject(new Error(reply.error ?? "RPC handler error"));
+                }
             });
+            await sub.subscribe(this._replyChannel);
+            this._replySub = sub;
+        })();
+        return this._replyReady;
+    }
 
-        const loop = async (): Promise<void> => {
-            await ready;
-            while (running) {
-                let results: [string, [string, string[]][]][] | null = null;
-                try {
-                    results = (await reader.xreadgroup(
-                        "GROUP", group, consumerId,
-                        "COUNT", "1",
-                        "BLOCK", "1000",
-                        "STREAMS", streamKey, ">",
-                    )) as [string, [string, string[]][]][] | null;
-                } catch {
-                    if (!running) {
-                        break;
+    // ── Stream consumption ──────────────────────────────────────────────────────
+
+    /** Start a background XREADGROUP loop on its own connection. */
+    private _startConsumeLoop(
+        stream: string,
+        group: string,
+        onEntry: (fields: Record<string, string>) => Promise<void>,
+    ): ConsumeLoop {
+        const loop: ConsumeLoop = { running: true, conn: this._cmd.duplicate() };
+        this._loops.add(loop);
+        // Background loop: it owns its own error handling per-iteration and only
+        // exits when loop.running flips false. A rejection here would mean the loop
+        // crashed unexpectedly, so it must be LOGGED rather than become an
+        // unhandled rejection.
+        this._consume(loop, stream, group, onEntry).catch((err: unknown) => {
+            console.error(
+                `[RedisSystemBus] consume loop crashed on ${stream}: ${(err as Error).message}`,
+            );
+        });
+        return loop;
+    }
+
+    private async _consume(
+        loop: ConsumeLoop,
+        stream: string,
+        group: string,
+        onEntry: (fields: Record<string, string>) => Promise<void>,
+    ): Promise<void> {
+        while (loop.running) {
+            let results: Array<[string, Array<[string, string[]]>]> | null;
+            try {
+                // biome-ignore lint/suspicious/noExplicitAny: ioredis stream commands lack public overloads
+                results = (await (loop.conn as any).xreadgroup(
+                    "GROUP",
+                    group,
+                    this._instanceId,
+                    "COUNT",
+                    10,
+                    "BLOCK",
+                    this._blockMs,
+                    "STREAMS",
+                    stream,
+                    ">",
+                )) as Array<[string, Array<[string, string[]]>]> | null;
+            } catch (err: unknown) {
+                if (!loop.running) {
+                    break;
+                }
+                console.error(
+                    `[RedisSystemBus] XREADGROUP error on ${stream}: ${(err as Error).message}`,
+                );
+                continue;
+            }
+
+            for (const [, entries] of results ?? []) {
+                for (const [entryId, rawFields] of entries) {
+                    const fields = toFieldMap(rawFields);
+                    try {
+                        await onEntry(fields);
+                    } catch (err: unknown) {
+                        console.error(
+                            `[RedisSystemBus] handler error on ${stream} ${entryId}: ${(err as Error).message}`,
+                        );
                     }
-                    await _delay(200);
-                    continue;
-                }
-
-                if (!results) {
-                    continue;
-                }
-
-                for (const [, messages] of results) {
-                    for (const [msgId, fields] of messages) {
-                        const req = _parseRpcRequest(fields);
-                        if (!req) {
-                            await reader.xack(streamKey, group, msgId).catch(() => {});
-                            continue;
-                        }
-
-                        let reply: RpcReply;
-                        try {
-                            const data = await fn(JSON.parse(req.payload) as unknown);
-                            reply = { ok: true, data };
-                        } catch (err: unknown) {
-                            reply = {
-                                ok: false,
-                                error: err instanceof Error ? err.message : String(err),
-                            };
-                        }
-
-                        const replyRedis = new Redis(url);
-                        try {
-                            await replyRedis.lpush(req.replyTo, JSON.stringify(reply));
-                            await replyRedis.expire(req.replyTo, replyTtlSecs);
-                        } finally {
-                            await replyRedis.quit().catch(() => {});
-                        }
-
-                        await reader.xack(streamKey, group, msgId).catch(() => {});
+                    // Ack after the attempt: at-least-once on transport, with
+                    // handler errors logged rather than poison-looping. A failed
+                    // XACK must never be swallowed: the entry stays in the consumer
+                    // group's pending list and is redelivered (no loss), so the
+                    // failure is LOGGED rather than reported as a false ack.
+                    try {
+                        // biome-ignore lint/suspicious/noExplicitAny: ioredis stream commands lack public overloads
+                        await (this._cmd as any).xack(stream, group, entryId);
+                    } catch (err: unknown) {
+                        console.error(
+                            `[RedisSystemBus] XACK failed on ${stream} ${entryId} (will be redelivered): ${(err as Error).message}`,
+                        );
                     }
                 }
             }
-        };
-
-        loop().finally(resolveLoopDone);
-
-        this._handlerSubs.push({
-            cancel: async () => {
-                running = false;
-                await reader.quit().catch(() => {});
-                await loopDone;
-            },
-        });
-
-        // Resolve after XGROUP CREATE so callers that await handle() are
-        // guaranteed the consumer group exists before they send any requests.
-        return ready.then(() => {});
+        }
     }
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────────
-
-    async close(): Promise<void> {
-        if (this._closed) {
-            return;
+    private async _stopLoop(loop: ConsumeLoop): Promise<void> {
+        loop.running = false;
+        this._loops.delete(loop);
+        try {
+            await loop.conn.quit();
+        } catch (err: unknown) {
+            // Quit failed; force the socket closed so the connection is not leaked.
+            console.error(
+                `[RedisSystemBus] consumer connection quit failed, forcing disconnect: ${(err as Error).message}`,
+            );
+            loop.conn.disconnect();
         }
-        this._closed = true;
-        for (const sub of this._handlerSubs) {
-            await sub.cancel();
-        }
-        this._handlerSubs.length = 0;
-        await this._eventBus.close();
-        await this._publishRedis.quit().catch(() => {});
     }
 
-    // ── Private ───────────────────────────────────────────────────────────────
+    private async _ensureGroup(stream: string, group: string): Promise<void> {
+        try {
+            // biome-ignore lint/suspicious/noExplicitAny: ioredis stream commands lack public overloads
+            await (this._cmd as any).xgroup("CREATE", stream, group, "$", "MKSTREAM");
+        } catch (err: unknown) {
+            if (!(err as Error).message.includes("BUSYGROUP")) {
+                throw err;
+            }
+        }
+    }
 
-    private _rpcStreamKey(kind: RpcKind, typeIri: string): string {
-        return `${this._rpcPrefix}${kind}:${Buffer.from(typeIri).toString("base64url")}`;
+    private async _xadd(stream: string, ...fieldArgs: string[]): Promise<void> {
+        // biome-ignore lint/suspicious/noExplicitAny: ioredis stream commands lack public overloads
+        await (this._cmd as any).xadd(stream, "MAXLEN", "~", this._maxLen, "*", ...fieldArgs);
     }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function _parseRpcRequest(fields: string[]): RpcRequest | null {
-    const map: Record<string, string> = {};
-    for (let i = 0; i + 1 < fields.length; i += 2) {
-        const k = fields[i];
-        const v = fields[i + 1];
+function toFieldMap(rawFields: string[]): Record<string, string> {
+    const fields: Record<string, string> = {};
+    for (let i = 0; i < rawFields.length; i += 2) {
+        const k = rawFields[i];
+        const v = rawFields[i + 1];
         if (k !== undefined && v !== undefined) {
-            map[k] = v;
+            fields[k] = v;
         }
     }
-    if (!map.id || !map.kind || !map.typeIri || !map.payload || !map.replyTo) {
-        return null;
-    }
-    return {
-        id: map.id,
-        kind: map.kind as RpcKind,
-        typeIri: map.typeIri,
-        payload: map.payload,
-        replyTo: map.replyTo,
-    };
-}
-
-function _delay(ms: number): Promise<void> {
-    return new Promise((r) => setTimeout(r, ms));
+    return fields;
 }

@@ -175,7 +175,7 @@ jobs:
         # expansion produces the correct scoped names in published manifests.
         run: |
           OWNER="${{ github.repository_owner }}"
-          for pkg in api app auth core data entities flow gen server vaults worker; do
+          for pkg in api app auth core data entities events flow gen server vaults worker; do
             tmp=$(mktemp)
             sed "s|\"@system/|\"@${OWNER}/|g" "packages/${pkg}/package.json" > "$tmp"
             mv "$tmp" "packages/${pkg}/package.json"
@@ -230,6 +230,7 @@ jobs:
 
           # Layer 1 — depend only on core (or core + flow)
           publish_pkg data
+          publish_pkg events
           publish_pkg flow
           publish_pkg worker
           publish_pkg gen

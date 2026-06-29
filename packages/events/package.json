@@ -15,6 +15,15 @@
     "files": [
         "dist"
     ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/jasonlscharf/system.git",
+        "directory": "packages/events"
+    },
+    "publishConfig": {
+        "registry": "https://npm.pkg.github.com",
+        "access": "public"
+    },
     "scripts": {
         "build": "yarn compile",
         "compile": "tsc -b",

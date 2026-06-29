@@ -2,7 +2,7 @@ import type { ISystemBus } from "@jasonscharf/core";
 import type { DefRegistry } from "./DefRegistry.js";
 import { dispatchIri, rpcKindFor } from "./iri.js";
 import { Runner, type RunnerOptions } from "./runner.js";
-import type { DispatchKind } from "./types.js";
+import type { DispatchKind, DispatchManifestEntry } from "./types.js";
 
 // ── DispatchHost ─────────────────────────────────────────────────────────────────
 //
@@ -48,5 +48,14 @@ export class DispatchHost {
         await this._bus.handle(iri, rpcKindFor(kind), async (payload: unknown) => {
             return this._runner.run(kind, name, payload);
         });
+    }
+
+    /**
+     * The runtime dispatch manifest for every definition this host knows about.
+     * Delegates to the registry so the host can publish its catalog for a
+     * generic client (CLI, WebSockets, Switchyard) to discover.
+     */
+    describe(): DispatchManifestEntry[] {
+        return this._registry.describe();
     }
 }

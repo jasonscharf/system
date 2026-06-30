@@ -33,6 +33,17 @@ type SecretClientLike = {
  * stack.
  *
  * Azure KV secret names allow only [a-zA-Z0-9-] and max 127 characters.
+ *
+ * Per-secret environment fallback
+ * ───────────────────────────────
+ * A key that is NOT present in the vault (Azure returns SecretNotFound / 404)
+ * falls back to the matching `process.env[key]` before resolving to null. This
+ * lets non-sensitive runtime config (db host/user/database, redis url, etc.)
+ * live in a plain ConfigMap / env block while only the actual secrets are
+ * stored in the vault — the caller passes one key (`SYS_PG_HOST`) and gets the
+ * vault value when present, otherwise the env value, otherwise null. Auth /
+ * network errors are still rethrown so a misconfigured vault fails loudly
+ * rather than silently degrading to env.
  */
 export class AzureKeyVaultProvider implements ISecretsProvider {
     private readonly _vaultUri: string;
@@ -75,16 +86,23 @@ export class AzureKeyVaultProvider implements ISecretsProvider {
 
         try {
             const secret = await client.getSecret(secretName);
-            return secret.value ?? null;
+            return secret.value ?? this._envFallback(key);
         } catch (err: unknown) {
             const code =
                 (err as { code?: string; statusCode?: number }).code ??
                 String((err as { statusCode?: number }).statusCode);
             if (code === "SecretNotFound" || code === "404") {
-                return null;
+                // Not in the vault — fall back to the matching env var so plain
+                // ConfigMap config resolves through the same call as real secrets.
+                return this._envFallback(key);
             }
             throw err;
         }
+    }
+
+    /** The raw env var for a key, or null when it too is unset. */
+    private _envFallback(key: string): string | null {
+        return process.env[key] ?? null;
     }
 
     async getRequired(key: string): Promise<string> {

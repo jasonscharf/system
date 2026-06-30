@@ -269,6 +269,58 @@ describe("AzureKeyVaultProvider", () => {
 
         expect(await provider.get("ANY_KEY")).toBeNull();
     });
+
+    // ── Per-secret env fallback ─────────────────────────────────────────────
+    // A key absent from the vault falls back to the matching process.env[key]
+    // before resolving to null, so plain ConfigMap config (db host/user, etc.)
+    // resolves through the same call as real vault secrets.
+
+    it("get() falls back to the env var when the secret is not in the vault", async () => {
+        process.env.__VAULT_FALLBACK__ = "from-env";
+        const provider = new AzureKeyVaultProvider("https://fake.vault.azure.net/");
+        const fakeClient = {
+            getSecret: vi.fn().mockRejectedValue({ code: "SecretNotFound" }),
+        };
+        (provider as unknown as { _client: typeof fakeClient })._client = fakeClient;
+
+        expect(await provider.get("__VAULT_FALLBACK__")).toBe("from-env");
+        delete process.env.__VAULT_FALLBACK__;
+    });
+
+    it("get() returns null when neither the vault nor the env has the key", async () => {
+        delete process.env.__VAULT_FALLBACK_MISSING__;
+        const provider = new AzureKeyVaultProvider("https://fake.vault.azure.net/");
+        const fakeClient = {
+            getSecret: vi.fn().mockRejectedValue({ statusCode: 404 }),
+        };
+        (provider as unknown as { _client: typeof fakeClient })._client = fakeClient;
+
+        expect(await provider.get("__VAULT_FALLBACK_MISSING__")).toBeNull();
+    });
+
+    it("get() prefers the vault value over the env var when both exist", async () => {
+        process.env.__VAULT_PREFER__ = "from-env";
+        const provider = new AzureKeyVaultProvider("https://fake.vault.azure.net/");
+        const fakeClient = {
+            getSecret: vi.fn().mockResolvedValue({ value: "from-vault" }),
+        };
+        (provider as unknown as { _client: typeof fakeClient })._client = fakeClient;
+
+        expect(await provider.get("__VAULT_PREFER__")).toBe("from-vault");
+        delete process.env.__VAULT_PREFER__;
+    });
+
+    it("get() falls back to the env var when the vault value is empty/undefined", async () => {
+        process.env.__VAULT_EMPTY__ = "from-env";
+        const provider = new AzureKeyVaultProvider("https://fake.vault.azure.net/");
+        const fakeClient = {
+            getSecret: vi.fn().mockResolvedValue({ value: undefined }),
+        };
+        (provider as unknown as { _client: typeof fakeClient })._client = fakeClient;
+
+        expect(await provider.get("__VAULT_EMPTY__")).toBe("from-env");
+        delete process.env.__VAULT_EMPTY__;
+    });
 });
 
 // ── SecretsManager ────────────────────────────────────────────────────────────

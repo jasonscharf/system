@@ -25,7 +25,12 @@ type SecretClientLike = {
  * Environment variable names (e.g. `GOOGLE_CLIENT_SECRET`) are mapped to Azure
  * Key Vault secret names by lowercasing and replacing underscores with hyphens:
  *   GOOGLE_CLIENT_SECRET  →  google-client-secret
- *   SYS_PG_PASSWORD      →  tern-pg-password
+ *   SYS_PG_PASSWORD       →  sys-pg-password
+ *
+ * The `SYS_` env prefix lowercases to the `sys-` vault prefix verbatim; the two
+ * are the same namespace spelled for two transports (env vars use underscores,
+ * Azure KV names use hyphens). This is the single naming convention across the
+ * stack.
  *
  * Azure KV secret names allow only [a-zA-Z0-9-] and max 127 characters.
  */
@@ -93,8 +98,10 @@ export class AzureKeyVaultProvider implements ISecretsProvider {
     }
 
     private _toVaultName(key: string): string {
-        // SYS_ is the internal env prefix; Azure vault secrets keep the tern- prefix
-        const normalized = key.startsWith("SYS_") ? `TERN_${key.slice(4)}` : key;
-        return normalized.toLowerCase().replace(/_/g, "-");
+        // The env name and the vault name are the same convention in two
+        // spellings: SYS_FOO (env, underscores) <-> sys-foo (vault, hyphens).
+        // Just lowercase and swap underscores for hyphens; do NOT rewrite the
+        // SYS_ prefix.
+        return key.toLowerCase().replace(/_/g, "-");
     }
 }

@@ -936,3 +936,127 @@ describe("FlowLoader: declarative graph construction", () => {
         ).rejects.toThrow();
     });
 });
+
+// ── FlowApp.stop(): graceful drain (TRN-472) ─────────────────────────────────
+//
+// stop() must not dispose components while work is still in flight. The
+// canonical failure: a worker confirms a send, emits an ack onto a consumer's
+// feedback port, and stop() disposes the consumer before the ack is processed,
+// so the broker redelivers the message to another worker (a double-send).
+// These tests model that shape with a deterministic gate instead of timing.
+
+/**
+ * Models a sender that processes each input on a detached async task (like a
+ * provider send) and emits an ack on a feedback port once the task completes.
+ * The task awaits an externally-controlled gate so tests can hold the send
+ * in flight across a stop() call with zero timing sensitivity.
+ */
+class GatedAsyncSender extends FlowComponent {
+    readonly input = this.addPort<number>("input", "in");
+    readonly outAck = this.addPort<number>("outAck", "out");
+    gate: Promise<void> = Promise.resolve();
+    constructor(ctx: FlowContext, config: { name?: string } = {}) {
+        super({ name: config.name ?? "gated-sender", context: ctx });
+        this.on(this.input, (msg) => {
+            this.trackInFlight(
+                (async (): Promise<void> => {
+                    await this.gate;
+                    this.outAck.put(msg);
+                })(),
+            );
+        });
+    }
+}
+
+/** Records every ack it processes and the moments it is quiesced/disposed. */
+class AckRecorder extends FlowComponent {
+    readonly inAck = this.addPort<number>("inAck", "in");
+    readonly events: string[] = [];
+    constructor(ctx: FlowContext, config: { name?: string } = {}) {
+        super({ name: config.name ?? "ack-recorder", context: ctx });
+        this.on(this.inAck, (msg) => this.events.push(`ack:${msg}`));
+    }
+    protected override onQuiesce(): void {
+        this.events.push("quiesce");
+    }
+    protected override onDispose(): void {
+        this.events.push("dispose");
+    }
+}
+
+describe("FlowApp.stop(): graceful drain (TRN-472)", () => {
+    it("waits for in-flight tracked work and drains its feedback ack before disposing", async () => {
+        const app = new FlowApp();
+        const sender = new GatedAsyncSender(app.context);
+        const recorder = new AckRecorder(app.context);
+        app.connect(sender.outAck, recorder.inAck);
+
+        let release: () => void = () => undefined;
+        sender.gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+
+        await app.start();
+        sender.input.put(42);
+        // Let the step run so the send is genuinely in flight (gate unresolved).
+        await app.drain();
+        expect(sender.inFlight).toBe(1);
+
+        // Stop while the send is mid-flight, then release the gate. stop() must
+        // wait for the task, process the emitted ack, and only then dispose.
+        const stopping = app.stop();
+        release();
+        await stopping;
+
+        expect(sender.inFlight).toBe(0);
+        expect(recorder.events).toContain("ack:42");
+        expect(recorder.events.indexOf("quiesce")).toBeLessThan(recorder.events.indexOf("ack:42"));
+        expect(recorder.events.indexOf("ack:42")).toBeLessThan(recorder.events.indexOf("dispose"));
+    });
+
+    it("quiesces every component (Clock stops ticking) and still stops when idle", async () => {
+        vi.useFakeTimers();
+        try {
+            const app = new FlowApp();
+            const clock = new Clock(app.context, { intervalMs: 10 });
+            const collector = new Collector<TickEvent>(app.context);
+            app.connect(clock.out, collector.input);
+            await app.start();
+            vi.advanceTimersByTime(35);
+            await app.drain();
+            expect(collector.received.length).toBeGreaterThan(0);
+            const seen = collector.received.length;
+
+            const stopping = app.stop();
+            await vi.runAllTimersAsync();
+            await stopping;
+
+            // Quiesce halted the timer: no ticks were produced after stop().
+            expect(clock.running).toBe(false);
+            vi.advanceTimersByTime(100);
+            expect(collector.received.length).toBe(seen);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("a pending message no step consumes does not hold stop() open", async () => {
+        class UnboundSink extends FlowComponent {
+            readonly dead = this.addPort<number>("dead", "in");
+        }
+        const app = new FlowApp();
+        const echo = new Echo<number>(app.context);
+        const sink = new UnboundSink({ name: "unbound-sink", context: app.context });
+        app.addComponent(echo).addComponent(sink);
+        app.connect(echo.output, sink.dead);
+        await app.init();
+        echo.input.put(1);
+        await app.drain();
+        // The message sits on an unbound in-port forever; stop() must return
+        // promptly instead of burning the whole drain timeout.
+        const started = Date.now();
+        await app.stop();
+        expect(Date.now() - started).toBeLessThan(1_000);
+        expect(sink.dead.size).toBe(1);
+    });
+});

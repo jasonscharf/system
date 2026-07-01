@@ -61,6 +61,10 @@ export class Clock extends FlowComponent {
     protected override onInit(): void {
         this._startTimer();
     }
+    protected override onQuiesce(): void {
+        // Stop producing new ticks so the FlowApp.stop() drain can settle.
+        this._stopTimer();
+    }
     protected override onDispose(): void {
         this._stopTimer();
     }

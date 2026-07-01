@@ -10,6 +10,12 @@ export interface FlowAppOptions {
     scheduler?: FlowScheduler;
 }
 
+/** Upper bound on the stop() shutdown drain before disposing anyway. */
+const DEFAULT_STOP_DRAIN_TIMEOUT_MS = 30_000;
+
+/** Idle wait between shutdown-drain ticks while in-flight work settles. */
+const STOP_DRAIN_POLL_MS = 10;
+
 interface Connection {
     transport: FlowTransport<unknown>;
     fromOwner: FlowComponent;
@@ -101,8 +107,27 @@ export class FlowApp {
         this.scheduler.start();
     }
 
-    async stop(): Promise<void> {
+    /**
+     * Graceful shutdown (TRN-472). Three phases:
+     *   1. Quiesce - every component stops taking NEW work (sources stop
+     *      pulling, pollers stop their timers) but keeps its resources open.
+     *   2. Drain - the background loop is stopped and the graph is ticked
+     *      manually (single driver) until it is idle: no queued steps, no
+     *      in-flight tracked tasks, and no pending message still making
+     *      progress. This lets already-accepted work finish and its feedback
+     *      (e.g. a consumer's broker ack) be fully processed BEFORE anything
+     *      is disposed - disposing mid-ack is how a delivered message gets
+     *      redelivered and double-processed.
+     *   3. Dispose - components are disposed in reverse insertion order.
+     * The drain is bounded by drainTimeoutMs; on timeout the app disposes
+     * anyway (unfinished work stays unacked and is redelivered, never lost).
+     */
+    async stop(drainTimeoutMs = DEFAULT_STOP_DRAIN_TIMEOUT_MS): Promise<void> {
+        for (const component of this._components) {
+            await component.quiesce();
+        }
         this.scheduler.stop();
+        await this._drainForStop(drainTimeoutMs);
         const all = [...this._components].reverse();
         for (const component of all) {
             await component.dispose();
@@ -133,17 +158,55 @@ export class FlowApp {
     }
 
     private _hasPendingMessages(): boolean {
+        return this._pendingMessageCount() > 0;
+    }
+
+    private _pendingMessageCount(): number {
+        let count = 0;
         for (const c of this._components) {
             if (!c.isRunning) {
                 continue; // paused/stopped components won't process their queued data
             }
             for (const [, port] of c.ports) {
-                if (port.direction === "in" && port.size > 0) {
-                    return true;
+                if (port.direction === "in") {
+                    count += port.size;
                 }
             }
         }
-        return false;
+        return count;
+    }
+
+    private _inFlightCount(): number {
+        let count = 0;
+        for (const c of this._components) {
+            count += c.inFlight;
+        }
+        return count;
+    }
+
+    /**
+     * Shutdown drain: tick until the graph is provably done. "Done" is an
+     * empty scheduler queue, zero in-flight tracked tasks, and a pending
+     * message count that did not move across the last tick - a message no
+     * step() ever consumes (an unbound port) must not hold shutdown open,
+     * because after quiesce nothing new is produced into it.
+     */
+    private async _drainForStop(timeoutMs: number): Promise<void> {
+        const deadline = Date.now() + timeoutMs;
+        let lastPending = this._pendingMessageCount();
+        for (;;) {
+            await this.scheduler.tick();
+            const pending = this._pendingMessageCount();
+            const stalled = pending === lastPending;
+            lastPending = pending;
+            if (this.scheduler.queueSize === 0 && this._inFlightCount() === 0 && stalled) {
+                return;
+            }
+            if (Date.now() >= deadline) {
+                return;
+            }
+            await new Promise<void>((resolve) => setTimeout(resolve, STOP_DRAIN_POLL_MS));
+        }
     }
 
     private _updatePullOrder(): void {

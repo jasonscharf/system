@@ -45,6 +45,7 @@ export class FlowComponent implements FlowNode {
     private readonly _disposables: IDisposable[] = [];
     private _state: ComponentState = "idle";
     private _controlState: "running" | "paused" | "stopped" = "running";
+    private _inFlightTasks = 0;
 
     /**
      * Controls how the base class step() reads from data ports when using on()
@@ -76,6 +77,19 @@ export class FlowComponent implements FlowNode {
 
     get children(): readonly FlowComponent[] {
         return this._children;
+    }
+
+    /**
+     * Number of detached async tasks (registered via trackInFlight) that have
+     * not yet settled, including those of children. FlowApp.stop() drains
+     * until every component reports zero before disposing anything.
+     */
+    get inFlight(): number {
+        let count = this._inFlightTasks;
+        for (const child of this._children) {
+            count += child.inFlight;
+        }
+        return count;
     }
 
     protected addPort<T>(name: string, direction: PortDirection): FlowPort<T> {
@@ -187,7 +201,31 @@ export class FlowComponent implements FlowNode {
 
     protected onInit(): void | Promise<void> {}
 
+    /**
+     * Stop taking on NEW work (a source stops pulling; a poller stops its
+     * timer) while keeping resources open so already-accepted work can finish
+     * and its feedback (e.g. a broker ack) can still be processed. Called by
+     * FlowApp.stop() on every component before the shutdown drain. Must be
+     * safe to call more than once. Default: no-op.
+     */
+    protected onQuiesce(): void | Promise<void> {}
+
     protected onDispose(): void | Promise<void> {}
+
+    /**
+     * Register a detached async task spawned by step() as in-flight work.
+     * FlowApp.stop() drains until every tracked task has settled before
+     * disposing, so work like a send-whose-ack-must-commit is never cut off
+     * mid-flight. Error handling stays with the caller (attach catch before
+     * tracking); tracking only observes settlement.
+     */
+    protected trackInFlight(task: Promise<unknown>): void {
+        this._inFlightTasks += 1;
+        const settle = (): void => {
+            this._inFlightTasks -= 1;
+        };
+        task.then(settle, settle);
+    }
 
     async init(): Promise<void> {
         await this.onInit();
@@ -195,6 +233,13 @@ export class FlowComponent implements FlowNode {
             await child.init();
         }
         this._state = "running";
+    }
+
+    async quiesce(): Promise<void> {
+        await this.onQuiesce();
+        for (const child of this._children) {
+            await child.quiesce();
+        }
     }
 
     async dispose(): Promise<void> {

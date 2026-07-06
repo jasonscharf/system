@@ -1,15 +1,14 @@
-import { makeUri, NS_CORE, resolveService } from "@jasonscharf/core";
+import { Inject, makeUri, NS_CORE } from "@jasonscharf/core";
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
 import { buildServerContext, systemSec } from "@jasonscharf/server";
 import { SESSION_TTL_SECS } from "../constants.js";
 import type { IOAuthProvider } from "../oauth/types.js";
-import { UserDeviceRepository } from "../repository/UserDeviceRepository.js";
-import { UserIdentityRepository } from "../repository/UserIdentityRepository.js";
-import { UserRepository } from "../repository/UserRepository.js";
-import { UserSessionRepository } from "../repository/UserSessionRepository.js";
+import type { UserDeviceRepository } from "../repository/UserDeviceRepository.js";
+import type { UserIdentityRepository } from "../repository/UserIdentityRepository.js";
+import type { UserRepository } from "../repository/UserRepository.js";
+import type { UserSessionRepository } from "../repository/UserSessionRepository.js";
 import { hashSessionToken } from "../repository/util.js";
-import { SessionStore } from "../services.js";
-import type { ISessionStore } from "../session/ISessionStore.js";
+import type { SessionStore } from "../services.js";
 import type { DeviceInfo, OAuthProvider, UserEntity, UserSessionEntity } from "../types.js";
 
 export interface CallbackRequest {
@@ -40,11 +39,6 @@ export interface CallbackError {
  */
 export interface CallbackComponentOptions extends FlowComponentOptions {
     providers: IOAuthProvider[];
-    sessionStore?: ISessionStore;
-    users?: UserRepository;
-    identities?: UserIdentityRepository;
-    sessions?: UserSessionRepository;
-    devices?: UserDeviceRepository;
 }
 
 /**
@@ -59,11 +53,11 @@ export class CallbackComponent extends FlowComponent {
     readonly errorOut: FlowPort<CallbackError>;
 
     private readonly _providers: Map<OAuthProvider, IOAuthProvider>;
-    private readonly _sessions: ISessionStore;
-    private readonly _users: UserRepository;
-    private readonly _identities: UserIdentityRepository;
-    private readonly _sessRepo: UserSessionRepository;
-    private readonly _devices: UserDeviceRepository;
+    @Inject private readonly _sessions: SessionStore;
+    @Inject private readonly _users: UserRepository;
+    @Inject private readonly _identities: UserIdentityRepository;
+    @Inject private readonly _sessRepo: UserSessionRepository;
+    @Inject private readonly _devices: UserDeviceRepository;
 
     constructor(options: CallbackComponentOptions) {
         super(options);
@@ -72,11 +66,6 @@ export class CallbackComponent extends FlowComponent {
         this.errorOut = this.addPort<CallbackError>("errorOut", "out");
 
         this._providers = new Map(options.providers.map((p) => [p.name, p]));
-        this._sessions = options.sessionStore ?? resolveService(SessionStore);
-        this._users = options.users ?? resolveService(UserRepository);
-        this._identities = options.identities ?? resolveService(UserIdentityRepository);
-        this._sessRepo = options.sessions ?? resolveService(UserSessionRepository);
-        this._devices = options.devices ?? resolveService(UserDeviceRepository);
     }
 
     override step(): void {

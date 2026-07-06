@@ -13,8 +13,7 @@
  *     everywhere EntityStores are created.
  *   - Boot-owned tokens (DataSource, SessionStore, auth repositories) throw
  *     ServiceNotBoundError before boot binds them and resolve afterwards.
- *   - Worker/auth components fall back to the container when service options
- *     are omitted.
+ *   - Worker/auth components resolve their services from the container.
  */
 
 import {
@@ -178,26 +177,20 @@ describe("IoC container", () => {
         expect(tryResolveService(DataSource)?.knex).toBe(knex);
     });
 
-    // ── Component fallback to the container ───────────────────────────────────
+    // ── Components resolve services from the container ────────────────────────
 
-    it("test worker component resolves knex from the container when omitted", () => {
-        expect(
-            () => new JobScheduler({ context: new FlowContext(), isActive: () => false }),
-        ).toThrow(ServiceNotBoundError);
-
+    it("test worker component takes no knex option and resolves DataSource from the container", () => {
         bindService(DataSource, new DataSource(knex));
+        // No knex option — the component @Injects DataSource from the container.
         const scheduler = new JobScheduler({ context: new FlowContext(), isActive: () => false });
         expect(scheduler).toBeInstanceOf(JobScheduler);
     });
 
-    it("test auth component resolves services from the container when omitted", () => {
-        expect(() => new SessionComponent({ context: new FlowContext() })).toThrow(
-            ServiceNotBoundError,
-        );
-
+    it("test auth component takes no service options and resolves them from the container", () => {
         bindService(SessionStore, new MemorySessionStore());
         bindService(UserRepository, new UserRepository(store));
         bindService(UserSessionRepository, new UserSessionRepository(store));
+        // No sessionStore/users/sessions options — all @Injected from the container.
         const component = new SessionComponent({ context: new FlowContext() });
         expect(component).toBeInstanceOf(SessionComponent);
     });
@@ -218,22 +211,5 @@ describe("IoC container", () => {
         });
         const withExplicit = buildServerContext(store, { cipher: explicit });
         expect(withExplicit.cipher).toBe(explicit);
-    });
-
-    it("test explicit component options win over the container", () => {
-        bindService(SessionStore, new MemorySessionStore());
-        bindService(UserRepository, new UserRepository(store));
-        bindService(UserSessionRepository, new UserSessionRepository(store));
-
-        // Passing explicit services must not consult the container at all —
-        // rebinding afterwards does not affect the constructed component.
-        const explicitStore = new MemorySessionStore();
-        const component = new SessionComponent({
-            context: new FlowContext(),
-            sessionStore: explicitStore,
-            users: new UserRepository(store),
-            sessions: new UserSessionRepository(store),
-        });
-        expect(component).toBeInstanceOf(SessionComponent);
     });
 });

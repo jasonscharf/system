@@ -49,6 +49,7 @@
         "watch": "tsc -b -w"
     },
     "dependencies": {
+        "reflect-metadata": "^0.1.14",
         "typescript-ioc": "^3.2.2"
     }
 }

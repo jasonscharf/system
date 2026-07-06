@@ -1,3 +1,4 @@
+import { bindService } from "@jasonscharf/core";
 /**
  * TRN-156: Integration tests for JobScheduler.
  *
@@ -15,7 +16,7 @@
  * ManualClock; _tick() is invoked directly.
  */
 
-import { createDataContext } from "@jasonscharf/data";
+import { createDataContext, DataSource } from "@jasonscharf/data";
 import { FlowContext } from "@jasonscharf/flow";
 import { JobScheduler } from "@jasonscharf/worker";
 import type { Knex } from "knex";
@@ -50,7 +51,6 @@ function makeFlowContext(): FlowContext {
 function makeScheduler(knex: Knex, clock: ManualClock, isActive: () => boolean): JobScheduler {
     return new JobScheduler({
         context: makeFlowContext(),
-        knex,
         isActive,
         now: () => clock.now(),
         // Use a very long tick interval so the background timer never fires.
@@ -114,6 +114,7 @@ describe("JobScheduler — SQLite (in-memory)", () => {
 
     beforeEach(async () => {
         knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
+        bindService(DataSource, new DataSource(knex));
         clock = new ManualClock(NOW);
     });
 

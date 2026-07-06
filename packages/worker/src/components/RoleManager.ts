@@ -1,6 +1,6 @@
 import { hostname } from "node:os";
-import { resolveService } from "@jasonscharf/core";
-import { DataSource } from "@jasonscharf/data";
+import { Inject } from "@jasonscharf/core";
+import type { DataSource } from "@jasonscharf/data";
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
 import type { Knex } from "knex";
 import {
@@ -26,8 +26,6 @@ export interface RoleChangeEvent {
 }
 
 export interface RoleManagerOptions extends FlowComponentOptions {
-    /** Database connection. Resolved from the container (DataSource) when omitted. */
-    knex?: Knex;
     roles: WillingRole[];
     /** Lease TTL in ms. Defaults to ROLE_DEFAULT_TTL_MS. */
     ttlMs?: number;
@@ -69,7 +67,10 @@ export class RoleManager extends FlowComponent {
     /** Emits RoleChangeEvent whenever a role is gained or lost. */
     readonly outRoleChanged: FlowPort<RoleChangeEvent>;
 
-    private readonly _knex: Knex;
+    @Inject private readonly _dataSource: DataSource;
+    private get _knex(): Knex {
+        return this._dataSource.knex;
+    }
     private readonly _roles: WillingRole[];
     private readonly _ttlMs: number;
     private readonly _heartbeatMs: number;
@@ -87,7 +88,6 @@ export class RoleManager extends FlowComponent {
 
         this.outRoleChanged = this.addPort<RoleChangeEvent>("outRoleChanged", "out");
 
-        this._knex = options.knex ?? resolveService(DataSource).knex;
         this._roles = options.roles;
         this._ttlMs = options.ttlMs ?? ROLE_DEFAULT_TTL_MS;
         this._heartbeatMs = Math.floor(this._ttlMs / ROLE_HEARTBEAT_DIVISOR);

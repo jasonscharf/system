@@ -39,8 +39,8 @@
  *   - tickIntervalMs            — override tick cadence
  */
 
-import { resolveModuleRef, resolveService } from "@jasonscharf/core";
-import { DataSource } from "@jasonscharf/data";
+import { Inject, resolveModuleRef } from "@jasonscharf/core";
+import type { DataSource } from "@jasonscharf/data";
 import { FlowComponent, type FlowComponentOptions } from "@jasonscharf/flow";
 import type { Knex } from "knex";
 import {
@@ -74,8 +74,6 @@ interface ClaimCandidate {
 }
 
 export interface JobRunnerOptions extends FlowComponentOptions {
-    /** Database connection. Resolved from the container (DataSource) when omitted. */
-    knex?: Knex;
     handlers: JobHandlers;
     /**
      * Injectable clock for deterministic tests. Defaults to () => new Date().
@@ -105,7 +103,10 @@ export interface JobRunnerOptions extends FlowComponentOptions {
  * and records the outcome with retry and dead-letter semantics.
  */
 export class JobRunner extends FlowComponent {
-    private readonly _knex: Knex;
+    @Inject private readonly _dataSource: DataSource;
+    private get _knex(): Knex {
+        return this._dataSource.knex;
+    }
     private readonly _handlers: JobHandlers;
     private readonly _now: () => Date;
     private readonly _holdsRole: (role: string) => boolean;
@@ -118,7 +119,6 @@ export class JobRunner extends FlowComponent {
     constructor(options: JobRunnerOptions) {
         super(options);
 
-        this._knex = options.knex ?? resolveService(DataSource).knex;
         this._handlers = options.handlers;
         this._now = options.now ?? (() => new Date());
         this._holdsRole = options.holdsRole ?? (() => true);

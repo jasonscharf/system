@@ -23,8 +23,8 @@
 
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { _clearModuleRefCache } from "@jasonscharf/core";
-import { createDataContext } from "@jasonscharf/data";
+import { _clearModuleRefCache, bindService } from "@jasonscharf/core";
+import { createDataContext, DataSource } from "@jasonscharf/data";
 import { FlowContext } from "@jasonscharf/flow";
 import { JobHandlers, JobRunner } from "@jasonscharf/worker";
 import type { Knex } from "knex";
@@ -95,10 +95,12 @@ describe.skipIf(!process.env.SYS_PG_URL)("JobRunner — real Postgres (TRN-403)"
         // A pool of ONE: the smallest pool that makes the held-transaction deadlock
         // deterministic. createDataContext runs the migrations so the schema exists.
         knex = await createDataContext({ ...PG_CONFIG });
+        bindService(DataSource, new DataSource(knex));
         // Shrink the pool created above to a single connection for this suite.
         await knex.destroy();
         const { default: Knex } = await import("knex");
         knex = Knex({ client: "pg", connection: PG_CONFIG, pool: { min: 1, max: 1 } });
+        bindService(DataSource, new DataSource(knex));
     });
 
     afterAll(async () => {
@@ -130,7 +132,6 @@ describe.skipIf(!process.env.SYS_PG_URL)("JobRunner — real Postgres (TRN-403)"
 
         const runner = new JobRunner({
             context: new FlowContext(),
-            knex,
             handlers: new JobHandlers(),
             // A real (but generous) timeout: the deadlock fix means the handler
             // returns in milliseconds; the OLD code would hit this and fail.
@@ -176,7 +177,6 @@ describe.skipIf(!process.env.SYS_PG_URL)("JobRunner — real Postgres (TRN-403)"
 
         const runner = new JobRunner({
             context: new FlowContext(),
-            knex,
             handlers: new JobHandlers(),
             now: () => pinnedNow,
             backoffMaxMs: 5_000,

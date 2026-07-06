@@ -1,23 +1,38 @@
-import { Container, Scope } from "typescript-ioc";
+// reflect-metadata underpins typescript-ioc's @Inject (it reads the field's
+// design:type). typescript-ioc pulls it in, but import it here too so load
+// order is guaranteed for every consumer of the container.
+import "reflect-metadata";
+import { Container, Inject, Scope } from "typescript-ioc";
 
 /**
  * The platform IoC container (typescript-ioc), re-exported so every package —
  * inside this repo and downstream consumers — resolves the exact same module
- * instance. Import Container from "@jasonscharf/core", never from
+ * instance. Import Container / Inject from "@jasonscharf/core", never from
  * "typescript-ioc" directly: a second copy of the library is a second,
  * disconnected container, and overrides bound to one are invisible to the
  * other.
  *
- * Override pattern for consumers: import the container and bind before the
- * first context is created —
+ * Field injection uses typescript-ioc's @Inject; the field's type IS the token:
+ *
+ *   class MailRouter {
+ *       @Inject private readonly _store: TripleStore;   // concrete token
+ *       @Inject private readonly _bus: SystemBus;       // abstract token
+ *   }
+ *
+ * No option, no fallback, no nullable field, no `!`/`?` — a service is a
+ * dependency, never optional. Requires experimentalDecorators +
+ * emitDecoratorMetadata + useDefineForClassFields:false in tsconfig (the
+ * @Inject getter is clobbered by ES field-define semantics otherwise).
+ *
+ * Override pattern for consumers: bind before the first context/component is
+ * created —
  *
  *   import { bindService, SystemBus } from "@jasonscharf/core";
  *   bindService(SystemBus, myBus);
  *
- * Every context built afterwards (buildServerContext, defaultCtx reads) sees
- * the override.
+ * Every context/component built afterwards sees the override.
  */
-export { Container, Scope };
+export { Container, Inject, Scope };
 
 /**
  * A class object usable as a container token. Abstract classes are the

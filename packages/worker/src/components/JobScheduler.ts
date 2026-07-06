@@ -27,8 +27,8 @@
  *   - tickIntervalMs             — override tick cadence
  */
 
-import { resolveService } from "@jasonscharf/core";
-import { DataSource } from "@jasonscharf/data";
+import { Inject } from "@jasonscharf/core";
+import type { DataSource } from "@jasonscharf/data";
 import { FlowComponent, type FlowComponentOptions } from "@jasonscharf/flow";
 import type { Knex } from "knex";
 import { SCHEDULER_BATCH_SIZE, SCHEDULER_TICK_INTERVAL_MS } from "../config.js";
@@ -45,8 +45,6 @@ interface DueJob {
 }
 
 export interface JobSchedulerOptions extends FlowComponentOptions {
-    /** Database connection. Resolved from the container (DataSource) when omitted. */
-    knex?: Knex;
     /**
      * Returns true when this process should perform the scheduler tick.
      * Wire this to roleManager.holds(schedulerRole) in the app. JobScheduler
@@ -68,7 +66,10 @@ export interface JobSchedulerOptions extends FlowComponentOptions {
  * Its sole job is to advance the clock-driven schedule and produce pending runs.
  */
 export class JobScheduler extends FlowComponent {
-    private readonly _knex: Knex;
+    @Inject private readonly _dataSource: DataSource;
+    private get _knex(): Knex {
+        return this._dataSource.knex;
+    }
     private readonly _isActive: () => boolean;
     private readonly _now: () => Date;
     private readonly _tickIntervalMs: number;
@@ -77,7 +78,6 @@ export class JobScheduler extends FlowComponent {
     constructor(options: JobSchedulerOptions) {
         super(options);
 
-        this._knex = options.knex ?? resolveService(DataSource).knex;
         this._isActive = options.isActive;
         this._now = options.now ?? (() => new Date());
         this._tickIntervalMs = options.tickIntervalMs ?? SCHEDULER_TICK_INTERVAL_MS;

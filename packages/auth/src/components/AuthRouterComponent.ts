@@ -30,7 +30,6 @@ import { UserSessionRepository } from "../repository/UserSessionRepository.js";
 import { hashSessionToken } from "../repository/util.js";
 import { SessionStore } from "../services.js";
 import { AuthThrottle } from "../session/AuthThrottle.js";
-import type { ISessionStore } from "../session/ISessionStore.js";
 import type { OAuthProvider, UserEntity } from "../types.js";
 import { CallbackComponent } from "./CallbackComponent.js";
 import { OAuthComponent } from "./OAuthComponent.js";
@@ -43,16 +42,7 @@ import { SessionComponent } from "./SessionComponent.js";
  */
 export interface AuthRouterOptions extends FlowComponentOptions {
     providers: IOAuthProvider[];
-    sessionStore?: ISessionStore;
-    users?: UserRepository;
-    identities?: UserIdentityRepository;
-    sessions?: UserSessionRepository;
-    devices?: UserDeviceRepository;
-    /**
-     * Optional. When provided (or bound in the container), login attempts are
-     * recorded for audit (TRN-171).
-     */
-    attempts?: LoginAttemptRepository;
+
     /** Base URL of this server, e.g. http://localhost:3000 */
     baseUrl: string;
     /** Where to redirect after successful login (default: '/'). */
@@ -149,13 +139,14 @@ export class AuthRouterComponent extends FlowComponent {
         this._secure = this._baseUrl.startsWith("https://");
         this._trustedProxies = new Set(options.trustedProxies ?? AUTH_TRUSTED_PROXIES);
 
-        // Resolve services once: explicit options win, else the container.
-        const sessionStore = options.sessionStore ?? resolveService(SessionStore);
-        const users = options.users ?? resolveService(UserRepository);
-        const identities = options.identities ?? resolveService(UserIdentityRepository);
-        const sessions = options.sessions ?? resolveService(UserSessionRepository);
-        const devices = options.devices ?? resolveService(UserDeviceRepository);
-        const attempts = options.attempts ?? tryResolveService(LoginAttemptRepository) ?? undefined;
+        // Mission-critical services resolve from the container (bound at boot);
+        // login-attempt audit is genuinely optional (TRN-171).
+        const sessionStore = resolveService(SessionStore);
+        const users = resolveService(UserRepository);
+        const identities = resolveService(UserIdentityRepository);
+        const sessions = resolveService(UserSessionRepository);
+        const devices = resolveService(UserDeviceRepository);
+        const attempts = tryResolveService(LoginAttemptRepository) ?? undefined;
 
         this._throttle = new AuthThrottle(sessionStore);
 
@@ -179,18 +170,10 @@ export class AuthRouterComponent extends FlowComponent {
             name: `${options.name ?? "auth"}.callback`,
             context: this.context,
             providers: options.providers,
-            sessionStore,
-            users,
-            identities,
-            sessions,
-            devices,
         });
         this.session = new SessionComponent({
             name: `${options.name ?? "auth"}.session`,
             context: this.context,
-            sessionStore,
-            users,
-            sessions,
         });
         this.addChild(this.oauth);
         this.addChild(this.callback);

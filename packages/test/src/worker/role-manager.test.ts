@@ -1,3 +1,4 @@
+import { bindService } from "@jasonscharf/core";
 /**
  * TRN-155: Integration tests for RoleManager.
  *
@@ -26,7 +27,7 @@
  *     manager's port to capture events into a plain array.
  */
 
-import { createDataContext } from "@jasonscharf/data";
+import { createDataContext, DataSource } from "@jasonscharf/data";
 import { FlowContext, FlowTransport } from "@jasonscharf/flow";
 import { type RoleChangeEvent, RoleManager } from "@jasonscharf/worker";
 import type { Knex } from "knex";
@@ -88,7 +89,6 @@ function makeManager(
 ): RoleManager {
     return new RoleManager({
         context: makeFlowContext(),
-        knex,
         roles,
         ttlMs,
         now: () => clock.now(),
@@ -125,6 +125,7 @@ describe("RoleManager — SQLite (in-memory)", () => {
 
     beforeEach(async () => {
         knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
+        bindService(DataSource, new DataSource(knex));
         clock = new ManualClock(new Date("2026-01-01T00:00:00Z"));
     });
 

@@ -23,19 +23,20 @@ import {
     LoginAttemptRepository,
     MemorySessionStore,
     type OAuthProvider,
+    SessionStore,
     UserDeviceRepository,
     UserIdentityRepository,
     UserRepository,
     UserSessionRepository,
 } from "@jasonscharf/auth";
-import { TEST_CIPHER } from "./testCipher.js";
-import { makeUri, NS_CORE } from "@jasonscharf/core";
+import { bindService, makeUri, NS_CORE } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import { FlowContext, type HttpResponseDraft, type ParsedHttpRequest } from "@jasonscharf/flow";
 import { buildServerContext, type ServerContext, systemSec } from "@jasonscharf/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";
+import { TEST_CIPHER } from "./testCipher.js";
 
 const NEG_CACHE_SENTINEL = "__neg__";
 
@@ -337,16 +338,16 @@ describe("AuthRouterComponent — throttle / trusted-proxy / audit", () => {
     }
 
     function makeRouter(trustedProxies?: string[]): AuthRouterComponent {
+        bindService(SessionStore, memStore);
+        bindService(UserRepository, new UserRepository(store, TEST_CIPHER));
+        bindService(UserIdentityRepository, new UserIdentityRepository(store, TEST_CIPHER));
+        bindService(UserSessionRepository, new UserSessionRepository(store));
+        bindService(UserDeviceRepository, new UserDeviceRepository(store));
+        bindService(LoginAttemptRepository, attempts);
         return new AuthRouterComponent({
             name: "auth",
             context: new FlowContext(),
             providers: [new TestOAuthProvider()],
-            sessionStore: memStore,
-            users: new UserRepository(store, TEST_CIPHER),
-            identities: new UserIdentityRepository(store, TEST_CIPHER),
-            sessions: new UserSessionRepository(store),
-            devices: new UserDeviceRepository(store),
-            attempts,
             baseUrl: "http://localhost:3000",
             trustedProxies,
         });

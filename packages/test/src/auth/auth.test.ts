@@ -29,6 +29,7 @@ import {
     type OAuthProvider,
     RedisSessionStore,
     SessionComponent,
+    SessionStore,
     UserDeviceRepository,
     UserDeviceSchema,
     UserIdentityRepository,
@@ -37,7 +38,7 @@ import {
     UserSessionRepository,
     UserSessionSchema,
 } from "@jasonscharf/auth";
-import { makeUri, NS_CORE } from "@jasonscharf/core";
+import { bindService, makeUri, NS_CORE } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import {
     FlowContext,
@@ -968,12 +969,12 @@ describe("SessionComponent", () => {
         store = new TripleStore(trx as unknown as import("knex").Knex);
         memStore = new MemorySessionStore();
 
+        bindService(SessionStore, memStore);
+        bindService(UserRepository, new UserRepository(store, TEST_CIPHER));
+        bindService(UserSessionRepository, new UserSessionRepository(store));
         sessComp = new SessionComponent({
             name: "session",
             context: new FlowContext(),
-            sessionStore: memStore,
-            users: new UserRepository(store, TEST_CIPHER),
-            sessions: new UserSessionRepository(store),
         });
     });
     afterEach(async () => {
@@ -1063,12 +1064,12 @@ describe("SessionComponent", () => {
     });
 
     it("revokeIn → success:false when session store del throws (line 126 catch branch)", async () => {
+        bindService(SessionStore, new ThrowingSessionStore());
+        bindService(UserRepository, new UserRepository(store, TEST_CIPHER));
+        bindService(UserSessionRepository, new UserSessionRepository(store));
         const throwingComp = new SessionComponent({
             name: "session-throw",
             context: new FlowContext(),
-            sessionStore: new ThrowingSessionStore(),
-            users: new UserRepository(store, TEST_CIPHER),
-            sessions: new UserSessionRepository(store),
         });
         throwingComp.revokeIn.put({ token: "any-token", requestId: "r6" });
         throwingComp.step();
@@ -1121,15 +1122,15 @@ describe("CallbackComponent (FBP)", () => {
         trx = await knex.transaction();
         store = new TripleStore(trx as unknown as import("knex").Knex);
         memStore = new MemorySessionStore();
+        bindService(SessionStore, memStore);
+        bindService(UserRepository, new UserRepository(store, TEST_CIPHER));
+        bindService(UserIdentityRepository, new UserIdentityRepository(store, TEST_CIPHER));
+        bindService(UserSessionRepository, new UserSessionRepository(store));
+        bindService(UserDeviceRepository, new UserDeviceRepository(store));
         comp = new CallbackComponent({
             name: "callback",
             context: new FlowContext(),
             providers: [new TestOAuthProvider()],
-            sessionStore: memStore,
-            users: new UserRepository(store, TEST_CIPHER),
-            identities: new UserIdentityRepository(store, TEST_CIPHER),
-            sessions: new UserSessionRepository(store),
-            devices: new UserDeviceRepository(store),
         });
     });
 
@@ -1286,15 +1287,15 @@ describe("AuthRouterComponent.sessionMiddleware()", () => {
         const sched = new PushScheduler();
         ctx._setScheduler(sched);
 
+        bindService(SessionStore, memStore);
+        bindService(UserRepository, new UserRepository(store, TEST_CIPHER));
+        bindService(UserIdentityRepository, new UserIdentityRepository(store, TEST_CIPHER));
+        bindService(UserSessionRepository, new UserSessionRepository(store));
+        bindService(UserDeviceRepository, new UserDeviceRepository(store));
         const router = new AuthRouterComponent({
             name: "auth",
             context: ctx,
             providers: [new GoogleProvider("c", "s")],
-            sessionStore: memStore,
-            users: new UserRepository(store, TEST_CIPHER),
-            identities: new UserIdentityRepository(store, TEST_CIPHER),
-            sessions: new UserSessionRepository(store),
-            devices: new UserDeviceRepository(store),
             baseUrl: "http://localhost:3000",
         });
 
@@ -1317,15 +1318,15 @@ describe("AuthRouterComponent.sessionMiddleware()", () => {
         const knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
         const ctx = new FlowContext();
 
+        bindService(SessionStore, new MemorySessionStore());
+        bindService(UserRepository, new UserRepository(new TripleStore(knex)));
+        bindService(UserIdentityRepository, new UserIdentityRepository(new TripleStore(knex)));
+        bindService(UserSessionRepository, new UserSessionRepository(new TripleStore(knex)));
+        bindService(UserDeviceRepository, new UserDeviceRepository(new TripleStore(knex)));
         const router = new AuthRouterComponent({
             name: "auth",
             context: ctx,
             providers: [new GoogleProvider("c", "s")],
-            sessionStore: new MemorySessionStore(),
-            users: new UserRepository(new TripleStore(knex)),
-            identities: new UserIdentityRepository(new TripleStore(knex)),
-            sessions: new UserSessionRepository(new TripleStore(knex)),
-            devices: new UserDeviceRepository(new TripleStore(knex)),
             baseUrl: "http://localhost:3000",
         });
 
@@ -1370,15 +1371,15 @@ describe("AuthRouterComponent HTTP routes", () => {
         trx = await knex.transaction();
         store = new TripleStore(trx as unknown as import("knex").Knex);
         memStore = new MemorySessionStore();
+        bindService(SessionStore, memStore);
+        bindService(UserRepository, new UserRepository(store, TEST_CIPHER));
+        bindService(UserIdentityRepository, new UserIdentityRepository(store, TEST_CIPHER));
+        bindService(UserSessionRepository, new UserSessionRepository(store));
+        bindService(UserDeviceRepository, new UserDeviceRepository(store));
         router = new AuthRouterComponent({
             name: "auth",
             context: new FlowContext(),
             providers: [new TestOAuthProvider()],
-            sessionStore: memStore,
-            users: new UserRepository(store, TEST_CIPHER),
-            identities: new UserIdentityRepository(store, TEST_CIPHER),
-            sessions: new UserSessionRepository(store),
-            devices: new UserDeviceRepository(store),
             baseUrl: "http://localhost:3000",
         });
     });
@@ -1566,15 +1567,15 @@ describe("AuthRouterComponent HTTP routes", () => {
                 throw new Error("OAuth exchange failed");
             }
         }
+        bindService(SessionStore, memStore);
+        bindService(UserRepository, new UserRepository(store, TEST_CIPHER));
+        bindService(UserIdentityRepository, new UserIdentityRepository(store, TEST_CIPHER));
+        bindService(UserSessionRepository, new UserSessionRepository(store));
+        bindService(UserDeviceRepository, new UserDeviceRepository(store));
         const errorRouter = new AuthRouterComponent({
             name: "auth-err",
             context: new FlowContext(),
             providers: [new ErrorOAuthProvider()],
-            sessionStore: memStore,
-            users: new UserRepository(store, TEST_CIPHER),
-            identities: new UserIdentityRepository(store, TEST_CIPHER),
-            sessions: new UserSessionRepository(store),
-            devices: new UserDeviceRepository(store),
             baseUrl: "http://localhost:3000",
         });
         const req = makeReq("GET", "/auth/github/callback", {

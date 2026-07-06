@@ -20,8 +20,8 @@
 
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { _clearModuleRefCache } from "@jasonscharf/core";
-import { createDataContext } from "@jasonscharf/data";
+import { _clearModuleRefCache, bindService } from "@jasonscharf/core";
+import { createDataContext, DataSource } from "@jasonscharf/data";
 import { FlowContext } from "@jasonscharf/flow";
 import { JobHandlers, JobRunner } from "@jasonscharf/worker";
 import type { Knex } from "knex";
@@ -67,7 +67,6 @@ function makeRunner(
 ): JobRunner {
     return new JobRunner({
         context: makeFlowContext(),
-        knex,
         handlers,
         now: () => clock.now(),
         holdsRole: opts?.holdsRole,
@@ -178,6 +177,7 @@ describe("JobRunner — SQLite (in-memory)", () => {
 
     beforeEach(async () => {
         knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
+        bindService(DataSource, new DataSource(knex));
         clock = new ManualClock(NOW);
         handlers = new JobHandlers();
         // Reset the module-level fixture invocation log.

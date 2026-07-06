@@ -60,6 +60,7 @@ export { UserRepository } from "./repository/UserRepository.js";
 export { UserSessionRepository } from "./repository/UserSessionRepository.js";
 // One-way hash applied to session tokens before they are stored / cached.
 export { hashSessionToken } from "./repository/util.js";
+export { SessionStore } from "./services.js";
 export type { AuthThrottleOptions } from "./session/AuthThrottle.js";
 // ── Auth throttle ──────────────────────────────────────────────────────────────
 export { AuthThrottle } from "./session/AuthThrottle.js";

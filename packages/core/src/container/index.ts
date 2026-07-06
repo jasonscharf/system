@@ -1,2 +1,1 @@
-export * from "./ServiceContainer.js";
-export * from "./ServiceToken.js";
+export * from "./ioc.js";

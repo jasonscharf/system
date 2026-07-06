@@ -1,3 +1,4 @@
+import { resolveService, tryResolveService } from "@jasonscharf/core";
 import type { HttpResponseDraft, ParsedHttpRequest } from "@jasonscharf/flow";
 import {
     FlowComponent,
@@ -21,12 +22,13 @@ import {
     SESSION_TTL_SECS,
 } from "../constants.js";
 import type { IOAuthProvider } from "../oauth/types.js";
-import type { LoginAttemptRepository } from "../repository/LoginAttemptRepository.js";
-import type { UserDeviceRepository } from "../repository/UserDeviceRepository.js";
-import type { UserIdentityRepository } from "../repository/UserIdentityRepository.js";
-import type { UserRepository } from "../repository/UserRepository.js";
-import type { UserSessionRepository } from "../repository/UserSessionRepository.js";
+import { LoginAttemptRepository } from "../repository/LoginAttemptRepository.js";
+import { UserDeviceRepository } from "../repository/UserDeviceRepository.js";
+import { UserIdentityRepository } from "../repository/UserIdentityRepository.js";
+import { UserRepository } from "../repository/UserRepository.js";
+import { UserSessionRepository } from "../repository/UserSessionRepository.js";
 import { hashSessionToken } from "../repository/util.js";
+import { SessionStore } from "../services.js";
 import { AuthThrottle } from "../session/AuthThrottle.js";
 import type { ISessionStore } from "../session/ISessionStore.js";
 import type { OAuthProvider, UserEntity } from "../types.js";
@@ -34,14 +36,22 @@ import { CallbackComponent } from "./CallbackComponent.js";
 import { OAuthComponent } from "./OAuthComponent.js";
 import { SessionComponent } from "./SessionComponent.js";
 
+/**
+ * Service members are optional: when omitted they resolve from the IoC
+ * container (SessionStore, UserRepository, ...), which boot binds. Passing
+ * them explicitly overrides the container for this component instance.
+ */
 export interface AuthRouterOptions extends FlowComponentOptions {
     providers: IOAuthProvider[];
-    sessionStore: ISessionStore;
-    users: UserRepository;
-    identities: UserIdentityRepository;
-    sessions: UserSessionRepository;
-    devices: UserDeviceRepository;
-    /** Optional. When provided, login attempts are recorded for audit (TRN-171). */
+    sessionStore?: ISessionStore;
+    users?: UserRepository;
+    identities?: UserIdentityRepository;
+    sessions?: UserSessionRepository;
+    devices?: UserDeviceRepository;
+    /**
+     * Optional. When provided (or bound in the container), login attempts are
+     * recorded for audit (TRN-171).
+     */
     attempts?: LoginAttemptRepository;
     /** Base URL of this server, e.g. http://localhost:3000 */
     baseUrl: string;
@@ -137,17 +147,26 @@ export class AuthRouterComponent extends FlowComponent {
         this._success = options.loginSuccess ?? "/";
         this._failure = options.loginFailure ?? "/auth/error";
         this._secure = this._baseUrl.startsWith("https://");
-        this._throttle = new AuthThrottle(options.sessionStore);
         this._trustedProxies = new Set(options.trustedProxies ?? AUTH_TRUSTED_PROXIES);
+
+        // Resolve services once: explicit options win, else the container.
+        const sessionStore = options.sessionStore ?? resolveService(SessionStore);
+        const users = options.users ?? resolveService(UserRepository);
+        const identities = options.identities ?? resolveService(UserIdentityRepository);
+        const sessions = options.sessions ?? resolveService(UserSessionRepository);
+        const devices = options.devices ?? resolveService(UserDeviceRepository);
+        const attempts = options.attempts ?? tryResolveService(LoginAttemptRepository) ?? undefined;
+
+        this._throttle = new AuthThrottle(sessionStore);
 
         this._service = new AuthService({
             providers: options.providers,
-            sessionStore: options.sessionStore,
-            users: options.users,
-            identities: options.identities,
-            sessions: options.sessions,
-            devices: options.devices,
-            attempts: options.attempts,
+            sessionStore,
+            users,
+            identities,
+            sessions,
+            devices,
+            attempts,
         });
 
         // ── Child FBP components (for standalone pipeline use) ────────────────
@@ -160,18 +179,18 @@ export class AuthRouterComponent extends FlowComponent {
             name: `${options.name ?? "auth"}.callback`,
             context: this.context,
             providers: options.providers,
-            sessionStore: options.sessionStore,
-            users: options.users,
-            identities: options.identities,
-            sessions: options.sessions,
-            devices: options.devices,
+            sessionStore,
+            users,
+            identities,
+            sessions,
+            devices,
         });
         this.session = new SessionComponent({
             name: `${options.name ?? "auth"}.session`,
             context: this.context,
-            sessionStore: options.sessionStore,
-            users: options.users,
-            sessions: options.sessions,
+            sessionStore,
+            users,
+            sessions,
         });
         this.addChild(this.oauth);
         this.addChild(this.callback);

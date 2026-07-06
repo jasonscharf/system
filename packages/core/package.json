@@ -47,5 +47,8 @@
         "start": "node dist/index.js",
         "typecheck": "tsc -p tsconfig.json --noEmit",
         "watch": "tsc -b -w"
+    },
+    "dependencies": {
+        "typescript-ioc": "^3.2.2"
     }
 }

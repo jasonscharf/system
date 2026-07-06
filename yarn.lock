@@ -1294,6 +1294,8 @@ __metadata:
 "@jasonscharf/core@workspace:^, @jasonscharf/core@workspace:packages/core":
   version: 0.0.0-use.local
   resolution: "@jasonscharf/core@workspace:packages/core"
+  dependencies:
+    typescript-ioc: "npm:^3.2.2"
   languageName: unknown
   linkType: soft
 
@@ -1512,6 +1514,7 @@ __metadata:
   resolution: "@jasonscharf/worker@workspace:packages/worker"
   dependencies:
     "@jasonscharf/core": "workspace:^"
+    "@jasonscharf/data": "workspace:^"
     "@jasonscharf/flow": "workspace:^"
     "@types/luxon": "npm:^3.7.1"
     cron-parser: "npm:^5.5.0"
@@ -4571,6 +4574,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"lodash.get@npm:^4.4.2":
+  version: 4.4.2
+  resolution: "lodash.get@npm:4.4.2"
+  checksum: 10c0/48f40d471a1654397ed41685495acb31498d5ed696185ac8973daef424a749ca0c7871bf7b665d5c14f5cc479394479e0307e781f61d5573831769593411be6e
+  languageName: node
+  linkType: hard
+
 "lodash.includes@npm:^4.3.0":
   version: 4.3.0
   resolution: "lodash.includes@npm:4.3.0"
@@ -4624,6 +4634,13 @@ __metadata:
   version: 4.1.1
   resolution: "lodash.once@npm:4.1.1"
   checksum: 10c0/46a9a0a66c45dd812fcc016e46605d85ad599fe87d71a02f6736220554b52ffbe82e79a483ad40f52a8a95755b0d1077fba259da8bfb6694a7abbf4a48f1fc04
+  languageName: node
+  linkType: hard
+
+"lodash.set@npm:^4.3.2":
+  version: 4.3.2
+  resolution: "lodash.set@npm:4.3.2"
+  checksum: 10c0/c641d31905e51df43170dce8a1d11a1cff11356e2e2e75fe2615995408e9687d58c3e1d64c3c284c2df2bc519f79a98af737d2944d382ff82ffd244ff6075c29
   languageName: node
   linkType: hard
 
@@ -5735,6 +5752,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"reflect-metadata@npm:^0.1.13":
+  version: 0.1.14
+  resolution: "reflect-metadata@npm:0.1.14"
+  checksum: 10c0/3a6190c7f6cb224f26a012d11f9e329360c01c1945e2cbefea23976a8bacf9db6b794aeb5bf18adcb673c448a234fbc06fc41853c00a6c206b30f0777ecf019e
+  languageName: node
+  linkType: hard
+
 "release-zalgo@npm:^1.0.0":
   version: 1.0.0
   resolution: "release-zalgo@npm:1.0.0"
@@ -6623,6 +6647,17 @@ __metadata:
   dependencies:
     is-typedarray: "npm:^1.0.0"
   checksum: 10c0/4ac5b7a93d604edabf3ac58d3a2f7e07487e9f6e98195a080e81dbffdc4127817f470f219d794a843b87052cedef102b53ac9b539855380b8c2172054b7d5027
+  languageName: node
+  linkType: hard
+
+"typescript-ioc@npm:^3.2.2":
+  version: 3.2.2
+  resolution: "typescript-ioc@npm:3.2.2"
+  dependencies:
+    lodash.get: "npm:^4.4.2"
+    lodash.set: "npm:^4.3.2"
+    reflect-metadata: "npm:^0.1.13"
+  checksum: 10c0/a4158f86dd231f9bfca617a802e7fb4126142d56a57230ed793c1b5269288afe5bdd2cf781b0564fe70a0df4239ad9040b9f46b878cd43f2268072ece98f5c0b
   languageName: node
   linkType: hard
 

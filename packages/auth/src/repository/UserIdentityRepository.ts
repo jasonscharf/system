@@ -1,7 +1,7 @@
 import type { TripleStore } from "@jasonscharf/data";
 import type { EntityRecord, IFieldCipher } from "@jasonscharf/entities";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import { EntityQuery, EntityStore } from "@jasonscharf/server";
+import { createEntityStore, EntityQuery, type EntityStore } from "@jasonscharf/server";
 import { UserIdentitySchema } from "../entities/UserIdentitySchema.js";
 import type { OAuthProvider, UserIdentityEntity } from "../types.js";
 import { idFrom, iriFor, newId } from "./util.js";
@@ -41,7 +41,7 @@ export class UserIdentityRepository {
         // decrypted on read even when the caller's ctx carries no cipher.
         // ctx.cipher still takes precedence when present.
         this._cipher = cipher;
-        this._entities = new EntityStore(store, undefined, cipher);
+        this._entities = createEntityStore(store, undefined, cipher);
     }
 
     get store(): TripleStore {

@@ -239,6 +239,32 @@ declare module '@jasonscharf/core' {
 }
 ```
 
+### IoC container (TRN-267)
+
+Context members (`bus`, `logger`, `entityStore`) populate from the platform
+IoC container at context build time, and services are never passed by hand
+through options or constructor args when a container binding exists.
+
+- Import `Container`/`bindService`/`resolveService` from `@jasonscharf/core`,
+  never from `typescript-ioc` directly — one shared container instance is what
+  makes downstream overrides work.
+- Tokens are classes. Interface-shaped services get an abstract token class
+  (`SystemBus` for `ISystemBus`, `SystemLogger` for `Logger`, `SessionStore`
+  for `ISessionStore`); concrete services (`TripleStore`, `DataSource`,
+  repositories) are their own token.
+- Every token is declared with `declareService(Token, defaultFactory?)`.
+  Without a default factory, resolving before boot binds an implementation
+  throws `ServiceNotBoundError` (typescript-ioc would otherwise silently
+  auto-instantiate a broken instance).
+- Boot binds real implementations with `bindService(Token, instance)`.
+  Downstream consumers (the tern repo and below) override any service the same
+  way — bind before creating contexts/components and every context built
+  afterwards carries the override.
+- `EntityStoreFactory` is the one factory-shaped token: every `EntityStore` in
+  the platform is created through `createEntityStore(store, registry?,
+  cipher?)`, so rebinding the factory substitutes an EntityStore subclass
+  everywhere.
+
 ---
 
 ## EntityStore
@@ -719,12 +745,19 @@ const store = new TripleStore(knex);
 await store.ensureNamespace(ctx, 'tern',  'http://tern.dev/ns/');
 await store.ensureNamespace(ctx, 'myapp', 'http://myapp.com/ns/');
 
-// 4. Session store
-const sessionStore = new RedisSessionStore(new Redis());
+// 3.5. Bind boot-owned services into the IoC container (TRN-267)
+bindService(DataSource, new DataSource(knex));
+bindService(TripleStore, store);
 
-// 5. Auth repositories + service
-const repos   = { userRepo, sessionRepo, deviceRepo, identRepo };
-const authSvc = new AuthService({ providers: [...], sessionStore, repos });
+// 4. Session store
+bindService(SessionStore, new RedisSessionStore(new Redis()));
+
+// 5. Auth repositories — bound into the container; AuthRouterComponent and
+// friends resolve them (no options threading)
+bindService(UserRepository, new UserRepository(store, cipher));
+bindService(UserIdentityRepository, new UserIdentityRepository(store, cipher));
+bindService(UserSessionRepository, new UserSessionRepository(store));
+bindService(UserDeviceRepository, new UserDeviceRepository(store));
 
 // 6. RBAC
 const rbac = new RbacService({ /* repos */ });

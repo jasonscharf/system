@@ -34,6 +34,7 @@
     },
     "dependencies": {
         "@jasonscharf/core": "workspace:^",
+        "@jasonscharf/data": "workspace:^",
         "@jasonscharf/flow": "workspace:^",
         "cron-parser": "^5.5.0",
         "knex": "^3.1.0",

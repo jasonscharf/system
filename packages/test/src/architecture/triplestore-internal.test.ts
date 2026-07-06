@@ -42,6 +42,7 @@ const ALLOWLIST: ReadonlyArray<string> = [
     "packages/server/src/CollectionView.ts",
     "packages/server/src/EntityQuery.ts",
     "packages/server/src/EntityStore.ts",
+    "packages/server/src/EntityStoreFactory.ts",
     "packages/server/src/ExtensionRegistry.ts",
     "packages/server/src/GraphQuery.ts",
     "packages/server/src/SchemaRegistry.ts",

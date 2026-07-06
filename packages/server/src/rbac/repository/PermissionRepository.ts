@@ -2,7 +2,8 @@ import type { TripleStore } from "@jasonscharf/data";
 import type { EntityRecord } from "@jasonscharf/entities";
 import { idFromIri } from "@jasonscharf/entities";
 import { EntityQuery } from "../../EntityQuery.js";
-import { EntityStore } from "../../EntityStore.js";
+import type { EntityStore } from "../../EntityStore.js";
+import { createEntityStore } from "../../EntityStoreFactory.js";
 import type { SecurityContext } from "../../SecurityContext.js";
 import type { ServerContext } from "../../ServerContext.js";
 import { PermissionSchema } from "../schemas.generated.js";
@@ -33,7 +34,7 @@ export class PermissionRepository {
 
     constructor(store: TripleStore) {
         this._store = store;
-        this._es = new EntityStore(store);
+        this._es = createEntityStore(store);
     }
 
     /** @dataLayer — no checks here; RbacService enforces (see class doc). */

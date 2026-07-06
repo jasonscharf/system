@@ -1,6 +1,7 @@
-import { InMemorySystemBus } from "./bus/InMemorySystemBus.js";
 import type { ISystemBus } from "./bus/ISystemBus.js";
-import type { ServiceContainer } from "./container/index.js";
+import { SystemBus } from "./bus/SystemBus.js";
+import { resolveService } from "./container/ioc.js";
+import { SystemLogger } from "./SystemLogger.js";
 
 /**
  * Minimal logger interface.  Any logger satisfying this shape (pino, winston,
@@ -36,11 +37,20 @@ export interface ApplicationContext {
      *   operations: data RPC (mutates state, returns T)
      */
     readonly bus: ISystemBus;
-    /** Service container for typed dependency resolution across extensions. */
-    services?: ServiceContainer;
 }
 
-/** Default context — in-memory bus, no logger.  Use in tests and bootstrapping. */
+/**
+ * Default context — members resolve lazily from the IoC container, so a
+ * context read (or a spread like `{...defaultCtx}` at context build time)
+ * always reflects the bindings in force at that moment.  Rebinding SystemBus
+ * or SystemLogger at boot changes what every subsequently created context
+ * carries.
+ */
 export const defaultCtx: ApplicationContext = Object.freeze({
-    bus: new InMemorySystemBus(),
+    get bus(): ISystemBus {
+        return resolveService(SystemBus);
+    },
+    get logger(): Logger {
+        return resolveService(SystemLogger);
+    },
 });

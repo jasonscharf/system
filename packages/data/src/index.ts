@@ -3,5 +3,6 @@ export * from "./DataContext.js";
 export * from "./jobs/types.js";
 export * from "./migrationBaseline.js";
 export * from "./schema.js";
+export * from "./services.js";
 export * from "./sqlLogging.js";
 export * from "./TripleStore.js";

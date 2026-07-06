@@ -1,13 +1,14 @@
-import { makeUri, NS_CORE } from "@jasonscharf/core";
+import { makeUri, NS_CORE, resolveService } from "@jasonscharf/core";
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
 import { buildServerContext, systemSec } from "@jasonscharf/server";
 import { SESSION_TTL_SECS } from "../constants.js";
 import type { IOAuthProvider } from "../oauth/types.js";
-import type { UserDeviceRepository } from "../repository/UserDeviceRepository.js";
-import type { UserIdentityRepository } from "../repository/UserIdentityRepository.js";
-import type { UserRepository } from "../repository/UserRepository.js";
-import type { UserSessionRepository } from "../repository/UserSessionRepository.js";
+import { UserDeviceRepository } from "../repository/UserDeviceRepository.js";
+import { UserIdentityRepository } from "../repository/UserIdentityRepository.js";
+import { UserRepository } from "../repository/UserRepository.js";
+import { UserSessionRepository } from "../repository/UserSessionRepository.js";
 import { hashSessionToken } from "../repository/util.js";
+import { SessionStore } from "../services.js";
 import type { ISessionStore } from "../session/ISessionStore.js";
 import type { DeviceInfo, OAuthProvider, UserEntity, UserSessionEntity } from "../types.js";
 
@@ -32,13 +33,18 @@ export interface CallbackError {
     requestId?: string;
 }
 
+/**
+ * Service members are optional: when omitted they resolve from the IoC
+ * container (SessionStore, UserRepository, ...), which boot binds. Passing
+ * them explicitly overrides the container for this component instance.
+ */
 export interface CallbackComponentOptions extends FlowComponentOptions {
     providers: IOAuthProvider[];
-    sessionStore: ISessionStore;
-    users: UserRepository;
-    identities: UserIdentityRepository;
-    sessions: UserSessionRepository;
-    devices: UserDeviceRepository;
+    sessionStore?: ISessionStore;
+    users?: UserRepository;
+    identities?: UserIdentityRepository;
+    sessions?: UserSessionRepository;
+    devices?: UserDeviceRepository;
 }
 
 /**
@@ -66,11 +72,11 @@ export class CallbackComponent extends FlowComponent {
         this.errorOut = this.addPort<CallbackError>("errorOut", "out");
 
         this._providers = new Map(options.providers.map((p) => [p.name, p]));
-        this._sessions = options.sessionStore;
-        this._users = options.users;
-        this._identities = options.identities;
-        this._sessRepo = options.sessions;
-        this._devices = options.devices;
+        this._sessions = options.sessionStore ?? resolveService(SessionStore);
+        this._users = options.users ?? resolveService(UserRepository);
+        this._identities = options.identities ?? resolveService(UserIdentityRepository);
+        this._sessRepo = options.sessions ?? resolveService(UserSessionRepository);
+        this._devices = options.devices ?? resolveService(UserDeviceRepository);
     }
 
     override step(): void {

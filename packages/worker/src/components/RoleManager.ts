@@ -1,4 +1,6 @@
 import { hostname } from "node:os";
+import { resolveService } from "@jasonscharf/core";
+import { DataSource } from "@jasonscharf/data";
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
 import type { Knex } from "knex";
 import {
@@ -24,7 +26,8 @@ export interface RoleChangeEvent {
 }
 
 export interface RoleManagerOptions extends FlowComponentOptions {
-    knex: Knex;
+    /** Database connection. Resolved from the container (DataSource) when omitted. */
+    knex?: Knex;
     roles: WillingRole[];
     /** Lease TTL in ms. Defaults to ROLE_DEFAULT_TTL_MS. */
     ttlMs?: number;
@@ -84,7 +87,7 @@ export class RoleManager extends FlowComponent {
 
         this.outRoleChanged = this.addPort<RoleChangeEvent>("outRoleChanged", "out");
 
-        this._knex = options.knex;
+        this._knex = options.knex ?? resolveService(DataSource).knex;
         this._roles = options.roles;
         this._ttlMs = options.ttlMs ?? ROLE_DEFAULT_TTL_MS;
         this._heartbeatMs = Math.floor(this._ttlMs / ROLE_HEARTBEAT_DIVISOR);

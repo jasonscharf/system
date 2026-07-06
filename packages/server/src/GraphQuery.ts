@@ -3,6 +3,7 @@ import type { TraverseHop, TripleStore } from "@jasonscharf/data";
 import type { EntityRecord, EntitySchema, FilterOp } from "@jasonscharf/entities";
 import { entityIriFor, toLiteral } from "@jasonscharf/entities";
 import { type EntityInput, EntityStore } from "./EntityStore.js";
+import { createEntityStore } from "./EntityStoreFactory.js";
 import { AccessChecker } from "./rbac/AccessChecker.js";
 import { PolicyGrantRepository } from "./rbac/repository/PolicyGrantRepository.js";
 import type { SecurityContext } from "./SecurityContext.js";
@@ -135,7 +136,7 @@ export class GraphQuery {
         leafSchema: EntitySchema<Props>,
     ): Promise<EntityRecord<Props>[]> {
         const iris = await this.ids(leafSchema);
-        let records = await new EntityStore(this._store).hydrateMany(this._ctx, leafSchema, iris);
+        let records = await createEntityStore(this._store).hydrateMany(this._ctx, leafSchema, iris);
 
         for (const w of this._wheres) {
             if (w.op !== "=") {
@@ -197,7 +198,7 @@ export class GraphQuery {
                 ? entityIriFor(opts.under.schema, opts.under.id).value
                 : (this._root?.value ?? "");
             await this._assert(txCtx, opts.requires, anchor);
-            const es = new EntityStore(this._store);
+            const es = createEntityStore(this._store);
             const rec = await es.create<Props>(txCtx, schema, data);
             if (opts.under) {
                 await es.addEdge(txCtx, opts.under.schema, opts.under.id, opts.under.edge, rec.iri);
@@ -215,7 +216,7 @@ export class GraphQuery {
     ): Promise<void> {
         await this._store.withTransaction(this._ctx, async (txCtx) => {
             await this._assert(txCtx, opts.requires, entityIriFor(schema, id).value);
-            await new EntityStore(this._store).update(txCtx, schema, id, patch);
+            await createEntityStore(this._store).update(txCtx, schema, id, patch);
         });
     }
 
@@ -223,7 +224,7 @@ export class GraphQuery {
     async delete(schema: EntitySchema, id: string, opts: { requires: string }): Promise<void> {
         await this._store.withTransaction(this._ctx, async (txCtx) => {
             await this._assert(txCtx, opts.requires, entityIriFor(schema, id).value);
-            await new EntityStore(this._store).delete(txCtx, schema, id);
+            await createEntityStore(this._store).delete(txCtx, schema, id);
         });
     }
 

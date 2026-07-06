@@ -11,6 +11,7 @@ export type { FilterOp } from "./EntityQuery.js";
 export { EntityQuery } from "./EntityQuery.js";
 export type { EdgeInput, EntityInput } from "./EntityStore.js";
 export { EntityStore } from "./EntityStore.js";
+export { createEntityStore, EntityStoreFactory } from "./EntityStoreFactory.js";
 export { EntityValidationError } from "./EntityValidationError.js";
 export { ExtensionManager } from "./ExtensionManager.js";
 export type { ExtensionRecord } from "./ExtensionRegistry.js";
@@ -35,6 +36,7 @@ export type { SecurityContext } from "./SecurityContext.js";
 export { anonymousSec, systemSec } from "./SecurityContext.js";
 export type { EntityLookup, GraphLookup, ServerContext } from "./ServerContext.js";
 export { buildServerContext } from "./ServerContext.js";
+export { FieldCipherService } from "./services.js";
 // ── Superuser (membership of the system SYS_SUPERUSERS group) ────────────────
 export * from "./superuser/index.js";
 // ── Tenancy (Tenant and Organization entities) ──────────────────────────────

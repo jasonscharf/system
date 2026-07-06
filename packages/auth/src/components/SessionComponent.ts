@@ -1,8 +1,9 @@
-import { makeUri, NS_CORE } from "@jasonscharf/core";
+import { makeUri, NS_CORE, resolveService } from "@jasonscharf/core";
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
 import { buildServerContext, systemSec } from "@jasonscharf/server";
-import type { UserRepository } from "../repository/UserRepository.js";
-import type { UserSessionRepository } from "../repository/UserSessionRepository.js";
+import { UserRepository } from "../repository/UserRepository.js";
+import { UserSessionRepository } from "../repository/UserSessionRepository.js";
+import { SessionStore } from "../services.js";
 import type { ISessionStore } from "../session/ISessionStore.js";
 import type { SessionData, UserEntity, UserSessionEntity } from "../types.js";
 
@@ -28,10 +29,15 @@ export interface RevokeResult {
     requestId?: string;
 }
 
+/**
+ * Service members are optional: when omitted they resolve from the IoC
+ * container (SessionStore, UserRepository, ...), which boot binds. Passing
+ * them explicitly overrides the container for this component instance.
+ */
 export interface SessionComponentOptions extends FlowComponentOptions {
-    sessionStore: ISessionStore;
-    users: UserRepository;
-    sessions: UserSessionRepository;
+    sessionStore?: ISessionStore;
+    users?: UserRepository;
+    sessions?: UserSessionRepository;
 }
 
 /**
@@ -57,9 +63,9 @@ export class SessionComponent extends FlowComponent {
         this.revokeIn = this.addPort<RevokeRequest>("revokeIn", "in");
         this.revokeOut = this.addPort<RevokeResult>("revokeOut", "out");
 
-        this._store = options.sessionStore;
-        this._users = options.users;
-        this._sessions = options.sessions;
+        this._store = options.sessionStore ?? resolveService(SessionStore);
+        this._users = options.users ?? resolveService(UserRepository);
+        this._sessions = options.sessions ?? resolveService(UserSessionRepository);
     }
 
     override step(): void {

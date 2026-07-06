@@ -1,7 +1,7 @@
 import type { TripleStore } from "@jasonscharf/data";
 import type { EntityRecord } from "@jasonscharf/entities";
 import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import { EntityQuery, EntityStore } from "@jasonscharf/server";
+import { createEntityStore, EntityQuery, type EntityStore } from "@jasonscharf/server";
 import { ReadReceiptSchema } from "../entities/ReadReceiptSchema.js";
 import type { ReadReceiptEntity } from "../types.js";
 import { idFrom, iriFor, newId } from "./util.js";
@@ -38,7 +38,7 @@ export class ReadReceiptRepository {
 
     constructor(store: TripleStore) {
         this._store = store;
-        this._entities = new EntityStore(store);
+        this._entities = createEntityStore(store);
     }
 
     get store(): TripleStore {

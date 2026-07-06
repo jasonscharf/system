@@ -8,7 +8,7 @@ Foundational types and interfaces for the Tern platform. Every other package dep
 - **RDF term types** — `IRI`, `Literal`, `BlankNode`, `Triple`, `Quad`
 - **IDomainEventBus** — event bus interface (`publish`, `subscribe`)
 - **DomainEvent** — typed domain event wrapper
-- **ServiceContainer** / **ServiceToken** — lightweight, type-safe IoC container
+- **Container** (typescript-ioc) — the platform IoC container, plus `SystemBus`/`SystemLogger` tokens and `bindService`/`declareService`/`resolveService` helpers
 - **TernMessage** — wire format for commands, queries, events, and results
 - **PrefixRegistry** — IRI namespace prefix management
 - **AuthRBAC** — shared RBAC types (roles, permissions)
@@ -84,17 +84,30 @@ await ctx.events!.publish<{ userId: string }>({
 });
 ```
 
-## ServiceContainer
+## IoC container
+
+Services resolve from the platform container (typescript-ioc). Tokens are
+classes — abstract classes stand in for interface-shaped services. Always
+import the container from `@jasonscharf/core` (never `typescript-ioc`
+directly) so every package and downstream consumer shares one container.
 
 ```typescript
-import { ServiceContainer, ServiceToken } from '@jasonscharf/core';
+import { bindService, declareService, resolveService, SystemBus } from '@jasonscharf/core';
 
-const MY_SERVICE = new ServiceToken<MyService>('MyService');
+// Declare a token where the service lives (a default factory is optional;
+// without one, resolving before boot binds an implementation throws).
+export abstract class MyService {
+    abstract doThing(): Promise<void>;
+}
+declareService(MyService);
 
-const container = new ServiceContainer();
-container.bind(MY_SERVICE, new MyService());
+// Boot binds the real implementation...
+bindService(MyService, new RealMyService());
 
-const svc = container.resolve(MY_SERVICE); // typed as MyService
+// ...and any code (including downstream consumers overriding the binding)
+// resolves it. Contexts populate their members this way at build time.
+const svc = resolveService(MyService);
+const bus = resolveService(SystemBus);
 ```
 
 ## RDF Terms

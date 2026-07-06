@@ -20,13 +20,15 @@ import {
     GoogleProvider,
     MemorySessionStore,
     RedisSessionStore,
+    SessionStore,
     UserDeviceRepository,
     UserIdentityRepository,
     UserRepository,
     UserSessionRepository,
 } from "@jasonscharf/auth";
 import { convosExtension, getConvoService, getConvosInstall } from "@jasonscharf/convos";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
+import { bindService } from "@jasonscharf/core";
+import { createDataContext, DataSource, TripleStore } from "@jasonscharf/data";
 import {
     FlowApp,
     HttpDecoder,
@@ -35,7 +37,12 @@ import {
     HttpServer,
     WebSocketServer,
 } from "@jasonscharf/flow";
-import { buildServerContext, getRbacService, rbacExtension } from "@jasonscharf/server";
+import {
+    buildServerContext,
+    FieldCipherService,
+    getRbacService,
+    rbacExtension,
+} from "@jasonscharf/server";
 import { FieldCipher, SecretsManager } from "@jasonscharf/vaults";
 import { MessageDecoder } from "./components/MessageDecoder.js";
 import { MessageEncoder } from "./components/MessageEncoder.js";
@@ -97,6 +104,8 @@ async function main(): Promise<void> {
     }
 
     const store = new TripleStore(knex);
+    bindService(DataSource, new DataSource(knex));
+    bindService(TripleStore, store);
     await store.ensureNamespace(buildServerContext(store), "tern", "urn:sys:");
     await store.ensureNamespace(
         buildServerContext(store),
@@ -140,12 +149,16 @@ async function main(): Promise<void> {
         );
     }
     console.log("[sandbox-server] Field cipher: enabled (at-rest PII encryption)");
+    bindService(FieldCipherService, cipher);
 
-    // ── Auth repositories ─────────────────────────────────────────────────────
-    const users = new UserRepository(store, cipher);
-    const identities = new UserIdentityRepository(store, cipher);
-    const sessions = new UserSessionRepository(store);
-    const devices = new UserDeviceRepository(store);
+    // ── Auth services → IoC container ─────────────────────────────────────────
+    // Components (AuthRouterComponent and children) resolve these from the
+    // container; nothing threads them through options any more.
+    bindService(SessionStore, sessionStore);
+    bindService(UserRepository, new UserRepository(store, cipher));
+    bindService(UserIdentityRepository, new UserIdentityRepository(store, cipher));
+    bindService(UserSessionRepository, new UserSessionRepository(store));
+    bindService(UserDeviceRepository, new UserDeviceRepository(store));
 
     // ── OAuth provider credentials (from vault or env) ────────────────────────
     const googleClientId = await secrets.getWithDefault(
@@ -188,11 +201,6 @@ async function main(): Promise<void> {
             new GoogleProvider(googleClientId, googleClientSecret),
             new GitHubProvider(githubClientId, githubClientSecret),
         ],
-        sessionStore,
-        users,
-        identities,
-        sessions,
-        devices,
         baseUrl: BASE_URL,
         loginSuccess: "/",
         loginFailure: "/auth/error",

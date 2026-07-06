@@ -1,11 +1,18 @@
-import { type ApplicationContext, defaultCtx, type UserSession } from "@jasonscharf/core";
+import {
+    type ApplicationContext,
+    defaultCtx,
+    tryResolveService,
+    type UserSession,
+} from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import type { EntityRecord, EntitySchema, IFieldCipher } from "@jasonscharf/entities";
 import type { Knex } from "knex";
 import { EntityQuery } from "./EntityQuery.js";
-import { EntityStore } from "./EntityStore.js";
+import type { EntityStore } from "./EntityStore.js";
+import { createEntityStore } from "./EntityStoreFactory.js";
 import { GraphQuery } from "./GraphQuery.js";
 import type { SecurityContext } from "./SecurityContext.js";
+import { FieldCipherService } from "./services.js";
 
 export type EntityLookup = <Props extends Record<string, unknown>>(
     schema: EntitySchema<Props>,
@@ -97,17 +104,24 @@ export function buildServerContext(
         Omit<ServerContext, "entities" | "store" | "graph" | "related" | "tx" | "entityStore">
     > = {},
 ): ServerContext {
+    // Members resolve from the IoC container at build time (defaultCtx getters
+    // and the FieldCipherService fallback), so bindService overrides installed
+    // at boot are reflected by every context created afterwards. Explicit base
+    // fields always win.
+    const cipher = base.cipher ?? tryResolveService(FieldCipherService) ?? undefined;
     const ctx: ServerContext = {
         bus: defaultCtx.bus,
+        logger: defaultCtx.logger,
         ...base,
+        cipher,
         store,
         entities: (schema) => new EntityQuery(store, schema),
         graph: (sec) => new GraphQuery(ctx, sec),
         related: (sources, schema, edgeName) =>
-            new EntityStore(store, undefined, ctx.cipher).related(ctx, sources, schema, edgeName),
-        // Eager: constructed before `ctx` is assigned (TDZ), so it reads
-        // base.cipher, which equals ctx.cipher at build time.
-        entityStore: new EntityStore(store, undefined, base.cipher),
+            createEntityStore(store, undefined, ctx.cipher).related(ctx, sources, schema, edgeName),
+        // Eager: constructed before `ctx` is assigned (TDZ), so it reads the
+        // resolved cipher, which equals ctx.cipher at build time.
+        entityStore: createEntityStore(store, undefined, cipher),
         tx<T>(fn: (c: ServerContext) => Promise<T>): Promise<T> {
             if (ctx.trx) {
                 return fn(ctx);

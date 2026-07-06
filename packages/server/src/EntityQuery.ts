@@ -2,7 +2,13 @@ import type { IRI } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import type { EntityRecord, EntitySchema, FilterOp, IFieldCipher } from "@jasonscharf/entities";
 import { RDF_TYPE, toLiteral } from "@jasonscharf/entities";
-import { type EdgeInput, type EntityInput, EntityStore, edgeTargetIri } from "./EntityStore.js";
+import {
+    type EdgeInput,
+    type EntityInput,
+    type EntityStore,
+    edgeTargetIri,
+} from "./EntityStore.js";
+import { createEntityStore } from "./EntityStoreFactory.js";
 import type { ServerContext } from "./ServerContext.js";
 import { tenantGraph } from "./tenancy.js";
 
@@ -55,7 +61,7 @@ export class EntityQuery<Props extends Record<string, unknown>> {
         // The cipher (when supplied) flows to the inner EntityStore so that
         // hydrating PII-bearing records decrypts them, matching ctx.cipher
         // semantics for callers that wire the cipher at construction instead.
-        this._es = new EntityStore(_store, undefined, cipher);
+        this._es = createEntityStore(_store, undefined, cipher);
     }
 
     where(prop: keyof Props & string, op: FilterOp, value: unknown): this {

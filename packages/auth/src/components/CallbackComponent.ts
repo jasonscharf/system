@@ -3,12 +3,17 @@ import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasons
 import { buildServerContext, systemSec } from "@jasonscharf/server";
 import { SESSION_TTL_SECS } from "../constants.js";
 import type { IOAuthProvider } from "../oauth/types.js";
-import type { UserDeviceRepository } from "../repository/UserDeviceRepository.js";
-import type { UserIdentityRepository } from "../repository/UserIdentityRepository.js";
-import type { UserRepository } from "../repository/UserRepository.js";
-import type { UserSessionRepository } from "../repository/UserSessionRepository.js";
+// biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
+import { UserDeviceRepository } from "../repository/UserDeviceRepository.js";
+// biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
+import { UserIdentityRepository } from "../repository/UserIdentityRepository.js";
+// biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
+import { UserRepository } from "../repository/UserRepository.js";
+// biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
+import { UserSessionRepository } from "../repository/UserSessionRepository.js";
 import { hashSessionToken } from "../repository/util.js";
-import type { SessionStore } from "../services.js";
+// biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
+import { SessionStore } from "../services.js";
 import type { DeviceInfo, OAuthProvider, UserEntity, UserSessionEntity } from "../types.js";
 
 export interface CallbackRequest {

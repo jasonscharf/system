@@ -1,4 +1,5 @@
 import path from "node:path";
+import swc from "unplugin-swc";
 import { defineConfig } from "vitest/config";
 
 const workspaceRoot = path.resolve(__dirname, "../..");
@@ -7,6 +8,20 @@ const pkg = (name: string) => path.resolve(__dirname, `../${name}/src`);
 
 export default defineConfig({
     root: workspaceRoot,
+    // esbuild (vite's default transform) cannot emit emitDecoratorMetadata, so
+    // typescript-ioc @Inject field tokens resolve to `undefined` at runtime.
+    // Transform TS/TSX with SWC instead, which emits legacy-decorator metadata.
+    plugins: [
+        swc.vite({
+            jsc: {
+                transform: {
+                    legacyDecorator: true,
+                    decoratorMetadata: true,
+                },
+                keepClassNames: true,
+            },
+        }),
+    ],
     test: {
         globals: true,
         environment: "node",

@@ -40,7 +40,8 @@
  */
 
 import { Inject, resolveModuleRef } from "@jasonscharf/core";
-import type { DataSource } from "@jasonscharf/data";
+// biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
+import { DataSource } from "@jasonscharf/data";
 import { FlowComponent, type FlowComponentOptions } from "@jasonscharf/flow";
 import type { Knex } from "knex";
 import {

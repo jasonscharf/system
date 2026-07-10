@@ -1,9 +1,12 @@
 import { Inject, makeUri, NS_CORE } from "@jasonscharf/core";
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
 import { buildServerContext, systemSec } from "@jasonscharf/server";
-import type { UserRepository } from "../repository/UserRepository.js";
-import type { UserSessionRepository } from "../repository/UserSessionRepository.js";
-import type { SessionStore } from "../services.js";
+// biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
+import { UserRepository } from "../repository/UserRepository.js";
+// biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
+import { UserSessionRepository } from "../repository/UserSessionRepository.js";
+// biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
+import { SessionStore } from "../services.js";
 import type { SessionData, UserEntity, UserSessionEntity } from "../types.js";
 
 export interface ValidateRequest {

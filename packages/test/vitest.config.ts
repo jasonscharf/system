@@ -54,6 +54,7 @@ export default defineConfig({
             "@jasonscharf/core": pkg("core"),
             "@jasonscharf/data": pkg("data"),
             "@jasonscharf/entities": pkg("entities"),
+            "@jasonscharf/events": pkg("events"),
             "@jasonscharf/flow": pkg("flow"),
             "@jasonscharf/gen": pkg("gen"),
             "@jasonscharf/server": pkg("server"),

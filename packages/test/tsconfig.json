@@ -24,6 +24,7 @@
         { "path": "../core" },
         { "path": "../data" },
         { "path": "../entities" },
+        { "path": "../events" },
         { "path": "../flow" },
         { "path": "../gen" },
         { "path": "../sandbox-labs" },

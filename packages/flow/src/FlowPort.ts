@@ -3,6 +3,16 @@ import type { FlowTransport } from "./FlowTransport.js";
 import { isTickEvent } from "./TickEvent.js";
 import type { PortDirection, ReadMode } from "./types.js";
 
+/**
+ * Upper bound on messages retained by an out port that has NO transport bound
+ * (TRN-525). An out port is an edge, not a buffer: once a transport is bound it
+ * delivers without retaining. The only reason to keep anything is so a test can
+ * read an unwired out port back as a Collector, and those reads are prompt and
+ * small. Bounding the queue guarantees an out port that is never wired and never
+ * read can still not grow for the life of a long-running process.
+ */
+const OUT_PORT_MAX_RETAINED = 1024;
+
 export class FlowPort<T> {
     readonly name: string;
     readonly direction: PortDirection;
@@ -48,16 +58,29 @@ export class FlowPort<T> {
     }
 
     put(msg: T): void {
-        if (this.direction === "in" && isTickEvent(msg) && !this.isBound) {
+        if (this.direction === "in") {
+            if (isTickEvent(msg) && !this.isBound) {
+                return;
+            }
+            this._queue.push(msg);
+            this.owner.context.scheduler?.enqueue(this.owner);
             return;
         }
-        this._queue.push(msg);
-        if (this.direction === "in") {
-            this.owner.context.scheduler?.enqueue(this.owner);
-        } else {
+        // Out ports are edges, not buffers (TRN-525). When a transport is bound
+        // we deliver WITHOUT enqueueing — nothing ever drains an out port's
+        // queue, so retaining every delivered message is an unbounded leak on a
+        // long-running server. Only when no transport is bound do we retain the
+        // message, so a test can read the port back as a Collector, and we cap
+        // that queue so an unwired, unread out port still cannot grow forever.
+        if (this._transports.length > 0) {
             for (const transport of this._transports) {
                 transport.deliver(msg);
             }
+            return;
+        }
+        this._queue.push(msg);
+        if (this._queue.length > OUT_PORT_MAX_RETAINED) {
+            this._queue.shift();
         }
     }
 

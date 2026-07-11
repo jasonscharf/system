@@ -450,6 +450,68 @@ describe("FlowTransport / wire: pluggable delivery edges", () => {
     });
 });
 
+// ── Out-port retention (TRN-525) ──────────────────────────────────────────────
+//
+// An out port is an edge, not a buffer. Nothing ever drains an out port's queue
+// (dispatch() and _pendingMessageCount() only look at in ports), so retaining
+// every delivered message was an unbounded leak on a long-running server. The
+// fix: once a transport is bound the out port delivers WITHOUT enqueueing; only
+// an unwired out port retains, so a test can still read it as a Collector, and
+// that retention is capped.
+
+describe("FlowPort out-port retention (TRN-525)", () => {
+    it("an out port with a bound transport delivers without retaining", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [1, 2, 3] });
+        const collector = new Collector<number>(app.context);
+        app.connect(source.output, collector.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        // Every message reached the collector...
+        expect(collector.received).toEqual([1, 2, 3]);
+        // ...and none were retained on the out port's queue — no leak.
+        expect(source.output.size).toBe(0);
+    });
+
+    it("a heavily used out port with a transport never grows its queue", async () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, {
+            messages: Array.from({ length: 5000 }, (_, i) => i),
+        });
+        const collector = new Collector<number>(app.context);
+        app.connect(source.output, collector.input);
+        await app.init();
+        await app.drain();
+        await app.stop();
+        expect(collector.received.length).toBe(5000);
+        expect(source.output.size).toBe(0);
+    });
+
+    it("an unwired out port still retains messages so it can be read as a Collector", () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [] });
+        source.output.put(11);
+        source.output.put(22);
+        expect(source.output.size).toBe(2);
+        expect(source.output.read()).toBe(11);
+        expect(source.output.read()).toBe(22);
+        expect(source.output.size).toBe(0);
+    });
+
+    it("an unwired, unread out port caps its retained queue instead of leaking", () => {
+        const app = new FlowApp();
+        const source = new Source<number>(app.context, { messages: [] });
+        for (let i = 0; i < 10_000; i++) {
+            source.output.put(i);
+        }
+        // Bounded retention: the queue never grows past the cap even though it is
+        // never read, and it holds the most recent window (FIFO drop-oldest).
+        expect(source.output.size).toBe(1024);
+        expect(source.output.peek()).toBe(10_000 - 1024);
+    });
+});
+
 // ── PushScheduler ─────────────────────────────────────────────────────────────
 //
 // PushScheduler is reactive — every inbound put() enqueues the owner once.

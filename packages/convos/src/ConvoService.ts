@@ -587,17 +587,23 @@ export class ConvoService {
             id: args.lastReadMessageId,
         });
         if (lastReadMsg) {
+            // Only dismiss notifications sourced from messages in THIS
+            // conversation — matching a generic ":message:" substring would
+            // silently clear unrelated conversations' notifications too.
+            const messages = await this._messages.findByConversation(ctx, sec, {
+                conversationId: args.conversationId,
+            });
+            const conversationMessageIris = new Set(messages.map((m) => m.iri));
+
             const notifs = await this._notifications.findByUser(ctx, sec, {
                 userId: args.userId,
                 unreadOnly: true,
             });
-            for (const n of notifs) {
-                if (
-                    n.sourceIri &&
-                    (n.sourceIri === lastReadMsg.iri || n.sourceIri.includes(":message:"))
-                ) {
-                    await this._notifications.dismiss(ctx, sec, { id: n.id });
-                }
+            const staleIds = notifs
+                .filter((n) => n.sourceIri != null && conversationMessageIris.has(n.sourceIri))
+                .map((n) => n.id);
+            if (staleIds.length > 0) {
+                await this._notifications.dismissMany(ctx, sec, { ids: staleIds });
             }
         }
 
@@ -853,7 +859,7 @@ export class ConvoService {
                 }
             }
 
-            const notifType = message.replyToId ? "reply" : "reply";
+            const notifType = message.replyToId ? "reply" : "mention";
             await this._notifications.create(ctx, sec, {
                 userId: p.userId,
                 notifType,

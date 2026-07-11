@@ -18,6 +18,10 @@ export interface IdArgs {
     id: string;
 }
 
+export interface IdsArgs {
+    ids: string[];
+}
+
 export interface FindByUserArgs {
     userId: string;
     unreadOnly?: boolean;
@@ -169,6 +173,29 @@ export class NotificationRepository {
         args: IdArgs,
     ): Promise<NotificationEntity | null> {
         return this._setBooleanFlag(ctx, sec, args.id, "isDismissed", true);
+    }
+
+    /**
+     * @dataLayer — no checks here; ConvoService enforces (see class doc).
+     * Dismiss many notifications in a single transaction, avoiding the N+1
+     * of calling dismiss() per id. Unknown ids are skipped.
+     */
+    async dismissMany(ctx: ServerContext, _sec: SecurityContext, args: IdsArgs): Promise<number> {
+        if (args.ids.length === 0) {
+            return 0;
+        }
+        return this._store.withTransaction(ctx, async (ctx) => {
+            let dismissed = 0;
+            for (const id of args.ids) {
+                const record = await this._entities.findById(ctx, NotificationSchema, id);
+                if (!record) {
+                    continue;
+                }
+                await this._entities.update(ctx, NotificationSchema, id, { isDismissed: true });
+                dismissed += 1;
+            }
+            return dismissed;
+        });
     }
 
     /**

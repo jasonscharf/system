@@ -1155,6 +1155,28 @@ for (const provider of providers) {
             expect(active).toHaveLength(1);
         });
 
+        it("postMessage types a reply notification 'reply' and a plain message 'mention'", async () => {
+            const { conversation } = await svc.createConversation(ctx, secFor(ALICE), {
+                subjectIri: CONTRACT_IRI,
+                title: "t",
+                participantIds: [BOB],
+            });
+            const plain = await svc.postMessage(ctx, secFor(ALICE), {
+                conversationId: conversation.id,
+                content: "plain message",
+            });
+            const reply = await svc.postMessage(ctx, secFor(ALICE), {
+                conversationId: conversation.id,
+                content: "a reply",
+                replyToId: plain.id,
+            });
+            const notifs = await svc.getNotificationsForUser(ctx, systemSec, { userId: BOB });
+            const plainNotif = notifs.find((n) => n.sourceIri === plain.iri);
+            const replyNotif = notifs.find((n) => n.sourceIri === reply.iri);
+            expect(plainNotif?.notifType).toBe("mention");
+            expect(replyNotif?.notifType).toBe("reply");
+        });
+
         it("editMessage returns updated content with revision", async () => {
             const { conversation } = await svc.createConversation(ctx, secFor(ALICE), {
                 subjectIri: CONTRACT_IRI,
@@ -1400,6 +1422,43 @@ for (const provider of providers) {
                 lastReadMessageId: msg.id,
             });
             expect(await svc.getUnreadCount(ctx, systemSec, { userId: BOB })).toBe(0);
+        });
+
+        it("markConversationRead does not dismiss notifications from other conversations", async () => {
+            const { conversation: convA } = await svc.createConversation(ctx, secFor(ALICE), {
+                subjectIri: CONTRACT_IRI,
+                title: "A",
+                participantIds: [BOB],
+            });
+            const { conversation: convB } = await svc.createConversation(ctx, secFor(ALICE), {
+                subjectIri: CONTRACT_IRI,
+                title: "B",
+                participantIds: [BOB],
+            });
+            const msgA = await svc.postMessage(ctx, secFor(ALICE), {
+                conversationId: convA.id,
+                content: "in A",
+            });
+            const msgB = await svc.postMessage(ctx, secFor(ALICE), {
+                conversationId: convB.id,
+                content: "in B",
+            });
+            expect(await svc.getUnreadCount(ctx, systemSec, { userId: BOB })).toBe(2);
+
+            // BOB reads conversation A only.
+            await svc.markConversationRead(ctx, systemSec, {
+                userId: BOB,
+                conversationId: convA.id,
+                lastReadMessageId: msgA.id,
+            });
+
+            // The notification for conversation B must survive; only A's is dismissed.
+            const notifs = await svc.getNotificationsForUser(ctx, systemSec, { userId: BOB });
+            const notifA = notifs.find((n) => n.sourceIri === msgA.iri);
+            const notifB = notifs.find((n) => n.sourceIri === msgB.iri);
+            expect(notifA?.isDismissed).toBe(true);
+            expect(notifB?.isDismissed).toBe(false);
+            expect(await svc.getUnreadCount(ctx, systemSec, { userId: BOB })).toBe(1);
         });
     });
 

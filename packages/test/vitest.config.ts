@@ -6,22 +6,25 @@ const workspaceRoot = path.resolve(__dirname, "../..");
 
 const pkg = (name: string) => path.resolve(__dirname, `../${name}/src`);
 
+// esbuild (vite's default transform) cannot emit emitDecoratorMetadata, so
+// typescript-ioc @Inject field tokens resolve to `undefined` at runtime.
+// Transform TS/TSX with SWC instead, which emits legacy-decorator metadata.
+const swcPlugin = swc.vite({
+    jsc: {
+        transform: {
+            legacyDecorator: true,
+            decoratorMetadata: true,
+        },
+        keepClassNames: true,
+    },
+});
+
 export default defineConfig({
     root: workspaceRoot,
-    // esbuild (vite's default transform) cannot emit emitDecoratorMetadata, so
-    // typescript-ioc @Inject field tokens resolve to `undefined` at runtime.
-    // Transform TS/TSX with SWC instead, which emits legacy-decorator metadata.
-    plugins: [
-        swc.vite({
-            jsc: {
-                transform: {
-                    legacyDecorator: true,
-                    decoratorMetadata: true,
-                },
-                keepClassNames: true,
-            },
-        }),
-    ],
+    // unplugin-swc resolves a different vite copy than vitest's bundled vite, so
+    // their Plugin types are nominally incompatible though runtime-compatible.
+    // biome-ignore lint/suspicious/noExplicitAny: cross-vite-version Plugin type bridge
+    plugins: [swcPlugin as any],
     test: {
         globals: true,
         environment: "node",

@@ -6,12 +6,10 @@
 
 name: tern-core
 version: "1.0.0"
-description: >
-  Core extension providing baseline message handlers.
-  Registers tern:ping so clients can test connectivity.
+description: "Core extension providing baseline message handlers. Registers urn:sys:core:msg:ping so clients can test connectivity."
 
 handlers:
-  - type: "http://tern.dev/ns/msg/ping"
-    module: "../src/handlers/ping.js"
+  - type: "urn:sys:core:msg:ping"
+    module: "../dist/handlers/ping.js"
     export: "handlePing"
     priority: 100

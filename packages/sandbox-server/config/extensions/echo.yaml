@@ -4,12 +4,10 @@
 
 name: tern-echo
 version: "1.0.0"
-description: >
-  Sample endpoint: echoes the caller's message back uppercased with a
-  server-side timestamp.  Useful as a copy-paste template for new endpoints.
+description: "Sample endpoint: echoes the caller's message back uppercased with a server-side timestamp. Useful as a copy-paste template for new endpoints."
 
 handlers:
-  - type: "http://tern.dev/ns/msg/echo"
-    module: "../src/handlers/echo.js"
+  - type: "urn:sys:core:msg:echo"
+    module: "../dist/handlers/echo.js"
     export: "handleEcho"
     priority: 100

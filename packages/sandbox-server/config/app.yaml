@@ -19,10 +19,7 @@
 
 name:        tern-sandbox-server
 version:     "1.0.0"
-description: >
-  Development sandbox demonstrating a minimal Tern server application.
-  Loads core handlers from YAML, data handlers from Turtle/RDF, and the
-  echo sample endpoint from a standalone YAML extension.
+description: "Development sandbox demonstrating a minimal Tern server application. Loads core handlers from YAML, data handlers from Turtle/RDF, and the echo sample endpoint from a standalone YAML extension."
 author:      jason <jasonlscharf@gmail.com>
 license:     MIT
 ternVersion: "1.0.0"

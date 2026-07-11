@@ -7,7 +7,7 @@
 #   name: tern-data
 #   handlers:
 #     - type: "urn:sys:core:msg:triple.find"
-#       module: "../src/handlers/triples.js"
+#       module: "../dist/handlers/triples.js"
 #       export: "handleFind"
 #     ...
 #
@@ -28,21 +28,21 @@ ext:DataExtension
 
     ternapp:handler [
         ternapp:type     msg:triple.find ;
-        ternapp:module   "../src/handlers/triples.js" ;
+        ternapp:module   "../dist/handlers/triples.js" ;
         ternapp:export   "handleFind" ;
         ternapp:priority 100
     ] ;
 
     ternapp:handler [
         ternapp:type     msg:triple.insert ;
-        ternapp:module   "../src/handlers/triples.js" ;
+        ternapp:module   "../dist/handlers/triples.js" ;
         ternapp:export   "handleInsert" ;
         ternapp:priority 100
     ] ;
 
     ternapp:handler [
         ternapp:type     msg:triple.stats ;
-        ternapp:module   "../src/handlers/triples.js" ;
+        ternapp:module   "../dist/handlers/triples.js" ;
         ternapp:export   "handleStats" ;
         ternapp:priority 100
     ] .

@@ -25,10 +25,10 @@ export const defaults = {
 const allowedModes = ["test", "dev", "staging", "staging-dev", "staging-production", "production"];
 
 export function isTest() {
-    return env.SYS_MODE === "test" || env.PRIMO_MODE === "";
+    return env.SYS_MODE === "test";
 }
 export function isDev() {
-    return env.SYS_MODE === "dev" || isStagingOrProduction();
+    return env.SYS_MODE === "dev";
 }
 export function isStagingDev() {
     return env.SYS_MODE === "staging-dev";
@@ -43,19 +43,24 @@ export function isStagingOrProduction() {
     return isStaging() || isProduction();
 }
 
-// Create a new blank object, copy process variables but only if present in `defaults`
-export const env = (<typeof defaults>Object.assign({}, defaults)) as Record<string, string>;
-
+// Copy `source` values over the keys already present in `target`, but only when the
+// source actually has a value. Keys absent from `source` keep their existing `target`
+// value (the default), so an unset process variable never clobbers a default.
 export function copyEnvBlock(
     source: Record<string, string>,
     target: Record<string, string | null | undefined>,
 ) {
-    Object.keys(target)
-        .filter(exists)
-        .forEach((key) => {
+    Object.keys(target).forEach((key) => {
+        if (exists(source[key])) {
             target[key] = source[key];
-        });
+        }
+    });
 }
+
+// Start from the defaults, then let matching process.env values override them.
+// Only keys declared in `defaults` are pulled from process.env.
+export const env = (<typeof defaults>Object.assign({}, defaults)) as Record<string, string>;
+copyEnvBlock(process.env as Record<string, string>, env);
 
 if (allowedModes.indexOf(env.SYS_MODE) < 0) {
     throw new Error(`Unknown mode '${env.SYS_MODE}'`);

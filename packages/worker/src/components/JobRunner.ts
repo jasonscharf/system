@@ -39,7 +39,7 @@
  *   - tickIntervalMs            — override tick cadence
  */
 
-import { Inject, resolveModuleRef } from "@jasonscharf/core";
+import { Inject, resolveModuleRef, systemSec } from "@jasonscharf/core";
 // biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
 import { DataSource } from "@jasonscharf/data";
 import { FlowComponent, type FlowComponentOptions } from "@jasonscharf/flow";
@@ -290,6 +290,8 @@ export class JobRunner extends FlowComponent {
         const ctx: JobContext = {
             knex: this._knex,
             trx: this._knex as unknown as Knex.Transaction,
+            sec: systemSec,
+            tenantId: null,
         };
         return this._raceHandler(run, handler, ctx);
     }
@@ -308,7 +310,12 @@ export class JobRunner extends FlowComponent {
         let handlerError: string | undefined;
         try {
             await this._knex.transaction(async (handlerTrx) => {
-                const ctx: JobContext = { knex: this._knex, trx: handlerTrx };
+                const ctx: JobContext = {
+                    knex: this._knex,
+                    trx: handlerTrx,
+                    sec: systemSec,
+                    tenantId: null,
+                };
                 const err = await this._raceHandler(run, handler, ctx);
                 if (err !== undefined) {
                     // Throw so knex rolls the handler-scoped transaction back; the

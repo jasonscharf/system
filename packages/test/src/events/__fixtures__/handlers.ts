@@ -99,3 +99,18 @@ export async function firstResult(ctx: ReducerCtx): Promise<unknown> {
     const results = ctx.acc as unknown[];
     return results[0] ?? null;
 }
+
+// ── Principal-aware invocations (TRN-535) ────────────────────────────────────────
+
+/** Echoes the principal + tenant the run carries, proving InvocationCtx.sec threads. */
+export async function echoPrincipal(ctx: InvocationCtx): Promise<unknown> {
+    return { principalIri: ctx.sec.principalIri, tenantId: ctx.tenantId };
+}
+
+/** Fails closed unless a real (non-anonymous) principal is present. */
+export async function requireRealPrincipal(ctx: InvocationCtx): Promise<void> {
+    if (ctx.sec.principalIri == null) {
+        throw new Error("denied: anonymous principal");
+    }
+    state().sideEffects.push(`allowed:${ctx.sec.principalIri}`);
+}

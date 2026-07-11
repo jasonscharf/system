@@ -1,8 +1,10 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
+    anonymousSec,
     errResult,
     resolveModuleRef,
+    type SecurityContext,
     type SystemRequest,
     type SystemResult,
     type SystemTypeRef,
@@ -19,9 +21,30 @@ import type { Dispatcher } from "../routing/Dispatcher.js";
  */
 export type HandlerFn = (request: SystemRequest, ctx: HandlerContext) => Promise<SystemResult>;
 
-/** Host-application-specific context passed to every handler. */
+/**
+ * Host-application-specific context passed to every handler.
+ *
+ * `sec` is always present: the dispatch entry point normalizes an omitted
+ * principal to `anonymousSec`, so a handler can read `ctx.sec` unconditionally
+ * and must fail closed when it is anonymous but a real principal is required.
+ * `tenantId` scopes the request, or is null for cross-tenant / system calls.
+ */
 export interface HandlerContext {
     readonly connectionId: string;
+    readonly sec: SecurityContext;
+    readonly tenantId: string | null;
+    readonly [key: string]: unknown;
+}
+
+/**
+ * The loosened context accepted by `dispatch()`.  Callers may omit `sec` and
+ * `tenantId`; the registry fills the safe anonymous defaults before handing a
+ * fully-populated {@link HandlerContext} to each handler.
+ */
+export interface HandlerContextInput {
+    readonly connectionId: string;
+    readonly sec?: SecurityContext;
+    readonly tenantId?: string | null;
     readonly [key: string]: unknown;
 }
 
@@ -99,7 +122,7 @@ export class HandlerRegistry implements Dispatcher {
      * Dispatch a request to the highest-priority handler for its type IRI.
      * If no handler is registered, returns an error result.
      */
-    async dispatch(request: SystemRequest, ctx: HandlerContext): Promise<SystemResult> {
+    async dispatch(request: SystemRequest, ctx: HandlerContextInput): Promise<SystemResult> {
         const entries = this._entries.get(request.type.iri);
         if (!entries || entries.length === 0) {
             return errResult(
@@ -109,10 +132,18 @@ export class HandlerRegistry implements Dispatcher {
             );
         }
 
+        // Normalize the loosened input into a fully-populated context so every
+        // handler reads a guaranteed `sec` (anonymous by default) and `tenantId`.
+        const fullCtx: HandlerContext = {
+            ...ctx,
+            sec: ctx.sec ?? anonymousSec,
+            tenantId: ctx.tenantId ?? null,
+        };
+
         for (const entry of entries) {
             try {
                 const fn = await this._load(entry);
-                const result = await fn(request, ctx);
+                const result = await fn(request, fullCtx);
                 if (result.ok) {
                     return result;
                 }

@@ -11,6 +11,7 @@
  *   - All other strings are looked up here (in-process registered handlers).
  */
 
+import type { SecurityContext } from "@jasonscharf/core";
 import type { Knex } from "knex";
 
 // ── JobContext ────────────────────────────────────────────────────────────────
@@ -32,6 +33,14 @@ export interface JobContext {
     readonly knex: Knex;
     /** The active handler-scoped transaction. Roll back on handler failure. */
     readonly trx: Knex.Transaction;
+    /**
+     * The security principal the job runs as. Background jobs are internal
+     * system actors, so JobRunner supplies `systemSec`; a handler that needs a
+     * narrower principal must resolve it from its own args and re-scope.
+     */
+    readonly sec: SecurityContext;
+    /** The tenant this job is scoped to, or null for cross-tenant / system jobs. */
+    readonly tenantId: string | null;
 }
 
 // ── JobHandler ────────────────────────────────────────────────────────────────

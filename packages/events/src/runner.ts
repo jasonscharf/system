@@ -1,4 +1,4 @@
-import { resolveModuleRef } from "@jasonscharf/core";
+import { anonymousSec, resolveModuleRef, type SecurityContext } from "@jasonscharf/core";
 import type { DefRegistry } from "./DefRegistry.js";
 import type {
     DispatchDef,
@@ -37,15 +37,26 @@ export class Runner {
     /**
      * Run the named definition with its single JSON arg.  Throws if no
      * definition is registered for (kind, name), or if any invocation throws.
+     *
+     * `sec` is the principal every invocation reads off `ctx.sec`; it defaults
+     * to `anonymousSec` so a caller that supplies none dispatches as anonymous
+     * (and a required-principal invocation fails closed).  `tenantId` scopes the
+     * run, defaulting to null (cross-tenant / system).
      */
-    async run(kind: DispatchKind, name: string, arg: unknown): Promise<unknown> {
+    async run(
+        kind: DispatchKind,
+        name: string,
+        arg: unknown,
+        sec: SecurityContext = anonymousSec,
+        tenantId: string | null = null,
+    ): Promise<unknown> {
         const def = this._registry.get(kind, name);
         if (def == null) {
             throw new Error(`No ${kind} definition registered for "${name}"`);
         }
 
         const results: unknown[] = [];
-        const ctx: InvocationCtx = { name, kind, arg, results };
+        const ctx: InvocationCtx = { name, kind, arg, results, sec, tenantId };
 
         for (const ref of def.invocations) {
             const value = await this._invoke(ref, ctx);

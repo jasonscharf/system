@@ -46,6 +46,11 @@ export class DispatchHost {
         }
         this._bound.add(iri);
         await this._bus.handle(iri, rpcKindFor(kind), async (payload: unknown) => {
+            // The bus RPC currently carries only the payload, so every bound
+            // handler runs as `anonymousSec` (the Runner default) — i.e.
+            // unauthenticated by an explicit principal, never by an absent one.
+            // Threading a real per-request principal off the bus envelope is
+            // TRN-527 (WS auth); it supplies `sec`/`tenantId` to run() here.
             return this._runner.run(kind, name, payload);
         });
     }

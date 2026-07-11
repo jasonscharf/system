@@ -12,6 +12,7 @@
  *   - Non-running rows (pending / succeeded / dead) are never touched.
  */
 
+import { systemSec } from "@jasonscharf/core";
 import { createDataContext } from "@jasonscharf/data";
 import { createStaleRunReaper, type JobContext, type JobHandler } from "@jasonscharf/worker";
 import type { Knex } from "knex";
@@ -26,7 +27,7 @@ const STALE_TIMEOUT_MS = 10 * 60 * 1_000; // 10 minutes
 
 async function runHandler(knex: Knex, handler: JobHandler): Promise<void> {
     await knex.transaction(async (trx) => {
-        const ctx: JobContext = { knex, trx };
+        const ctx: JobContext = { knex, trx, sec: systemSec, tenantId: null };
         await handler(ctx, {});
     });
 }

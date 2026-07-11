@@ -11,6 +11,7 @@
  *     run) — an end-to-end smoke through registry → handler → effect.
  */
 
+import { systemSec } from "@jasonscharf/core";
 import { createDataContext } from "@jasonscharf/data";
 import {
     type JobContext,
@@ -95,7 +96,7 @@ describe("SystemJobs — SQLite (in-memory)", () => {
         });
 
         await knex.transaction(async (trx) => {
-            const ctx: JobContext = { knex, trx };
+            const ctx: JobContext = { knex, trx, sec: systemSec, tenantId: null };
             // biome-ignore lint/style/noNonNullAssertion: asserted defined above.
             await reaper!(ctx, {});
         });

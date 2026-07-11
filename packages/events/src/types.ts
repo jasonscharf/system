@@ -1,3 +1,4 @@
+import type { SecurityContext } from "@jasonscharf/core";
 import type { JsonValue } from "./registry.js";
 
 // ── Dispatch kinds ─────────────────────────────────────────────────────────────
@@ -103,12 +104,20 @@ export type DispatchDef = CommandDef | EventDef | QueryDef | OperationDef;
  *             run; the runner pushes each non-null return onto it.
  * `name`    — the dispatch name being run.
  * `kind`    — the dispatch kind being run.
+ * `sec`     — the security principal for this run.  The runner defaults it to
+ *             `anonymousSec` so unauthenticated dispatch is unauthenticated by
+ *             an explicit value, never by an absent field; an invocation that
+ *             requires a real principal must fail closed when it is anonymous.
+ * `tenantId`— the tenant this run is scoped to, or null for cross-tenant /
+ *             system runs.  Both fields are JSON-serializable.
  */
 export interface InvocationCtx {
     readonly name: string;
     readonly kind: DispatchKind;
     readonly arg: unknown;
     readonly results: unknown[];
+    readonly sec: SecurityContext;
+    readonly tenantId: string | null;
 }
 
 /**

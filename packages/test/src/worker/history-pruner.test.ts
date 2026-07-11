@@ -12,6 +12,7 @@
  *   - pending / running rows are never deleted regardless of age.
  */
 
+import { systemSec } from "@jasonscharf/core";
 import { createDataContext } from "@jasonscharf/data";
 import { createHistoryPruner, type JobContext, type JobHandler } from "@jasonscharf/worker";
 import type { Knex } from "knex";
@@ -35,7 +36,7 @@ let _seq = 0;
 
 async function runHandler(knex: Knex, handler: JobHandler): Promise<void> {
     await knex.transaction(async (trx) => {
-        const ctx: JobContext = { knex, trx };
+        const ctx: JobContext = { knex, trx, sec: systemSec, tenantId: null };
         await handler(ctx, {});
     });
 }

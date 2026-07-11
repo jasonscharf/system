@@ -1,5 +1,5 @@
 import { dirname, resolve } from "node:path";
-import type { SystemTypeRef } from "@jasonscharf/core";
+import { anonymousSec, type SecurityContext, type SystemTypeRef } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import { FlowApp } from "@jasonscharf/flow";
 import { loadAppConfig, mergeHandlers } from "./config/loader.js";
@@ -11,7 +11,7 @@ import type {
     TernExtension,
 } from "./config/types.js";
 import {
-    type HandlerContext,
+    type HandlerContextInput,
     type HandlerFn,
     HandlerRegistry,
 } from "./registry/HandlerRegistry.js";
@@ -168,12 +168,19 @@ export class SystemApp {
     /**
      * Dispatch a request with a caller-supplied connectionId.
      * Merges `options.context` with connectionId and passes it to the handler.
+     *
+     * `sec` is the principal the handler reads off `ctx.sec`; it defaults to
+     * `anonymousSec` so an unauthenticated caller dispatches as anonymous.  The
+     * WS-auth path (TRN-527) resolves the real principal per connection and
+     * passes it (and `tenantId`) here.
      */
     async dispatch(
         request: Parameters<HandlerRegistry["dispatch"]>[0],
         connectionId: string,
+        sec: SecurityContext = anonymousSec,
+        tenantId: string | null = null,
     ): ReturnType<HandlerRegistry["dispatch"]> {
-        const ctx: HandlerContext = { connectionId, ...this._extraContext };
+        const ctx: HandlerContextInput = { ...this._extraContext, connectionId, sec, tenantId };
         return this.registry.dispatch(request, ctx);
     }
 

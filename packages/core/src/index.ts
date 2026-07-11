@@ -9,6 +9,7 @@ export * from "./messages/SystemMessage.js";
 export * from "./modref/resolveModuleRef.js";
 export * from "./rbac/index.js";
 export * from "./rdf/index.js";
+export * from "./SecurityContext.js";
 export * from "./SystemLogger.js";
 export * from "./semantics/IRI.js";
 export * from "./semantics/PrefixRegistry.js";

@@ -170,7 +170,12 @@ export class WebSocketServer extends FlowComponent {
         const wss = new WsServer({ noServer: true });
 
         httpServer.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-            void this._handleUpgrade(wss, req, socket, head);
+            // Detached upgrade handling: register as in-flight work so
+            // FlowApp.stop() drains an in-progress upgrade before disposing
+            // (graceful-drain contract, TRN-472). _handleUpgrade never rejects —
+            // an unexpected error rejects the socket rather than becoming an
+            // unhandled rejection (TRN-528).
+            this.trackInFlight(this._handleUpgrade(wss, req, socket, head));
         });
 
         wss.on("connection", (ws: WsSocket, _req: IncomingMessage, connection: WsConnection) => {
@@ -216,39 +221,50 @@ export class WebSocketServer extends FlowComponent {
         socket: Duplex,
         head: Buffer,
     ): Promise<void> {
-        const origin = headerValue(req.headers.origin);
+        try {
+            const origin = headerValue(req.headers.origin);
 
-        // 1. Origin allow-list (CSWSH defense) — checked before authentication so
-        //    a cross-site attacker never reaches credential validation.
-        if (!this._originAllowed(origin)) {
-            rejectUpgrade(socket, 403, "Forbidden");
-            return;
-        }
-
-        // 2. Upgrade-time authentication. A null principal rejects the upgrade.
-        let principal: WsPrincipal | null = null;
-        if (this._authenticate !== undefined) {
-            try {
-                principal = await this._authenticate(req);
-            } catch {
-                principal = null;
-            }
-            if (principal === null) {
-                rejectUpgrade(socket, 401, "Unauthorized");
+            // 1. Origin allow-list (CSWSH defense) — checked before authentication so
+            //    a cross-site attacker never reaches credential validation.
+            if (!this._originAllowed(origin)) {
+                rejectUpgrade(socket, 403, "Forbidden");
                 return;
             }
+
+            // 2. Upgrade-time authentication. A null principal rejects the upgrade.
+            let principal: WsPrincipal | null = null;
+            if (this._authenticate !== undefined) {
+                try {
+                    principal = await this._authenticate(req);
+                } catch {
+                    principal = null;
+                }
+                if (principal === null) {
+                    rejectUpgrade(socket, 401, "Unauthorized");
+                    return;
+                }
+            }
+
+            const connection: WsConnection = {
+                connectionId: hexId(uuidv4Binary()),
+                principal,
+                origin,
+                remoteAddress: req.socket.remoteAddress ?? null,
+            };
+
+            wss.handleUpgrade(req, socket, head, (ws) => {
+                wss.emit("connection", ws, req, connection);
+            });
+        } catch (err) {
+            // Any unexpected failure (e.g. wss.handleUpgrade throwing) must not
+            // become an unhandled rejection. Log it and reject the socket so the
+            // client sees a real status instead of a hung connection (TRN-528).
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`[${this.name}] WebSocket upgrade failed: ${message}`);
+            if (!socket.destroyed) {
+                rejectUpgrade(socket, 500, "Internal Server Error");
+            }
         }
-
-        const connection: WsConnection = {
-            connectionId: hexId(uuidv4Binary()),
-            principal,
-            origin,
-            remoteAddress: req.socket.remoteAddress ?? null,
-        };
-
-        wss.handleUpgrade(req, socket, head, (ws) => {
-            wss.emit("connection", ws, req, connection);
-        });
     }
 
     override step(): void {

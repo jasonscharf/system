@@ -221,7 +221,12 @@ export class HttpRouter extends FlowComponent {
             if (req === undefined) {
                 break;
             }
-            void this._handle(req);
+            // Detached request handling: register as in-flight work so
+            // FlowApp.stop() drains it before disposing (graceful-drain contract,
+            // TRN-472). _handle never rejects — a throwing handler with no
+            // error-boundary middleware yields a 500 response rather than an
+            // unhandled rejection plus a leaked pending ServerResponse (TRN-528).
+            this.trackInFlight(this._handle(req));
         }
     }
 
@@ -234,22 +239,41 @@ export class HttpRouter extends FlowComponent {
 
     private async _handle(req: ParsedHttpRequest): Promise<void> {
         const ctx = new HttpCtx(req, this._extras);
-        const chain = this._buildChain(req.method, req.pathname, ctx);
 
-        await compose(chain)(ctx, async () => {
-            // After all handlers — if body is still unset and status is default, it's a 404
-            if (ctx.body === undefined && ctx.status === 200) {
-                ctx.notFound();
-            }
-        });
+        try {
+            const chain = this._buildChain(req.method, req.pathname, ctx);
 
-        this.responses.put({
-            requestId: req.requestId,
-            status: ctx.status,
-            headers: ctx.headers,
-            body: ctx.body,
-            contentType: inferContentType(ctx.body, ctx.headers),
-        });
+            await compose(chain)(ctx, async () => {
+                // After all handlers — if body is still unset and status is default, it's a 404
+                if (ctx.body === undefined && ctx.status === 200) {
+                    ctx.notFound();
+                }
+            });
+
+            this.responses.put({
+                requestId: req.requestId,
+                status: ctx.status,
+                headers: ctx.headers,
+                body: ctx.body,
+                contentType: inferContentType(ctx.body, ctx.headers),
+            });
+        } catch (err) {
+            // A handler (or middleware) threw and no error-boundary middleware
+            // caught it. Log it and emit a default 500 so the client always gets
+            // a response and the pending ServerResponse is never leaked (TRN-528).
+            // Apps that want custom error bodies still install their own boundary.
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(
+                `[${this.name}] unhandled error handling ${req.method} ${req.pathname}: ${message}`,
+            );
+            this.responses.put({
+                requestId: req.requestId,
+                status: 500,
+                headers: {},
+                body: { error: "Internal Server Error" },
+                contentType: "application/json",
+            });
+        }
     }
 
     private _buildChain(method: HttpMethod, pathname: string, ctx: HttpCtx): HttpMiddlewareFn[] {

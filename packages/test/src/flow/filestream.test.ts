@@ -129,6 +129,61 @@ describe("FileStreamHandler (unit)", () => {
 
         expect(h.out.read()?.status).toBe(403);
     });
+
+    // TRN-528: the detached _handle() was fired with `void`; it is now tracked as
+    // in-flight work so FlowApp.stop() drains it before disposing (graceful-drain
+    // contract, TRN-472). _handle awaits a dynamic import on its first line, so
+    // the task is genuinely in flight the instant step() returns.
+    it("registers the detached handler as in-flight work for graceful drain", async () => {
+        const app = new FlowApp();
+        const h = new FileStreamHandler({ name: "h", context: app.context, directory: "/tmp" });
+
+        const req: ParsedHttpRequest = {
+            requestId: "r4",
+            method: "GET",
+            url: "/?name=whatever.bin",
+            pathname: "/",
+            searchParams: new URLSearchParams("name=whatever.bin"),
+            headers: {},
+        };
+        h.in.put(req);
+        h.step();
+
+        expect(h.inFlight).toBe(1);
+
+        const deadline = Date.now() + 500;
+        while (h.inFlight > 0 && Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 10));
+        }
+        expect(h.inFlight).toBe(0);
+    });
+
+    // TRN-528: an unexpected failure inside _handle (here a malformed request
+    // whose searchParams is missing, so `.get()` throws) must not become an
+    // unhandled rejection — it is caught, logged, and answered with a 500.
+    it("emits a 500 error response when handling throws unexpectedly", async () => {
+        const app = new FlowApp();
+        const h = new FileStreamHandler({ name: "h", context: app.context, directory: "/tmp" });
+
+        // Deliberately malformed ParsedHttpRequest: no searchParams.
+        const malformed = {
+            requestId: "r5",
+            method: "GET",
+            url: "/",
+            pathname: "/x.bin",
+            headers: {},
+        } as unknown as ParsedHttpRequest;
+        h.in.put(malformed);
+        h.step();
+
+        await new Promise((r) => setTimeout(r, 30));
+        const resp = h.out.read();
+        if (resp == null) {
+            throw new Error("expected a response from h.out");
+        }
+        expect(resp.requestId).toBe("r5");
+        expect(resp.status).toBe(500);
+    });
 });
 
 // ── Integration ───────────────────────────────────────────────────────────────

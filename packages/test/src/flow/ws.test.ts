@@ -563,6 +563,60 @@ describe("WebSocketServer open server (no auth, no origin list)", () => {
     });
 });
 
+// ── TRN-528: detached upgrade handler is tracked for graceful drain ──────────
+//
+// The upgrade handler was fired with `void this._handleUpgrade(...)`. It is now
+// registered as in-flight work so FlowApp.stop() drains an in-progress upgrade
+// before disposing, and any unexpected error rejects the socket instead of
+// becoming an unhandled rejection. A gated (real) authenticate keeps the upgrade
+// genuinely in flight so the tracking is observable over a real socket.
+
+describe("WebSocketServer: in-flight upgrade is tracked for graceful drain (TRN-528)", () => {
+    it("reports inFlight while an upgrade authenticates and drains to zero after", async () => {
+        const port = await freePort();
+        const app = new FlowApp({ mode: "push" });
+
+        let release: () => void = () => undefined;
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const server = new WebSocketServer({
+            name: "srv",
+            context: app.context,
+            port,
+            authenticate: async () => {
+                await gate;
+                return { sub: "u1", token: "t" };
+            },
+        });
+        app.addComponent(server);
+        await app.start();
+        app.scheduler.start();
+
+        // Initiate a real upgrade but do not await it — authenticate is gated.
+        const connecting = connectWs(`ws://127.0.0.1:${port}`, {});
+
+        const deadline = Date.now() + 1000;
+        while (server.inFlight === 0 && Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 5));
+        }
+        expect(server.inFlight).toBe(1);
+
+        release();
+        const result = await connecting;
+        expect(result.ok).toBe(true);
+
+        const drainDeadline = Date.now() + 1000;
+        while (server.inFlight > 0 && Date.now() < drainDeadline) {
+            await new Promise((r) => setTimeout(r, 5));
+        }
+        expect(server.inFlight).toBe(0);
+
+        result.ws?.close();
+        await app.stop();
+    });
+});
+
 describe("WebSocketServer authenticate that throws is treated as rejection", () => {
     it("rejects with 401 when the authenticate callback throws", async () => {
         const port = await freePort();

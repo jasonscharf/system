@@ -124,14 +124,27 @@ export class FileStreamHandler extends FlowComponent {
             if (req === undefined) {
                 break;
             }
-            void this._handle(req);
+            // Detached file handling: register as in-flight work so FlowApp.stop()
+            // drains it before disposing (graceful-drain contract, TRN-472).
+            // _handle never rejects — an unexpected failure yields a 500 error
+            // response rather than an unhandled rejection (TRN-528).
+            this.trackInFlight(this._handle(req));
         }
     }
 
     private async _handle(req: ParsedHttpRequest): Promise<void> {
-        const { stat } = await import("node:fs/promises");
-
         const reqId = req.requestId ?? "";
+        try {
+            await this._serve(req, reqId);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`[${this.name}] failed to serve ${req.pathname}: ${message}`);
+            this.out.put(errorResponse(reqId, 500, "Internal Server Error"));
+        }
+    }
+
+    private async _serve(req: ParsedHttpRequest, reqId: string): Promise<void> {
+        const { stat } = await import("node:fs/promises");
 
         // ── Resolve filename ──────────────────────────────────────────────────
         const rawName = req.searchParams.get("name") ?? req.pathname.replace(/^\/+/, "");

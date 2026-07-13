@@ -276,7 +276,12 @@ export class HttpServer extends FlowComponent {
             if (stream === undefined) {
                 break;
             }
-            void this._sendStream(stream);
+            // Detached stream pipe: register as in-flight work so FlowApp.stop()
+            // drains an in-progress response before disposing (graceful-drain
+            // contract, TRN-472). _sendStream never rejects — a body-generator
+            // failure destroys the socket rather than becoming an unhandled
+            // rejection (TRN-528).
+            this.trackInFlight(this._sendStream(stream));
         }
     }
 
@@ -296,7 +301,14 @@ export class HttpServer extends FlowComponent {
                     res.write(chunk);
                 }
             }
-        } catch {
+        } catch (err) {
+            // The body generator failed mid-stream. Headers are already sent, so
+            // the only correct signal is to destroy the socket; log the cause so
+            // the failure is not silently swallowed (TRN-528).
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(
+                `[${this.name}] streaming response ${response.requestId} failed: ${message}`,
+            );
             if (!res.writableEnded) {
                 res.destroy();
             }

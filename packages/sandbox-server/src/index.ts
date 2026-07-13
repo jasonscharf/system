@@ -44,6 +44,7 @@ import {
     rbacExtension,
 } from "@jasonscharf/server";
 import { FieldCipher, SecretsManager } from "@jasonscharf/vaults";
+import { buildWsAuthenticate, secFromPrincipal } from "./auth/wsAuth.js";
 import { MessageDecoder } from "./components/MessageDecoder.js";
 import { MessageEncoder } from "./components/MessageEncoder.js";
 import { MessageRouter } from "./components/MessageRouter.js";
@@ -249,13 +250,34 @@ async function main(): Promise<void> {
         .connect(httpEncoder.responseOut, httpServer.responses);
 
     // ── WebSocket pipeline ────────────────────────────────────────────────────
-    const wsServer = new WebSocketServer({ name: "ws", context: flowApp.context, port: WS_PORT });
+    // The WS pipeline carries the triple.* store handlers, so the upgrade is
+    // authenticated and origin-checked (TRN-527): an anonymous or cross-site
+    // upgrade is rejected before any message is dispatched. The principal
+    // resolved at upgrade is threaded into dispatch as `ctx.sec`.
+    const allowedOriginsRaw = await secrets.getWithDefault(
+        "SYS_WS_ALLOWED_ORIGINS",
+        process.env.SYS_WS_ALLOWED_ORIGINS ?? "http://localhost:5173",
+    );
+    const allowedOrigins = allowedOriginsRaw
+        .split(",")
+        .map((o) => o.trim())
+        .filter((o) => o.length > 0);
+    const wsServer = new WebSocketServer({
+        name: "ws",
+        context: flowApp.context,
+        port: WS_PORT,
+        authenticate: buildWsAuthenticate(authRouter),
+        allowedOrigins,
+    });
     const decoder = new MessageDecoder({ name: "decoder", context: flowApp.context });
     const router = new MessageRouter({
         name: "router",
         context: flowApp.context,
         dispatcher: ternApp.registry,
-        handlerContext: { store },
+        // rbac is threaded so the triple.* superuser gate (TRN-527) can evaluate
+        // membership; store handlers read it as ctx.rbac.
+        handlerContext: { store, rbac },
+        resolveSec: (connectionId) => secFromPrincipal(wsServer.getPrincipal(connectionId)),
     });
     const encoder = new MessageEncoder({ name: "encoder", context: flowApp.context });
 

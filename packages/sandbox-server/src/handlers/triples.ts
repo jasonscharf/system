@@ -8,9 +8,10 @@ import {
     SYSTEM_TYPES,
     type SystemRequest,
     type SystemResult,
+    type SystemTypeRef,
 } from "@jasonscharf/core";
 import { type QuadPattern, TripleStore } from "@jasonscharf/data";
-import { buildServerContext } from "@jasonscharf/server";
+import { buildServerContext, RbacService, SuperuserService, systemSec } from "@jasonscharf/server";
 
 type RdfTerm = IRI | BlankNode | Literal;
 
@@ -65,14 +66,66 @@ function getStore(ctx: HandlerContext): TripleStore {
     return store;
 }
 
-export async function handleFind(request: SystemRequest, ctx: HandlerContext): Promise<SystemResult> {
+/**
+ * The triple.* handlers are raw, graph-wide store access — reading any graph and
+ * forging quads (including RBAC grants). They are gated behind superuser
+ * membership (TRN-527). Returns an error SystemResult to deny, or null to allow.
+ *
+ * Fails closed: an anonymous principal, or a context wired without an RbacService
+ * (so superuser cannot be evaluated), is denied.
+ */
+async function denyUnlessSuperuser(
+    request: SystemRequest,
+    ctx: HandlerContext,
+    type: SystemTypeRef,
+): Promise<SystemResult | null> {
+    const sec = ctx.sec;
+    const rbac = ctx.rbac;
+    if (sec.principalIri === null || !(rbac instanceof RbacService)) {
+        return errResult(
+            request.id,
+            type,
+            "Access denied: triple.* requires an authenticated superuser",
+        );
+    }
+    // Membership evaluation is a system-level authorization read: listMembers is
+    // itself admin-gated, so it must run as the internal system principal (the
+    // same bootstrap pattern AuthService.validateToken uses), not the caller's
+    // sec — which would throw for exactly the non-superusers we mean to deny. The
+    // caller never sees the membership; we only branch on the boolean.
+    const isSuper = await new SuperuserService(rbac).isSuperuser(
+        buildServerContext(getStore(ctx)),
+        systemSec,
+        { userIri: sec.principalIri },
+    );
+    if (!isSuper) {
+        return errResult(request.id, type, "Access denied: triple.* requires superuser");
+    }
+    return null;
+}
+
+export async function handleFind(
+    request: SystemRequest,
+    ctx: HandlerContext,
+): Promise<SystemResult> {
+    const denied = await denyUnlessSuperuser(request, ctx, SYSTEM_TYPES.tripleFind);
+    if (denied !== null) {
+        return denied;
+    }
     const store = getStore(ctx);
     const pattern = patternFromWire(request.payload);
     const quads = await store.find(buildServerContext(store), pattern);
     return okResult(request.id, SYSTEM_TYPES.tripleFind, { quads });
 }
 
-export async function handleInsert(request: SystemRequest, ctx: HandlerContext): Promise<SystemResult> {
+export async function handleInsert(
+    request: SystemRequest,
+    ctx: HandlerContext,
+): Promise<SystemResult> {
+    const denied = await denyUnlessSuperuser(request, ctx, SYSTEM_TYPES.tripleInsert);
+    if (denied !== null) {
+        return denied;
+    }
     const store = getStore(ctx);
     const payload = request.payload as Record<string, unknown> | undefined;
     if (!payload) {
@@ -99,7 +152,14 @@ export async function handleInsert(request: SystemRequest, ctx: HandlerContext):
     return okResult(request.id, SYSTEM_TYPES.tripleInsert);
 }
 
-export async function handleStats(request: SystemRequest, ctx: HandlerContext): Promise<SystemResult> {
+export async function handleStats(
+    request: SystemRequest,
+    ctx: HandlerContext,
+): Promise<SystemResult> {
+    const denied = await denyUnlessSuperuser(request, ctx, SYSTEM_TYPES.tripleStats);
+    if (denied !== null) {
+        return denied;
+    }
     const store = getStore(ctx);
     const stats = await store.stats(buildServerContext(store));
     return okResult(request.id, SYSTEM_TYPES.tripleStats, stats);

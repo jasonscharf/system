@@ -21,6 +21,8 @@ export type {
     ValidateResult,
 } from "./components/SessionComponent.js";
 export { SessionComponent } from "./components/SessionComponent.js";
+// Canonical session cookie name — the WS upgrade edge reads it to authenticate.
+export { SESSION_COOKIE } from "./constants.js";
 export { LoginAttemptSchema } from "./entities/LoginAttemptSchema.js";
 export { UserDeviceSchema } from "./entities/UserDeviceSchema.js";
 export { UserIdentitySchema } from "./entities/UserIdentitySchema.js";

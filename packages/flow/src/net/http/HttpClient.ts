@@ -46,7 +46,11 @@ export class HttpClient extends FlowComponent {
             if (req === undefined) {
                 break;
             }
-            void this._fetch(req);
+            // Detached fetch: register as in-flight work so FlowApp.stop() drains
+            // it before disposing (graceful-drain contract, TRN-472). _fetch never
+            // rejects — a transport failure surfaces as an error response on the
+            // responses port rather than an unhandled rejection (TRN-528).
+            this.trackInFlight(this._fetch(req));
         }
     }
 
@@ -77,10 +81,24 @@ export class HttpClient extends FlowComponent {
                 body: (await res.text()) || undefined,
             });
         } catch (err) {
+            // A cancelled request (dispose aborts the controller) is expected —
+            // swallow it silently and emit nothing.
             if ((err as Error).name === "AbortError") {
                 return;
             }
-            throw err;
+            // Any other failure (DNS, connection refused, TLS, …) is a
+            // transport-level error. Log it and surface it as an error response
+            // (status 0, the fetch/XHR network-error convention) so the process
+            // survives and downstream can react — never an unhandled rejection.
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`[${this.name}] HTTP request to ${request.url} failed: ${message}`);
+            this.responses.put({
+                requestId: request.requestId,
+                status: 0,
+                statusText: message,
+                headers: {},
+                body: undefined,
+            });
         }
     }
 }

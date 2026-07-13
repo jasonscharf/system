@@ -897,29 +897,25 @@ describe("codec: text/html and text/css content types (switch case coverage)", (
     });
 });
 
-describe("HttpRouter: next() called multiple times throws (line 16)", () => {
-    it("compose throws when next() is called twice — captured via unhandledRejection", async () => {
+describe("HttpRouter: a throwing handler yields a 500 (TRN-528)", () => {
+    it("emits a 500 response draft when middleware throws (no error boundary installed)", async () => {
         const ctx = new FlowContext();
         const router = new HttpRouter({ name: "r", context: ctx });
 
-        let caughtError: Error | undefined;
-        const handler = (err: Error) => {
-            caughtError = err;
-        };
-        process.once("unhandledRejection", handler);
+        // Calling next() twice makes compose() throw. Before TRN-528 this became
+        // an unhandled rejection (process crash) and no response was ever
+        // emitted, leaking the pending ServerResponse. Now it is caught and
+        // turned into a 500 error response draft.
+        router.get("/path", async (_c: HttpCtx, next: () => Promise<void>) => {
+            await next();
+            await next();
+        });
+        router.requests.put(makeRequest("GET", "/path"));
+        router.step();
 
-        try {
-            router.get("/path", async (_c: HttpCtx, next: () => Promise<void>) => {
-                await next();
-                await next();
-            });
-            router.requests.put(makeRequest("GET", "/path"));
-            router.step();
-            await new Promise((r) => setTimeout(r, 30));
-            expect(caughtError?.message).toMatch(/next.*called multiple/i);
-        } finally {
-            process.removeListener("unhandledRejection", handler);
-        }
+        const [resp] = await drain(router);
+        expect(resp.status).toBe(500);
+        expect(resp.requestId).toBe("r1");
     });
 });
 
@@ -1014,29 +1010,42 @@ describe("HttpServer: response with no body (res.end() empty branch)", () => {
     });
 });
 
-describe("HttpClient: AbortError is swallowed silently", () => {
-    it("does not propagate AbortError when request is aborted", async () => {
-        const app = new FlowApp();
+describe("HttpClient: AbortError is swallowed silently (real socket)", () => {
+    it("does not emit a response when an in-flight request is aborted on dispose", async () => {
+        // A real server that accepts the connection but never answers, so the
+        // client's fetch stays in flight until dispose() aborts it.
+        const port = await freePort();
+        const app = new FlowApp({ mode: "push" });
+        const server = new HttpServer({ name: "srv", context: app.context, port });
+        // No downstream wiring: requests pile up in server.requests unanswered.
+        app.addComponent(server);
+        await app.start();
+        app.scheduler.start();
+
         const client = new HttpClient({ name: "cli", context: app.context });
         await client.init();
 
-        const origFetch = globalThis.fetch;
-        globalThis.fetch = (async () => {
-            const err = new Error("The operation was aborted.");
-            err.name = "AbortError";
-            throw err;
-        }) as typeof fetch;
+        client.requests.put({
+            method: "GET",
+            url: `http://127.0.0.1:${port}/hang`,
+            headers: {},
+            requestId: "req-abort",
+        });
+        client.step();
+        expect(client.inFlight).toBe(1);
 
-        try {
-            client.requests.put({ method: "GET", url: "http://localhost/", headers: {} });
-            client.step();
-            await new Promise((r) => setTimeout(r, 30));
-            // AbortError was swallowed — no response put on the port
-            expect(client.responses.size).toBe(0);
-        } finally {
-            globalThis.fetch = origFetch;
-            await client.dispose();
+        // Abort the in-flight fetch. The AbortError must be swallowed: no error
+        // response is emitted and the process survives.
+        await client.dispose();
+
+        const deadline = Date.now() + 500;
+        while (client.inFlight > 0 && Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 10));
         }
+        expect(client.inFlight).toBe(0);
+        expect(client.responses.size).toBe(0);
+
+        await app.stop();
     });
 });
 
@@ -1158,36 +1167,67 @@ describe("HttpRouter: dynamic-route segment matching", () => {
     });
 });
 
-// ── HttpClient: non-AbortError is re-thrown (line 76) ────────────────────────
+// ── HttpClient: transport failure surfaces an error output (TRN-528) ─────────
+//
+// Before TRN-528 the detached fetch was fired with `void this._fetch(req)` and
+// _fetch re-threw any non-abort error. A DNS failure / connection refused thus
+// became an unhandled rejection that crashed the Node process. The fix catches
+// the failure, logs it, emits an error response (status 0) on the responses
+// port, and registers the fetch as in-flight work for graceful drain.
 
-describe("HttpClient: non-AbortError is re-thrown from _fetch", () => {
-    it("re-throws non-AbortError (line 76) — captured via unhandledRejection", async () => {
-        const app = new FlowApp();
+describe("HttpClient: connection failure surfaces an error output (TRN-528)", () => {
+    it("emits a status-0 error response and survives a refused connection (real socket)", async () => {
+        const app = new FlowApp({ mode: "push" });
         const client = new HttpClient({ name: "cli", context: app.context });
-        await client.init();
+        app.addComponent(client);
+        await app.start();
 
-        // Capture the unhandled rejection before vitest sees it
-        let caughtError: Error | undefined;
-        const handler = (err: Error) => {
-            caughtError = err;
-        };
-        process.once("unhandledRejection", handler);
+        // freePort() closes its listener, so nothing is accepting on this port.
+        const deadPort = await freePort();
 
-        const origFetch = globalThis.fetch;
-        globalThis.fetch = (async () => {
-            throw new Error("Network failure"); // name !== 'AbortError' → line 76 throw
-        }) as typeof fetch;
+        client.requests.put({
+            method: "GET",
+            url: `http://127.0.0.1:${deadPort}/`,
+            headers: {},
+            requestId: "req-refused",
+        });
+        client.step(); // fires the detached fetch
 
-        try {
-            client.requests.put({ method: "GET", url: "http://localhost/", headers: {} });
-            client.step();
-            await new Promise((r) => setTimeout(r, 30));
-            expect(caughtError?.message).toBe("Network failure");
-        } finally {
-            process.removeListener("unhandledRejection", handler);
-            globalThis.fetch = origFetch;
-            await client.dispose();
-        }
+        // The fetch is registered as in-flight work (graceful-drain contract).
+        expect(client.inFlight).toBe(1);
+
+        const resp = await waitForMessage(client.responses);
+        expect(resp.requestId).toBe("req-refused");
+        // Transport-level failure surfaces as status 0 (fetch/XHR network-error
+        // convention) rather than crashing the process.
+        expect(resp.status).toBe(0);
+        expect(resp.statusText).toBeTruthy();
+
+        // The in-flight task settled; nothing is left to drain.
+        expect(client.inFlight).toBe(0);
+
+        await app.stop();
+    });
+
+    it("emits a status-0 error response for an unresolvable host (real DNS failure)", async () => {
+        const app = new FlowApp({ mode: "push" });
+        const client = new HttpClient({ name: "cli", context: app.context });
+        app.addComponent(client);
+        await app.start();
+
+        client.requests.put({
+            method: "GET",
+            url: "http://this-host-does-not-exist.invalid/",
+            headers: {},
+            requestId: "req-dns",
+        });
+        client.step();
+
+        const resp = await waitForMessage(client.responses);
+        expect(resp.requestId).toBe("req-dns");
+        expect(resp.status).toBe(0);
+
+        await app.stop();
     });
 });
 
@@ -1308,5 +1348,106 @@ describe("HttpServer: streaming response happy path", () => {
         if (res) {
             expect(res.status).toBe(200);
         }
+    });
+});
+
+// ── HttpRouter: throwing middleware yields a 500 to a real client (TRN-528) ───
+//
+// Full real-socket pipeline with NO error-boundary middleware installed. Before
+// TRN-528 a throwing handler became an unhandled rejection (process crash) and
+// the client's request hung forever with the pending ServerResponse leaked in
+// HttpServer._pending. Now the router catches the error, emits a 500, and the
+// real client receives it.
+
+describe("HttpRouter: throwing middleware yields a 500 to a real client (TRN-528)", () => {
+    let app: FlowApp;
+    let server: HttpServer;
+    let port: number;
+    let baseUrl: string;
+
+    beforeEach(async () => {
+        port = await freePort();
+        baseUrl = `http://127.0.0.1:${port}`;
+
+        app = new FlowApp({ mode: "push" });
+        server = new HttpServer({ name: "server", context: app.context, port });
+        const dec = new HttpDecoder({ name: "dec", context: app.context });
+        const router = new HttpRouter({ name: "router", context: app.context });
+        const enc = new HttpEncoder({ name: "enc", context: app.context });
+
+        // A route whose handler throws, with NO error-boundary middleware.
+        router.get("/boom", async () => {
+            throw new Error("handler exploded");
+        });
+        // A healthy route to prove the server keeps serving afterwards.
+        router.get("/ping", async (c) => {
+            c.body = { pong: true };
+        });
+
+        app.addComponent(server)
+            .addComponent(dec)
+            .addComponent(router)
+            .addComponent(enc)
+            .connect(server.requests, dec.requestIn)
+            .connect(dec.requestOut, router.requests)
+            .connect(router.responses, enc.responseIn)
+            .connect(enc.responseOut, server.responses);
+
+        await app.start();
+        app.scheduler.start();
+    });
+
+    afterEach(async () => {
+        await app.stop();
+    });
+
+    it("responds 500 (not a hung request) when a handler throws", async () => {
+        const res = await fetch(`${baseUrl}/boom`, { signal: AbortSignal.timeout(3000) });
+        expect(res.status).toBe(500);
+        await res.text();
+    });
+
+    it("keeps serving other routes after a handler throws (no pending leak)", async () => {
+        const boom = await fetch(`${baseUrl}/boom`, { signal: AbortSignal.timeout(3000) });
+        expect(boom.status).toBe(500);
+        await boom.text();
+
+        // If the failed request had leaked its pending ServerResponse or crashed
+        // the server, this follow-up would hang / fail.
+        const ping = await fetch(`${baseUrl}/ping`, { signal: AbortSignal.timeout(3000) });
+        expect(ping.status).toBe(200);
+        expect(await ping.json()).toEqual({ pong: true });
+    });
+});
+
+// ── HttpRouter: detached handler is registered for graceful drain (TRN-528) ───
+
+describe("HttpRouter: in-flight work is tracked for graceful drain (TRN-528)", () => {
+    it("reports inFlight while a handler is running and drains to zero after", async () => {
+        const ctx = new FlowContext();
+        const router = new HttpRouter({ name: "r", context: ctx });
+
+        let release: () => void = () => undefined;
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        router.get("/slow", async (c: HttpCtx) => {
+            await gate;
+            c.body = { ok: true };
+        });
+
+        router.requests.put(makeRequest("GET", "/slow"));
+        router.step();
+
+        // The handler is detached and gated open, so it is genuinely in flight.
+        expect(router.inFlight).toBe(1);
+
+        release();
+        const [resp] = await drain(router);
+        expect(resp.status).toBe(200);
+
+        // Let the tracked task settle.
+        await new Promise((r) => setTimeout(r, 0));
+        expect(router.inFlight).toBe(0);
     });
 });

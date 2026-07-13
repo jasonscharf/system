@@ -119,8 +119,11 @@ function connectWs(url: string, headers: Record<string, string>): Promise<Connec
 const ORIGIN = "http://localhost:5173";
 
 describe("TRN-527 — WS triple.* store access is authenticated + superuser-gated", () => {
-    let knex: Knex;
-    let trx: Knex.Transaction;
+    // knex/trx are null until their setup hook succeeds, and the teardown hooks
+    // guard on that: a failed connection or seed then reports the real setup
+    // error instead of cascading a TypeError out of afterEach/afterAll.
+    let knex: Knex | null = null;
+    let trx: Knex.Transaction | null = null;
     let store: TripleStore;
     let ctx: ServerContext;
     let rbac: RbacService;
@@ -131,10 +134,16 @@ describe("TRN-527 — WS triple.* store access is authenticated + superuser-gate
         knex = await pgContext();
     });
     afterAll(async () => {
-        await knex.destroy();
+        if (knex !== null) {
+            await knex.destroy();
+            knex = null;
+        }
     });
 
     beforeEach(async () => {
+        if (knex === null) {
+            throw new Error("Postgres connection was not established in beforeAll");
+        }
         trx = await knex.transaction();
         // Binding the store to the transaction makes even the handlers' internal
         // buildServerContext(store) (no explicit trx) run inside a savepoint of
@@ -165,8 +174,13 @@ describe("TRN-527 — WS triple.* store access is authenticated + superuser-gate
         });
     });
     afterEach(async () => {
-        await trx.rollback();
-        await assertEmptyStore(knex);
+        if (trx !== null && !trx.isCompleted()) {
+            await trx.rollback();
+        }
+        trx = null;
+        if (knex !== null) {
+            await assertEmptyStore(knex);
+        }
     });
 
     // Mint a real session and return its raw bearer token + the user IRI.

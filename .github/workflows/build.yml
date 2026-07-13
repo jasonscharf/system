@@ -49,6 +49,31 @@ jobs:
     permissions:
       contents: read
 
+    # Real Postgres for the Postgres-only suites (repo law: integration tests
+    # hit real infra). The security suite (packages/test/src/security) connects
+    # to postgresql://sys:sys@localhost:5432/sys — its SYS_PG_URL dev default —
+    # so the service credentials must stay in sync with that URL.
+    #
+    # SYS_PG_URL is deliberately NOT exported on the test step: doing so would
+    # switch every dual-engine suite's Postgres leg on, and those suites
+    # currently collide when vitest runs them in parallel against one shared
+    # database (pre-existing debt, tracked as TRN-538). Scope: security suite
+    # only, until TRN-538 isolates the dual-engine suites per worker.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: sys
+          POSTGRES_USER: sys
+          POSTGRES_PASSWORD: sys
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sys -d sys"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
@@ -76,6 +101,8 @@ jobs:
         run: yarn build
 
       - name: Run test suite
+        # No SYS_PG_URL here — see the postgres service comment above. The
+        # security suite reaches the service through its built-in default URL.
         run: yarn test
 
   # ── 2. Build and push Docker images to GHCR ──────────────────────────────────

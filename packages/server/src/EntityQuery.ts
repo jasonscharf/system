@@ -227,10 +227,21 @@ export class EntityQuery<Props extends Record<string, unknown>> {
         return iris;
     }
 
+    /**
+     * The graph every flat type scan runs in: a schema's fixed graphIri wins,
+     * otherwise the caller's tenant graph (null ⇒ DEFAULT_GRAPH).  Mirrors
+     * EntityStore._filterGraph so a query and its store agree on scope; without
+     * it a scan reads across every tenant and leaks foreign rows (TRN-531).
+     */
+    private _scanGraph(ctx: ServerContext): IRI | null {
+        return this._schema.graphIri ?? tenantGraph(ctx, this._schema.graph);
+    }
+
     private async _allEntityIris(ctx: ServerContext): Promise<string[]> {
         const quads = await this._store.find(ctx, {
             predicate: RDF_TYPE,
             object: this._schema.typeIRI,
+            graph: this._scanGraph(ctx),
         });
         return quads.map((q) => (q.subject as IRI).value);
     }
@@ -249,6 +260,7 @@ export class EntityQuery<Props extends Record<string, unknown>> {
         const edgeQuads = await this._store.find(ctx, {
             predicate: def.predicate,
             object: { value: f.targetIri } as IRI,
+            graph: this._scanGraph(ctx),
         });
         const matching = new Set(edgeQuads.map((q) => (q.subject as IRI).value));
         return iris.filter((iri) => matching.has(iri));
@@ -272,7 +284,7 @@ export class EntityQuery<Props extends Record<string, unknown>> {
         const targetSet = new Set(f.targetIris);
         const edgeQuads = await this._store.find(ctx, {
             predicate: def.predicate,
-            graph: this._schema.graphIri ?? tenantGraph(ctx, this._schema.graph),
+            graph: this._scanGraph(ctx),
         });
         const matching = new Set(
             edgeQuads
@@ -298,7 +310,7 @@ export class EntityQuery<Props extends Record<string, unknown>> {
             roots: [{ value: f.rootIri } as IRI],
             predicates: [def.predicate],
             direction: "in",
-            graph: this._schema.graphIri ?? tenantGraph(ctx, this._schema.graph),
+            graph: this._scanGraph(ctx),
         });
         const subtreeSet = new Set(subtree.map((i) => i.value));
         return iris.filter((iri) => subtreeSet.has(iri));
@@ -311,7 +323,11 @@ export class EntityQuery<Props extends Record<string, unknown>> {
         }
 
         const valueNode = toLiteral(f.value);
-        const propQuads = await this._store.find(ctx, { predicate: propIri, object: valueNode });
+        const propQuads = await this._store.find(ctx, {
+            predicate: propIri,
+            object: valueNode,
+            graph: this._scanGraph(ctx),
+        });
         const matchingEntities = new Set(propQuads.map((q) => (q.subject as IRI).value));
 
         return iris.filter((iri) => matchingEntities.has(iri));

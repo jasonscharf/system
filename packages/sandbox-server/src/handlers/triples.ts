@@ -67,6 +67,19 @@ function getStore(ctx: HandlerContext): TripleStore {
 }
 
 /**
+ * Build a ServerContext for a WS handler, carrying the connection's tenant so
+ * store access is scoped to that tenant's graph rather than DEFAULT_GRAPH. The
+ * tenant is resolved per connection upstream and threaded onto HandlerContext;
+ * a null tenant (system / cross-tenant) keeps the un-tenanted default (TRN-531).
+ */
+function contextFor(
+    store: TripleStore,
+    ctx: HandlerContext,
+): ReturnType<typeof buildServerContext> {
+    return buildServerContext(store, { tenantId: ctx.tenantId ?? undefined });
+}
+
+/**
  * The triple.* handlers are raw, graph-wide store access — reading any graph and
  * forging quads (including RBAC grants). They are gated behind superuser
  * membership (TRN-527). Returns an error SystemResult to deny, or null to allow.
@@ -93,8 +106,12 @@ async function denyUnlessSuperuser(
     // same bootstrap pattern AuthService.validateToken uses), not the caller's
     // sec — which would throw for exactly the non-superusers we mean to deny. The
     // caller never sees the membership; we only branch on the boolean.
+    // The read is tenant-scoped (TRN-531): the RBAC seed (Superusers group and
+    // its members) lives in the host's tenant graph, so the membership lookup
+    // must run in the connection's tenant graph to find it. No tenant on the
+    // connection ⇒ DEFAULT_GRAPH, matching an un-tenanted seed.
     const isSuper = await new SuperuserService(rbac).isSuperuser(
-        buildServerContext(getStore(ctx)),
+        contextFor(getStore(ctx), ctx),
         systemSec,
         { userIri: sec.principalIri },
     );
@@ -114,7 +131,7 @@ export async function handleFind(
     }
     const store = getStore(ctx);
     const pattern = patternFromWire(request.payload);
-    const quads = await store.find(buildServerContext(store), pattern);
+    const quads = await store.find(contextFor(store, ctx), pattern);
     return okResult(request.id, SYSTEM_TYPES.tripleFind, { quads });
 }
 
@@ -143,7 +160,7 @@ export async function handleInsert(
     if (object == null) {
         return errResult(request.id, SYSTEM_TYPES.tripleInsert, "Missing or invalid object");
     }
-    await store.insert(buildServerContext(store), {
+    await store.insert(contextFor(store, ctx), {
         subject: subject as IRI | BlankNode,
         predicate: predicate as IRI,
         object: object as RdfTerm,
@@ -161,6 +178,6 @@ export async function handleStats(
         return denied;
     }
     const store = getStore(ctx);
-    const stats = await store.stats(buildServerContext(store));
+    const stats = await store.stats(contextFor(store, ctx));
     return okResult(request.id, SYSTEM_TYPES.tripleStats, stats);
 }

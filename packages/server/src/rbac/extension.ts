@@ -37,9 +37,14 @@ export const rbacExtension: TernExtension = {
     version: "0.1.0",
     description: "Role-based access control — tenants, groups, roles, permissions, grants.",
 
-    async install({ store }: ExtensionInstallContext) {
+    async install({ store, context }: ExtensionInstallContext) {
         const typedStore = store as TripleStore;
-        await seedSystemData(buildServerContext(typedStore), typedStore);
+        // Seed into the app's tenant graph when the host supplies one, so the
+        // system superadmin/superusers/wildcard grant live where authorization
+        // is later checked (AccessChecker is tenant-graph scoped). No tenant ⇒
+        // DEFAULT_GRAPH, preserving the un-tenanted default.
+        const tenantId = typeof context.tenantId === "string" ? context.tenantId : undefined;
+        await seedSystemData(buildServerContext(typedStore, { tenantId }), typedStore);
 
         const rbac = new RbacService({
             store: typedStore,

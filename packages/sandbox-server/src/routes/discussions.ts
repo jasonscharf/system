@@ -15,7 +15,9 @@ import type { RbacService } from "@jasonscharf/server";
 import {
     anonymousSec,
     buildServerContext,
+    resolveTenantId,
     type SecurityContext,
+    type ServerContext,
     systemSec,
 } from "@jasonscharf/server";
 
@@ -23,6 +25,15 @@ import {
 
 function sec(c: HttpCtx): SecurityContext {
     return (c.sec as SecurityContext | undefined) ?? anonymousSec;
+}
+
+/** The request Host header (first value if repeated), or null when absent. */
+function hostOf(c: HttpCtx): string | null {
+    const host = c.req.headers.host;
+    if (Array.isArray(host)) {
+        return host[0] ?? null;
+    }
+    return host ?? null;
 }
 
 function body(c: HttpCtx): Record<string, unknown> {
@@ -36,7 +47,7 @@ function q(c: HttpCtx, key: string): string | undefined {
 // ── Auto-provision ────────────────────────────────────────────────────────────
 
 async function ensureUserProvisioned(
-    ctx: ReturnType<typeof buildServerContext>,
+    ctx: ServerContext,
     rbac: RbacService,
     userSec: SecurityContext,
     userRoleIri: string,
@@ -65,17 +76,28 @@ export function mountDiscussionsRoutes(
     auth: AuthRouterComponent,
     userRoleIri: string,
 ): void {
-    const ctx = buildServerContext(svc.store);
     const sessionMW = auth.sessionMiddleware();
 
-    async function handle(c: HttpCtx, handler: (c: HttpCtx) => Promise<void>): Promise<void> {
+    async function handle(
+        c: HttpCtx,
+        handler: (c: HttpCtx, ctx: ServerContext) => Promise<void>,
+    ): Promise<void> {
         await sessionMW(c, async () => {});
+        // Resolve this request's tenant from its Host header and stamp it on a
+        // fresh per-request ServerContext, so every convos read/write is scoped
+        // to that tenant's named graph instead of the empty DEFAULT_GRAPH the
+        // deprecated flat repositories fell back to. The sandbox configures no
+        // host map, so every host resolves to DEFAULT_SANDBOX_TENANT — the same
+        // tenant the RBAC/convos seed data was installed into at boot (TRN-531).
+        const ctx = buildServerContext(svc.store, {
+            tenantId: resolveTenantId({ host: hostOf(c) }),
+        });
         const userSec = sec(c);
         if (userSec.principalIri) {
             await ensureUserProvisioned(ctx, rbac, userSec, userRoleIri);
         }
         try {
-            await handler(c);
+            await handler(c, ctx);
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
             if (msg.includes("Access denied")) {
@@ -92,7 +114,7 @@ export function mountDiscussionsRoutes(
     // ── Conversations ─────────────────────────────────────────────────────────
 
     router.get("/api/convos/conversations", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             const subjectIri = q(c, "subjectIri");
             if (!subjectIri) {
                 c.status = 400;
@@ -104,7 +126,7 @@ export function mountDiscussionsRoutes(
     );
 
     router.post("/api/convos/conversations", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             const b = body(c);
             const subjectIri = b.subjectIri as string | undefined;
             const title = b.title as string | undefined;
@@ -124,7 +146,7 @@ export function mountDiscussionsRoutes(
     );
 
     router.get("/api/convos/conversations/:id", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             const convo = await svc.getConversation(ctx, sec(c), {
                 conversationId: c.params.id,
             });
@@ -138,7 +160,7 @@ export function mountDiscussionsRoutes(
     );
 
     router.post("/api/convos/conversations/:id/close", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             c.body = (await svc.closeConversation(ctx, sec(c), {
                 conversationId: c.params.id,
             })) ?? { error: "not found" };
@@ -148,7 +170,7 @@ export function mountDiscussionsRoutes(
     // ── Messages ──────────────────────────────────────────────────────────────
 
     router.get("/api/convos/conversations/:id/messages", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             c.body = await svc.getMessagesForConversation(ctx, sec(c), {
                 conversationId: c.params.id,
             });
@@ -156,7 +178,7 @@ export function mountDiscussionsRoutes(
     );
 
     router.post("/api/convos/conversations/:id/messages", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             const b = body(c);
             const content = b.content as string | undefined;
             if (!content) {
@@ -175,7 +197,7 @@ export function mountDiscussionsRoutes(
     );
 
     router.patch("/api/convos/messages/:id", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             const b = body(c);
             const content = b.content as string | undefined;
             if (!content) {
@@ -197,7 +219,7 @@ export function mountDiscussionsRoutes(
     );
 
     router.delete("/api/convos/messages/:id", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             c.body = (await svc.deleteMessage(ctx, sec(c), { messageId: c.params.id })) ?? {
                 error: "not found",
             };
@@ -207,7 +229,7 @@ export function mountDiscussionsRoutes(
     // ── Read receipts ─────────────────────────────────────────────────────────
 
     router.post("/api/convos/conversations/:id/read", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             const b = body(c);
             const userId = (b.userId as string | undefined) ?? sec(c).principalIri ?? "";
             const lastReadMessageId = b.lastReadMessageId as string | undefined;
@@ -225,7 +247,7 @@ export function mountDiscussionsRoutes(
     );
 
     router.get("/api/convos/conversations/:id/unread", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             const userId = q(c, "userId") ?? sec(c).principalIri ?? "";
             c.body = {
                 unread: await svc.getUnreadMessageCount(ctx, sec(c), {
@@ -239,7 +261,7 @@ export function mountDiscussionsRoutes(
     // ── Participants ──────────────────────────────────────────────────────────
 
     router.get("/api/convos/conversations/:id/participants", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             c.body = await svc.getParticipants(ctx, sec(c), { conversationId: c.params.id });
         }),
     );
@@ -247,7 +269,7 @@ export function mountDiscussionsRoutes(
     // ── Notifications ─────────────────────────────────────────────────────────
 
     router.get("/api/convos/notifications", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             const userId = q(c, "userId") ?? sec(c).principalIri ?? "";
             const unreadOnly = q(c, "unreadOnly") === "true";
             c.body = await svc.getNotificationsForUser(ctx, sec(c), { userId, unreadOnly });
@@ -255,7 +277,7 @@ export function mountDiscussionsRoutes(
     );
 
     router.post("/api/convos/notifications/:id/read", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             c.body = await svc.markNotificationRead(ctx, sec(c), {
                 notificationId: c.params.id,
             });
@@ -263,14 +285,14 @@ export function mountDiscussionsRoutes(
     );
 
     router.post("/api/convos/notifications/read-all", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             const userId = (body(c).userId as string | undefined) ?? sec(c).principalIri ?? "";
             c.body = { marked: await svc.markAllNotificationsRead(ctx, sec(c), { userId }) };
         }),
     );
 
     router.post("/api/convos/notifications/:id/dismiss", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             c.body = await svc.dismissNotification(ctx, sec(c), {
                 notificationId: c.params.id,
             });
@@ -280,7 +302,7 @@ export function mountDiscussionsRoutes(
     // ── Current user info ─────────────────────────────────────────────────────
 
     router.get("/api/convos/me", (c) =>
-        handle(c, async (c) => {
+        handle(c, async (c, ctx) => {
             const s = sec(c);
             c.body = {
                 iri: s.principalIri,

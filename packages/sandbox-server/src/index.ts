@@ -39,6 +39,7 @@ import {
 } from "@jasonscharf/flow";
 import {
     buildServerContext,
+    DEFAULT_SANDBOX_TENANT,
     FieldCipherService,
     getRbacService,
     rbacExtension,
@@ -180,7 +181,14 @@ async function main(): Promise<void> {
     );
 
     // ── Application config + infrastructure extensions ───────────────────────
-    const ternApp = await SystemApp.fromYAML(CONFIG, { context: { store } });
+    // Install extensions into the sandbox tenant graph so RBAC and convos seed
+    // data live where per-request authorization is later checked. Every request
+    // resolves to this same tenant (see resolveTenantId / mountDiscussionsRoutes),
+    // so seed and reads share one graph instead of the empty DEFAULT_GRAPH the
+    // deprecated flat repositories fell back to (TRN-531).
+    const ternApp = await SystemApp.fromYAML(CONFIG, {
+        context: { store, tenantId: DEFAULT_SANDBOX_TENANT },
+    });
     const rbacInstalled = await ternApp.use(rbacExtension);
     const convosInstalled = await ternApp.use(convosExtension);
     const rbac = getRbacService(rbacInstalled);

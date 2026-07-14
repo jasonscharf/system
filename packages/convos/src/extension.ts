@@ -49,7 +49,7 @@ export const convosExtension: TernExtension = {
     description: "Conversations, threads, inboxes, notifications, and read receipts.",
     requires: ["tern.rbac"],
 
-    async install({ store, extensions }: ExtensionInstallContext) {
+    async install({ store, context, extensions }: ExtensionInstallContext) {
         const typedStore = store as TripleStore;
 
         const rbacInstalled = extensions.get("tern.rbac");
@@ -58,7 +58,15 @@ export const convosExtension: TernExtension = {
         }
         const rbac = getRbacService(rbacInstalled) as RbacService;
 
-        const convosInstall = await installConvos(buildServerContext(typedStore), rbac);
+        // Seed convos permissions and roles into the host's tenant graph so they
+        // live where per-request authorization is checked (AccessChecker and the
+        // convos repositories are tenant-graph scoped). No tenant ⇒ DEFAULT_GRAPH,
+        // preserving the un-tenanted default. Matches rbacExtension (TRN-531).
+        const tenantId = typeof context.tenantId === "string" ? context.tenantId : undefined;
+        const convosInstall = await installConvos(
+            buildServerContext(typedStore, { tenantId }),
+            rbac,
+        );
 
         const notificationRepo = new NotificationRepository(typedStore);
 

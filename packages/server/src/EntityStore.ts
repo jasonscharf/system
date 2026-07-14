@@ -602,16 +602,22 @@ export class EntityStore {
             const subjects = iris.map((iri) => ({ value: iri }) as IRI);
             const bySubject = await this._store.findForSubjects(txCtx, subjects, graph);
             const tsBySubject = await this._store.entityTimestamps(txCtx, subjects, graph);
-            return iris.map((iri) =>
-                this._recordFromQuads(
-                    txCtx,
-                    schema,
-                    idFromIri(iri),
-                    iri,
-                    bySubject.get(iri) ?? [],
-                    tsBySubject.get(iri),
-                ),
-            );
+            // Drop subjects that carry no rdf:type quad for this schema in the
+            // scoped graph. A foreign-tenant subject may share an IRI but has no
+            // type triple here; without this it would surface as an empty ghost
+            // record (an existence + IRI/id leak across the tenant boundary).
+            return iris
+                .filter((iri) => hasTypeQuad(bySubject.get(iri), schema.typeIRI))
+                .map((iri) =>
+                    this._recordFromQuads(
+                        txCtx,
+                        schema,
+                        idFromIri(iri),
+                        iri,
+                        bySubject.get(iri) ?? [],
+                        tsBySubject.get(iri),
+                    ),
+                );
         });
     }
 
@@ -989,6 +995,22 @@ function objectIri(object: Quad["object"]): string | null {
         return (object as IRI).value;
     }
     return null;
+}
+
+/**
+ * True when `quads` (a subject's quads within one graph) contain the rdf:type
+ * triple for `typeIRI`.  Used to reject subjects with no type quad in the scoped
+ * graph so foreign-tenant IRIs never hydrate into ghost records.
+ */
+function hasTypeQuad(quads: Quad[] | undefined, typeIRI: IRI): boolean {
+    if (!quads) {
+        return false;
+    }
+    return quads.some(
+        (q) =>
+            (q.predicate as IRI).value === RDF_TYPE.value &&
+            (q.object as IRI)?.value === typeIRI.value,
+    );
 }
 
 // ── Edge write helpers ──────────────────────────────────────────────────────────

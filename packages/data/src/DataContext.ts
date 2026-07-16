@@ -14,6 +14,40 @@ export interface SqliteConfig {
     readonly filename: string;
 }
 
+/**
+ * Connection-pool bounds for a Postgres DataContext.
+ *
+ * Each caller sizes this for ITS OWN workload rather than inheriting a single
+ * global cap: a test file that opens many pools concurrently against one shared
+ * Postgres wants a small pool so it does not starve the server, whereas a
+ * production worker managing many domains needs enough connections to service
+ * its concurrent per-domain work without the pool wedging. Only the fields a
+ * caller sets are applied; the rest fall back to DEFAULT_PG_POOL.
+ */
+export interface PgPoolConfig {
+    /** Minimum idle connections the pool keeps open. */
+    readonly min?: number;
+    /** Maximum connections the pool may open. */
+    readonly max?: number;
+    /**
+     * How long (ms) an acquire waits for a free connection before rejecting with
+     * "Timeout acquiring a connection". Shorter values surface a saturated pool
+     * as a fast, logged error instead of a 60s stall.
+     */
+    readonly acquireTimeoutMillis?: number;
+}
+
+/**
+ * Conservative default pool, used when a PgConfig does not set its own `pool`.
+ *
+ * Deliberately small: many test files open pools concurrently against one
+ * Postgres, so an unbounded default (min 2, max 10) would starve the shared
+ * server. This is a TEST-safe default, NOT a production sizing — a production
+ * caller (e.g. a worker managing many domains) must pass an explicit, larger
+ * `pool` sized for its load rather than inherit this cap.
+ */
+export const DEFAULT_PG_POOL = { min: 0, max: 4 } as const;
+
 export interface PgConfig {
     readonly client: "pg";
     readonly host: string;
@@ -21,6 +55,11 @@ export interface PgConfig {
     readonly database: string;
     readonly user: string;
     readonly password: string;
+    /**
+     * Connection-pool bounds sized for this caller's workload. Omitted ⇒
+     * DEFAULT_PG_POOL (a test-safe cap). Production callers size this explicitly.
+     */
+    readonly pool?: PgPoolConfig;
 }
 
 export type DataConfig = SqliteConfig | PgConfig;
@@ -55,10 +94,17 @@ export async function createDataContext(config: DataConfig): Promise<Knex> {
                 user: config.user,
                 password: config.password,
             },
-            // Cap per-context pools and don't hoard idle connections — many test
-            // files open pools concurrently against one Postgres, so an
-            // unbounded default pool (min 2, max 10) starves the shared server.
-            pool: { min: 0, max: 4 },
+            // Pool bounds come from the caller (sized for its workload), falling
+            // back to the test-safe DEFAULT_PG_POOL. Only the fields the caller
+            // set are applied; acquireTimeoutMillis is left to knex's default
+            // unless the caller opts into a shorter, fail-fast timeout.
+            pool: {
+                min: config.pool?.min ?? DEFAULT_PG_POOL.min,
+                max: config.pool?.max ?? DEFAULT_PG_POOL.max,
+                ...(config.pool?.acquireTimeoutMillis !== undefined
+                    ? { acquireTimeoutMillis: config.pool.acquireTimeoutMillis }
+                    : {}),
+            },
         });
     }
 

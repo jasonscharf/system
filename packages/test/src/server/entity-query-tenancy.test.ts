@@ -135,6 +135,26 @@ describe("EntityQuery — cross-tenant isolation (Postgres)", () => {
         expect(await owner.count(ctx(TENANT_B))).toBe(1);
     });
 
+    it("acrossTenants() is the explicit cross-tenant view: sees every tenant's entities", async () => {
+        await entityStore.create(ctx(TENANT_A), AccountSchema, {
+            email: "alice@x.com",
+            name: "Alice",
+        });
+        await entityStore.create(ctx(TENANT_B), AccountSchema, { email: "bob@x.com", name: "Bob" });
+
+        // A tenant-scoped ctx still counts/lists ONLY its own graph...
+        expect(await ctx(TENANT_A).entities(AccountSchema).count(ctx(TENANT_A))).toBe(1);
+
+        // ...while the sanctioned cross-tenant mode sees both, fully hydrated.
+        const query = ctx(TENANT_A).entities(AccountSchema).acrossTenants();
+        expect(await query.count(ctx(TENANT_A))).toBe(2);
+        const all = await ctx(TENANT_B)
+            .entities(AccountSchema)
+            .acrossTenants()
+            .all(ctx(TENANT_B));
+        expect(all.map((r) => r.props.email).sort()).toEqual(["alice@x.com", "bob@x.com"]);
+    });
+
     it("hydrateMany drops a foreign-tenant subject instead of returning a ghost record", async () => {
         const bob = await entityStore.create(ctx(TENANT_B), AccountSchema, {
             email: "bob@x.com",

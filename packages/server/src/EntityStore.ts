@@ -36,6 +36,16 @@ import { tenantGraph, tenantGraphForInsert } from "./tenancy.js";
 
 // ── EntityStore ───────────────────────────────────────────────────────────────
 
+/** Options for hydrateMany. */
+export interface HydrateManyOptions {
+    /**
+     * Hydrate each subject from its home graph instead of the caller's tenant
+     * graph — set by EntityQuery.acrossTenants() for sanctioned cross-tenant
+     * system surfaces.  Never set this on a request path (TRN-531).
+     */
+    acrossTenants?: boolean;
+}
+
 export class EntityStore {
     private _cvsInstance: CollectionViewStore | null = null;
 
@@ -595,9 +605,12 @@ export class EntityStore {
         ctx: ServerContext,
         schema: EntitySchema<Props>,
         iris: string[],
+        opts?: HydrateManyOptions,
     ): Promise<EntityRecord<Props>[]> {
         return this._withTrx(ctx, async (txCtx) => {
-            const graph = this._filterGraph(txCtx, schema);
+            // acrossTenants (EntityQuery's sanctioned cross-tenant mode) omits
+            // the graph filter so each subject hydrates from its home graph.
+            const graph = opts?.acrossTenants ? undefined : this._filterGraph(txCtx, schema);
             // Single round-trip for all subjects — no per-IRI N+1.
             const subjects = iris.map((iri) => ({ value: iri }) as IRI);
             const bySubject = await this._store.findForSubjects(txCtx, subjects, graph);

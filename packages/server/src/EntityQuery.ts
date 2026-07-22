@@ -52,6 +52,7 @@ export class EntityQuery<Props extends Record<string, unknown>> {
     private _order?: OrderClause;
     private _limit?: number;
     private _offset?: number;
+    private _acrossTenants = false;
 
     constructor(
         private readonly _store: TripleStore,
@@ -66,6 +67,19 @@ export class EntityQuery<Props extends Record<string, unknown>> {
 
     where(prop: keyof Props & string, op: FilterOp, value: unknown): this {
         this._filters.push({ prop, op, value });
+        return this;
+    }
+
+    /**
+     * Read across EVERY tenant graph instead of the caller's own — the
+     * sanctioned escape hatch for system surfaces (superuser dashboards,
+     * install-wide metrics) whose whole point is a cross-tenant view.  The
+     * caller is responsible for gating access (e.g. behind a superuser guard);
+     * request paths must never use this — they stay scoped to ctx.tenantId
+     * (TRN-531).  Scans and hydration omit the graph filter entirely.
+     */
+    acrossTenants(): this {
+        this._acrossTenants = true;
         return this;
     }
 
@@ -140,7 +154,9 @@ export class EntityQuery<Props extends Record<string, unknown>> {
 
             const otherFilters = this._filters.filter((f) => f.op !== "=");
 
-            let records = await this._es.hydrateMany(txCtx, this._schema, candidateIris);
+            let records = await this._es.hydrateMany(txCtx, this._schema, candidateIris, {
+                acrossTenants: this._acrossTenants,
+            });
 
             for (const f of otherFilters) {
                 records = records.filter((r) => this._matchFilter(r, f));
@@ -232,8 +248,12 @@ export class EntityQuery<Props extends Record<string, unknown>> {
      * otherwise the caller's tenant graph (null ⇒ DEFAULT_GRAPH).  Mirrors
      * EntityStore._filterGraph so a query and its store agree on scope; without
      * it a scan reads across every tenant and leaks foreign rows (TRN-531).
+     * In acrossTenants() mode the filter is omitted entirely (all graphs).
      */
-    private _scanGraph(ctx: ServerContext): IRI | null {
+    private _scanGraph(ctx: ServerContext): IRI | null | undefined {
+        if (this._acrossTenants) {
+            return undefined;
+        }
         return this._schema.graphIri ?? tenantGraph(ctx, this._schema.graph);
     }
 

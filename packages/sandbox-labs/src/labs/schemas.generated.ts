@@ -9,8 +9,8 @@ export const UserSchema: EntitySchema = new EntitySchema({
     ns: "urn:sys:core:auth:",
     properties: {
         email: new IRI("urn:sys:core:auth:email"),
-        displayName: new IRI("urn:sys:core:auth:displayName"),
-        avatarUrl: new IRI("urn:sys:core:auth:avatarUrl"),
+        displayName: { iri: new IRI("urn:sys:core:auth:displayName"), pii: true },
+        avatarUrl: { iri: new IRI("urn:sys:core:auth:avatarUrl"), pii: true },
         analyticsRole: new IRI("urn:sys:ext:labs:analyticsRole"),
         lastActiveAt: new IRI("urn:sys:ext:labs:lastActiveAt"),
         consentedToTracking: new IRI("urn:sys:ext:labs:consentedToTracking"),

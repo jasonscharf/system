@@ -4,12 +4,17 @@
  * Tern codegen CLI
  *
  * Zero-config usage (recommended):
- *   tern-codegen             # auto-discover tern-gen.json, generate once
- *   tern-codegen --watch     # auto-discover tern-gen.json, re-run on any change
+ *   tern-codegen             # read the `tern` manifest in package.json, generate once
+ *   tern-codegen --watch     # same, re-running on any ontology or manifest change
  *
- * Explicit config:
- *   tern-codegen --config <tern-gen.json>
- *   tern-codegen --config <tern-gen.json> --watch
+ * The manifest drives every codegen target the package declares, so a package
+ * owning four bounded contexts regenerates them all with one command.  Watch mode
+ * watches every ontology reachable from the manifest — previously it auto-discovered
+ * a single `tern-gen.json` and silently ignored a package's other ontologies.
+ *
+ * Explicit config (legacy sidecar, still supported for ad-hoc configs):
+ *   tern-codegen --config <config.json>
+ *   tern-codegen --config <config.json> --watch
  *
  * Single-file (legacy):
  *   tern-codegen <file.ttl>
@@ -18,9 +23,9 @@
  * Downstream packages just need this in package.json:
  *   "scripts": { "gen": "tern-codegen", "gen:watch": "tern-codegen --watch" }
  */
-import { access } from "node:fs/promises";
 import path from "node:path";
 import { generate, generateFromConfig } from "./generate.js";
+import { findManifest, generateFromManifest, manifestInputs, readManifest } from "./manifest.js";
 
 const [, , ...args] = process.argv;
 
@@ -43,17 +48,18 @@ if (configIdx !== -1) {
     }
     await runConfig(path.resolve(configPath), watchMode);
 } else if (cleanArgs.length === 0) {
-    // Zero-arg: auto-discover tern-gen.json
-    const configPath = await findConfig(process.cwd());
-    if (!configPath) {
+    // Zero-arg: discover the `tern` manifest in package.json
+    const packageJsonPath = await findManifest(process.cwd());
+    if (!packageJsonPath) {
         console.error(
-            "[gen] No tern-gen.json found in current directory or any parent.\n" +
-                "      Create a tern-gen.json or run: tern-codegen --config <path>",
+            '[gen] No package.json with a "tern" manifest found in this directory or any parent.\n' +
+                '      Add a "tern" field to package.json (see packages/core/package.json),\n' +
+                "      or run: tern-codegen --config <path>",
         );
         process.exit(1);
     }
-    console.log(`[gen] Using ${path.relative(process.cwd(), configPath)}`);
-    await runConfig(configPath, watchMode);
+    console.log(`[gen] Using ${path.relative(process.cwd(), packageJsonPath)}`);
+    await runManifest(packageJsonPath, watchMode);
 } else {
     // Legacy single-file mode
     if (watchMode) {
@@ -105,20 +111,32 @@ async function runConfig(configPath: string, watch: boolean): Promise<void> {
     );
 }
 
-/** Walk up from startDir until tern-gen.json is found, or return null. */
-async function findConfig(startDir: string): Promise<string | null> {
-    let dir = startDir;
-    while (true) {
-        const candidate = path.join(dir, "tern-gen.json");
-        try {
-            await access(candidate);
-            return candidate;
-        } catch {
-            const parent = path.dirname(dir);
-            if (parent === dir) {
-                return null;
-            }
-            dir = parent;
-        }
+/**
+ * Runs a package's `tern` manifest, optionally re-running whenever any ontology,
+ * shapes file, or the manifest itself changes.
+ */
+async function runManifest(packageJsonPath: string, watch: boolean): Promise<void> {
+    if (!watch) {
+        await generateFromManifest(packageJsonPath);
+        return;
     }
+
+    const loaded = await readManifest(packageJsonPath);
+    if (loaded === null) {
+        console.error(`[gen] ${packageJsonPath} declares no "tern" manifest.`);
+        process.exit(1);
+    }
+
+    // Watch every input the manifest reaches, so a package with several bounded
+    // contexts re-generates all of them on any ontology change.
+    const watchTargets = manifestInputs(loaded);
+    const { default: chokidar } = await import("chokidar");
+    const run = () => generateFromManifest(packageJsonPath).catch(console.error);
+
+    const watcher = chokidar.watch(watchTargets, { ignoreInitial: false });
+    watcher.on("add", run);
+    watcher.on("change", run);
+    console.log(
+        `[gen] Watching ${watchTargets.map((t) => path.relative(process.cwd(), t)).join(", ")} ...`,
+    );
 }

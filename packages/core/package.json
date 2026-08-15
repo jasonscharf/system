@@ -40,7 +40,7 @@
     },
     "scripts": {
         "build": "yarn compile",
-        "gen": "tern-codegen --config tern-gen.json && tern-codegen --config tern-gen-rbac.json && tern-codegen --config tern-gen-tenancy.json && tern-codegen --config tern-gen-licensing.json",
+        "gen": "tern-codegen",
         "gen:watch": "tern-codegen --watch",
         "compile": "tsc -b",
         "clean": "rm -rf dist && rm tsconfig.tsbuildinfo",
@@ -51,5 +51,95 @@
     "dependencies": {
         "reflect-metadata": "^0.1.14",
         "typescript-ioc": "^3.2.2"
+    },
+    "tern": {
+        "extension": "urn:sys:core",
+        "requires": [],
+        "targets": [
+            {
+                "name": "auth",
+                "extensions": [
+                    "./ontology/auth.ttl"
+                ],
+                "shapes": [
+                    "./ontology/auth.shacl.ttl"
+                ],
+                "localNamespace": "urn:sys:core:auth:",
+                "iriImport": "../semantics/IRI.js",
+                "out": "./src/auth/types.generated.ts"
+            },
+            {
+                "name": "rbac",
+                "extensions": [
+                    "./ontology/rbac.ttl"
+                ],
+                "shapes": [
+                    "./ontology/rbac.shacl.ttl"
+                ],
+                "localNamespace": "urn:sys:core:rbac:",
+                "iriImport": "../semantics/IRI.js",
+                "out": "./src/rbac/types.generated.ts"
+            },
+            {
+                "name": "tenancy",
+                "bases": [
+                    {
+                        "ontology": "./ontology/auth.ttl",
+                        "package": "../auth/types.generated.js"
+                    },
+                    {
+                        "ontology": "./ontology/licensing.ttl",
+                        "package": "../licensing/types.generated.js"
+                    }
+                ],
+                "extensions": [
+                    "./ontology/tenancy.ttl"
+                ],
+                "shapes": [],
+                "localNamespace": "urn:sys:core:tenancy:",
+                "iriImport": "../semantics/IRI.js",
+                "out": "./src/tenancy/types.generated.ts"
+            },
+            {
+                "name": "licensing",
+                "extensions": [
+                    "./ontology/licensing.ttl"
+                ],
+                "shapes": [
+                    "./ontology/licensing.shacl.ttl"
+                ],
+                "localNamespace": "urn:sys:core:licensing:",
+                "iriImport": "../semantics/IRI.js",
+                "out": "./src/licensing/types.generated.ts"
+            },
+            {
+                "name": "superuser",
+                "bases": [
+                    {
+                        "ontology": "./ontology/auth.ttl",
+                        "package": "../auth/types.generated.js"
+                    }
+                ],
+                "extensions": [
+                    "./ontology/superuser.ttl"
+                ],
+                "shapes": [
+                    "./ontology/superuser.shacl.ttl"
+                ],
+                "localNamespace": "urn:sys:core:superuser:",
+                "iriImport": "../semantics/IRI.js",
+                "out": "./src/superuser/types.generated.ts"
+            },
+            {
+                "name": "core",
+                "extensions": [
+                    "./ontology/core.ttl"
+                ],
+                "shapes": [],
+                "localNamespace": "urn:sys:core:core:",
+                "iriImport": "../semantics/IRI.js",
+                "out": "./src/core/types.generated.ts"
+            }
+        ]
     }
 }

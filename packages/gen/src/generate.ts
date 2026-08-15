@@ -77,7 +77,7 @@ function biomeBin(): string | null {
  * Formats a freshly written generated file with biome (format + organize imports),
  * so codegen output matches the surrounding codebase.  No-op when biome is absent.
  */
-function formatGenerated(filePath: string): void {
+export function formatGenerated(filePath: string): void {
     const bin = biomeBin();
     if (bin === null) {
         return;
@@ -114,7 +114,18 @@ async function parseFile(filePath: string): Promise<Triple[]> {
 export async function generateFromConfig(configPath: string): Promise<void> {
     const dir = path.dirname(path.resolve(configPath));
     const config = JSON.parse(await readFile(configPath, "utf-8")) as GenConfig;
+    await generateTarget(dir, config);
+}
 
+/**
+ * Runs one codegen target: parses its ontologies and emits whichever of
+ * types / shapes / schemas the target declares.
+ *
+ * `dir` is the directory every relative path in `config` resolves against — the
+ * package directory for a manifest target, or the config file's directory for a
+ * legacy `--config` run.
+ */
+export async function generateTarget(dir: string, config: GenConfig): Promise<void> {
     const externalClasses = new Map<string, string>(); // classIRI → importPath
     // classIRI → the EntitySchema to import when an edge targets a base class.
     const schemaImports = new Map<string, { importPath: string; schemaName: string }>();

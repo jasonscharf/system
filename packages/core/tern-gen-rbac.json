@@ -1,8 +1,0 @@
-{
-    "bases": [],
-    "extensions": ["./ontology/rbac.ttl"],
-    "shapes": ["./ontology/rbac.shacl.ttl"],
-    "localNamespace": "urn:sys:core:rbac:",
-    "iriImport": "../semantics/IRI.js",
-    "out": "./src/rbac/types.generated.ts"
-}

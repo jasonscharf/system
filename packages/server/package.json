@@ -28,7 +28,9 @@
         "build": "yarn compile",
         "compile": "tsc -b",
         "clean": "rm -rf dist && rm -f tsconfig.tsbuildinfo",
-        "typecheck": "tsc -p tsconfig.json --noEmit"
+        "typecheck": "tsc -p tsconfig.json --noEmit",
+        "gen": "tern-codegen",
+        "gen:watch": "tern-codegen --watch"
     },
     "dependencies": {
         "@jasonscharf/app": "workspace:^",
@@ -37,5 +39,26 @@
         "@jasonscharf/entities": "workspace:^",
         "@jasonscharf/gen": "workspace:^",
         "knex": "^3.1.0"
+    },
+    "tern": {
+        "extension": "urn:sys:ext:rbac",
+        "requires": [
+            "urn:sys:core"
+        ],
+        "extensions": [
+            "../core/ontology/rbac.ttl"
+        ],
+        "shapes": [
+            "../core/ontology/rbac.shacl.ttl"
+        ],
+        "localNamespace": "urn:sys:core:rbac:",
+        "idSegments": {
+            "Install": "install",
+            "UserGroup": "group",
+            "ServiceAccount": "sa",
+            "PolicyGrant": "grant",
+            "ResourceNode": "resource"
+        },
+        "schemasOut": "./src/rbac/schemas.generated.ts"
     }
 }

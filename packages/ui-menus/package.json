@@ -75,5 +75,25 @@
         "@jasonscharf/entities": "workspace:^",
         "@jasonscharf/gen": "workspace:^",
         "react-native-web": "^0.21.2"
+    },
+    "tern": {
+        "extension": "urn:sys:ui:menus",
+        "requires": [
+            "urn:sys:core"
+        ],
+        "extensions": [
+            "./ontology/menus.ttl"
+        ],
+        "shapes": [
+            "./ontology/menus.shacl.ttl"
+        ],
+        "localNamespace": "urn:sys:ui:",
+        "idSegments": {
+            "MenuItem": "item"
+        },
+        "out": "./src/types.generated.ts",
+        "shapesOut": "./src/shapes.generated.ts",
+        "schemasOut": "./src/schemas.generated.ts",
+        "extensionOut": "./src/extension.generated.ts"
     }
 }

@@ -29,5 +29,29 @@
         "@jasonscharf/core": "workspace:^",
         "@jasonscharf/entities": "workspace:^",
         "@jasonscharf/gen": "workspace:^"
+    },
+    "tern": {
+        "extension": "urn:sys:ext:labs",
+        "requires": [
+            "urn:sys:core"
+        ],
+        "bases": [
+            {
+                "ontology": "../core/ontology/auth.ttl",
+                "package": "@jasonscharf/core",
+                "importPath": "@jasonscharf/core"
+            }
+        ],
+        "extensions": [
+            "./ontology/labs.ttl"
+        ],
+        "shapes": [
+            "./ontology/labs.shacl.ttl"
+        ],
+        "localNamespace": "urn:sys:ext:labs:",
+        "out": "./src/labs/types.generated.ts",
+        "shapesOut": "./src/labs/shapes.generated.ts",
+        "schemasOut": "./src/labs/schemas.generated.ts",
+        "extensionOut": "./src/labs/extension.generated.ts"
     }
 }

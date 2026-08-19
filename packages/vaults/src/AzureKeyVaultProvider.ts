@@ -91,9 +91,17 @@ export class AzureKeyVaultProvider implements ISecretsProvider {
             const code =
                 (err as { code?: string; statusCode?: number }).code ??
                 String((err as { statusCode?: number }).statusCode);
-            if (code === "SecretNotFound" || code === "404") {
-                // Not in the vault — fall back to the matching env var so plain
-                // ConfigMap config resolves through the same call as real secrets.
+            // A disabled secret is unavailable, not misconfigured: Key Vault
+            // answers 403 with an inner SecretDisabled code. Match that inner
+            // code specifically — a bare 403 is a genuine RBAC failure and must
+            // stay fatal rather than silently resolving to the env fallback.
+            const innerCode = (
+                err as { details?: { error?: { innerError?: { code?: string } } } }
+            ).details?.error?.innerError?.code;
+            if (code === "SecretNotFound" || code === "404" || innerCode === "SecretDisabled") {
+                // Not available in the vault — fall back to the matching env var
+                // so plain ConfigMap config resolves through the same call as
+                // real secrets.
                 return this._envFallback(key);
             }
             throw err;

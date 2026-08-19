@@ -100,6 +100,38 @@ jobs:
       - name: Build all packages
         run: yarn build
 
+      - name: Verify generated files are up to date
+        # Codegen is the source of truth: every *.generated.ts is derived from
+        # the .ttl ontologies via the `tern` manifest in each package.json, and
+        # the output is checked in. Regenerate everything and fail if the tree
+        # moved: that catches both a hand-edited generated file and a .ttl
+        # change that was never regenerated.
+        #
+        # Runs after the build because tern-codegen is a workspace binary
+        # compiled from packages/gen.
+        run: |
+          set -euo pipefail
+          yarn workspaces foreach --all run gen
+          # --intent-to-add so a brand new generated file that was never
+          # committed shows up in the diff instead of passing as untracked.
+          git add --intent-to-add .
+          if git diff --exit-code; then
+            echo "Generated files are up to date."
+            exit 0
+          fi
+          stale=$(git diff --name-only)
+          echo "::error::Generated files are stale. Codegen output differs from what is committed."
+          echo ""
+          echo "Stale file(s):"
+          echo "${stale}" | sed 's/^/  /'
+          echo ""
+          echo "These files are generated from the .ttl ontologies and must not be edited by hand."
+          echo "To fix, run this at the repo root and commit the result:"
+          echo ""
+          echo "  yarn workspaces foreach --all run gen"
+          echo ""
+          exit 1
+
       - name: Run test suite
         # No SYS_PG_URL here — see the postgres service comment above. The
         # security suite reaches the service through its built-in default URL.

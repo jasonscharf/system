@@ -52,6 +52,9 @@
         "reflect-metadata": "^0.1.14",
         "typescript-ioc": "^3.2.2"
     },
+    "devDependencies": {
+        "@jasonscharf/gen": "workspace:^"
+    },
     "tern": {
         "extension": "urn:sys:core",
         "requires": [],

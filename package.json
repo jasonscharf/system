@@ -25,7 +25,6 @@
         "typecheck": "yarn workspaces foreach -pt run typecheck",
         "watch": "tsc -b -w --preserveWatchOutput",
         "watch:reload": "node dev.watch.js",
-        "gen": "yarn workspace @system/gen",
         "aliases": "--- Workspace aliases ---",
         "api": "yarn workspace @system/api",
         "core": "yarn workspace @system/core",

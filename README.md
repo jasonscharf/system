@@ -105,17 +105,19 @@ Each suite runs inside a rolled-back transaction, so no cleanup is needed betwee
 
 ## Codegen
 
-Tern generates TypeScript types from RDF/SHACL ontologies. To run codegen across all packages that have a `tern-gen.json`:
+Tern generates TypeScript types from RDF/SHACL ontologies. Each ontology-owning package declares its targets in the `tern` manifest in its own `package.json`. To run codegen across every such package:
 
 ```bash
-yarn gen
+yarn workspaces foreach --all run gen
 ```
 
 Individual package:
 
 ```bash
-yarn gen packages/auth
+yarn workspace @jasonscharf/core run gen
 ```
+
+Generated files are checked in, and CI regenerates them and fails on any diff, so a hand-edited `*.generated.ts` or an unregenerated `.ttl` change is caught in the build.
 
 
 ## Type-checking

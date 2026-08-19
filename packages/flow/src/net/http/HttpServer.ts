@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { getLogger, uuidv4Binary } from "@jasonscharf/core";
+import { getLog, uuidv4Binary } from "@jasonscharf/core";
 import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
 import type { FlowPort } from "../../FlowPort.js";
 import { wire } from "../../FlowTransport.js";
@@ -13,7 +13,7 @@ import type {
     HttpStreamResponse,
 } from "./HttpTypes.js";
 
-const log = getLogger("HttpServer");
+const log = getLog("sys:flow:http:server");
 
 /** Default maximum inbound request body size: 1 MiB. */
 export const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
@@ -308,7 +308,7 @@ export class HttpServer extends FlowComponent {
             // the only correct signal is to destroy the socket; log the cause so
             // the failure is not silently swallowed (TRN-528).
             const message = err instanceof Error ? err.message : String(err);
-            log.error("streaming response failed", {
+            log.error("stream-failed", "Streaming response failed", {
                 component: this.name,
                 requestId: response.requestId,
                 error: message,

@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 import {
     anonymousSec,
     errResult,
-    getLogger,
+    getLog,
     resolveModuleRef,
     type SecurityContext,
     type SystemRequest,
@@ -13,7 +13,7 @@ import {
 import type { HandlerEntry } from "../config/types.js";
 import type { Dispatcher } from "../routing/Dispatcher.js";
 
-const log = getLogger("HandlerRegistry");
+const log = getLog("sys:app:handler-registry");
 
 /**
  * The contract every handler function must satisfy.
@@ -152,7 +152,7 @@ export class HandlerRegistry implements Dispatcher {
                 }
             } catch (err) {
                 // Log the failure and try the next registered handler
-                log.error("handler threw, trying the next one", {
+                log.error("handler-threw", "Handler threw, trying the next one", {
                     moduleUrl: entry.moduleUrl,
                     exportName: entry.exportName,
                     error: err instanceof Error ? err.message : String(err),

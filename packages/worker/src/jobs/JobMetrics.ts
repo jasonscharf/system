@@ -22,11 +22,11 @@
  * the call site.
  */
 
-import { getLogger } from "@jasonscharf/core";
+import { getLog } from "@jasonscharf/core";
 import type { Knex } from "knex";
 import { METRICS_CONSECUTIVE_FAILURE_ALERT_THRESHOLD } from "../config.js";
 
-const log = getLogger("JobMetrics");
+const log = getLog("sys:worker:job-metrics");
 
 /** Terminal run statuses, most-recent-first folding stops/continues on these. */
 const TERMINAL_STATUSES = ["succeeded", "failed", "dead"] as const;
@@ -162,7 +162,7 @@ export interface EmitJobMetricsOptions {
 }
 
 const _defaultSink: MetricLogSink = (alert) => {
-    log.warn(alert.message);
+    log.warn("alert", alert.message);
 };
 
 /**

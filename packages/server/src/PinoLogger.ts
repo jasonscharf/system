@@ -3,7 +3,7 @@
  * Logging.
  *
  * This is the ONLY module in the platform that imports pino. Everything else
- * goes through `getLogger()` from @jasonscharf/core, so replacing pino is a
+ * goes through `getLog()` from @jasonscharf/core, so replacing pino is a
  * change to this file and the one `bindService` call at boot. It lives in
  * @jasonscharf/server rather than @jasonscharf/core because core is also loaded
  * in the browser, and pino has no business in a browser bundle.
@@ -22,6 +22,10 @@
  * So the level formatter emits `severity` and `messageKey` is `message`. Every
  * other field rides along as jsonPayload, which is what makes `jsonPayload.name`
  * and `jsonPayload.correlationId` queryable in the Logs Explorer.
+ *
+ * `code` is written as a first-class field next to `name`, so the pair that
+ * identifies a log line is two equality filters and never a substring match on
+ * the message.
  */
 import { bindService, LOGGER_NAME_KEY, type Logger, SystemLogger } from "@jasonscharf/core";
 import { type Logger as PinoBaseLogger, pino } from "pino";
@@ -61,7 +65,7 @@ export class PinoLogger implements Logger {
     /**
      * pino `child()` pre-serializes its bindings, so a per-name child is
      * meaningfully cheaper than re-serializing `name` on every line. Names come
-     * from `getLogger()` calls, which are module-scoped and therefore a small,
+     * from `getLog()` calls, which are module-scoped and therefore a small,
      * bounded set.
      */
     private readonly _children = new Map<string, PinoBaseLogger>();
@@ -81,20 +85,20 @@ export class PinoLogger implements Logger {
         );
     }
 
-    debug(msg: string, meta?: Record<string, unknown>): void {
-        this._write("debug", msg, meta);
+    debug(code: string, msg: string, meta?: Record<string, unknown>): void {
+        this._write("debug", code, msg, meta);
     }
 
-    info(msg: string, meta?: Record<string, unknown>): void {
-        this._write("info", msg, meta);
+    info(code: string, msg: string, meta?: Record<string, unknown>): void {
+        this._write("info", code, msg, meta);
     }
 
-    warn(msg: string, meta?: Record<string, unknown>): void {
-        this._write("warn", msg, meta);
+    warn(code: string, msg: string, meta?: Record<string, unknown>): void {
+        this._write("warn", code, msg, meta);
     }
 
-    error(msg: string, meta?: Record<string, unknown>): void {
-        this._write("error", msg, meta);
+    error(code: string, msg: string, meta?: Record<string, unknown>): void {
+        this._write("error", code, msg, meta);
     }
 
     /** Flush buffered lines. Call before a deliberate exit so nothing is lost. */
@@ -109,23 +113,19 @@ export class PinoLogger implements Logger {
      */
     private _write(
         level: "debug" | "info" | "warn" | "error",
+        code: string,
         msg: string,
         meta?: Record<string, unknown>,
     ): void {
         if (!meta) {
-            this._pino[level](msg);
+            this._pino[level]({ code }, msg);
             return;
         }
 
         const { [LOGGER_NAME_KEY]: name, ...rest } = meta;
         const target = typeof name === "string" ? this._child(name) : this._pino;
 
-        if (Object.keys(rest).length === 0) {
-            target[level](msg);
-            return;
-        }
-
-        target[level](rest, msg);
+        target[level]({ code, ...rest }, msg);
     }
 
     private _child(name: string): PinoBaseLogger {

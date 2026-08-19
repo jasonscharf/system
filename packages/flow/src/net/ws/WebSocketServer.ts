@@ -1,6 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
-import { getLogger, uuidv4Binary } from "@jasonscharf/core";
+import { getLog, uuidv4Binary } from "@jasonscharf/core";
 import type { WebSocketServer as WsServerType, WebSocket as WsSocket } from "ws";
 import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
 import type { FlowPort } from "../../FlowPort.js";
@@ -10,7 +10,7 @@ import { WebSocketWriter } from "./WebSocketWriter.js";
 import type { WsConnection, WsPrincipal } from "./WsConnection.js";
 import type { WsMessage } from "./WsMessage.js";
 
-const log = getLogger("WebSocketServer");
+const log = getLog("sys:flow:ws:server");
 
 export interface WebSocketServerOptions extends FlowComponentOptions {
     host?: string;
@@ -262,7 +262,10 @@ export class WebSocketServer extends FlowComponent {
             // become an unhandled rejection. Log it and reject the socket so the
             // client sees a real status instead of a hung connection (TRN-528).
             const message = err instanceof Error ? err.message : String(err);
-            log.error("WebSocket upgrade failed", { component: this.name, error: message });
+            log.error("upgrade-failed", "WebSocket upgrade failed", {
+                component: this.name,
+                error: message,
+            });
             if (!socket.destroyed) {
                 rejectUpgrade(socket, 500, "Internal Server Error");
             }

@@ -4,30 +4,48 @@ import { declareService, resolveService } from "./container/ioc.js";
 /**
  * The platform logging API. Every log line in every package flows through here.
  *
+ * A log line is an EVENT, not a sentence. It has three parts, and the signature
+ * makes all three mandatory to think about:
+ *
+ *   const log = getLog("tern:tubemail:outgoing-email-sender");
+ *   log.warn("send-failed", "Outgoing email send failed", { messageId });
+ *          |               |                              |
+ *          code            message                        fields
+ *
+ *   code     What happened, as a short stable slug. Unique WITHIN its logger,
+ *            which is all it needs to be: the logger's URN already namespaces
+ *            it, so the identity of a line is `name` + `code` and the same
+ *            "send-failed" may appear under a dozen loggers. This is the field
+ *            you filter and group on, and it never changes when the wording of
+ *            the message does.
+ *   message  What a human reads. Free prose, safe to reword at any time.
+ *   fields   Everything else, structured. Values NEVER go in the message.
+ *
+ * The logger's name is a URN: a colon-delimited path from the product down to
+ * the module, e.g. "tern:auth:login" or "sys:core:secrets". It is a namespace,
+ * so a whole subtree is one query prefix.
+ *
  * There are exactly two pieces:
  *
  *   SystemLogger  the container token for the ROOT sink. One per process, bound
  *                 once at boot. `ConsoleLogger` is the default so an unbooted
  *                 process (a test, a script, the browser) still logs.
- *   getLogger()   how a module gets a logger. Returns a named view onto
+ *   getLog()      how a module gets a logger. Returns a named view onto
  *                 whatever root is bound, resolved lazily.
  *
  * A package NEVER imports pino, never calls console, and never takes a logger
- * as a constructor option just to log:
- *
- *   const log = getLogger("PulsarConsumer");
- *   log.info("subscribed", { topic });
- *
- * Swapping the backing implementation is a single bind at boot, because the
- * sink is a container service and nothing holds a direct reference to it:
+ * as a constructor option just to log. Swapping the backing implementation is a
+ * single bind at boot, because the sink is a container service and nothing
+ * holds a direct reference to it:
  *
  *   bindService(SystemLogger, new PinoLogger());     // @jasonscharf/server
  *   bindService(SystemLogger, captureForAssertions); // a test
  */
 
 /**
- * Meta key carrying the logger name. RESERVED: a caller's own `name` in meta is
- * overwritten by the logger's name, so use a more specific key for domain data.
+ * Meta key carrying the logger's URN. RESERVED: a caller's own `name` in meta
+ * is overwritten by the logger's name, so use a more specific key for domain
+ * data.
  */
 export const LOGGER_NAME_KEY = "name";
 
@@ -35,53 +53,53 @@ export const LOGGER_NAME_KEY = "name";
  * Container token for the root logger. This is the sink, and deliberately
  * nothing more than the four level methods: anything can be bound to it,
  * including a plain object literal that pushes to an array in a test. Naming
- * and metadata binding are {@link getLogger}'s job, not the sink's, so an
+ * and metadata binding are {@link getLog}'s job, not the sink's, so an
  * implementation only has to know how to write a line.
  */
 export abstract class SystemLogger implements Logger {
-    abstract debug(msg: string, meta?: Record<string, unknown>): void;
-    abstract info(msg: string, meta?: Record<string, unknown>): void;
-    abstract warn(msg: string, meta?: Record<string, unknown>): void;
-    abstract error(msg: string, meta?: Record<string, unknown>): void;
+    abstract debug(code: string, msg: string, meta?: Record<string, unknown>): void;
+    abstract info(code: string, msg: string, meta?: Record<string, unknown>): void;
+    abstract warn(code: string, msg: string, meta?: Record<string, unknown>): void;
+    abstract error(code: string, msg: string, meta?: Record<string, unknown>): void;
 }
 
 /**
  * Console-backed sink, the container default when no logger is bound.
  *
- * Renders the logger name as a `[name]` prefix, which is what the platform's
- * log lines looked like before they were unified and is the readable form for
- * local dev. Structured output for log aggregation is PinoLogger's job.
+ * Renders as `[name/code] message`, which is the readable form for local dev
+ * and the browser. Structured output for log aggregation is PinoLogger's job.
  */
 export class ConsoleLogger implements Logger {
-    debug(msg: string, meta?: Record<string, unknown>): void {
+    debug(code: string, msg: string, meta?: Record<string, unknown>): void {
         // biome-ignore lint/suspicious/noConsole: this IS the console sink
-        console.debug(...format(msg, meta));
+        console.debug(...format(code, msg, meta));
     }
 
-    info(msg: string, meta?: Record<string, unknown>): void {
+    info(code: string, msg: string, meta?: Record<string, unknown>): void {
         // biome-ignore lint/suspicious/noConsole: this IS the console sink
-        console.info(...format(msg, meta));
+        console.info(...format(code, msg, meta));
     }
 
-    warn(msg: string, meta?: Record<string, unknown>): void {
+    warn(code: string, msg: string, meta?: Record<string, unknown>): void {
         // biome-ignore lint/suspicious/noConsole: this IS the console sink
-        console.warn(...format(msg, meta));
+        console.warn(...format(code, msg, meta));
     }
 
-    error(msg: string, meta?: Record<string, unknown>): void {
+    error(code: string, msg: string, meta?: Record<string, unknown>): void {
         // biome-ignore lint/suspicious/noConsole: this IS the console sink
-        console.error(...format(msg, meta));
+        console.error(...format(code, msg, meta));
     }
 }
 
-/** Split the reserved name out of meta and render it as a readable prefix. */
-function format(msg: string, meta?: Record<string, unknown>): [string, ...unknown[]] {
+/** Split the reserved name out of meta and render `[name/code] message`. */
+function format(code: string, msg: string, meta?: Record<string, unknown>): [string, ...unknown[]] {
     if (!meta) {
-        return [msg];
+        return [`[${code}] ${msg}`];
     }
 
     const { [LOGGER_NAME_KEY]: name, ...rest } = meta;
-    const line = typeof name === "string" ? `[${name}] ${msg}` : msg;
+    const label = typeof name === "string" ? `${name}/${code}` : code;
+    const line = `[${label}] ${msg}`;
 
     if (Object.keys(rest).length === 0) {
         return [line];
@@ -89,8 +107,6 @@ function format(msg: string, meta?: Record<string, unknown>): [string, ...unknow
 
     return [line, rest];
 }
-
-declareService<Logger>(SystemLogger, () => new ConsoleLogger());
 
 /**
  * A logger bound to a name and, optionally, standing metadata. `child()` adds
@@ -105,10 +121,10 @@ export interface NamedLogger extends Logger {
  * A named view onto the bound root sink.
  *
  * The root is resolved on each call rather than captured at construction,
- * because `getLogger()` is called at MODULE scope: every module-level logger
- * would otherwise capture the ConsoleLogger default at import time, before boot
- * has bound the real one, and boot's bind would silently do nothing. Resolution
- * is a singleton lookup in the container, so this costs a map read per line.
+ * because `getLog()` is called at MODULE scope: every module-level logger would
+ * otherwise capture the ConsoleLogger default at import time, before boot has
+ * bound the real one, and boot's bind would silently do nothing. Resolution is
+ * a singleton lookup in the container, so this costs a map read per line.
  */
 class BoundLogger implements NamedLogger {
     private readonly _meta: Record<string, unknown>;
@@ -117,20 +133,20 @@ class BoundLogger implements NamedLogger {
         this._meta = { ...meta, [LOGGER_NAME_KEY]: name };
     }
 
-    debug(msg: string, meta?: Record<string, unknown>): void {
-        this._sink().debug(msg, this._merge(meta));
+    debug(code: string, msg: string, meta?: Record<string, unknown>): void {
+        this._sink().debug(code, msg, this._merge(meta));
     }
 
-    info(msg: string, meta?: Record<string, unknown>): void {
-        this._sink().info(msg, this._merge(meta));
+    info(code: string, msg: string, meta?: Record<string, unknown>): void {
+        this._sink().info(code, msg, this._merge(meta));
     }
 
-    warn(msg: string, meta?: Record<string, unknown>): void {
-        this._sink().warn(msg, this._merge(meta));
+    warn(code: string, msg: string, meta?: Record<string, unknown>): void {
+        this._sink().warn(code, msg, this._merge(meta));
     }
 
-    error(msg: string, meta?: Record<string, unknown>): void {
-        this._sink().error(msg, this._merge(meta));
+    error(code: string, msg: string, meta?: Record<string, unknown>): void {
+        this._sink().error(code, msg, this._merge(meta));
     }
 
     child(meta: Record<string, unknown>): NamedLogger {
@@ -153,12 +169,18 @@ class BoundLogger implements NamedLogger {
 }
 
 /**
- * Get a named logger. THE entry point for logging anywhere in the platform.
+ * Get a logger for a module. THE entry point for logging anywhere.
+ *
+ * `urn` is a colon-delimited namespace path, product first, module last:
+ * "tern:auth:login", "sys:core:secrets", "tern:tubemail:pg-writer". Because it
+ * is a path, "name:tern:tubemail:*" selects one product's whole log surface.
  *
  * Safe to call at module scope: the returned logger holds no reference to the
  * root sink, so a logger created at import time still writes to whatever boot
  * later binds.
  */
-export function getLogger(name: string, meta?: Record<string, unknown>): NamedLogger {
-    return new BoundLogger(name, meta);
+export function getLog(urn: string, meta?: Record<string, unknown>): NamedLogger {
+    return new BoundLogger(urn, meta);
 }
+
+declareService<Logger>(SystemLogger, () => new ConsoleLogger());

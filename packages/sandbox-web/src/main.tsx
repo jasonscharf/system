@@ -5,9 +5,9 @@ import { ClientApp } from "./ClientApp.js";
 import { ComponentShowcaseView } from "./components/ComponentShowcase.js";
 import { DiscussionsPage } from "./components/DiscussionsPage.js";
 import "./style.css";
-import { getLogger } from "@jasonscharf/core";
+import { getLog } from "@jasonscharf/core";
 
-const log = getLogger("sandbox-web");
+const log = getLog("sys:sandbox:web");
 
 // In k8s the web container is behind an nginx reverse proxy that forwards
 // /ws → server:8080 and /auth → server:8081.  When VITE_SERVER_URL is not
@@ -73,5 +73,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-    log.error("boot failed", { error: err instanceof Error ? err.message : String(err) });
+    log.error("boot-failed", "Boot failed", {
+        error: err instanceof Error ? err.message : String(err),
+    });
 });

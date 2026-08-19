@@ -27,7 +27,7 @@ import {
     UserSessionRepository,
 } from "@jasonscharf/auth";
 import { convosExtension, getConvoService, getConvosInstall } from "@jasonscharf/convos";
-import { bindService, getLogger } from "@jasonscharf/core";
+import { bindService, getLog } from "@jasonscharf/core";
 import { createDataContext, DataSource, TripleStore } from "@jasonscharf/data";
 import {
     FlowApp,
@@ -51,7 +51,7 @@ import { MessageEncoder } from "./components/MessageEncoder.js";
 import { MessageRouter } from "./components/MessageRouter.js";
 import { mountDiscussionsRoutes } from "./routes/discussions.js";
 
-const log = getLogger("sandbox-server");
+const log = getLog("sys:sandbox:server");
 
 function loadVersion(): unknown {
     try {
@@ -97,14 +97,14 @@ async function main(): Promise<void> {
             user: await secrets.getWithDefault("SYS_PG_USER", process.env.SYS_PG_USER ?? "tern"),
             password: await secrets.getRequired("SYS_PG_PASSWORD"),
         });
-        log.info("DB: PostgreSQL");
+        log.info("db-postgres", "Database is PostgreSQL");
     } else {
         const dbPath = await secrets.getWithDefault(
             "SYS_DB_PATH",
             process.env.SYS_DB_PATH ?? ":memory:",
         );
         knex = await createDataContext({ client: "sqlite", filename: dbPath });
-        log.info("DB: SQLite", { dbPath });
+        log.info("db-sqlite", "Database is SQLite", { dbPath });
     }
 
     const store = new TripleStore(knex);
@@ -129,10 +129,10 @@ async function main(): Promise<void> {
     if (redisUrl) {
         const { Redis: RedisClient } = await import("ioredis");
         sessionStore = new RedisSessionStore(new RedisClient(redisUrl));
-        log.info("session store: Redis", { redisUrl });
+        log.info("session-store-redis", "Session store is Redis", { redisUrl });
     } else {
         sessionStore = new MemorySessionStore();
-        log.info("session store: in-memory (dev only)");
+        log.info("session-store-memory", "Session store is in-memory (dev only)");
     }
 
     // ── Field cipher (at-rest PII) ────────────────────────────────────────────
@@ -152,7 +152,7 @@ async function main(): Promise<void> {
                 `vault or environment. Encryption of at-rest PII cannot be disabled. Cause: ${err}`,
         );
     }
-    log.info("field cipher enabled (at-rest PII encryption)");
+    log.info("field-cipher-enabled", "Field cipher enabled (at-rest PII encryption)");
     bindService(FieldCipherService, cipher);
 
     // ── Auth services → IoC container ─────────────────────────────────────────
@@ -196,11 +196,13 @@ async function main(): Promise<void> {
     const rbac = getRbacService(rbacInstalled);
     const convos = getConvoService(convosInstalled);
     const convosInstall = getConvosInstall(convosInstalled);
-    log.info("loaded app", {
+    log.info("app-loaded", "Loaded app", {
         app: ternApp.config.name,
         version: ternApp.config.version ?? "?",
     });
-    log.info("handlers registered", { handlers: ternApp.registry.registeredTypes });
+    log.info("handlers-registered", "Handlers registered", {
+        handlers: ternApp.registry.registeredTypes,
+    });
 
     // ── Shared FBP app ────────────────────────────────────────────────────────
     const flowApp = new FlowApp({ mode: "push" });
@@ -305,11 +307,11 @@ async function main(): Promise<void> {
     await flowApp.start();
     flowApp.scheduler.start();
 
-    log.info("WS listening", { url: `ws://0.0.0.0:${WS_PORT}` });
-    log.info("HTTP listening", { url: `http://0.0.0.0:${HTTP_PORT}` });
+    log.info("ws-listening", "WebSocket server listening", { url: `ws://0.0.0.0:${WS_PORT}` });
+    log.info("http-listening", "HTTP server listening", { url: `http://0.0.0.0:${HTTP_PORT}` });
 
     process.once("SIGINT", async () => {
-        log.info("shutting down");
+        log.info("shutting-down", "Shutting down");
         await flowApp.stop();
         await secrets.close();
         await knex.destroy();
@@ -318,6 +320,8 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-    log.error("fatal", { error: err instanceof Error ? err.message : String(err) });
+    log.error("fatal", "Fatal boot error", {
+        error: err instanceof Error ? err.message : String(err),
+    });
     process.exit(1);
 });

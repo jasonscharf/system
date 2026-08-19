@@ -10,7 +10,7 @@
 
 import type { AuthRouterComponent } from "@jasonscharf/auth";
 import type { ConvoService } from "@jasonscharf/convos";
-import { getLogger } from "@jasonscharf/core";
+import { getLog } from "@jasonscharf/core";
 import type { HttpCtx, HttpRouter } from "@jasonscharf/flow";
 import type { RbacService } from "@jasonscharf/server";
 import {
@@ -22,7 +22,7 @@ import {
     systemSec,
 } from "@jasonscharf/server";
 
-const log = getLogger("convos");
+const log = getLog("sys:sandbox:discussions");
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -66,7 +66,9 @@ async function ensureUserProvisioned(
             principalIri: userSec.principalIri,
             roleIri: userRoleIri,
         });
-        log.info("auto-provisioned ConvoUser", { principalIri: userSec.principalIri });
+        log.info("convo-user-provisioned", "Auto-provisioned ConvoUser", {
+            principalIri: userSec.principalIri,
+        });
     }
 }
 
@@ -109,7 +111,7 @@ export function mountDiscussionsRoutes(
             } else {
                 c.status = 500;
                 c.body = { error: "Internal server error" };
-                log.error("unhandled error", {
+                log.error("unhandled-error", "Unhandled error", {
                     error: err instanceof Error ? err.message : String(err),
                 });
             }

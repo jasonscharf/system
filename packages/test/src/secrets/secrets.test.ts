@@ -207,6 +207,44 @@ describe("AzureKeyVaultProvider", () => {
         expect(value).toBeNull();
     });
 
+    it("get() falls back to env when the secret is DISABLED (403 SecretDisabled)", async () => {
+        // A disabled secret is unavailable, not misconfigured. Key Vault answers
+        // 403 with an inner SecretDisabled code; treating it as fatal took the
+        // tubemail worker down on a secret whose env fallback was already correct.
+        const provider = new AzureKeyVaultProvider("https://fake.vault.azure.net/");
+        const fakeClient = {
+            getSecret: vi.fn().mockRejectedValue({
+                code: "Forbidden",
+                statusCode: 403,
+                details: { error: { code: "Forbidden", innerError: { code: "SecretDisabled" } } },
+            }),
+        };
+        (provider as unknown as { _client: typeof fakeClient })._client = fakeClient;
+
+        process.env.REDIS_URL = "redis://redis:6379";
+        try {
+            expect(await provider.get("REDIS_URL")).toBe("redis://redis:6379");
+        } finally {
+            delete process.env.REDIS_URL;
+        }
+    });
+
+    it("get() re-throws a bare 403 that is NOT SecretDisabled", async () => {
+        // Guard the fix above: a genuine RBAC denial must stay fatal rather than
+        // silently resolving to whatever the environment happens to hold.
+        const provider = new AzureKeyVaultProvider("https://fake.vault.azure.net/");
+        const fakeClient = {
+            getSecret: vi.fn().mockRejectedValue({
+                code: "Forbidden",
+                statusCode: 403,
+                details: { error: { code: "Forbidden" } },
+            }),
+        };
+        (provider as unknown as { _client: typeof fakeClient })._client = fakeClient;
+
+        await expect(provider.get("ANY_KEY")).rejects.toMatchObject({ code: "Forbidden" });
+    });
+
     it("get() re-throws non-404 errors", async () => {
         const provider = new AzureKeyVaultProvider("https://fake.vault.azure.net/");
         const fakeClient = {

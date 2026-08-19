@@ -1,6 +1,9 @@
+import { getLogger } from "@jasonscharf/core";
 import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
 import type { FlowPort } from "../../FlowPort.js";
 import type { HttpHeaders, HttpRequest, HttpResponse } from "./HttpTypes.js";
+
+const log = getLogger("HttpClient");
 
 /**
  * Flow component that makes HTTP requests via the platform-native Fetch API
@@ -91,7 +94,11 @@ export class HttpClient extends FlowComponent {
             // (status 0, the fetch/XHR network-error convention) so the process
             // survives and downstream can react — never an unhandled rejection.
             const message = err instanceof Error ? err.message : String(err);
-            console.error(`[${this.name}] HTTP request to ${request.url} failed: ${message}`);
+            log.error("HTTP request failed", {
+                component: this.name,
+                url: request.url,
+                error: message,
+            });
             this.responses.put({
                 requestId: request.requestId,
                 status: 0,

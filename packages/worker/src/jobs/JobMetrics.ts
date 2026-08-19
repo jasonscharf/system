@@ -22,8 +22,11 @@
  * the call site.
  */
 
+import { getLogger } from "@jasonscharf/core";
 import type { Knex } from "knex";
 import { METRICS_CONSECUTIVE_FAILURE_ALERT_THRESHOLD } from "../config.js";
+
+const log = getLogger("JobMetrics");
 
 /** Terminal run statuses, most-recent-first folding stops/continues on these. */
 const TERMINAL_STATUSES = ["succeeded", "failed", "dead"] as const;
@@ -149,7 +152,7 @@ export async function computeJobMetrics(knex: Knex): Promise<JobMetric[]> {
 }
 
 export interface EmitJobMetricsOptions {
-    /** Structured-log sink. Defaults to a console.warn-backed sink. */
+    /** Structured-log sink. Defaults to the platform logger at warn level. */
     log?: MetricLogSink;
     /**
      * consecutiveFailures at or above this value triggers a warn alert.
@@ -159,7 +162,7 @@ export interface EmitJobMetricsOptions {
 }
 
 const _defaultSink: MetricLogSink = (alert) => {
-    console.warn(`[JobMetrics] ${alert.message}`);
+    log.warn(alert.message);
 };
 
 /**

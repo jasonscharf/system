@@ -1,8 +1,10 @@
 import type { Dispatcher } from "@jasonscharf/app";
-import { anonymousSec, errResult, type SecurityContext } from "@jasonscharf/core";
+import { anonymousSec, errResult, getLogger, type SecurityContext } from "@jasonscharf/core";
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
 import type { IncomingMessage } from "./MessageDecoder.js";
 import type { OutgoingMessage } from "./MessageEncoder.js";
+
+const log = getLogger("MessageRouter");
 
 export interface MessageRouterOptions extends FlowComponentOptions {
     /**
@@ -55,10 +57,10 @@ export class MessageRouter extends FlowComponent {
             // defensive backstop that logs rather than letting a stray rejection
             // escape as an unhandled rejection and crash the process (TRN-527).
             this._dispatch(msg).catch((err) => {
-                console.error(
-                    `[MessageRouter] unexpected dispatch rejection for connection ${msg.connectionId}:`,
-                    err,
-                );
+                log.error("unexpected dispatch rejection", {
+                    connectionId: msg.connectionId,
+                    error: err instanceof Error ? err.message : String(err),
+                });
             });
         }
     }
@@ -81,10 +83,10 @@ export class MessageRouter extends FlowComponent {
             // A throwing dispatcher or sec resolver must never become an
             // unhandled rejection: send the client an error result instead so
             // the request fails cleanly and the process survives (TRN-527).
-            console.error(
-                `[MessageRouter] dispatch failed for connection ${incoming.connectionId}:`,
-                err,
-            );
+            log.error("dispatch failed", {
+                connectionId: incoming.connectionId,
+                error: err instanceof Error ? err.message : String(err),
+            });
             this.out.put({
                 connectionId: incoming.connectionId,
                 result: errResult(

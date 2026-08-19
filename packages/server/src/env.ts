@@ -20,6 +20,10 @@ import { exists } from "@jasonscharf/core";
 // NOTE: Adding a key here means it will get pulled from `process.env` if present
 export const defaults = {
     SYS_MODE: "dev",
+    // Threshold for the platform logger (see PinoLogger). "debug" locally when
+    // chasing something, "info" everywhere else. This is a config VALUE, not an
+    // environment branch: the logger is identical at every level.
+    SYS_LOG_LEVEL: "info",
 } as Record<string, string>;
 
 const allowedModes = ["test", "dev", "staging", "staging-dev", "staging-production", "production"];

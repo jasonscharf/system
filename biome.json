@@ -7,7 +7,14 @@
     },
     "files": {
         "ignoreUnknown": false,
-        "includes": ["**", "!**/dist", "!**/node_modules", "!**/.yarn", "!**/*.tsbuildinfo"]
+        "includes": [
+            "**",
+            "!**/dist",
+            "!**/node_modules",
+            "!**/.yarn",
+            "!**/.claude",
+            "!**/*.tsbuildinfo"
+        ]
     },
     "formatter": {
         "enabled": true,
@@ -34,10 +41,28 @@
             },
             "suspicious": {
                 "noAssignInExpressions": "warn",
-                "noExplicitAny": "warn"
+                "noExplicitAny": "warn",
+                "noConsole": "error"
             }
         }
     },
+    "overrides": [
+        {
+            "includes": [
+                "**/packages/gen/**",
+                "**/packages/sandbox-cli/**",
+                "**/packages/sandbox-server/src/examples/**",
+                "**/scripts/**"
+            ],
+            "linter": {
+                "rules": {
+                    "suspicious": {
+                        "noConsole": "off"
+                    }
+                }
+            }
+        }
+    ],
     "javascript": {
         "formatter": {
             "quoteStyle": "double",

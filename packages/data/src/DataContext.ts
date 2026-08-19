@@ -1,3 +1,4 @@
+import { getLogger } from "@jasonscharf/core";
 import type { Knex } from "knex";
 import { recordMigrationBaseline } from "./migrationBaseline.js";
 import { up as migrate001 } from "./migrations/001_init.js";
@@ -5,6 +6,8 @@ import { up as migrate002 } from "./migrations/002_fix_nodes.js";
 import { up as migrate003 } from "./migrations/003_jobs_roles.js";
 import { up as migrate004 } from "./migrations/004_node_encryption.js";
 import { attachSqlLogging, sqlLoggingEnabled } from "./sqlLogging.js";
+
+const log = getLogger("sql");
 
 export type DbClient = "sqlite" | "pg";
 
@@ -109,7 +112,7 @@ export async function createDataContext(config: DataConfig): Promise<Knex> {
     }
 
     if (sqlLoggingEnabled()) {
-        attachSqlLogging(knex, (line) => console.log(line));
+        attachSqlLogging(knex, (line) => log.debug(line));
     }
 
     await migrate001(knex);

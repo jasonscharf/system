@@ -1,4 +1,9 @@
-import { errResult, type SystemRequest, type SystemResult, type SystemTypeRef } from "@jasonscharf/core";
+import {
+    errResult,
+    type SystemRequest,
+    type SystemResult,
+    type SystemTypeRef,
+} from "@jasonscharf/core";
 import { compose, type MiddlewareFn } from "./compose.js";
 import type { Dispatcher } from "./Dispatcher.js";
 
@@ -45,7 +50,7 @@ interface Route {
  *   router.use(async (ctx, next) => {
  *       const t0 = Date.now();
  *       await next();
- *       console.log(`${ctx.request.type.iri} → ${Date.now() - t0}ms`);
+ *       log.info("dispatched", { type: ctx.request.type.iri, ms: Date.now() - t0 });
  *   });
  *
  *   // Error boundary

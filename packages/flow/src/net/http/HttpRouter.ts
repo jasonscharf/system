@@ -1,7 +1,10 @@
+import { getLogger } from "@jasonscharf/core";
 import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
 import type { FlowPort } from "../../FlowPort.js";
 import { HttpCtx } from "./HttpCtx.js";
 import type { HttpHeaders, HttpMethod, HttpResponseDraft, ParsedHttpRequest } from "./HttpTypes.js";
+
+const log = getLogger("HttpRouter");
 
 // ── Compose (local copy — flow package has no dep on @system/app) ─────────────
 
@@ -263,9 +266,12 @@ export class HttpRouter extends FlowComponent {
             // a response and the pending ServerResponse is never leaked (TRN-528).
             // Apps that want custom error bodies still install their own boundary.
             const message = err instanceof Error ? err.message : String(err);
-            console.error(
-                `[${this.name}] unhandled error handling ${req.method} ${req.pathname}: ${message}`,
-            );
+            log.error("unhandled error handling request", {
+                component: this.name,
+                method: req.method,
+                pathname: req.pathname,
+                error: message,
+            });
             this.responses.put({
                 requestId: req.requestId,
                 status: 500,

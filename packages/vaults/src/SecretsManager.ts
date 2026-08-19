@@ -1,7 +1,10 @@
+import { getLogger } from "@jasonscharf/core";
 import { AzureKeyVaultProvider } from "./AzureKeyVaultProvider.js";
 import { CachedSecretsProvider } from "./CachedSecretsProvider.js";
 import { EnvSecretsProvider } from "./EnvSecretsProvider.js";
 import type { ISecretsProvider } from "./ISecretsProvider.js";
+
+const log = getLogger("secrets");
 
 /**
  * SecretsManager is the single entry point for secret retrieval.
@@ -57,7 +60,7 @@ export class SecretsManager {
         const vaultUri = process.env.AZURE_KEY_VAULT_URI;
 
         if (vaultUri) {
-            console.log(`[secrets] Using Azure Key Vault: ${vaultUri}`);
+            log.info("using Azure Key Vault", { vaultUri });
             return new SecretsManager(
                 new CachedSecretsProvider(new AzureKeyVaultProvider(vaultUri), {
                     ttlMs: 5 * 60 * 1000,
@@ -66,7 +69,7 @@ export class SecretsManager {
             );
         }
 
-        console.log("[secrets] Using environment variable secrets (local/dev mode)");
+        log.info("using environment variable secrets");
         return new SecretsManager(new EnvSecretsProvider());
     }
 }

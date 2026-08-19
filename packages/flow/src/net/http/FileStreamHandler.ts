@@ -1,7 +1,10 @@
 import { extname, isAbsolute, join, normalize, relative } from "node:path";
+import { getLogger } from "@jasonscharf/core";
 import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
 import type { FlowPort } from "../../FlowPort.js";
 import type { HttpHeaders, HttpStreamResponse, ParsedHttpRequest } from "./HttpTypes.js";
+
+const log = getLogger("FileStreamHandler");
 
 // ── MIME type map ──────────────────────────────────────────────────────────────
 
@@ -138,7 +141,11 @@ export class FileStreamHandler extends FlowComponent {
             await this._serve(req, reqId);
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
-            console.error(`[${this.name}] failed to serve ${req.pathname}: ${message}`);
+            log.error("failed to serve request", {
+                component: this.name,
+                pathname: req.pathname,
+                error: message,
+            });
             this.out.put(errorResponse(reqId, 500, "Internal Server Error"));
         }
     }

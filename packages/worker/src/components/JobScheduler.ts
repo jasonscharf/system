@@ -27,7 +27,7 @@
  *   - tickIntervalMs             — override tick cadence
  */
 
-import { Inject } from "@jasonscharf/core";
+import { getLogger, Inject } from "@jasonscharf/core";
 // biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
 import { DataSource } from "@jasonscharf/data";
 import { FlowComponent, type FlowComponentOptions } from "@jasonscharf/flow";
@@ -35,6 +35,8 @@ import type { Knex } from "knex";
 import { SCHEDULER_BATCH_SIZE, SCHEDULER_TICK_INTERVAL_MS } from "../config.js";
 import { nextRun } from "../schedule/nextRun.js";
 import type { Schedule } from "../schedule/types.js";
+
+const log = getLogger("JobScheduler");
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -95,7 +97,7 @@ export class JobScheduler extends FlowComponent {
             const tickPromise = this._tick();
             tickPromise.catch((err: unknown) => {
                 const msg = err instanceof Error ? err.message : String(err);
-                console.error(`[JobScheduler] tick error: ${msg}`);
+                log.error("tick error", { error: msg });
             });
         }, this._tickIntervalMs);
     }

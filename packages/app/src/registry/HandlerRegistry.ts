@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import {
     anonymousSec,
     errResult,
+    getLogger,
     resolveModuleRef,
     type SecurityContext,
     type SystemRequest,
@@ -11,6 +12,8 @@ import {
 } from "@jasonscharf/core";
 import type { HandlerEntry } from "../config/types.js";
 import type { Dispatcher } from "../routing/Dispatcher.js";
+
+const log = getLogger("HandlerRegistry");
 
 /**
  * The contract every handler function must satisfy.
@@ -149,10 +152,11 @@ export class HandlerRegistry implements Dispatcher {
                 }
             } catch (err) {
                 // Log the failure and try the next registered handler
-                console.error(
-                    `[HandlerRegistry] Handler ${entry.moduleUrl}#${entry.exportName} threw:`,
-                    err,
-                );
+                log.error("handler threw, trying the next one", {
+                    moduleUrl: entry.moduleUrl,
+                    exportName: entry.exportName,
+                    error: err instanceof Error ? err.message : String(err),
+                });
             }
         }
 

@@ -16,7 +16,6 @@ import {
     tenantUserIRI,
 } from "@jasonscharf/core/tenancy";
 import { EntitySchema } from "@jasonscharf/entities";
-import { registerTopology } from "../topology.js";
 import { TENANCY_NS } from "./constants.js";
 
 /**
@@ -113,6 +112,3 @@ export const TenantSchema: EntitySchema<TenantProps> = new EntitySchema<TenantPr
         },
     },
 });
-
-// Register containment edges so scope chains resolve over them.
-registerTopology(TenantSchema, OrgSchema, DomainSchema);

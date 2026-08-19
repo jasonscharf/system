@@ -43,4 +43,8 @@ export * from "./superuser/index.js";
 // ── Tenancy (Tenant and Organization entities) ──────────────────────────────
 export * from "./tenancy/index.js";
 export { tenantGraph, tenantGraphForInsert } from "./tenancy.js";
-export { containmentPredicates, registerTopology, scopeChainFor } from "./topology.js";
+export {
+    CORE_CONTAINMENT_SCHEMAS,
+    containmentPredicatesOf,
+    scopeChainFor,
+} from "./topology.js";

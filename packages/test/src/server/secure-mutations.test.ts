@@ -21,7 +21,6 @@ import {
     RbacService,
     ResourceNodeRepository,
     RoleRepository,
-    registerTopology,
     type SecurityContext,
     type ServerContext,
     ServiceAccountRepository,
@@ -58,7 +57,10 @@ const TenantForums = new EntitySchema({
     properties: { name: new IRI("urn:sys:core:tenancy:tenantName") },
     edges: { forum: { predicate: hasForumIRI, direction: "out", containment: true } },
 });
-registerTopology(ForumSchema, TenantForums);
+
+// The forum topology is handed to each context explicitly — no module-scope
+// registration, so the scope chain cannot depend on import order (TRN-627).
+const FORUM_SCHEMAS = [ForumSchema, TenantForums];
 
 const PERM_UPDATE = "post.update";
 const PERM_CREATE = "post.create";
@@ -99,7 +101,7 @@ describe("PoC — secure-by-default mutations", () => {
         store = new TripleStore(knex);
         es = new EntityStore(store);
         rbac = makeRbac(store);
-        ctx = buildServerContext(store, { trx, tenantId: "acme" });
+        ctx = buildServerContext(store, { trx, tenantId: "acme", schemas: FORUM_SCHEMAS });
     });
     afterEach(async () => {
         await trx.rollback();
@@ -231,7 +233,7 @@ describe("PoC — secure mutations are atomic (create + attach-under)", () => {
         knex = await createDataContext({ client: "sqlite", filename: ":memory:" });
         store = new TripleStore(knex);
         es = new EntityStore(store);
-        ctx = buildServerContext(store, { tenantId: "acme" }); // no ambient trx
+        ctx = buildServerContext(store, { tenantId: "acme", schemas: FORUM_SCHEMAS }); // no ambient trx
     });
     afterEach(async () => {
         for (const t of ["edges", "nodes", "namespaces"]) {

@@ -1,6 +1,7 @@
 import {
     type ApplicationContext,
     defaultCtx,
+    type IRI,
     tryResolveService,
     type UserSession,
 } from "@jasonscharf/core";
@@ -13,6 +14,7 @@ import { createEntityStore } from "./EntityStoreFactory.js";
 import { GraphQuery } from "./GraphQuery.js";
 import type { SecurityContext } from "./SecurityContext.js";
 import { FieldCipherService } from "./services.js";
+import { CORE_CONTAINMENT_SCHEMAS, containmentPredicatesOf } from "./topology.js";
 
 export type EntityLookup = <Props extends Record<string, unknown>>(
     schema: EntitySchema<Props>,
@@ -92,7 +94,35 @@ export interface ServerContext extends ApplicationContext {
      * encryption can never be forgotten and the raw store stays an internal detail.
      */
     entityStore: EntityStore;
+    /**
+     * The containment predicates that define this context's authorization scope
+     * chain — the edges `scopeChainFor` walks up from a resource to the tenant
+     * root. Derived once at build time from the core backbone plus any extension
+     * `schemas`, so the chain never depends on module import order (TRN-627).
+     */
+    containment: readonly IRI[];
 }
+
+/**
+ * Base fields accepted by buildServerContext.
+ *
+ * `containment` is derived, never passed: it is always composed from the core
+ * backbone plus `schemas`, so no caller can build a context whose scope chain
+ * omits the tenant root.
+ */
+export type ServerContextBase = Partial<
+    Omit<
+        ServerContext,
+        "entities" | "store" | "graph" | "related" | "tx" | "entityStore" | "containment"
+    >
+> & {
+    /**
+     * Extension schemas whose `containment: true` edges extend the tenant-rooted
+     * topology for this context (e.g. Forum --hasPost--> Post). The core tenancy
+     * backbone is always included and cannot be dropped.
+     */
+    schemas?: readonly EntitySchema[];
+};
 
 /**
  * Build a ServerContext bound to the given store.
@@ -100,9 +130,7 @@ export interface ServerContext extends ApplicationContext {
  */
 export function buildServerContext(
     store: TripleStore,
-    base: Partial<
-        Omit<ServerContext, "entities" | "store" | "graph" | "related" | "tx" | "entityStore">
-    > = {},
+    base: ServerContextBase = {},
 ): ServerContext {
     // Members resolve from the IoC container at build time (defaultCtx getters
     // and the FieldCipherService fallback), so bindService overrides installed
@@ -115,6 +143,12 @@ export function buildServerContext(
         ...base,
         cipher,
         store,
+        // Composed, not registered: the core backbone is always present, so the
+        // scope chain reaches the tenant root no matter which module imported what.
+        containment: containmentPredicatesOf([
+            ...CORE_CONTAINMENT_SCHEMAS,
+            ...(base.schemas ?? []),
+        ]),
         entities: (schema) => new EntityQuery(store, schema),
         graph: (sec) => new GraphQuery(ctx, sec),
         related: (sources, schema, edgeName) =>

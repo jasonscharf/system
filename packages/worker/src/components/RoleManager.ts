@@ -1,5 +1,5 @@
 import { hostname } from "node:os";
-import { Inject } from "@jasonscharf/core";
+import { getLogger, Inject } from "@jasonscharf/core";
 // biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
 import { DataSource } from "@jasonscharf/data";
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
@@ -10,6 +10,8 @@ import {
     ROLE_HEARTBEAT_DIVISOR,
     ROLE_HOLDER_NONCE_BYTES,
 } from "../config.js";
+
+const log = getLogger("RoleManager");
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -126,7 +128,7 @@ export class RoleManager extends FlowComponent {
             tickPromise.catch((err: unknown) => {
                 const msg = err instanceof Error ? err.message : String(err);
                 // Log via console until the worker has a structured logger.
-                console.error(`[RoleManager] tick error: ${msg}`);
+                log.error("tick error", { error: msg });
             });
         }, this._heartbeatMs);
     }

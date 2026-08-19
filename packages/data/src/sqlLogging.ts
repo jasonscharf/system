@@ -16,7 +16,7 @@ import type { Knex } from "knex";
 /** Environment flag that turns SQL logging on. */
 export const SQL_LOG_FLAG = "SYS_DB_LOG_SQL";
 
-/** A sink for formatted SQL log lines (console.log in production, a collector in tests). */
+/** A sink for formatted SQL log lines (the platform logger at runtime, a collector in tests). */
 export type SqlLogSink = (line: string) => void;
 
 /**

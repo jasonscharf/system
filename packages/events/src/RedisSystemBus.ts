@@ -24,14 +24,17 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type {
-    DomainEvent,
-    EventSubscription,
-    ISystemBus,
-    RpcHandler,
-    RpcKind,
+import {
+    type DomainEvent,
+    type EventSubscription,
+    getLogger,
+    type ISystemBus,
+    type RpcHandler,
+    type RpcKind,
 } from "@jasonscharf/core";
 import type { Redis } from "ioredis";
+
+const log = getLogger("RedisSystemBus");
 
 export interface RedisSystemBusOptions {
     /** Namespace for all bus keys. Default: "bus". */
@@ -280,9 +283,7 @@ export class RedisSystemBus implements ISystemBus {
         // crashed unexpectedly, so it must be LOGGED rather than become an
         // unhandled rejection.
         this._consume(loop, stream, group, onEntry).catch((err: unknown) => {
-            console.error(
-                `[RedisSystemBus] consume loop crashed on ${stream}: ${(err as Error).message}`,
-            );
+            log.error("consume loop crashed", { stream, error: (err as Error).message });
         });
         return loop;
     }
@@ -313,9 +314,7 @@ export class RedisSystemBus implements ISystemBus {
                 if (!loop.running) {
                     break;
                 }
-                console.error(
-                    `[RedisSystemBus] XREADGROUP error on ${stream}: ${(err as Error).message}`,
-                );
+                log.error("XREADGROUP error", { stream, error: (err as Error).message });
                 continue;
             }
 
@@ -325,9 +324,11 @@ export class RedisSystemBus implements ISystemBus {
                     try {
                         await onEntry(fields);
                     } catch (err: unknown) {
-                        console.error(
-                            `[RedisSystemBus] handler error on ${stream} ${entryId}: ${(err as Error).message}`,
-                        );
+                        log.error("handler error", {
+                            stream,
+                            entryId,
+                            error: (err as Error).message,
+                        });
                     }
                     // Ack after the attempt: at-least-once on transport, with
                     // handler errors logged rather than poison-looping. A failed
@@ -338,9 +339,11 @@ export class RedisSystemBus implements ISystemBus {
                         // biome-ignore lint/suspicious/noExplicitAny: ioredis stream commands lack public overloads
                         await (this._cmd as any).xack(stream, group, entryId);
                     } catch (err: unknown) {
-                        console.error(
-                            `[RedisSystemBus] XACK failed on ${stream} ${entryId} (will be redelivered): ${(err as Error).message}`,
-                        );
+                        log.error("XACK failed, entry will be redelivered", {
+                            stream,
+                            entryId,
+                            error: (err as Error).message,
+                        });
                     }
                 }
             }
@@ -354,9 +357,9 @@ export class RedisSystemBus implements ISystemBus {
             await loop.conn.quit();
         } catch (err: unknown) {
             // Quit failed; force the socket closed so the connection is not leaked.
-            console.error(
-                `[RedisSystemBus] consumer connection quit failed, forcing disconnect: ${(err as Error).message}`,
-            );
+            log.error("consumer connection quit failed, forcing disconnect", {
+                error: (err as Error).message,
+            });
             loop.conn.disconnect();
         }
     }

@@ -69,4 +69,10 @@ async function main(): Promise<void> {
     await app.start();
 }
 
-main().catch(console.error);
+// getLogger() is not exported from @jasonscharf/core's `browser` entry: it
+// resolves through the IoC container, and pulling typescript-ioc +
+// reflect-metadata into every browser bundle is a bigger decision than this
+// one line. Browser-side logging is deliberately still an open question; the
+// platform logging law covers server and worker code.
+// biome-ignore lint/suspicious/noConsole: browser boot, see above
+main().catch((err) => console.error(err));

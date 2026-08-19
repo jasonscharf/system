@@ -27,7 +27,7 @@ import {
     UserSessionRepository,
 } from "@jasonscharf/auth";
 import { convosExtension, getConvoService, getConvosInstall } from "@jasonscharf/convos";
-import { bindService } from "@jasonscharf/core";
+import { bindService, getLogger } from "@jasonscharf/core";
 import { createDataContext, DataSource, TripleStore } from "@jasonscharf/data";
 import {
     FlowApp,
@@ -50,6 +50,8 @@ import { MessageDecoder } from "./components/MessageDecoder.js";
 import { MessageEncoder } from "./components/MessageEncoder.js";
 import { MessageRouter } from "./components/MessageRouter.js";
 import { mountDiscussionsRoutes } from "./routes/discussions.js";
+
+const log = getLogger("sandbox-server");
 
 function loadVersion(): unknown {
     try {
@@ -95,14 +97,14 @@ async function main(): Promise<void> {
             user: await secrets.getWithDefault("SYS_PG_USER", process.env.SYS_PG_USER ?? "tern"),
             password: await secrets.getRequired("SYS_PG_PASSWORD"),
         });
-        console.log("[sandbox-server] DB: PostgreSQL");
+        log.info("DB: PostgreSQL");
     } else {
         const dbPath = await secrets.getWithDefault(
             "SYS_DB_PATH",
             process.env.SYS_DB_PATH ?? ":memory:",
         );
         knex = await createDataContext({ client: "sqlite", filename: dbPath });
-        console.log(`[sandbox-server] DB: SQLite (${dbPath})`);
+        log.info("DB: SQLite", { dbPath });
     }
 
     const store = new TripleStore(knex);
@@ -127,10 +129,10 @@ async function main(): Promise<void> {
     if (redisUrl) {
         const { Redis: RedisClient } = await import("ioredis");
         sessionStore = new RedisSessionStore(new RedisClient(redisUrl));
-        console.log(`[sandbox-server] Session store: Redis (${redisUrl})`);
+        log.info("session store: Redis", { redisUrl });
     } else {
         sessionStore = new MemorySessionStore();
-        console.log("[sandbox-server] Session store: in-memory (dev only)");
+        log.info("session store: in-memory (dev only)");
     }
 
     // ── Field cipher (at-rest PII) ────────────────────────────────────────────
@@ -150,7 +152,7 @@ async function main(): Promise<void> {
                 `vault or environment. Encryption of at-rest PII cannot be disabled. Cause: ${err}`,
         );
     }
-    console.log("[sandbox-server] Field cipher: enabled (at-rest PII encryption)");
+    log.info("field cipher enabled (at-rest PII encryption)");
     bindService(FieldCipherService, cipher);
 
     // ── Auth services → IoC container ─────────────────────────────────────────
@@ -194,10 +196,11 @@ async function main(): Promise<void> {
     const rbac = getRbacService(rbacInstalled);
     const convos = getConvoService(convosInstalled);
     const convosInstall = getConvosInstall(convosInstalled);
-    console.log(
-        `[sandbox-server] Loaded: ${ternApp.config.name} v${ternApp.config.version ?? "?"}`,
-    );
-    console.log(`[sandbox-server] Handlers: ${ternApp.registry.registeredTypes.join(", ")}`);
+    log.info("loaded app", {
+        app: ternApp.config.name,
+        version: ternApp.config.version ?? "?",
+    });
+    log.info("handlers registered", { handlers: ternApp.registry.registeredTypes });
 
     // ── Shared FBP app ────────────────────────────────────────────────────────
     const flowApp = new FlowApp({ mode: "push" });
@@ -302,11 +305,11 @@ async function main(): Promise<void> {
     await flowApp.start();
     flowApp.scheduler.start();
 
-    console.log(`[sandbox-server] WS   → ws://0.0.0.0:${WS_PORT}`);
-    console.log(`[sandbox-server] HTTP → http://0.0.0.0:${HTTP_PORT}`);
+    log.info("WS listening", { url: `ws://0.0.0.0:${WS_PORT}` });
+    log.info("HTTP listening", { url: `http://0.0.0.0:${HTTP_PORT}` });
 
     process.once("SIGINT", async () => {
-        console.log("\n[sandbox-server] Shutting down…");
+        log.info("shutting down");
         await flowApp.stop();
         await secrets.close();
         await knex.destroy();
@@ -315,6 +318,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-    console.error("[sandbox-server] Fatal:", err);
+    log.error("fatal", { error: err instanceof Error ? err.message : String(err) });
     process.exit(1);
 });

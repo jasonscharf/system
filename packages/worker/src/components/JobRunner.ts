@@ -39,7 +39,7 @@
  *   - tickIntervalMs            — override tick cadence
  */
 
-import { Inject, resolveModuleRef, systemSec } from "@jasonscharf/core";
+import { getLogger, Inject, resolveModuleRef, systemSec } from "@jasonscharf/core";
 // biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
 import { DataSource } from "@jasonscharf/data";
 import { FlowComponent, type FlowComponentOptions } from "@jasonscharf/flow";
@@ -52,6 +52,8 @@ import {
     RUNNER_TICK_INTERVAL_MS,
 } from "../config.js";
 import type { JobContext, JobHandler, JobHandlers } from "../JobHandlers.js";
+
+const log = getLogger("JobRunner");
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -140,7 +142,7 @@ export class JobRunner extends FlowComponent {
             const tickPromise = this._tick();
             tickPromise.catch((err: unknown) => {
                 const msg = err instanceof Error ? err.message : String(err);
-                console.error(`[JobRunner] tick error: ${msg}`);
+                log.error("tick error", { error: msg });
             });
         }, this._tickIntervalMs);
     }

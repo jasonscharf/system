@@ -13,9 +13,10 @@ import type { ShaclShapes } from "./ShaclReader.js";
  * references another class becomes an edge, never a `fooId` scalar, mechanically.
  *
  * Containment is generator-driven too: an object property declared
- * `rdfs:subPropertyOf <CONTAINS_IRI>` becomes a `containment: true` edge and the
- * file ends with a `registerTopology(...)` call wiring those edges into the
- * tenant-rooted DAG (query path down, authorization scope chain up).  An object
+ * `rdfs:subPropertyOf <CONTAINS_IRI>` becomes a `containment: true` edge.  The
+ * flag is declarative data on the schema; the generated file registers nothing
+ * and runs no module-scope side effect (TRN-627).  A host composes the topology
+ * explicitly by handing schemas to buildServerContext.  An object
  * property whose `rdfs:domain` is an *external* (base-ontology) class produces an
  * augmented "view" schema for that class carrying just the new edge — that is how
  * a containment edge attaches onto a class owned by another package (e.g. adding
@@ -51,11 +52,6 @@ export interface SchemaGenConfig {
      * Defaults to {@link CONTAINS_IRI}.
      */
     containsIri?: string;
-    /**
-     * Import path for `registerTopology`, used in the generated footer when the
-     * ontology declares any containment edges.  Defaults to `@jasonscharf/server`.
-     */
-    topologyImport?: string;
 }
 
 function localName(iri: string): string {
@@ -145,7 +141,7 @@ function renderClass(
     config: SchemaGenConfig,
     generatedIris: Set<string>,
     externalImports: Map<string, string>,
-): { source: string; hasContainment: boolean } {
+): string {
     // A local class emits all its properties.  An augmented external view emits
     // the class's own data properties plus the locally-declared properties (its
     // new edges) — but NOT base object properties, whose edges/targets belong to
@@ -188,16 +184,12 @@ function renderClass(
     }
     lines.push(`    },`);
 
-    let hasContainment = false;
     const edgeLines: string[] = [];
     for (const prop of objectProps) {
         const rendered = renderEdge(prop, cls.iri, shapes, config, generatedIris);
         edgeLines.push(rendered.line);
         if (rendered.import) {
             externalImports.set(rendered.import.schemaName, rendered.import.importPath);
-        }
-        if (isContainment(prop, config)) {
-            hasContainment = true;
         }
     }
     if (edgeLines.length > 0) {
@@ -207,7 +199,7 @@ function renderClass(
     }
 
     lines.push(`});`);
-    return { source: lines.join("\n"), hasContainment };
+    return lines.join("\n");
 }
 
 /**
@@ -215,8 +207,8 @@ function renderClass(
  * the ontology that is local to `config.localNamespace` OR that an extension
  * property attaches an edge onto (an augmented external view).  Edge targets
  * generated in the same file are referenced via forward thunks; other external
- * targets are imported per `config.schemaImports`.  When any containment edge is
- * present, the file ends with a `registerTopology(...)` call.
+ * targets are imported per `config.schemaImports`.  The file is pure declarations:
+ * it never registers itself anywhere.
  */
 export function generateSchemas(
     ontology: Ontology,
@@ -225,7 +217,6 @@ export function generateSchemas(
 ): string {
     const entitiesPkg = config.entitiesImport ?? "@jasonscharf/entities";
     const iriPkg = config.iriImport ?? "@jasonscharf/core";
-    const topologyPkg = config.topologyImport ?? "@jasonscharf/server";
 
     // A class is generated when it is local, or when an extension property declares
     // it as `rdfs:domain` (so an external class can gain a containment edge).
@@ -238,10 +229,9 @@ export function generateSchemas(
     const generatedIris = new Set(generated.map((cls) => cls.iri));
 
     const externalImports = new Map<string, string>(); // schemaName → importPath
-    const containmentSchemas: string[] = [];
     const body = generated
         .map((cls) => {
-            const { source, hasContainment } = renderClass(
+            return renderClass(
                 cls,
                 isLocalClass(cls),
                 shapes,
@@ -249,10 +239,6 @@ export function generateSchemas(
                 generatedIris,
                 externalImports,
             );
-            if (hasContainment) {
-                containmentSchemas.push(schemaConstName(cls.iri));
-            }
-            return source;
         })
         .join("\n\n");
 
@@ -261,9 +247,6 @@ export function generateSchemas(
         `import { EntitySchema } from "${entitiesPkg}";`,
         `import { IRI } from "${iriPkg}";`,
     ];
-    if (containmentSchemas.length > 0) {
-        header.push(`import { registerTopology } from "${topologyPkg}";`);
-    }
     // Group external schema imports by package for stable, deduped output.
     const byPkg = new Map<string, Set<string>>();
     for (const [name, pkg] of externalImports) {
@@ -276,10 +259,5 @@ export function generateSchemas(
         header.push(`import { ${[...names].sort().join(", ")} } from "${pkg}";`);
     }
 
-    const footer =
-        containmentSchemas.length > 0
-            ? `\n\n// Wire containment edges into the tenant-rooted DAG (query path down, scope chain up).\nregisterTopology(${containmentSchemas.join(", ")});\n`
-            : "\n";
-
-    return `${header.join("\n")}\n\n${body}${footer}`;
+    return `${header.join("\n")}\n\n${body}\n`;
 }

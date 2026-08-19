@@ -151,7 +151,7 @@ describe("generateSchemas", () => {
         expect(src).not.toContain("target: () =>");
     });
 
-    it("emits a containment edge and a registerTopology footer for a contains-marked property", async () => {
+    it("emits a containment edge and no module-scope registration for a contains-marked property", async () => {
         const ontology = readOntology(
             await triples(`${PREFIXES}
             @prefix sys: <urn:sys:core:> .
@@ -174,14 +174,14 @@ describe("generateSchemas", () => {
         expect(src).toContain(
             'hasPost: { predicate: new IRI("http://ex.org/lib/hasPost"), target: () => PostSchema, cardinality: "many", direction: "out", containment: true }',
         );
-        // The footer wires it into the topology.
-        expect(src).toContain('import { registerTopology } from "@jasonscharf/server";');
-        expect(src).toContain("registerTopology(ForumSchema);");
-        // Post has no containment edge, so it is not registered.
-        expect(src).not.toContain("registerTopology(ForumSchema, PostSchema)");
+        // The flag is declarative data only: the generated file registers nothing
+        // and runs no import-time side effect, so no import order can change the
+        // authorization scope chain (TRN-627).
+        expect(src).not.toContain("registerTopology");
+        expect(src).not.toContain("@jasonscharf/server");
     });
 
-    it("does not emit containment or a topology footer when no property is contains-marked", async () => {
+    it("does not emit containment when no property is contains-marked", async () => {
         const ontology = readOntology(
             await triples(`${PREFIXES}
             lib:Forum a owl:Class .
@@ -244,6 +244,6 @@ describe("generateSchemas", () => {
         expect(domainBlock).not.toContain("domainTenant");
         // The view's edge target is generated here, so it is a thunk, not an import.
         expect(src).not.toContain("import { ExperimentSchema }");
-        expect(src).toContain("registerTopology(DomainSchema);");
+        expect(src).not.toContain("registerTopology");
     });
 });

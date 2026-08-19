@@ -12,7 +12,8 @@ import { DomainIRI, hasDomainIRI } from "@jasonscharf/core/tenancy";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import {
     buildServerContext,
-    containmentPredicates,
+    CORE_CONTAINMENT_SCHEMAS,
+    containmentPredicatesOf,
     DomainSchema,
     EntityStore,
     type ServerContext,
@@ -46,8 +47,8 @@ describe("DomainSchema — static contract", () => {
         expect(edge?.containment).toBe(true);
     });
 
-    it("test hasDomainIRI is registered as a containment predicate", () => {
-        const predicates = containmentPredicates().map((p) => p.value);
+    it("test hasDomainIRI is a containment predicate of the core backbone", () => {
+        const predicates = containmentPredicatesOf(CORE_CONTAINMENT_SCHEMAS).map((p) => p.value);
         expect(predicates).toContain(hasDomainIRI.value);
     });
 });

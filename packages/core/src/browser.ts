@@ -13,6 +13,10 @@ export * from "./hydration/TripleSource.js";
 export * from "./hydration/TripleStream.js";
 export * from "./messages/SystemMessage.js";
 export * from "./rdf/index.js";
+// The logging API. Browser-safe: it resolves through the container, and its
+// default binding is the ConsoleLogger, so browser code gets the same
+// getLogger() surface as the server with devtools as the sink.
+export * from "./SystemLogger.js";
 export * from "./semantics/IRI.js";
 export * from "./semantics/PrefixRegistry.js";
 export * from "./util/async.js";

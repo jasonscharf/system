@@ -105,8 +105,15 @@ bindService(SystemLogger, { debug, info, warn, error });
 Everything that emits a LOG line, including every server, goes through
 `getLogger()`.
 
-Browser code is the one open question: `getLogger()` is not exported from
-`@jasonscharf/core`'s `browser` entry, because it resolves through the IoC
-container and pulling typescript-ioc + reflect-metadata into every browser
-bundle is a bigger decision than the logging refactor. This law covers server
-and worker code.
+Browser code included. `getLogger()` is exported from `@jasonscharf/core`'s
+`browser` entry and resolves the same way it does on the server; the default
+`ConsoleLogger` binding means devtools is the sink, which is the right
+destination in a browser.
+
+The cost is that resolving through the container pulls typescript-ioc and
+reflect-metadata into the bundle. Measured on sandbox-web: 223.80 kB raw /
+69.98 kB gzip before, 257.52 kB / 80.37 kB after, so **+33.7 kB raw and
++10.4 kB gzip**. That was a deliberate trade for one logging API everywhere
+rather than two. If it ever stops being worth it, the alternative is a
+container-free console sink behind the same `getLogger()` surface, which keeps
+every call site unchanged.

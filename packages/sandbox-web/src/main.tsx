@@ -5,6 +5,9 @@ import { ClientApp } from "./ClientApp.js";
 import { ComponentShowcaseView } from "./components/ComponentShowcase.js";
 import { DiscussionsPage } from "./components/DiscussionsPage.js";
 import "./style.css";
+import { getLogger } from "@jasonscharf/core";
+
+const log = getLogger("sandbox-web");
 
 // In k8s the web container is behind an nginx reverse proxy that forwards
 // /ws → server:8080 and /auth → server:8081.  When VITE_SERVER_URL is not
@@ -69,10 +72,6 @@ async function main(): Promise<void> {
     await app.start();
 }
 
-// getLogger() is not exported from @jasonscharf/core's `browser` entry: it
-// resolves through the IoC container, and pulling typescript-ioc +
-// reflect-metadata into every browser bundle is a bigger decision than this
-// one line. Browser-side logging is deliberately still an open question; the
-// platform logging law covers server and worker code.
-// biome-ignore lint/suspicious/noConsole: browser boot, see above
-main().catch((err) => console.error(err));
+main().catch((err) => {
+    log.error("boot failed", { error: err instanceof Error ? err.message : String(err) });
+});

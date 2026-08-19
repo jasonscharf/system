@@ -126,15 +126,15 @@ describe("IoC container", () => {
     it("test rebinding the logger overrides what every new context sees", () => {
         const lines: string[] = [];
         const capture = {
-            debug: (msg: string) => lines.push(`debug:${msg}`),
-            info: (msg: string) => lines.push(`info:${msg}`),
-            warn: (msg: string) => lines.push(`warn:${msg}`),
-            error: (msg: string) => lines.push(`error:${msg}`),
+            debug: (code: string) => lines.push(`debug:${code}`),
+            info: (code: string) => lines.push(`info:${code}`),
+            warn: (code: string) => lines.push(`warn:${code}`),
+            error: (code: string) => lines.push(`error:${code}`),
         };
         bindService(SystemLogger, capture);
 
         const ctx = buildServerContext(store);
-        ctx.logger?.info("hello");
+        ctx.logger?.info("hello", "Hello there");
         expect(lines).toEqual(["info:hello"]);
     });
 

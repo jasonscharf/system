@@ -1,30 +1,29 @@
 /**
  * The platform logging API: one entry point, one swappable sink.
  *
+ * A line is `log.level(code, message, fields)`. The code is what you filter on
+ * and the message is prose you can reword freely, so the tests below assert on
+ * the code and the fields, never on wording.
+ *
  * Covers:
- *   - getLogger() writes to whatever is bound to SystemLogger.
+ *   - getLog() writes to whatever is bound to SystemLogger.
  *   - Late binding: a logger built at MODULE scope, before boot, still reaches
  *     the sink boot binds afterwards. This is the property that makes
- *     `const log = getLogger(...)` at the top of a file safe.
- *   - The logger name and child metadata ride along as structured fields.
- *   - ConsoleLogger renders the name as a readable prefix.
+ *     `const log = getLog(...)` at the top of a file safe.
+ *   - The logger URN and child metadata ride along as structured fields.
+ *   - ConsoleLogger renders name and code as a readable prefix.
  *   - PinoLogger emits the shape Google Cloud Logging parses: `severity`,
- *     `message`, and the name as a queryable field rather than a prefix.
+ *     `message`, and name + code as queryable fields rather than prose.
  */
 
 import { Writable } from "node:stream";
-import {
-    bindService,
-    ConsoleLogger,
-    getLogger,
-    type Logger,
-    SystemLogger,
-} from "@jasonscharf/core";
+import { bindService, ConsoleLogger, getLog, type Logger, SystemLogger } from "@jasonscharf/core";
 import { PinoLogger } from "@jasonscharf/server";
 import { afterEach, describe, expect, it } from "vitest";
 
 interface Line {
     level: string;
+    code: string;
     msg: string;
     meta?: Record<string, unknown>;
 }
@@ -33,67 +32,78 @@ interface Line {
 function capture(): { sink: Logger; lines: Line[] } {
     const lines: Line[] = [];
     const sink: Logger = {
-        debug: (msg, meta) => lines.push({ level: "debug", msg, meta }),
-        info: (msg, meta) => lines.push({ level: "info", msg, meta }),
-        warn: (msg, meta) => lines.push({ level: "warn", msg, meta }),
-        error: (msg, meta) => lines.push({ level: "error", msg, meta }),
+        debug: (code, msg, meta) => lines.push({ level: "debug", code, msg, meta }),
+        info: (code, msg, meta) => lines.push({ level: "info", code, msg, meta }),
+        warn: (code, msg, meta) => lines.push({ level: "warn", code, msg, meta }),
+        error: (code, msg, meta) => lines.push({ level: "error", code, msg, meta }),
     };
     return { sink, lines };
 }
 
 /**
  * Built at module scope, BEFORE any test binds a sink, exactly as a real
- * module's `const log = getLogger("X")` is. If getLogger captured the sink at
+ * module's `const log = getLog("X")` is. If getLog captured the sink at
  * construction this logger would be pinned to the ConsoleLogger default and
  * every assertion below would see nothing.
  */
-const moduleScopedLog = getLogger("ModuleScoped");
+const moduleScopedLog = getLog("sys:test:module-scoped");
 
 describe("platform logging", () => {
     afterEach(() => {
         bindService(SystemLogger, new ConsoleLogger());
     });
 
-    it("test getLogger writes to the bound sink", () => {
+    it("test getLog writes to the bound sink", () => {
         const { sink, lines } = capture();
         bindService(SystemLogger, sink);
 
-        getLogger("Widget").info("hello");
+        getLog("sys:test:widget").info("hello", "Hello there");
 
         expect(lines).toHaveLength(1);
         expect(lines[0].level).toBe("info");
-        expect(lines[0].msg).toBe("hello");
+        expect(lines[0].code).toBe("hello");
+        expect(lines[0].msg).toBe("Hello there");
     });
 
     it("test a module-scoped logger reaches a sink bound after it was created", () => {
         const { sink, lines } = capture();
         bindService(SystemLogger, sink);
 
-        moduleScopedLog.warn("late");
+        moduleScopedLog.warn("late", "Bound after the logger was built");
 
-        expect(lines).toEqual([{ level: "warn", msg: "late", meta: { name: "ModuleScoped" } }]);
+        expect(lines).toEqual([
+            {
+                level: "warn",
+                code: "late",
+                msg: "Bound after the logger was built",
+                meta: { name: "sys:test:module-scoped" },
+            },
+        ]);
     });
 
-    it("test the logger name rides along as a field", () => {
+    it("test the logger URN rides along as a field", () => {
         const { sink, lines } = capture();
         bindService(SystemLogger, sink);
 
-        getLogger("PulsarConsumer").error("subscribe failed", { topic: "t1" });
+        getLog("sys:flow:pulsar-consumer").error("subscribe-failed", "Subscribe failed", {
+            topic: "t1",
+        });
 
-        expect(lines[0].meta).toEqual({ name: "PulsarConsumer", topic: "t1" });
+        expect(lines[0].code).toBe("subscribe-failed");
+        expect(lines[0].meta).toEqual({ name: "sys:flow:pulsar-consumer", topic: "t1" });
     });
 
     it("test child metadata is merged into every line", () => {
         const { sink, lines } = capture();
         bindService(SystemLogger, sink);
 
-        const log = getLogger("dispatch").child({ correlationId: "abc" });
-        log.info("received", { name: "core.user.create" });
+        const log = getLog("sys:app:dispatch").child({ correlationId: "abc" });
+        log.info("received", "Request received", { name: "core.user.create" });
 
         // The correlation id rides along, and the logger's own name is not
         // clobbered by a caller passing a `name` of their own.
         expect(lines[0].meta).toEqual({
-            name: "dispatch",
+            name: "sys:app:dispatch",
             correlationId: "abc",
         });
     });
@@ -102,16 +112,16 @@ describe("platform logging", () => {
         const { sink, lines } = capture();
         bindService(SystemLogger, sink);
 
-        const log = getLogger("Levels");
-        log.debug("d");
-        log.info("i");
-        log.warn("w");
-        log.error("e");
+        const log = getLog("sys:test:levels");
+        log.debug("d", "debug");
+        log.info("i", "info");
+        log.warn("w", "warn");
+        log.error("e", "error");
 
         expect(lines.map((l) => l.level)).toEqual(["debug", "info", "warn", "error"]);
     });
 
-    it("test ConsoleLogger renders the name as a prefix", () => {
+    it("test ConsoleLogger renders name and code as a prefix", () => {
         const seen: unknown[][] = [];
         // biome-ignore lint/suspicious/noConsole: this test asserts on the console sink
         const original = console.info;
@@ -121,12 +131,12 @@ describe("platform logging", () => {
 
         try {
             bindService(SystemLogger, new ConsoleLogger());
-            getLogger("Widget").info("hello", { id: 7 });
+            getLog("sys:test:widget").info("hello", "Hello there", { id: 7 });
         } finally {
             console.info = original;
         }
 
-        expect(seen).toEqual([["[Widget] hello", { id: 7 }]]);
+        expect(seen).toEqual([["[sys:test:widget/hello] Hello there", { id: 7 }]]);
     });
 });
 
@@ -159,12 +169,13 @@ describe("PinoLogger", () => {
     }
 
     it("test output uses the field names Cloud Logging parses", () => {
-        const [line] = pinoLines((log) => log.info("started", { port: 8080 }));
+        const [line] = pinoLines((log) => log.info("started", "Service started", { port: 8080 }));
 
         // `severity` and `message`, NOT pino's `level: 30` and `msg`: the Ops
         // Agent keys off these names and drops everything else to jsonPayload.
         expect(line.severity).toBe("INFO");
-        expect(line.message).toBe("started");
+        expect(line.message).toBe("Service started");
+        expect(line.code).toBe("started");
         expect(line.port).toBe(8080);
         expect(line.service).toBe("test-service");
         expect(line.level).toBeUndefined();
@@ -173,29 +184,33 @@ describe("PinoLogger", () => {
 
     it("test each level maps to its Cloud Logging severity", () => {
         const lines = pinoLines((log) => {
-            log.debug("d");
-            log.info("i");
-            log.warn("w");
-            log.error("e");
+            log.debug("d", "debug");
+            log.info("i", "info");
+            log.warn("w", "warn");
+            log.error("e", "error");
         });
 
         expect(lines.map((l) => l.severity)).toEqual(["DEBUG", "INFO", "WARNING", "ERROR"]);
     });
 
-    it("test the logger name is a queryable field, not a message prefix", () => {
-        const [line] = pinoLines((log) => getLoggerVia(log, "RedisSub").info("subscribed"));
+    it("test name and code are queryable fields, not a message prefix", () => {
+        const [line] = pinoLines((log) => {
+            bindService(SystemLogger, log);
+            getLog("sys:flow:redis-sub").info("subscribed", "Subscribed to channels");
+        });
 
-        expect(line.name).toBe("RedisSub");
-        expect(line.message).toBe("subscribed");
+        expect(line.name).toBe("sys:flow:redis-sub");
+        expect(line.code).toBe("subscribed");
+        expect(line.message).toBe("Subscribed to channels");
     });
 
     it("test the level threshold suppresses lines below it", () => {
         const lines = pinoLines((log) => {
-            log.debug("dropped");
-            log.warn("kept");
+            log.debug("dropped", "below the threshold");
+            log.warn("kept", "at the threshold");
         }, "warn");
 
-        expect(lines.map((l) => l.message)).toEqual(["kept"]);
+        expect(lines.map((l) => l.code)).toEqual(["kept"]);
     });
 
     it("test standing base fields ride on every line", () => {
@@ -211,16 +226,10 @@ describe("PinoLogger", () => {
             base: { build: "abc123", branch: "main" },
             destination,
         });
-        logger.info("boot");
+        logger.info("boot", "Booted");
 
         const line = JSON.parse(chunks.join("").trim()) as Record<string, unknown>;
         expect(line.build).toBe("abc123");
         expect(line.branch).toBe("main");
     });
 });
-
-/** Route a getLogger() call through a specific PinoLogger instance. */
-function getLoggerVia(sink: Logger, name: string): Logger {
-    bindService(SystemLogger, sink);
-    return getLogger(name);
-}

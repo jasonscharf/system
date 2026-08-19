@@ -1,10 +1,10 @@
 import { extname, isAbsolute, join, normalize, relative } from "node:path";
-import { getLogger } from "@jasonscharf/core";
+import { getLog } from "@jasonscharf/core";
 import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
 import type { FlowPort } from "../../FlowPort.js";
 import type { HttpHeaders, HttpStreamResponse, ParsedHttpRequest } from "./HttpTypes.js";
 
-const log = getLogger("FileStreamHandler");
+const log = getLog("sys:flow:http:file-stream-handler");
 
 // ── MIME type map ──────────────────────────────────────────────────────────────
 
@@ -141,7 +141,7 @@ export class FileStreamHandler extends FlowComponent {
             await this._serve(req, reqId);
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
-            log.error("failed to serve request", {
+            log.error("serve-failed", "Failed to serve request", {
                 component: this.name,
                 pathname: req.pathname,
                 error: message,

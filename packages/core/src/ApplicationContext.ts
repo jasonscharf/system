@@ -4,14 +4,20 @@ import { resolveService } from "./container/ioc.js";
 import { SystemLogger } from "./SystemLogger.js";
 
 /**
- * Minimal logger interface.  Any logger satisfying this shape (pino, winston,
- * console-based, etc.) can be placed on ApplicationContext.
+ * Minimal logger interface: the shape every sink implements and every caller
+ * sees. See SystemLogger.ts for what the three arguments are for.
+ *
+ *   log.warn("send-failed", "Outgoing email send failed", { messageId });
+ *
+ * `code` is a short stable slug, unique within its logger, and is what you
+ * filter and group on. `msg` is prose for a human and may be reworded freely.
+ * Values go in `meta`, never interpolated into `msg`.
  */
 export interface Logger {
-    debug(msg: string, meta?: Record<string, unknown>): void;
-    info(msg: string, meta?: Record<string, unknown>): void;
-    warn(msg: string, meta?: Record<string, unknown>): void;
-    error(msg: string, meta?: Record<string, unknown>): void;
+    debug(code: string, msg: string, meta?: Record<string, unknown>): void;
+    info(code: string, msg: string, meta?: Record<string, unknown>): void;
+    warn(code: string, msg: string, meta?: Record<string, unknown>): void;
+    error(code: string, msg: string, meta?: Record<string, unknown>): void;
 }
 
 /**

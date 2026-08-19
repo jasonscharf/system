@@ -27,14 +27,14 @@ import { randomUUID } from "node:crypto";
 import {
     type DomainEvent,
     type EventSubscription,
-    getLogger,
+    getLog,
     type ISystemBus,
     type RpcHandler,
     type RpcKind,
 } from "@jasonscharf/core";
 import type { Redis } from "ioredis";
 
-const log = getLogger("RedisSystemBus");
+const log = getLog("sys:events:redis-system-bus");
 
 export interface RedisSystemBusOptions {
     /** Namespace for all bus keys. Default: "bus". */
@@ -283,7 +283,10 @@ export class RedisSystemBus implements ISystemBus {
         // crashed unexpectedly, so it must be LOGGED rather than become an
         // unhandled rejection.
         this._consume(loop, stream, group, onEntry).catch((err: unknown) => {
-            log.error("consume loop crashed", { stream, error: (err as Error).message });
+            log.error("consume-loop-crashed", "Consume loop crashed", {
+                stream,
+                error: (err as Error).message,
+            });
         });
         return loop;
     }
@@ -314,7 +317,10 @@ export class RedisSystemBus implements ISystemBus {
                 if (!loop.running) {
                     break;
                 }
-                log.error("XREADGROUP error", { stream, error: (err as Error).message });
+                log.error("xreadgroup-failed", "XREADGROUP failed", {
+                    stream,
+                    error: (err as Error).message,
+                });
                 continue;
             }
 
@@ -324,7 +330,7 @@ export class RedisSystemBus implements ISystemBus {
                     try {
                         await onEntry(fields);
                     } catch (err: unknown) {
-                        log.error("handler error", {
+                        log.error("handler-threw", "Event handler threw", {
                             stream,
                             entryId,
                             error: (err as Error).message,
@@ -339,7 +345,7 @@ export class RedisSystemBus implements ISystemBus {
                         // biome-ignore lint/suspicious/noExplicitAny: ioredis stream commands lack public overloads
                         await (this._cmd as any).xack(stream, group, entryId);
                     } catch (err: unknown) {
-                        log.error("XACK failed, entry will be redelivered", {
+                        log.error("xack-failed", "XACK failed, entry will be redelivered", {
                             stream,
                             entryId,
                             error: (err as Error).message,
@@ -357,7 +363,7 @@ export class RedisSystemBus implements ISystemBus {
             await loop.conn.quit();
         } catch (err: unknown) {
             // Quit failed; force the socket closed so the connection is not leaked.
-            log.error("consumer connection quit failed, forcing disconnect", {
+            log.error("quit-failed", "Consumer connection quit failed, forcing disconnect", {
                 error: (err as Error).message,
             });
             loop.conn.disconnect();

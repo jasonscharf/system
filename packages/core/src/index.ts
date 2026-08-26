@@ -5,6 +5,9 @@ export * from "./constants.js";
 export * from "./container/index.js";
 export * from "./events/index.js";
 export * from "./hydration/index.js";
+// Server-only (node:async_hooks): registers the ambient log field source.
+// Deliberately absent from browser.ts.
+export * from "./LogContext.js";
 export * from "./messages/SystemMessage.js";
 export * from "./modref/resolveModuleRef.js";
 export * from "./rbac/index.js";

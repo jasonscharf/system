@@ -35,6 +35,13 @@ export interface TokenArgs {
     token: string;
 }
 
+/** A validated session: the user it belongs to plus the session entity id. */
+export interface ValidatedSession {
+    user: UserEntity;
+    /** Session entity id (never the token). Null only for pre-TRN-668 cache entries. */
+    sessionId: string | null;
+}
+
 export interface UserIdArgs {
     userId: string;
 }
@@ -219,6 +226,7 @@ export class AuthService {
                 userId: user.id,
                 deviceId: session.deviceId,
                 expiresAt: session.expiresAt.getTime(),
+                sessionId: session.id,
             }),
             SESSION_TTL_SECS,
         );
@@ -331,6 +339,22 @@ export class AuthService {
         _sec: SecurityContext,
         args: TokenArgs,
     ): Promise<UserEntity | null> {
+        const validated = await this.validateSession(ctx, _sec, args);
+        return validated ? validated.user : null;
+    }
+
+    /**
+     * Like {@link validateToken}, but also surfaces the session entity id, so
+     * an edge can put it on the SecurityContext (revocation and log filtering
+     * key off it) without a second lookup. `sessionId` is null only for cache
+     * entries written before it was recorded; those roll over within a session
+     * TTL.
+     */
+    async validateSession(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: TokenArgs,
+    ): Promise<ValidatedSession | null> {
         const key = this._sessionCacheKey(args.token);
         const cached = await this._store.get(key);
 
@@ -340,16 +364,22 @@ export class AuthService {
         }
 
         if (cached) {
-            const data = JSON.parse(cached) as { userId: string; expiresAt: number };
+            const data = JSON.parse(cached) as {
+                userId: string;
+                expiresAt: number;
+                sessionId?: string;
+            };
             if (Date.now() < data.expiresAt) {
-                return this._users.findById(ctx, systemSec, { id: data.userId });
+                const user = await this._users.findById(ctx, systemSec, { id: data.userId });
+                return user ? { user, sessionId: data.sessionId ?? null } : null;
             }
             await this._store.del(key);
         }
 
         const session = await this._sessions.findByToken(ctx, systemSec, { token: args.token });
         if (session?.isActive && session.expiresAt.getTime() > Date.now()) {
-            return this._users.findById(ctx, systemSec, { id: session.userId });
+            const user = await this._users.findById(ctx, systemSec, { id: session.userId });
+            return user ? { user, sessionId: session.id } : null;
         }
 
         // Negative-cache the miss so repeated garbage tokens stop hitting the

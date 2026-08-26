@@ -49,6 +49,24 @@ import { declareService, resolveService } from "./container/ioc.js";
  */
 export const LOGGER_NAME_KEY = "name";
 
+/** Supplies the ambient fields for the current execution, or null when there are none. */
+export type AmbientLogFieldSource = () => Record<string, unknown> | null;
+
+/**
+ * Where BoundLogger reads ambient per-execution fields (a request's userIri,
+ * sessionId) from. LogContext.ts registers the real AsyncLocalStorage-backed
+ * source at module load; the indirection exists because THIS module is shared
+ * with the browser entry, where `node:async_hooks` does not exist, so the
+ * import must live in a server-only module. In the browser the default stands
+ * and every lookup is null.
+ */
+let ambientLogFields: AmbientLogFieldSource = () => null;
+
+/** Register the source of ambient log fields. Called once, by LogContext.ts. */
+export function setAmbientLogFieldSource(source: AmbientLogFieldSource): void {
+    ambientLogFields = source;
+}
+
 /**
  * Container token for the root logger. This is the sink, and deliberately
  * nothing more than the four level methods: anything can be bound to it,
@@ -158,13 +176,27 @@ class BoundLogger implements NamedLogger {
         return resolveService(SystemLogger);
     }
 
-    /** Standing metadata first, so a per-call key of the same name wins. */
+    /**
+     * Lowest precedence first: ambient execution context, then standing
+     * metadata, then per-call fields — so an explicit field always beats an
+     * ambient one, and the logger's name beats everything.
+     */
     private _merge(meta?: Record<string, unknown>): Record<string, unknown> {
-        if (!meta) {
-            return this._meta;
+        const ambient = ambientLogFields();
+        if (!ambient) {
+            if (!meta) {
+                return this._meta;
+            }
+
+            return { ...this._meta, ...meta, [LOGGER_NAME_KEY]: this._meta[LOGGER_NAME_KEY] };
         }
 
-        return { ...this._meta, ...meta, [LOGGER_NAME_KEY]: this._meta[LOGGER_NAME_KEY] };
+        return {
+            ...ambient,
+            ...this._meta,
+            ...meta,
+            [LOGGER_NAME_KEY]: this._meta[LOGGER_NAME_KEY],
+        };
     }
 }
 

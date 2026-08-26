@@ -17,7 +17,15 @@
  */
 
 import { Writable } from "node:stream";
-import { bindService, ConsoleLogger, getLog, type Logger, SystemLogger } from "@jasonscharf/core";
+import {
+    bindService,
+    ConsoleLogger,
+    getLog,
+    getLogContext,
+    type Logger,
+    runWithLogContext,
+    SystemLogger,
+} from "@jasonscharf/core";
 import { PinoLogger } from "@jasonscharf/server";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -137,6 +145,95 @@ describe("platform logging", () => {
         }
 
         expect(seen).toEqual([["[sys:test:widget/hello] Hello there", { id: 7 }]]);
+    });
+});
+
+describe("ambient log context", () => {
+    afterEach(() => {
+        bindService(SystemLogger, new ConsoleLogger());
+    });
+
+    it("test ambient fields ride on every line inside the context", () => {
+        const { sink, lines } = capture();
+        bindService(SystemLogger, sink);
+
+        runWithLogContext({ userIri: "urn:u:1", sessionId: "s-1" }, () => {
+            getLog("sys:test:handler").info("handled", "Handled");
+        });
+
+        expect(lines[0].meta).toEqual({
+            name: "sys:test:handler",
+            userIri: "urn:u:1",
+            sessionId: "s-1",
+        });
+    });
+
+    it("test lines outside any context carry no ambient fields", () => {
+        const { sink, lines } = capture();
+        bindService(SystemLogger, sink);
+
+        getLog("sys:test:boot").info("booted", "Booted");
+
+        expect(lines[0].meta).toEqual({ name: "sys:test:boot" });
+        expect(getLogContext()).toBeNull();
+    });
+
+    it("test explicit per-call and child fields beat ambient ones", () => {
+        const { sink, lines } = capture();
+        bindService(SystemLogger, sink);
+
+        runWithLogContext({ userIri: "ambient", tenant: "ambient-tenant" }, () => {
+            const log = getLog("sys:test:precedence").child({ tenant: "child-tenant" });
+            log.info("checked", "Checked", { userIri: "explicit" });
+        });
+
+        expect(lines[0].meta).toEqual({
+            name: "sys:test:precedence",
+            userIri: "explicit",
+            tenant: "child-tenant",
+        });
+    });
+
+    it("test contexts nest and the outer context is restored on exit", () => {
+        const { sink, lines } = capture();
+        bindService(SystemLogger, sink);
+        const log = getLog("sys:test:nesting");
+
+        runWithLogContext({ userIri: "outer" }, () => {
+            runWithLogContext({ sessionId: "inner" }, () => {
+                log.info("inner", "Inner");
+            });
+            log.info("outer", "Outer");
+        });
+
+        expect(lines[0].meta).toEqual({
+            name: "sys:test:nesting",
+            userIri: "outer",
+            sessionId: "inner",
+        });
+        expect(lines[1].meta).toEqual({ name: "sys:test:nesting", userIri: "outer" });
+    });
+
+    it("test the context follows async execution across awaits", async () => {
+        const { sink, lines } = capture();
+        bindService(SystemLogger, sink);
+        const log = getLog("sys:test:async");
+
+        // Two interleaved requests: each line must carry ITS request's fields.
+        await Promise.all([
+            runWithLogContext({ userIri: "urn:u:a" }, async () => {
+                await Promise.resolve();
+                log.info("a", "A");
+            }),
+            runWithLogContext({ userIri: "urn:u:b" }, async () => {
+                await Promise.resolve();
+                log.info("b", "B");
+            }),
+        ]);
+
+        const byCode = new Map(lines.map((l) => [l.code, l.meta]));
+        expect(byCode.get("a")).toEqual({ name: "sys:test:async", userIri: "urn:u:a" });
+        expect(byCode.get("b")).toEqual({ name: "sys:test:async", userIri: "urn:u:b" });
     });
 });
 

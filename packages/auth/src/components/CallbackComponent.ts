@@ -164,6 +164,7 @@ export class CallbackComponent extends FlowComponent {
                     userId: user.id,
                     deviceId: device.id,
                     expiresAt: expiresAt.getTime(),
+                    sessionId: session.id,
                 }),
                 SESSION_TTL_SECS,
             );

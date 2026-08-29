@@ -39,6 +39,20 @@ export interface UserIdArgs {
     userId: string;
 }
 
+export interface ValidatedSession {
+    /** The user the token authenticates. */
+    user: UserEntity;
+    /**
+     * The session ENTITY id, never the token.
+     *
+     * Null when the answer came from a fast-path cache entry written before the
+     * id was recorded there. Those entries expire within SESSION_TTL_SECS, so
+     * this is null only for sessions already open at the moment this shipped,
+     * and never for one established since.
+     */
+    sessionId: string | null;
+}
+
 /**
  * Core auth business logic — provider-agnostic, transport-agnostic.
  * Used directly by HTTP/WS handlers and wrapped by FBP components.
@@ -219,6 +233,10 @@ export class AuthService {
                 userId: user.id,
                 deviceId: session.deviceId,
                 expiresAt: session.expiresAt.getTime(),
+                // The session ENTITY id, never the token: validateSession hands
+                // this to callers that log or audit under a session, and the
+                // token is a bearer credential that must not reach either.
+                sessionId: session.id,
             }),
             SESSION_TTL_SECS,
         );
@@ -320,17 +338,39 @@ export class AuthService {
 
     /**
      * System/bootstrap path: resolves a raw session token to its owning user.
-     * Possession of the token IS the credential — this runs at the unauthenticated
-     * edge (cookie/Bearer validation) before any principal exists, so it
-     * deliberately uses the internal system principal rather than the caller's
-     * `sec`. It only ever reads back the user the token already belongs to; it
-     * grants no cross-user access.
+     * Callers that also need the session behind it want validateSession, which
+     * this delegates to.
      */
     async validateToken(
         ctx: ServerContext,
-        _sec: SecurityContext,
+        sec: SecurityContext,
         args: TokenArgs,
     ): Promise<UserEntity | null> {
+        const validated = await this.validateSession(ctx, sec, args);
+        return validated?.user ?? null;
+    }
+
+    /**
+     * Resolves a raw session token to the user it authenticates AND the session
+     * behind it. Same work as validateToken, which delegates here: there is one
+     * implementation of "is this token good", not two to drift apart.
+     *
+     * System/bootstrap path. Possession of the token IS the credential — this
+     * runs at the unauthenticated edge (cookie/Bearer validation) before any
+     * principal exists, so it deliberately uses the internal system principal
+     * rather than the caller's `sec`. It only ever reads back the user the token
+     * already belongs to; it grants no cross-user access.
+     *
+     * The session id exists because a caller that logs or audits under a session
+     * needs something stable to correlate on, and the token cannot be it: the
+     * token is the bearer credential, so putting it in a log line or an audit
+     * row hands out the session to anyone who can read either.
+     */
+    async validateSession(
+        ctx: ServerContext,
+        _sec: SecurityContext,
+        args: TokenArgs,
+    ): Promise<ValidatedSession | null> {
         const key = this._sessionCacheKey(args.token);
         const cached = await this._store.get(key);
 
@@ -340,16 +380,22 @@ export class AuthService {
         }
 
         if (cached) {
-            const data = JSON.parse(cached) as { userId: string; expiresAt: number };
+            const data = JSON.parse(cached) as {
+                userId: string;
+                expiresAt: number;
+                sessionId?: string;
+            };
             if (Date.now() < data.expiresAt) {
-                return this._users.findById(ctx, systemSec, { id: data.userId });
+                const user = await this._users.findById(ctx, systemSec, { id: data.userId });
+                return user ? { user, sessionId: data.sessionId ?? null } : null;
             }
             await this._store.del(key);
         }
 
         const session = await this._sessions.findByToken(ctx, systemSec, { token: args.token });
         if (session?.isActive && session.expiresAt.getTime() > Date.now()) {
-            return this._users.findById(ctx, systemSec, { id: session.userId });
+            const user = await this._users.findById(ctx, systemSec, { id: session.userId });
+            return user ? { user, sessionId: session.id } : null;
         }
 
         // Negative-cache the miss so repeated garbage tokens stop hitting the

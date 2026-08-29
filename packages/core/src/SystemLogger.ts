@@ -50,6 +50,29 @@ import { declareService, resolveService } from "./container/ioc.js";
 export const LOGGER_NAME_KEY = "name";
 
 /**
+ * Reads the fields bound to the current async scope by `runWithLogContext`, so
+ * every line emitted while handling one request carries who it was for without
+ * a single call site naming them.
+ *
+ * This is a slot rather than a direct import of logContext.js because THIS
+ * module is in the browser bundle (see browser.ts) and the only way to carry
+ * fields across an `await` is node:async_hooks, which a browser build cannot
+ * resolve. The Node entry point re-exports logContext.js, whose import installs
+ * the real reader; the browser entry point does not, so it keeps this no-op and
+ * never pulls the built-in into the graph. One installer, one reader.
+ */
+let readAmbientFields: () => Record<string, unknown> | undefined = () => undefined;
+
+/**
+ * Installs the ambient-field reader. Called once, by logContext.js, when that
+ * module is first imported. Application code binds fields with
+ * `runWithLogContext` and never calls this.
+ */
+export function installLogContextReader(read: () => Record<string, unknown> | undefined): void {
+    readAmbientFields = read;
+}
+
+/**
  * Container token for the root logger. This is the sink, and deliberately
  * nothing more than the four level methods: anything can be bound to it,
  * including a plain object literal that pushes to an array in a test. Naming
@@ -158,13 +181,25 @@ class BoundLogger implements NamedLogger {
         return resolveService(SystemLogger);
     }
 
-    /** Standing metadata first, so a per-call key of the same name wins. */
+    /**
+     * Precedence, lowest to highest: the ambient fields bound to this async
+     * scope, then the logger's standing metadata, then this call's own. The
+     * widest scope loses, so a handler that passes an explicit userIri overrides
+     * whatever the request bound. The logger's name is applied last and always
+     * wins, because it identifies where the line came from.
+     */
     private _merge(meta?: Record<string, unknown>): Record<string, unknown> {
-        if (!meta) {
+        const ambient = readAmbientFields();
+        if (!ambient && !meta) {
             return this._meta;
         }
 
-        return { ...this._meta, ...meta, [LOGGER_NAME_KEY]: this._meta[LOGGER_NAME_KEY] };
+        return {
+            ...ambient,
+            ...this._meta,
+            ...meta,
+            [LOGGER_NAME_KEY]: this._meta[LOGGER_NAME_KEY],
+        };
     }
 }
 

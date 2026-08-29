@@ -1,6 +1,6 @@
 // ── Entity schemas ────────────────────────────────────────────────────────────
 
-export type { LoginResult } from "./AuthService.js";
+export type { LoginResult, ValidatedSession } from "./AuthService.js";
 // ── Core service ──────────────────────────────────────────────────────────────
 export { AuthService } from "./AuthService.js";
 export type { AuthRouterOptions } from "./components/AuthRouterComponent.js";

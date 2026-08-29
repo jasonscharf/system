@@ -14,10 +14,19 @@
  *   - ConsoleLogger renders name and code as a readable prefix.
  *   - PinoLogger emits the shape Google Cloud Logging parses: `severity`,
  *     `message`, and name + code as queryable fields rather than prose.
+ *   - runWithLogContext binds ambient fields that ride on every line emitted in
+ *     scope, across awaits, without a call site naming them.
  */
 
 import { Writable } from "node:stream";
-import { bindService, ConsoleLogger, getLog, type Logger, SystemLogger } from "@jasonscharf/core";
+import {
+    bindService,
+    ConsoleLogger,
+    getLog,
+    type Logger,
+    runWithLogContext,
+    SystemLogger,
+} from "@jasonscharf/core";
 import { PinoLogger } from "@jasonscharf/server";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -231,5 +240,127 @@ describe("PinoLogger", () => {
         const line = JSON.parse(chunks.join("").trim()) as Record<string, unknown>;
         expect(line.build).toBe("abc123");
         expect(line.branch).toBe("main");
+    });
+});
+
+/**
+ * Ambient log context (TRN-668).
+ *
+ * The point of this is that the code doing the logging never mentions the
+ * fields: an edge binds the caller's identity once and everything downstream
+ * inherits it. So every test here logs through a plain `getLog(...)` that knows
+ * nothing about the context, and asserts on what came out the sink.
+ */
+describe("ambient log context", () => {
+    afterEach(() => {
+        bindService(SystemLogger, new ConsoleLogger());
+    });
+
+    it("test fields bound at the edge ride on a line logged deeper in", () => {
+        const { sink, lines } = capture();
+        bindService(SystemLogger, sink);
+
+        runWithLogContext({ userIri: "urn:user:alice", sessionId: "sess-1" }, () => {
+            getLog("sys:test:deep").info("did-a-thing", "Did a thing");
+        });
+
+        expect(lines[0].meta?.userIri).toBe("urn:user:alice");
+        expect(lines[0].meta?.sessionId).toBe("sess-1");
+    });
+
+    it("test a line outside the scope carries no ambient fields", () => {
+        const { sink, lines } = capture();
+        bindService(SystemLogger, sink);
+
+        runWithLogContext({ userIri: "urn:user:alice" }, () => {
+            getLog("sys:test:inside").info("inside", "Inside");
+        });
+        getLog("sys:test:outside").info("outside", "Outside");
+
+        expect(lines[1].meta?.userIri).toBeUndefined();
+    });
+
+    it("test the fields survive an await", async () => {
+        const { sink, lines } = capture();
+        bindService(SystemLogger, sink);
+
+        // The reason this is AsyncLocalStorage and not a module variable: the
+        // work a request does is almost entirely on the far side of an await.
+        await runWithLogContext({ userIri: "urn:user:bob" }, async () => {
+            await new Promise((resolve) => setTimeout(resolve, 1));
+            getLog("sys:test:after-await").info("resumed", "Resumed");
+        });
+
+        expect(lines[0].meta?.userIri).toBe("urn:user:bob");
+    });
+
+    it("test concurrent scopes do not see each other's fields", async () => {
+        const { sink, lines } = capture();
+        bindService(SystemLogger, sink);
+
+        // Two requests in flight at once is the normal case for a server, and a
+        // context that leaked between them would attribute one user's lines to
+        // another. Interleaved deliberately: the second starts before the first
+        // has logged.
+        await Promise.all([
+            runWithLogContext({ userIri: "urn:user:alice" }, async () => {
+                await new Promise((resolve) => setTimeout(resolve, 5));
+                getLog("sys:test:req").info("alice", "Alice's line");
+            }),
+            runWithLogContext({ userIri: "urn:user:bob" }, async () => {
+                getLog("sys:test:req").info("bob", "Bob's line");
+            }),
+        ]);
+
+        const byCode = new Map(lines.map((l) => [l.code, l.meta?.userIri]));
+        expect(byCode.get("alice")).toBe("urn:user:alice");
+        expect(byCode.get("bob")).toBe("urn:user:bob");
+    });
+
+    it("test nesting merges, and the inner scope wins a collision", () => {
+        const { sink, lines } = capture();
+        bindService(SystemLogger, sink);
+
+        // A WebSocket connection binding its own fields inside an authenticated
+        // request must not drop the request's identity.
+        runWithLogContext({ userIri: "urn:user:alice", tenant: "acme" }, () => {
+            runWithLogContext({ userIri: "urn:user:carol", connectionId: "ws-9" }, () => {
+                getLog("sys:test:nested").info("nested", "Nested");
+            });
+        });
+
+        expect(lines[0].meta?.tenant).toBe("acme");
+        expect(lines[0].meta?.connectionId).toBe("ws-9");
+        expect(lines[0].meta?.userIri).toBe("urn:user:carol");
+    });
+
+    it("test an explicit field on the call beats the ambient one", () => {
+        const { sink, lines } = capture();
+        bindService(SystemLogger, sink);
+
+        runWithLogContext({ userIri: "urn:user:alice" }, () => {
+            getLog("sys:test:explicit").info("acted-on", "Acted on another user", {
+                userIri: "urn:user:target",
+            });
+        });
+
+        expect(lines[0].meta?.userIri).toBe("urn:user:target");
+    });
+
+    it("test the logger name still wins over an ambient field of the same key", () => {
+        const { sink, lines } = capture();
+        bindService(SystemLogger, sink);
+
+        // `name` is reserved for the logger URN, and ambient fields are the
+        // widest scope of all, so they must not be able to forge it.
+        runWithLogContext({ name: "not-the-logger" }, () => {
+            getLog("sys:test:reserved").info("named", "Named");
+        });
+
+        expect(lines[0].meta?.name).toBe("sys:test:reserved");
+    });
+
+    it("test the callback's return value is passed through", () => {
+        expect(runWithLogContext({ userIri: "urn:user:alice" }, () => 42)).toBe(42);
     });
 });

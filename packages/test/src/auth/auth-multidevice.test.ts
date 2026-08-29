@@ -12,6 +12,8 @@
  *   - Logout-all: revoking every session for a user
  *   - Session store cache invalidation on revoke
  *   - validateToken returns null after revoke even with stale cache
+ *   - validateSession returns the session ENTITY id alongside the user, from
+ *     both the warm cache and the cold store, and never the bearer token
  *   - listSessions / listActiveSessions reflect real state
  *   - AuthService.hasProvider gating
  *   - Secure cookie flag derived from baseUrl (https → Secure, http → none)
@@ -189,6 +191,66 @@ for (const db of providers) {
             });
             const found = await ctx.service.validateToken(buildServerContext(ctx.store), systemSec, { token: session.sessionToken });
             expect(found?.email).toBe(ALICE.email);
+        });
+
+        it("validateSession returns the user and the session entity id", async () => {
+            vi.stubGlobal("fetch", mockGoogleFetch(ALICE));
+            const { session } = await ctx.service.handleCallback({
+                provider: "google",
+                code: "c",
+                redirectUri: "http://localhost/cb",
+                device: { userAgent: PC_UA, platform: "web" },
+            });
+
+            const validated = await ctx.service.validateSession(buildServerContext(ctx.store), systemSec, { token: session.sessionToken });
+
+            expect(validated?.user.email).toBe(ALICE.email);
+            expect(validated?.sessionId).toBe(session.id);
+            // The id is what may be logged and audited. The token must never be
+            // it: possession of the token IS the session.
+            expect(validated?.sessionId).not.toBe(session.sessionToken);
+        });
+
+        it("validateSession resolves the same session id with a cold cache", async () => {
+            vi.stubGlobal("fetch", mockGoogleFetch(ALICE));
+            const { session } = await ctx.service.handleCallback({
+                provider: "google",
+                code: "c",
+                redirectUri: "http://localhost/cb",
+                device: { userAgent: PC_UA, platform: "web" },
+            });
+
+            // A second service over the SAME repositories but an empty session
+            // store, which is what a process that did not mint the session sees.
+            // The fast path and the triple-store path must agree on the id, or a
+            // session's log lines would change identity on a cache miss.
+            const cold = new AuthService({
+                providers: [new GoogleProvider("cid", "cs")],
+                sessionStore: new MemorySessionStore(),
+                users: ctx.users,
+                identities: new UserIdentityRepository(ctx.store, TEST_CIPHER),
+                sessions: ctx.sessions,
+                devices: ctx.devices,
+            });
+
+            const validated = await cold.validateSession(buildServerContext(ctx.store), systemSec, { token: session.sessionToken });
+
+            expect(validated?.user.email).toBe(ALICE.email);
+            expect(validated?.sessionId).toBe(session.id);
+        });
+
+        it("validateSession returns null once the session is revoked", async () => {
+            vi.stubGlobal("fetch", mockGoogleFetch(ALICE));
+            const { session } = await ctx.service.handleCallback({
+                provider: "google",
+                code: "c",
+                redirectUri: "http://localhost/cb",
+                device: { userAgent: PC_UA, platform: "web" },
+            });
+
+            await ctx.service.revokeToken(buildServerContext(ctx.store), systemSec, { token: session.sessionToken });
+
+            expect(await ctx.service.validateSession(buildServerContext(ctx.store), systemSec, { token: session.sessionToken })).toBeNull();
         });
 
         it("second login on same device reuses device, creates new session", async () => {

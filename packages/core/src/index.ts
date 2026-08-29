@@ -5,6 +5,7 @@ export * from "./constants.js";
 export * from "./container/index.js";
 export * from "./events/index.js";
 export * from "./hydration/index.js";
+export * from "./logContext.js";
 export * from "./messages/SystemMessage.js";
 export * from "./modref/resolveModuleRef.js";
 export * from "./rbac/index.js";

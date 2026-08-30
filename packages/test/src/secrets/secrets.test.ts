@@ -390,6 +390,53 @@ describe("SecretsManager", () => {
         expect(mgr).toBeInstanceOf(SecretsManager);
     });
 
+    // ── Store selection (TRN-685) ────────────────────────────────────────────
+    //
+    // Which store a process reads is decided by an explicit variable naming it,
+    // never by detecting which cloud the process happens to be running in. These
+    // assert that choice, and that asking for two stores at once is refused
+    // rather than silently resolved in favour of one.
+    describe("fromEnvironment() store selection", () => {
+        afterEach(() => {
+            delete process.env.AZURE_KEY_VAULT_URI;
+            delete process.env.GCP_SECRETS_PROJECT;
+        });
+
+        it("picks GCP Secret Manager when GCP_SECRETS_PROJECT is set", async () => {
+            delete process.env.AZURE_KEY_VAULT_URI;
+            process.env.GCP_SECRETS_PROJECT = "some-project";
+            process.env.__GCP_SELECTION_PROBE__ = "from-env";
+
+            const mgr = SecretsManager.fromEnvironment();
+
+            // Proving WHICH provider was chosen without a metadata server: the
+            // GCP provider cannot reach one here, so a read fails loudly. The env
+            // provider would have answered "from-env" instead, and the Azure one
+            // would name a vault URI. A rejection is therefore the positive
+            // signal that the GCP branch was taken.
+            await expect(mgr.get("__GCP_SELECTION_PROBE__")).rejects.toThrow();
+
+            delete process.env.__GCP_SELECTION_PROBE__;
+        });
+
+        it("refuses to start when both stores are configured", () => {
+            process.env.AZURE_KEY_VAULT_URI = "https://example.vault.azure.net/";
+            process.env.GCP_SECRETS_PROJECT = "some-project";
+
+            expect(() => SecretsManager.fromEnvironment()).toThrow(/Exactly one secret store/);
+        });
+
+        it("falls back to env when neither is set", async () => {
+            process.env.__NEITHER_STORE_PROBE__ = "plain-env";
+
+            expect(await SecretsManager.fromEnvironment().get("__NEITHER_STORE_PROBE__")).toBe(
+                "plain-env",
+            );
+
+            delete process.env.__NEITHER_STORE_PROBE__;
+        });
+    });
+
     it("fromEnvironment() returns AzureKeyVaultProvider (cached) when vault URI is set", () => {
         process.env.AZURE_KEY_VAULT_URI = "https://test.vault.azure.net/";
         const mgr = SecretsManager.fromEnvironment();

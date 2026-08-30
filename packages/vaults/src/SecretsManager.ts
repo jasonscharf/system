@@ -2,6 +2,7 @@ import { getLog } from "@jasonscharf/core";
 import { AzureKeyVaultProvider } from "./AzureKeyVaultProvider.js";
 import { CachedSecretsProvider } from "./CachedSecretsProvider.js";
 import { EnvSecretsProvider } from "./EnvSecretsProvider.js";
+import { GcpSecretManagerProvider } from "./GcpSecretManagerProvider.js";
 import type { ISecretsProvider } from "./ISecretsProvider.js";
 
 const log = getLog("sys:vaults:secrets");
@@ -11,12 +12,18 @@ const log = getLog("sys:vaults:secrets");
  *
  * Provider selection (in priority order):
  *
- *   1. AZURE_KEY_VAULT_URI is set → AzureKeyVaultProvider (wrapped in a 5 min cache)
- *   2. Fallback                   → EnvSecretsProvider (reads process.env directly)
+ *   1. AZURE_KEY_VAULT_URI is set  → AzureKeyVaultProvider (5 min cache)
+ *   2. GCP_SECRETS_PROJECT is set  → GcpSecretManagerProvider (5 min cache)
+ *   3. Fallback                    → EnvSecretsProvider (reads process.env directly)
  *
  * This means:
- *   - Local dev:         set secrets as environment variables (or .env.local)
- *   - Staging / prod:    set AZURE_KEY_VAULT_URI; Workload Identity provides auth
+ *   - Local dev:      set secrets as environment variables (or .env.local)
+ *   - Azure staging:  set AZURE_KEY_VAULT_URI; Workload Identity provides auth
+ *   - GCP prod:       set GCP_SECRETS_PROJECT; the node service account provides auth
+ *
+ * Both cloud branches are chosen by an explicit variable naming the store, never
+ * by sniffing which cloud this happens to be running on. Unset means env, which
+ * is what a workstation and a test both want.
  *
  * Usage
  * ─────
@@ -53,11 +60,32 @@ export class SecretsManager {
     /**
      * Build a SecretsManager from the runtime environment.
      *
-     * Set AZURE_KEY_VAULT_URI to use Azure Key Vault (staging / prod).
-     * Leave it unset to fall back to EnvSecretsProvider (local dev).
+     * Set AZURE_KEY_VAULT_URI for Azure Key Vault, or GCP_SECRETS_PROJECT for
+     * GCP Secret Manager. Leave both unset to fall back to EnvSecretsProvider
+     * (local dev, tests).
      */
     static fromEnvironment(): SecretsManager {
         const vaultUri = process.env.AZURE_KEY_VAULT_URI;
+        const gcpProject = process.env.GCP_SECRETS_PROJECT;
+
+        if (vaultUri && gcpProject) {
+            // Two stores means two answers for one key and no way to tell which
+            // one a value came from. Refuse rather than pick.
+            throw new Error(
+                "AZURE_KEY_VAULT_URI and GCP_SECRETS_PROJECT are both set. " +
+                    "Exactly one secret store may be configured.",
+            );
+        }
+
+        if (gcpProject) {
+            log.info("source-gcp-secret-manager", "Using GCP Secret Manager", { gcpProject });
+            return new SecretsManager(
+                new CachedSecretsProvider(new GcpSecretManagerProvider(gcpProject), {
+                    ttlMs: 5 * 60 * 1000,
+                    nullTtlMs: 30 * 1000,
+                }),
+            );
+        }
 
         if (vaultUri) {
             log.info("source-key-vault", "Using Azure Key Vault", { vaultUri });

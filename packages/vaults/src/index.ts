@@ -9,6 +9,7 @@ export {
     FieldCipher,
     type FieldCipherOptions,
 } from "./FieldCipher.js";
+export { GcpSecretManagerProvider } from "./GcpSecretManagerProvider.js";
 export { InMemorySecretsProvider } from "./InMemorySecretsProvider.js";
 export type { ISecretsProvider } from "./ISecretsProvider.js";
 export { SecretsManager } from "./SecretsManager.js";

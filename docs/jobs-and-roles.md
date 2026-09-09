@@ -14,7 +14,7 @@ same loop, swallows its own errors, and self-schedules with the
 
 There are two problems hiding in that sameness. The first is **coordination**:
 run a worker two-up and *both* replicas sweep the same domains, racing each
-other to freeze experiment winners. The Pulsar shared subscription protects
+other to freeze experiment winners. A shared subscription on the bus protects
 *event* work, but tick work has no such guard. The second is **durability**: the
 schedule lives only in process memory. A restart forgets when anything is due;
 nothing records that a tick ran, succeeded, or failed; a crash mid-sweep is

@@ -16,7 +16,7 @@ import type {
  * downstream consumers rebind their distributed implementation before creating
  * contexts:
  *
- *   bindService(SystemBus, new PulsarSystemBus(client));
+ *   bindService(SystemBus, new MyDistributedSystemBus(client));
  */
 export abstract class SystemBus implements ISystemBus {
     abstract publish<T>(event: DomainEvent<T>): Promise<void>;

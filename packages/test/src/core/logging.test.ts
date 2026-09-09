@@ -93,12 +93,12 @@ describe("platform logging", () => {
         const { sink, lines } = capture();
         bindService(SystemLogger, sink);
 
-        getLog("sys:flow:pulsar-consumer").error("subscribe-failed", "Subscribe failed", {
+        getLog("sys:flow:event-consumer").error("subscribe-failed", "Subscribe failed", {
             topic: "t1",
         });
 
         expect(lines[0].code).toBe("subscribe-failed");
-        expect(lines[0].meta).toEqual({ name: "sys:flow:pulsar-consumer", topic: "t1" });
+        expect(lines[0].meta).toEqual({ name: "sys:flow:event-consumer", topic: "t1" });
     });
 
     it("test child metadata is merged into every line", () => {

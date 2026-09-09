@@ -8,7 +8,7 @@ lint error.
 ```ts
 import { getLogger } from "@jasonscharf/core";
 
-const log = getLogger("PulsarConsumer");
+const log = getLogger("EventConsumer");
 
 log.info("subscribed", { topic, tenant });
 log.error("subscribe failed", { topic, error: err.message });

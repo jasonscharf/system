@@ -489,11 +489,15 @@ export class TripleStore {
     }
 
     private async _insertQuad(ctx: ServerContext, quad: Quad): Promise<void> {
-        const [sId, pId, oId] = await Promise.all([
-            this._ensureNode(ctx, quad.subject as RdfTerm),
-            this._ensureNode(ctx, quad.predicate as IRI),
-            this._ensureNode(ctx, quad.object as RdfTerm),
-        ]);
+        // Sequential, not Promise.all: all three run on the transaction's single
+        // connection, which executes one statement at a time. Issuing them
+        // together does not overlap them - the driver queues them and warns that
+        // the client is already executing a query, a warning pg 9 turns into an
+        // error. Awaiting each in turn is what was actually happening, said
+        // plainly.
+        const sId = await this._ensureNode(ctx, quad.subject as RdfTerm);
+        const pId = await this._ensureNode(ctx, quad.predicate as IRI);
+        const oId = await this._ensureNode(ctx, quad.object as RdfTerm);
 
         const gIsDefault =
             !quad.graph || ("termType" in quad.graph && quad.graph.termType === "DefaultGraph");
@@ -727,8 +731,9 @@ export class TripleStore {
         if (sId === null) {
             return 0;
         }
-        const pIds = await Promise.all(predicates.map((p) => this._nodeId(ctx, p as RdfTerm)));
-        const validPIds = pIds.filter((id): id is number => id !== null);
+        // One query for every predicate, rather than a per-predicate SELECT
+        // issued concurrently on the transaction's single connection.
+        const validPIds = [...(await this._nodeIds(ctx, predicates)).values()];
         if (validPIds.length === 0) {
             return 0;
         }
@@ -943,16 +948,15 @@ export class TripleStore {
     private async _reachable(ctx: ServerContext, opts: ReachOptions): Promise<IRI[]> {
         const includeRoots = opts.includeRoots ?? true;
 
-        const rootIds = (
-            await Promise.all(opts.roots.map((r) => this._nodeId(ctx, r as RdfTerm)))
-        ).filter((id): id is number => id !== null);
+        // One query per set, rather than a SELECT per term issued concurrently
+        // on the transaction's single connection. Terms that were never interned
+        // are simply absent from the map, which is the filter this replaces.
+        const rootIds = [...(await this._nodeIds(ctx, opts.roots)).values()];
         if (rootIds.length === 0) {
             return [];
         }
 
-        const predIds = (
-            await Promise.all(opts.predicates.map((p) => this._nodeId(ctx, p as RdfTerm)))
-        ).filter((id): id is number => id !== null);
+        const predIds = [...(await this._nodeIds(ctx, opts.predicates)).values()];
 
         // No resolvable predicates ⇒ no edges to follow; only the roots qualify.
         if (predIds.length === 0) {
@@ -1148,14 +1152,14 @@ export class TripleStore {
     }
 
     private async _stats(ctx: ServerContext): Promise<StoreStats> {
-        const [ns, no, ne, net] = await Promise.all([
-            this._db(ctx)(T.namespaces).count<[{ count: number }]>(`${C.id} as count`),
-            this._db(ctx)(T.nodes).count<[{ count: number }]>(`${C.id} as count`),
-            this._db(ctx)(T.edges)
-                .where(C.isDeleted, false)
-                .count<[{ count: number }]>(`${C.id} as count`),
-            this._db(ctx)(T.edges).count<[{ count: number }]>(`${C.id} as count`),
-        ]);
+        // Sequential: four counts on the transaction's single connection run one
+        // at a time whether or not they are issued together.
+        const ns = await this._db(ctx)(T.namespaces).count<[{ count: number }]>(`${C.id} as count`);
+        const no = await this._db(ctx)(T.nodes).count<[{ count: number }]>(`${C.id} as count`);
+        const ne = await this._db(ctx)(T.edges)
+            .where(C.isDeleted, false)
+            .count<[{ count: number }]>(`${C.id} as count`);
+        const net = await this._db(ctx)(T.edges).count<[{ count: number }]>(`${C.id} as count`);
         return {
             namespaces: Number(ns[0].count),
             nodes: Number(no[0].count),

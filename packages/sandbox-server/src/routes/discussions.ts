@@ -10,7 +10,7 @@
 
 import type { AuthRouterComponent } from "@jasonscharf/auth";
 import type { ConvoService } from "@jasonscharf/convos";
-import { getLog } from "@jasonscharf/core";
+import { getLog, PermissionDeniedError } from "@jasonscharf/core";
 import type { HttpCtx, HttpRouter } from "@jasonscharf/flow";
 import type { RbacService } from "@jasonscharf/server";
 import {
@@ -104,10 +104,9 @@ export function mountDiscussionsRoutes(
         try {
             await handler(c, ctx);
         } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            if (msg.includes("Access denied")) {
+            if (err instanceof PermissionDeniedError) {
                 c.status = 403;
-                c.body = { error: msg };
+                c.body = { error: err.message };
             } else {
                 c.status = 500;
                 c.body = { error: "Internal server error" };

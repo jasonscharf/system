@@ -4,6 +4,7 @@ import {
     IRI,
     inheritsFromIRI,
     isMemberOfIRI,
+    PermissionDeniedError,
     permissionKeyIRI,
     roleNameIRI,
 } from "@jasonscharf/core";
@@ -134,8 +135,10 @@ export class RbacInspector {
                 actingAs: sec.isImpersonating ? sec.actingAsIri : undefined,
             }));
         if (!allowed) {
-            const who = sec.principalIri ?? "anonymous";
-            throw new Error(`Access denied: "${who}" lacks "${RBAC_ADMIN_PERMISSION}".`);
+            throw new PermissionDeniedError({
+                principal: sec.principalIri ?? null,
+                permission: RBAC_ADMIN_PERMISSION,
+            });
         }
     }
 

@@ -1,3 +1,4 @@
+import { PermissionDeniedError } from "@jasonscharf/core";
 import type { RbacService, SecurityContext, ServerContext } from "@jasonscharf/server";
 import {
     PERM_CONVO_ARCHIVE,
@@ -789,9 +790,13 @@ export class ConvoService {
                 scope,
             });
             if (!canEditOwn && !canEditAny) {
-                throw new Error(
-                    `Access denied: "${sec.principalIri}" lacks permission to edit messages.`,
-                );
+                // The own-message grant is the least privilege that permits
+                // this edit, so it is the one worth reporting.
+                throw new PermissionDeniedError({
+                    principal: sec.principalIri ?? null,
+                    permission: PERM_MESSAGE_EDIT_OWN,
+                    scope: scope ?? null,
+                });
             }
         } else {
             await this._rbac.assert(ctx, sec, { permission: PERM_MESSAGE_EDIT_ANY, scope });
@@ -821,9 +826,12 @@ export class ConvoService {
                 scope,
             });
             if (!canDeleteOwn && !canDeleteAny) {
-                throw new Error(
-                    `Access denied: "${sec.principalIri}" lacks permission to delete messages.`,
-                );
+                // The own-message grant, for the reason the edit path gives.
+                throw new PermissionDeniedError({
+                    principal: sec.principalIri ?? null,
+                    permission: PERM_MESSAGE_DELETE_OWN,
+                    scope: scope ?? null,
+                });
             }
         } else {
             await this._rbac.assert(ctx, sec, { permission: PERM_MESSAGE_DELETE_ANY, scope });

@@ -1,4 +1,4 @@
-import { actsForIRI, IRI } from "@jasonscharf/core";
+import { actsForIRI, IRI, PermissionDeniedError } from "@jasonscharf/core";
 import type { TripleStore } from "@jasonscharf/data";
 import type { SecurityContext } from "../SecurityContext.js";
 import type { ServerContext } from "../ServerContext.js";
@@ -166,9 +166,11 @@ export class RbacService {
     async assert(ctx: ServerContext, sec: SecurityContext, args: RbacCheckArgs): Promise<void> {
         const allowed = await this.can(ctx, sec, args);
         if (!allowed) {
-            const who = sec.principalIri ?? "anonymous";
-            const where = args.scope ? ` on "${args.scope}"` : "";
-            throw new Error(`Access denied: "${who}" lacks "${args.permission}"${where}.`);
+            throw new PermissionDeniedError({
+                principal: sec.principalIri ?? null,
+                permission: args.permission,
+                scope: args.scope ?? null,
+            });
         }
     }
 

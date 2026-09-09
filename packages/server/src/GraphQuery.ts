@@ -1,4 +1,4 @@
-import type { IRI } from "@jasonscharf/core";
+import { type IRI, PermissionDeniedError } from "@jasonscharf/core";
 import type { TraverseHop, TripleStore } from "@jasonscharf/data";
 import type { EntityRecord, EntitySchema, FilterOp } from "@jasonscharf/entities";
 import { entityIriFor, toLiteral } from "@jasonscharf/entities";
@@ -243,7 +243,7 @@ export class GraphQuery {
     ): Promise<void> {
         const principal = this._sec.principalIri;
         if (principal === null) {
-            throw new Error(`Access denied: anonymous lacks "${permission}".`);
+            throw new PermissionDeniedError({ principal: null, permission });
         }
         const scopeChain = await scopeChainFor(ctx, entityIri);
         const allowed = await this._accessChecker().check(ctx, {
@@ -253,7 +253,7 @@ export class GraphQuery {
             actingAs: this._sec.isImpersonating ? this._sec.actingAsIri : undefined,
         });
         if (!allowed) {
-            throw new Error(`Access denied: "${principal}" lacks "${permission}".`);
+            throw new PermissionDeniedError({ principal, permission });
         }
     }
 }

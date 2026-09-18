@@ -223,17 +223,22 @@ export class RedisSystemBus implements ISystemBus {
             this._pending.set(id, { resolve, reject, timer });
         });
 
-        await this._xadd(
-            this._rpcStream(kind, typeIri),
-            "id",
-            id,
-            "replyChannel",
-            this._replyChannel,
-            "payload",
-            JSON.stringify(payload ?? null),
-        );
-
-        return result;
+        // The reply can arrive before XADD's own reply does, so both are awaited
+        // together. A handler's error then rejects a promise that is already being
+        // awaited, instead of surfacing as an unhandled rejection.
+        const [, reply] = await Promise.all([
+            this._xadd(
+                this._rpcStream(kind, typeIri),
+                "id",
+                id,
+                "replyChannel",
+                this._replyChannel,
+                "payload",
+                JSON.stringify(payload ?? null),
+            ),
+            result,
+        ]);
+        return reply;
     }
 
     /** Subscribe (once) to this instance's reply inbox. */

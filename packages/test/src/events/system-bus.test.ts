@@ -396,6 +396,72 @@ if (process.env.SYS_REDIS_URL) {
             expect(new Set(processed).size).toBe(6);
         });
     });
+
+    // ── Redis-specific: a reply that arrives before XADD returns ──────────────
+
+    describe("RedisSystemBus — reply ahead of the request's own XADD reply", () => {
+        let prefix: string;
+        let buses: RedisSystemBus[];
+        const unhandled: unknown[] = [];
+        const onUnhandled = (reason: unknown) => {
+            unhandled.push(reason);
+        };
+
+        beforeEach(() => {
+            prefix = `${makeUri(NS_TEST, uniqueId())}:`;
+            buses = [];
+            unhandled.length = 0;
+            process.on("unhandledRejection", onUnhandled);
+        });
+
+        afterEach(async () => {
+            process.off("unhandledRejection", onUnhandled);
+            for (const b of buses) {
+                await b.close();
+            }
+            await cleanupRedisKeys(redisUrl, prefix);
+        });
+
+        // The handler answers on its own connection, so its reply can reach the
+        // caller before the caller has read XADD's reply. Holding the caller's
+        // command socket paused makes that order certain.
+        it("test a handler error that beats XADD's reply rejects the call and nothing else", async () => {
+            const handlerBus = makeRedisBus(prefix);
+            buses.push(handlerBus);
+            await handlerBus.handle(GET_WIDGET, "query", async () => {
+                throw new Error("handler exploded");
+            });
+
+            const callerRedis = new Redis(redisUrl);
+            trackedRedis.push(callerRedis);
+            const callerBus = new RedisSystemBus(callerRedis, {
+                keyPrefix: prefix,
+                requestTimeoutMs: 4000,
+            });
+            buses.push(callerBus);
+
+            const observer = new Redis(redisUrl);
+            trackedRedis.push(observer);
+            const answered = new Promise<void>((resolve) => {
+                observer.on("pmessage", () => resolve());
+            });
+            await observer.psubscribe(`${prefix}:reply:*`);
+
+            await callerRedis.ping();
+            callerRedis.stream.pause();
+            const outcome = callerBus.query(GET_WIDGET).then(
+                () => "resolved",
+                (err: Error) => err.message,
+            );
+            await answered;
+            // One turn of the loop, so the caller's reply socket is read too.
+            await new Promise<void>((resolve) => setImmediate(resolve));
+            callerRedis.stream.resume();
+
+            expect(await outcome).toBe("handler exploded");
+            expect(unhandled).toEqual([]);
+        });
+    });
 } else {
     describe("RedisSystemBus (skipped — set SYS_REDIS_URL to enable)", () => {
         it("test skipped", () => {

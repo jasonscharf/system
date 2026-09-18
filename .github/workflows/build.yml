@@ -73,6 +73,17 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # Real Redis for the bus suites. Each one writes under its own key prefix,
+      # so they share this instance safely when vitest runs them in parallel.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout
@@ -135,6 +146,8 @@ jobs:
       - name: Run test suite
         # No SYS_PG_URL here — see the postgres service comment above. The
         # security suite reaches the service through its built-in default URL.
+        env:
+          SYS_REDIS_URL: redis://localhost:6379
         run: yarn test
 
   # ── 2. Build and push Docker images to GHCR ──────────────────────────────────

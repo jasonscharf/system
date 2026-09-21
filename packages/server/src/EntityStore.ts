@@ -761,7 +761,7 @@ export class EntityStore {
         schema: EntitySchema<Props>,
         id: string,
         entIri: string,
-        graph?: IRI | null,
+        graph: IRI | null,
     ): Promise<EntityRecord<Props>> {
         const entNode = { value: entIri } as IRI;
         const quads = await this._store.find(ctx, { subject: entNode, graph });

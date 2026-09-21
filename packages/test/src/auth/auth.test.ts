@@ -804,7 +804,7 @@ describe("AuthService", () => {
         // Full quad-store dump: the raw bearer token must never appear; only its
         // one-way hash is stored.
         const ctx = buildServerContext(store, { trx });
-        const raw = JSON.stringify(await store.find(ctx, {}));
+        const raw = JSON.stringify(await store.findAcrossTenants(ctx, {}));
         expect(raw).not.toContain(rawToken);
         expect(raw).toContain(tokenHash);
 

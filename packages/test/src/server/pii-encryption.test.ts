@@ -158,7 +158,7 @@ for (const db of providers) {
 
             const ent = new IRI(created.iri);
             const quads = await store.withTransaction(buildServerContext(store), (txCtx) =>
-                store.find(txCtx, { subject: ent, predicate: CONTACT_EMAIL_IRI }),
+                store.find(txCtx, { subject: ent, predicate: CONTACT_EMAIL_IRI, graph: null }),
             );
             expect(quads).toHaveLength(1);
             const objectValue = (quads[0]?.object as { value: string }).value;
@@ -184,7 +184,7 @@ for (const db of providers) {
 
             const ent = new IRI(created.iri);
             const quads = await store.withTransaction(buildServerContext(store), (txCtx) =>
-                store.find(txCtx, { subject: ent, predicate: CONTACT_EMAIL_IRI }),
+                store.find(txCtx, { subject: ent, predicate: CONTACT_EMAIL_IRI, graph: null }),
             );
             expect(quads).toHaveLength(1);
             const objectValue = (quads[0]?.object as { value: string }).value;

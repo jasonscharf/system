@@ -196,13 +196,21 @@ for (const db of providers) {
             const to = "urn:test:p0:thing:2";
 
             await ctx.entityStore.addRawEdge(ctx, from, ownsIRI, to);
-            const after = await store.find(ctx, { subject: new IRI(from), predicate: ownsIRI });
+            const after = await store.find(ctx, {
+                subject: new IRI(from),
+                predicate: ownsIRI,
+                graph: null,
+            });
             expect(after).toHaveLength(1);
             expect((after[0]?.object as IRI).value).toBe(to);
 
             const removed = await ctx.entityStore.removeRawEdge(ctx, from, ownsIRI, to);
             expect(removed).toBe(true);
-            const cleared = await store.find(ctx, { subject: new IRI(from), predicate: ownsIRI });
+            const cleared = await store.find(ctx, {
+                subject: new IRI(from),
+                predicate: ownsIRI,
+                graph: null,
+            });
             expect(cleared).toHaveLength(0);
         });
     });

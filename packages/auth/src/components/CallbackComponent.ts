@@ -1,4 +1,4 @@
-import { Inject, makeUri, NS_CORE } from "@jasonscharf/core";
+import { Inject } from "@jasonscharf/core";
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
 import { buildServerContext, systemSec } from "@jasonscharf/server";
 import { SESSION_TTL_SECS } from "../constants.js";
@@ -11,7 +11,7 @@ import { UserIdentityRepository } from "../repository/UserIdentityRepository.js"
 import { UserRepository } from "../repository/UserRepository.js";
 // biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
 import { UserSessionRepository } from "../repository/UserSessionRepository.js";
-import { hashSessionToken } from "../repository/util.js";
+import { sessionCacheKey } from "../repository/util.js";
 // biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
 import { SessionStore } from "../services.js";
 import type { DeviceInfo, OAuthProvider, UserEntity, UserSessionEntity } from "../types.js";
@@ -157,9 +157,9 @@ export class CallbackComponent extends FlowComponent {
             });
 
             await this._sessions.set(
-                // session.sessionToken is the raw token from create(); hash it so
-                // the cache key matches validateToken and no raw token is cached.
-                makeUri(NS_CORE, "session", hashSessionToken(session.sessionToken)),
+                // session.sessionToken is the raw token from create(); the key
+                // helper hashes it, so no raw token lands in a cache key.
+                sessionCacheKey(session.sessionToken),
                 JSON.stringify({
                     userId: user.id,
                     deviceId: device.id,

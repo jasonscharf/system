@@ -60,8 +60,13 @@ export { UserDeviceRepository } from "./repository/UserDeviceRepository.js";
 export { UserIdentityRepository } from "./repository/UserIdentityRepository.js";
 export { UserRepository } from "./repository/UserRepository.js";
 export { UserSessionRepository } from "./repository/UserSessionRepository.js";
-// One-way hash applied to session tokens before they are stored / cached.
-export { hashSessionToken } from "./repository/util.js";
+// One-way hash applied to session tokens before they are stored / cached, and
+// the single derivation of the fast-path session cache key.
+export {
+    hashSessionToken,
+    sessionCacheKey,
+    sessionCacheKeyFromHash,
+} from "./repository/util.js";
 export { SessionStore } from "./services.js";
 export type { AuthThrottleOptions } from "./session/AuthThrottle.js";
 // ── Auth throttle ──────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { makeUri, NS_CORE } from "@jasonscharf/core";
+import { getLog } from "@jasonscharf/core";
 import {
     anonymousSec,
     buildServerContext,
@@ -16,7 +16,7 @@ import type { UserDeviceRepository } from "./repository/UserDeviceRepository.js"
 import type { UserIdentityRepository } from "./repository/UserIdentityRepository.js";
 import type { UserRepository } from "./repository/UserRepository.js";
 import type { UserSessionRepository } from "./repository/UserSessionRepository.js";
-import { hashSessionToken, iriFor } from "./repository/util.js";
+import { iriFor, sessionCacheKey, sessionCacheKeyFromHash } from "./repository/util.js";
 import type { ISessionStore } from "./session/ISessionStore.js";
 import type {
     DeviceInfo,
@@ -25,6 +25,8 @@ import type {
     UserEntity,
     UserSessionEntity,
 } from "./types.js";
+
+const log = getLog("tern:auth:session");
 
 export interface LoginResult {
     user: UserEntity;
@@ -89,15 +91,6 @@ export class AuthService {
 
     get store() {
         return this._users.store;
-    }
-
-    /**
-     * Fast-path session-store (Redis/memory) cache key for a raw token.  The
-     * token is hashed first so the raw bearer credential never lands in a cache
-     * key either — only its sha256, matching the at-rest representation.
-     */
-    private _sessionCacheKey(token: string): string {
-        return makeUri(NS_CORE, "session", hashSessionToken(token));
     }
 
     getProvider(name: OAuthProvider): IOAuthProvider {
@@ -221,7 +214,7 @@ export class AuthService {
 
         await this._store.set(
             // session.sessionToken here is the raw token returned by create().
-            this._sessionCacheKey(session.sessionToken),
+            sessionCacheKey(session.sessionToken),
             JSON.stringify({
                 userId: user.id,
                 deviceId: session.deviceId,
@@ -355,7 +348,7 @@ export class AuthService {
         _sec: SecurityContext,
         args: TokenArgs,
     ): Promise<ValidatedSession | null> {
-        const key = this._sessionCacheKey(args.token);
+        const key = sessionCacheKey(args.token);
         const cached = await this._store.get(key);
 
         if (cached === NEG_CACHE_SENTINEL) {
@@ -363,28 +356,30 @@ export class AuthService {
             return null;
         }
 
-        if (cached) {
-            const data = JSON.parse(cached) as {
-                userId: string;
-                expiresAt: number;
-                sessionId?: string;
-            };
-            if (Date.now() < data.expiresAt) {
-                const user = await this._users.findById(ctx, systemSec, { id: data.userId });
-                return user ? { user, sessionId: data.sessionId ?? null } : null;
-            }
-            await this._store.del(key);
-        }
-
+        // A cache hit is not an authorization. The cached blob is written once
+        // when the session is minted and never rewritten, so it can only ever
+        // say "live". The triple store holds `isActive` and is the only
+        // authority on revocation, so it is read on every validate: a
+        // revocation recorded by any other path (a direct repository call,
+        // another process, an operator marking the row inactive) takes effect
+        // on the very next request instead of at the end of the session TTL.
+        // The cache still earns its keep on the negative path above, which is
+        // where the volume is: garbage and replayed tokens never reach the
+        // store at all.
         const session = await this._sessions.findByToken(ctx, systemSec, { token: args.token });
         if (session?.isActive && session.expiresAt.getTime() > Date.now()) {
             const user = await this._users.findById(ctx, systemSec, { id: session.userId });
-            return user ? { user, sessionId: session.id } : null;
+            if (user) {
+                return { user, sessionId: session.id };
+            }
         }
 
         // Negative-cache the miss so repeated garbage tokens stop hitting the
-        // triple store. Short TTL bounds the window where a token that becomes
-        // valid (it never does — tokens are minted, not guessed) would be denied.
+        // triple store, and so a token the store has already rejected is not
+        // re-read on every request. Writing the sentinel also overwrites any
+        // stale positive entry. Short TTL bounds the window where a token that
+        // becomes valid (it never does — tokens are minted, not guessed) would
+        // be denied.
         await this._store.set(key, NEG_CACHE_SENTINEL, AUTH_NEG_CACHE_TTL_SECS);
         return null;
     }
@@ -396,10 +391,26 @@ export class AuthService {
      * check applies — there is nothing to check beyond possession of the token.
      */
     async revokeToken(ctx: ServerContext, _sec: SecurityContext, args: TokenArgs): Promise<void> {
-        await Promise.all([
-            this._store.del(this._sessionCacheKey(args.token)),
-            this._sessions.revoke(ctx, systemSec, { token: args.token }),
-        ]);
+        // Ordered, not parallel. The triple store is the authority, so it is
+        // revoked first and a failure there propagates before the cache is
+        // touched. Evicting the cache first opens a window in which a store
+        // revoke that failed has already dropped the entry, and the next
+        // validate reads the still-live record straight back.
+        await this._sessions.revoke(ctx, systemSec, { token: args.token });
+
+        try {
+            await this._store.del(sessionCacheKey(args.token));
+        } catch (err) {
+            // The revoke already landed in the store and every validate reads
+            // the store, so an entry left in the cache cannot revive the
+            // session. Report it and let the revocation stand rather than
+            // failing an operation that has already taken effect.
+            log.error(
+                "session.cache.evict-failed",
+                "Failed to evict a revoked session from the fast-path cache",
+                { error: String(err) },
+            );
+        }
     }
 
     /**
@@ -439,12 +450,29 @@ export class AuthService {
         });
         const active = sessions.filter((s) => s.isActive);
 
+        // Ordered for the same reason as revokeToken: the store is revoked
+        // first, so a failure there cannot be preceded by a cache eviction that
+        // lets the next validate re-read a live record.
+        const revoked = await this._sessions.revokeAllForUser(ctx, systemSec, {
+            userId: args.userId,
+        });
+
         // s.sessionToken from findByUserId is the stored hash, which is already
-        // exactly the cache-key component, so build the URI directly (no re-hash).
+        // exactly the cache-key component, so key off the hash without re-hashing.
         await Promise.all(
-            active.map((s) => this._store.del(makeUri(NS_CORE, "session", s.sessionToken))),
+            active.map(async (s) => {
+                try {
+                    await this._store.del(sessionCacheKeyFromHash(s.sessionToken));
+                } catch (err) {
+                    log.error(
+                        "session.cache.evict-failed",
+                        "Failed to evict a revoked session from the fast-path cache",
+                        { error: String(err), sessionId: s.id },
+                    );
+                }
+            }),
         );
-        return this._sessions.revokeAllForUser(ctx, systemSec, { userId: args.userId });
+        return revoked;
     }
 
     /** Returns true if the provider name is registered. */

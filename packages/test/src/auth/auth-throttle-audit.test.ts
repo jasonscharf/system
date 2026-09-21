@@ -18,18 +18,18 @@ import {
     AuthRouterComponent,
     AuthService,
     AuthThrottle,
-    hashSessionToken,
     type IOAuthProvider,
     LoginAttemptRepository,
     MemorySessionStore,
     type OAuthProvider,
     SessionStore,
+    sessionCacheKey,
     UserDeviceRepository,
     UserIdentityRepository,
     UserRepository,
     UserSessionRepository,
 } from "@jasonscharf/auth";
-import { bindService, makeUri, NS_CORE } from "@jasonscharf/core";
+import { bindService } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import { FlowContext, type HttpResponseDraft, type ParsedHttpRequest } from "@jasonscharf/flow";
 import { buildServerContext, type ServerContext, systemSec } from "@jasonscharf/server";
@@ -254,7 +254,7 @@ for (const db of dbProviders) {
             expect(result).toBeNull();
 
             // SEAM: the negative-cache entry now exists in the session store.
-            const key = makeUri(NS_CORE, "session", hashSessionToken("garbage-token"));
+            const key = sessionCacheKey("garbage-token");
             expect(await memStore.get(key)).toBe(NEG_CACHE_SENTINEL);
         });
     });

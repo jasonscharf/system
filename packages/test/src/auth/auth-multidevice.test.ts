@@ -25,13 +25,13 @@ import {
     GoogleProvider,
     hashSessionToken,
     MemorySessionStore,
+    sessionCacheKey,
     UserDeviceRepository,
     UserIdentityRepository,
     UserRepository,
     UserSessionRepository,
 } from "@jasonscharf/auth";
 import { TEST_CIPHER } from "./testCipher.js";
-import { makeUri, NS_CORE } from "@jasonscharf/core";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import { buildServerContext, systemSec } from "@jasonscharf/server";
 import type { Knex } from "knex";
@@ -321,8 +321,8 @@ for (const db of providers) {
 
         it("revokeAllSessions clears the fast-path session store", async () => {
             // Cache keys are keyed by the token hash, not the raw token.
-            const pcKey = makeUri(NS_CORE, "session", hashSessionToken(pcToken));
-            const phoneKey = makeUri(NS_CORE, "session", hashSessionToken(phoneToken));
+            const pcKey = sessionCacheKey(pcToken);
+            const phoneKey = sessionCacheKey(phoneToken);
             // Both tokens should be cached in the session store
             expect(await ctx.memStore.get(pcKey)).not.toBeNull();
             expect(await ctx.memStore.get(phoneKey)).not.toBeNull();
@@ -440,7 +440,7 @@ for (const db of providers) {
         });
 
         it("revokeToken removes token from the session store cache", async () => {
-            const key = makeUri(NS_CORE, "session", hashSessionToken(token));
+            const key = sessionCacheKey(token);
             expect(await ctx.memStore.get(key)).not.toBeNull();
             await ctx.service.revokeToken(buildServerContext(ctx.store), systemSec, { token });
             expect(await ctx.memStore.get(key)).toBeNull();

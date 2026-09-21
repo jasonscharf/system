@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import type { IRI } from "@jasonscharf/core";
+import { type IRI, makeUri, NS_CORE } from "@jasonscharf/core";
 import { entityIri, idFromIri, newId } from "@jasonscharf/entities";
 import { AUTH_NS } from "../constants.js";
 
@@ -36,4 +36,25 @@ export function newSessionToken(): string {
  */
 export function hashSessionToken(token: string): string {
     return createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * Fast-path session-store key for an already-hashed token.
+ *
+ * This is the one derivation of the session cache key. Every reader and writer
+ * of the session cache reaches it through this function or through
+ * `sessionCacheKey`, so the key one path writes is the key another path reads
+ * and deletes. Keying by the hash rather than the raw token also keeps the
+ * bearer credential out of the cache key, matching the at-rest representation.
+ */
+export function sessionCacheKeyFromHash(tokenHash: string): string {
+    return makeUri(NS_CORE, "session", tokenHash);
+}
+
+/**
+ * Fast-path session-store key for a raw bearer token. Hashes first, so callers
+ * holding the raw token cannot accidentally key the cache by the credential.
+ */
+export function sessionCacheKey(rawToken: string): string {
+    return sessionCacheKeyFromHash(hashSessionToken(rawToken));
 }

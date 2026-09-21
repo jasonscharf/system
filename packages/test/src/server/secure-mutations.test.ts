@@ -27,6 +27,7 @@ import {
     systemSec,
     TenantRepository,
     TenantSchema,
+    tenantGraph,
     UserGroupRepository,
 } from "@jasonscharf/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -247,7 +248,11 @@ describe("PoC — secure mutations are atomic (create + attach-under)", () => {
         const forum = await ctx.tx((c) => es.create(c, ForumSchema, { name: "Community" }));
         await ctx.tx((c) => es.addEdge(c, TenantForums, "acme", "forum", forum.iri));
 
-        const before = await store.find(ctx, { predicate: RDF_TYPE, object: PostSchema.typeIRI });
+        const before = await store.find(ctx, {
+            predicate: RDF_TYPE,
+            object: PostSchema.typeIRI,
+            graph: tenantGraph(ctx),
+        });
 
         // systemSec bypasses RBAC so _assert passes; a bogus edge name makes the
         // attach (addEdge) throw AFTER the post has been created within the txn.
@@ -262,7 +267,11 @@ describe("PoC — secure mutations are atomic (create + attach-under)", () => {
             ),
         ).rejects.toThrow(/no edge/);
 
-        const after = await store.find(ctx, { predicate: RDF_TYPE, object: PostSchema.typeIRI });
+        const after = await store.find(ctx, {
+            predicate: RDF_TYPE,
+            object: PostSchema.typeIRI,
+            graph: tenantGraph(ctx),
+        });
         expect(after.length).toBe(before.length); // the created Post was rolled back
     });
 });

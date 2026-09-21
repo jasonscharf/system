@@ -151,7 +151,7 @@ for (const provider of providers) {
             };
             await store.insert(ctx, q);
 
-            const found = await store.find(ctx, { subject: EX("s") });
+            const found = await store.find(ctx, { subject: EX("s"), graph: GRAPH });
             expect(found).toHaveLength(1);
             expect((found[0].subject as IRI).value).toBe("http://example.org/s");
             expect((found[0].predicate as IRI).value).toBe(RDF_TYPE.value);
@@ -184,7 +184,7 @@ for (const provider of providers) {
                 graph: GRAPH,
             });
 
-            const found = await store.find(ctx, { object: OWL_THING });
+            const found = await store.find(ctx, { object: OWL_THING, graph: GRAPH });
             expect(found).toHaveLength(1);
         });
 
@@ -197,7 +197,7 @@ for (const provider of providers) {
                 graph: GRAPH,
             });
 
-            const found = await store.find(ctx, { object: label });
+            const found = await store.find(ctx, { object: label, graph: GRAPH });
             expect(found).toHaveLength(1);
             expect((found[0].object as Literal).value).toBe("hello world");
         });
@@ -211,7 +211,7 @@ for (const provider of providers) {
                 graph: GRAPH,
             });
 
-            const found = await store.find(ctx, { subject: b });
+            const found = await store.find(ctx, { subject: b, graph: GRAPH });
             expect(found).toHaveLength(1);
             expect((found[0].subject as BlankNode).termType).toBe("BlankNode");
             expect((found[0].subject as BlankNode).id).toBe("anon1");
@@ -227,7 +227,7 @@ for (const provider of providers) {
             await store.insert(ctx, q);
             await store.insert(ctx, q); // should be ignored (onConflict ignore)
 
-            const found = await store.find(ctx, { subject: EX("s") });
+            const found = await store.find(ctx, { subject: EX("s"), graph: GRAPH });
             expect(found).toHaveLength(1);
         });
 
@@ -243,7 +243,7 @@ for (const provider of providers) {
         });
 
         it("returns empty array when subject not found", async () => {
-            const found = await store.find(ctx, { subject: EX("ghost") });
+            const found = await store.find(ctx, { subject: EX("ghost"), graph: GRAPH });
             expect(found).toHaveLength(0);
         });
 
@@ -278,13 +278,13 @@ for (const provider of providers) {
                 object: OWL_THING,
                 graph: GRAPH,
             });
-            const deleted = await store.delete(ctx, { subject: EX("del") });
+            const deleted = await store.delete(ctx, { subject: EX("del"), graph: GRAPH });
             expect(deleted).toBe(1);
-            expect(await store.find(ctx, { subject: EX("del") })).toHaveLength(0);
+            expect(await store.find(ctx, { subject: EX("del"), graph: GRAPH })).toHaveLength(0);
         });
 
         it("returns 0 when delete pattern matches nothing", async () => {
-            const deleted = await store.delete(ctx, { subject: EX("nobody") });
+            const deleted = await store.delete(ctx, { subject: EX("nobody"), graph: GRAPH });
             expect(deleted).toBe(0);
         });
 
@@ -293,7 +293,7 @@ for (const provider of providers) {
                 { subject: EX("keep"), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH },
                 { subject: EX("remove"), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH },
             ]);
-            await store.delete(ctx, { subject: EX("remove") });
+            await store.delete(ctx, { subject: EX("remove"), graph: GRAPH });
             const all = await store.find(ctx, { graph: GRAPH });
             expect(all).toHaveLength(1);
             expect((all[0].subject as IRI).value).toBe("http://example.org/keep");
@@ -320,7 +320,7 @@ for (const provider of providers) {
                 object: OWL_THING,
                 graph: GRAPH,
             });
-            await store.delete(ctx, { subject: EX("x") });
+            await store.delete(ctx, { subject: EX("x"), graph: GRAPH });
             const s = await store.stats(ctx);
             expect(s.edges - base.edges).toBe(0);
         });
@@ -342,7 +342,7 @@ for (const provider of providers) {
                 { subject: EX("a"), predicate: RDF_TYPE, object: OWL_THING, graph: GRAPH },
                 { subject: EX("b"), predicate: RDFS_LABEL, object: literal("B"), graph: GRAPH },
             ]);
-            const deleted = await store.delete(ctx, { object: OWL_THING });
+            const deleted = await store.delete(ctx, { object: OWL_THING, graph: GRAPH });
             expect(deleted).toBe(1);
         });
 
@@ -360,7 +360,10 @@ for (const provider of providers) {
         });
 
         it("delete returns 0 for non-existent predicate", async () => {
-            const deleted = await store.delete(ctx, { predicate: EX("no-such-predicate") });
+            const deleted = await store.delete(ctx, {
+                predicate: EX("no-such-predicate"),
+                graph: GRAPH,
+            });
             expect(deleted).toBe(0);
         });
     });
@@ -459,12 +462,18 @@ describe("TripleStore: find/delete with non-existent nodes return early", () => 
             });
 
             it("find() returns [] when predicate IRI not in store (line 161 null id branch)", async () => {
-                const result = await store.find(ctx, { predicate: iri("http://nonexistent/p") });
+                const result = await store.find(ctx, {
+                    predicate: iri("http://nonexistent/p"),
+                    graph: null,
+                });
                 expect(result).toHaveLength(0);
             });
 
             it("find() returns [] when object IRI not in store (line 166 null id branch)", async () => {
-                const result = await store.find(ctx, { object: iri("http://nonexistent/o") });
+                const result = await store.find(ctx, {
+                    object: iri("http://nonexistent/o"),
+                    graph: null,
+                });
                 expect(result).toHaveLength(0);
             });
 
@@ -474,12 +483,18 @@ describe("TripleStore: find/delete with non-existent nodes return early", () => 
             });
 
             it("delete() returns 0 when predicate IRI not in store (line 220 null id)", async () => {
-                const count = await store.delete(ctx, { predicate: iri("http://nonexistent/p") });
+                const count = await store.delete(ctx, {
+                    predicate: iri("http://nonexistent/p"),
+                    graph: null,
+                });
                 expect(count).toBe(0);
             });
 
             it("delete() returns 0 when object IRI not in store (null id branch)", async () => {
-                const count = await store.delete(ctx, { object: iri("http://nonexistent/o") });
+                const count = await store.delete(ctx, {
+                    object: iri("http://nonexistent/o"),
+                    graph: null,
+                });
                 expect(count).toBe(0);
             });
 
@@ -489,12 +504,18 @@ describe("TripleStore: find/delete with non-existent nodes return early", () => 
             });
 
             it("find() returns [] when blank node object not in store (line 271 null id)", async () => {
-                const result = await store.find(ctx, { object: blank("no-such-blank") });
+                const result = await store.find(ctx, {
+                    object: blank("no-such-blank"),
+                    graph: null,
+                });
                 expect(result).toHaveLength(0);
             });
 
             it("find() returns [] when literal object not in store (_nodeId literal null)", async () => {
-                const result = await store.find(ctx, { object: literal("nonexistent-value") });
+                const result = await store.find(ctx, {
+                    object: literal("nonexistent-value"),
+                    graph: null,
+                });
                 expect(result).toHaveLength(0);
             });
 
@@ -507,7 +528,7 @@ describe("TripleStore: find/delete with non-existent nodes return early", () => 
                     object: iri("http://o2"),
                     graph: DEFAULT_GRAPH,
                 });
-                const results = await store.find(ctx, { subject: iri("http://s2") });
+                const results = await store.find(ctx, { subject: iri("http://s2"), graph: null });
                 expect(results).toHaveLength(1);
             });
 
@@ -526,7 +547,10 @@ describe("TripleStore: find/delete with non-existent nodes return early", () => 
             });
 
             it("find() with blank node object not in store returns [] (_nodeId blank null)", async () => {
-                const result = await store.find(ctx, { object: blank("no-such-blank") });
+                const result = await store.find(ctx, {
+                    object: blank("no-such-blank"),
+                    graph: null,
+                });
                 expect(result).toHaveLength(0);
             });
 
@@ -542,7 +566,7 @@ describe("TripleStore: find/delete with non-existent nodes return early", () => 
                     object: lit,
                     graph: DEFAULT_GRAPH,
                 });
-                const results = await store.find(ctx, { subject: b });
+                const results = await store.find(ctx, { subject: b, graph: null });
                 // Results exist — _loadNodes was called with nodes including b (blank) and p (IRI)
                 expect(results.length).toBe(1);
             });
@@ -560,13 +584,14 @@ describe("TripleStore: find/delete with non-existent nodes return early", () => 
                 });
 
                 // Manually NULL-out value_json to simulate a pre-migration (legacy) row
-                await store
-                    .knex("nodes")
-                    .update({ value_json: null })
-                    .where({ kind: "literal" });
+                await store.knex("nodes").update({ value_json: null }).where({ kind: "literal" });
 
                 // find() should still reconstruct the literal from legacy columns
-                const found = await store.find(ctx, { subject: sub, predicate: pred });
+                const found = await store.find(ctx, {
+                    subject: sub,
+                    predicate: pred,
+                    graph: GRAPH,
+                });
                 expect(found).toHaveLength(1);
                 const foundObj = found[0].object as { termType: string; value: string };
                 expect(foundObj.termType).toBe("Literal");
@@ -588,7 +613,7 @@ describe("TripleStore: find/delete with non-existent nodes return early", () => 
                     graph: GRAPH,
                 });
 
-                const found = await store.find(ctx, { subject: sub });
+                const found = await store.find(ctx, { subject: sub, graph: GRAPH });
                 expect(found).toHaveLength(1);
                 const foundObj = found[0].object as {
                     termType: string;

@@ -347,7 +347,7 @@ describe("TRN-527 — WS triple.* store access is authenticated + superuser-gate
             expect(res.error).toContain("superuser");
 
             // Prove the quad never landed: no triple with the forged subject exists.
-            const quads = await store.find(buildServerContext(store), {
+            const quads = await store.findAcrossTenants(buildServerContext(store), {
                 subject: { value: forgedSubject } as never,
             });
             expect(quads).toHaveLength(0);

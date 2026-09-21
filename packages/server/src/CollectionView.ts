@@ -23,6 +23,7 @@ import {
     toLiteral,
 } from "@jasonscharf/entities";
 import type { ServerContext } from "./ServerContext.js";
+import { tenantGraph } from "./tenancy.js";
 
 export type { CollectionViewItemRecord, CollectionViewOpts, CollectionViewRecord };
 
@@ -40,6 +41,12 @@ function str(term: unknown): string {
 
 // ── CollectionViewStore ───────────────────────────────────────────────────────
 
+/**
+ * Collection views and their items are system structure, not tenant data:
+ * every quad below is written with DEFAULT_GRAPH, so every read of one is
+ * scoped with `graph: null`.  The one exception is _sortByProp, which reads a
+ * referenced domain entity and so runs in the caller's tenant graph.
+ */
 export class CollectionViewStore {
     constructor(private readonly _store: TripleStore) {}
 
@@ -133,8 +140,9 @@ export class CollectionViewStore {
                 subject: viewNode,
                 predicate: SYS_CV_ITEM,
                 object: itemNode,
+                graph: null,
             });
-            await this._store.delete(txCtx, { subject: itemNode });
+            await this._store.delete(txCtx, { subject: itemNode, graph: null });
             return true;
         });
     }
@@ -144,7 +152,7 @@ export class CollectionViewStore {
     async getView(ctx: ServerContext, viewIriStr: string): Promise<CollectionViewRecord | null> {
         return this._store.withTransaction(ctx, async (txCtx) => {
             const vNode = new IRI(viewIriStr);
-            const quads = await this._store.find(txCtx, { subject: vNode });
+            const quads = await this._store.find(txCtx, { subject: vNode, graph: null });
             if (quads.length === 0) {
                 return null;
             }
@@ -192,7 +200,11 @@ export class CollectionViewStore {
                     continue;
                 }
                 const itemNode = new IRI(item.iri);
-                await this._store.delete(txCtx, { subject: itemNode, predicate: SYS_CVI_POS });
+                await this._store.delete(txCtx, {
+                    subject: itemNode,
+                    predicate: SYS_CVI_POS,
+                    graph: null,
+                });
                 await this._store.insert(txCtx, {
                     subject: itemNode,
                     predicate: SYS_CVI_POS,
@@ -233,10 +245,11 @@ export class CollectionViewStore {
                     subject: viewNode,
                     predicate: SYS_CV_ITEM,
                     object: itemNode,
+                    graph: null,
                 });
-                await this._store.delete(txCtx, { subject: itemNode });
+                await this._store.delete(txCtx, { subject: itemNode, graph: null });
             }
-            await this._store.delete(txCtx, { subject: viewNode });
+            await this._store.delete(txCtx, { subject: viewNode, graph: null });
         });
     }
 
@@ -251,6 +264,7 @@ export class CollectionViewStore {
             const bySource = await this._store.find(txCtx, {
                 predicate: SYS_CV_SOURCE,
                 object: toLiteral(sourcePgIri),
+                graph: null,
             });
             if (bySource.length === 0) {
                 return [];
@@ -263,6 +277,7 @@ export class CollectionViewStore {
                     subject: viewNode,
                     predicate: SYS_CV_PROP,
                     object: toLiteral(propIri),
+                    graph: null,
                 });
                 if (propQ.length > 0) {
                     result.push(viewNode.value);
@@ -314,6 +329,7 @@ export class CollectionViewStore {
         const itemLinks = await this._store.find(ctx, {
             subject: viewNode,
             predicate: SYS_CV_ITEM,
+            graph: null,
         });
         if (itemLinks.length === 0) {
             return [];
@@ -352,9 +368,13 @@ export class CollectionViewStore {
                 let sortVal: unknown;
                 try {
                     const refIri = new IRI(item.ref);
+                    // item.ref points at a domain entity, which EntityStore
+                    // writes to the caller's tenant graph, not to the default
+                    // graph the view's own quads live in.
                     const quads = await this._store.find(ctx, {
                         subject: refIri,
                         predicate: propIri,
+                        graph: tenantGraph(ctx),
                     });
                     if (quads.length > 0) {
                         sortVal = fromLiteral(quads[0]?.object);

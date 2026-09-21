@@ -301,7 +301,7 @@ for (const db of providers) {
                 object: literal("99", `${XSD}integer`),
                 graph: GRAPH,
             });
-            const quads = await store.find(ctx, { subject: EX("s") });
+            const quads = await store.find(ctx, { subject: EX("s"), graph: GRAPH });
             expect(quads).toHaveLength(1);
             const obj = quads[0]?.object as Literal;
             expect(obj.termType).toBe("Literal");
@@ -364,7 +364,7 @@ for (const db of providers) {
                 object: EX("T"),
                 graph: GRAPH,
             });
-            expect(await countEdges(trx as unknown as Knex) - base).toBe(1);
+            expect((await countEdges(trx as unknown as Knex)) - base).toBe(1);
         });
     });
 
@@ -396,7 +396,7 @@ for (const db of providers) {
                 graph: GRAPH,
             });
             const before = Date.now();
-            const count = await store.delete(ctx, { subject: EX("s") });
+            const count = await store.delete(ctx, { subject: EX("s"), graph: GRAPH });
             const after = Date.now();
 
             expect(count).toBe(1);
@@ -417,9 +417,9 @@ for (const db of providers) {
                 object: EX("T"),
                 graph: GRAPH,
             });
-            await store.delete(ctx, { subject: EX("s") });
+            await store.delete(ctx, { subject: EX("s"), graph: GRAPH });
 
-            const quads = await store.find(ctx, { subject: EX("s") });
+            const quads = await store.find(ctx, { subject: EX("s"), graph: GRAPH });
             expect(quads).toHaveLength(0);
         });
 
@@ -432,7 +432,7 @@ for (const db of providers) {
                 graph: GRAPH,
             });
             const nodesAfterInsert = await countNodes(trx as unknown as Knex);
-            await store.delete(ctx, { subject: EX("s") });
+            await store.delete(ctx, { subject: EX("s"), graph: GRAPH });
             const nodesAfterDelete = await countNodes(trx as unknown as Knex);
 
             // Nodes never decrease
@@ -454,7 +454,7 @@ for (const db of providers) {
                 object: EX("T"),
                 graph: GRAPH,
             });
-            await store.delete(ctx, { subject: EX("s") });
+            await store.delete(ctx, { subject: EX("s"), graph: GRAPH });
 
             const s = await store.stats(ctx);
             expect(s.edges - base.edges).toBe(1); // only EX('u') is active
@@ -462,7 +462,7 @@ for (const db of providers) {
         });
 
         it("delete returns 0 when no active edge matches", async () => {
-            const count = await store.delete(ctx, { subject: EX("ghost") });
+            const count = await store.delete(ctx, { subject: EX("ghost"), graph: GRAPH });
             expect(count).toBe(0);
         });
 
@@ -474,10 +474,10 @@ for (const db of providers) {
                 object: EX("T"),
                 graph: GRAPH,
             });
-            await store.delete(ctx, { subject: EX("s") });
-            const count2 = await store.delete(ctx, { subject: EX("s") });
+            await store.delete(ctx, { subject: EX("s"), graph: GRAPH });
+            const count2 = await store.delete(ctx, { subject: EX("s"), graph: GRAPH });
             expect(count2).toBe(0); // already deleted, no active edges remain
-            expect(await countEdges(trx as unknown as Knex, true) - base).toBe(1); // still only one row total
+            expect((await countEdges(trx as unknown as Knex, true)) - base).toBe(1); // still only one row total
         });
     });
 
@@ -508,7 +508,7 @@ for (const db of providers) {
                 object: EX("T"),
                 graph: GRAPH,
             });
-            const history = await store.findHistory(ctx, { subject: EX("s") });
+            const history = await store.findHistory(ctx, { subject: EX("s"), graph: GRAPH });
             expect(history).toHaveLength(1);
             expect(history[0]?.isDeleted).toBe(false);
             expect(history[0]?.deletedAt).toBeNull();
@@ -522,8 +522,8 @@ for (const db of providers) {
                 object: EX("T"),
                 graph: GRAPH,
             });
-            await store.delete(ctx, { subject: EX("s") });
-            const history = await store.findHistory(ctx, { subject: EX("s") });
+            await store.delete(ctx, { subject: EX("s"), graph: GRAPH });
+            const history = await store.findHistory(ctx, { subject: EX("s"), graph: GRAPH });
             expect(history).toHaveLength(1);
             expect(history[0]?.isDeleted).toBe(true);
             expect(history[0]?.deletedAt).toBeInstanceOf(Date);
@@ -538,7 +538,7 @@ for (const db of providers) {
                 graph: GRAPH,
             });
             // Update: soft-delete old, insert new
-            await store.delete(ctx, { subject: EX("person"), predicate: NAME });
+            await store.delete(ctx, { subject: EX("person"), predicate: NAME, graph: GRAPH });
             await store.insert(ctx, {
                 subject: EX("person"),
                 predicate: NAME,
@@ -549,6 +549,7 @@ for (const db of providers) {
             const history = await store.findHistory(ctx, {
                 subject: EX("person"),
                 predicate: NAME,
+                graph: GRAPH,
             });
             expect(history).toHaveLength(2);
 
@@ -568,7 +569,7 @@ for (const db of providers) {
                 object: EX("T"),
                 graph: GRAPH,
             });
-            await store.delete(ctx, { subject: EX("s") });
+            await store.delete(ctx, { subject: EX("s"), graph: GRAPH });
             await store.insert(ctx, {
                 subject: EX("s"),
                 predicate: TYPE,
@@ -576,8 +577,8 @@ for (const db of providers) {
                 graph: GRAPH,
             }); // re-assert
 
-            const active = await store.find(ctx, { subject: EX("s") });
-            const history = await store.findHistory(ctx, { subject: EX("s") });
+            const active = await store.find(ctx, { subject: EX("s"), graph: GRAPH });
+            const history = await store.findHistory(ctx, { subject: EX("s"), graph: GRAPH });
 
             expect(active).toHaveLength(1); // one active edge
             expect(history).toHaveLength(2); // one deleted + one active
@@ -598,7 +599,7 @@ for (const db of providers) {
                 object: EX("T"),
                 graph: GRAPH,
             });
-            await store.delete(ctx, { subject: EX("a") });
+            await store.delete(ctx, { subject: EX("a"), graph: GRAPH });
 
             const history = await store.findHistory(ctx, { graph: GRAPH });
             expect(history).toHaveLength(2);
@@ -679,8 +680,8 @@ for (const db of providers) {
             // Delete only NAME and AGE, preserve TYPE
             await store.deleteBySubjectPredicates(ctx, s, [NAME, AGE]);
 
-            const active = await store.find(ctx, { subject: s });
-            const history = await store.findHistory(ctx, { subject: s });
+            const active = await store.find(ctx, { subject: s, graph: null });
+            const history = await store.findHistory(ctx, { subject: s, graph: null });
 
             expect(active).toHaveLength(1);
             expect((active[0]?.predicate as IRI).value).toBe(TYPE.value);
@@ -809,7 +810,7 @@ for (const db of providers) {
 
             await store.deleteSubjects(ctx, [EX("s1")], null);
 
-            const active = await store.find(ctx, { subject: EX("s1") });
+            const active = await store.findAcrossTenants(ctx, { subject: EX("s1") });
             // Only the named-graph quad survives
             expect(active).toHaveLength(1);
             expect((active[0]?.object as Literal).value).toBe("Named");
@@ -831,7 +832,7 @@ for (const db of providers) {
 
             await store.deleteSubjects(ctx, [EX("s1")], GRAPH_A);
 
-            const active = await store.find(ctx, { subject: EX("s1") });
+            const active = await store.findAcrossTenants(ctx, { subject: EX("s1") });
             expect(active).toHaveLength(1);
             expect((active[0]?.object as Literal).value).toBe("Default");
         });
@@ -852,7 +853,7 @@ for (const db of providers) {
 
             await store.deleteBySubjectPredicates(ctx, EX("s1"), [NAME], null);
 
-            const active = await store.find(ctx, { subject: EX("s1") });
+            const active = await store.findAcrossTenants(ctx, { subject: EX("s1") });
             expect(active).toHaveLength(1);
             expect((active[0]?.object as Literal).value).toBe("Named");
         });
@@ -873,7 +874,7 @@ for (const db of providers) {
 
             await store.deleteBySubjectPredicates(ctx, EX("s1"), [NAME], GRAPH_A);
 
-            const active = await store.find(ctx, { subject: EX("s1") });
+            const active = await store.findAcrossTenants(ctx, { subject: EX("s1") });
             expect(active).toHaveLength(1);
             expect((active[0]?.object as Literal).value).toBe("Default");
         });
@@ -894,7 +895,7 @@ for (const db of providers) {
 
             await store.deleteBySubjectPredicates(ctx, EX("s1"), [NAME]);
 
-            const active = await store.find(ctx, { subject: EX("s1") });
+            const active = await store.findAcrossTenants(ctx, { subject: EX("s1") });
             expect(active).toHaveLength(0);
         });
     });
@@ -926,7 +927,7 @@ for (const db of providers) {
                 object: EX("T"),
                 graph: GRAPH,
             });
-            await store.delete(ctx, { subject: EX("s") });
+            await store.delete(ctx, { subject: EX("s"), graph: GRAPH });
 
             const rows = await getEdgeById(trx as unknown as Knex, "http://example.org/s");
             const row = rows[0];
@@ -945,7 +946,7 @@ for (const db of providers) {
                 object: EX("T"),
                 graph: GRAPH,
             });
-            await store.delete(ctx, { subject: EX("s") });
+            await store.delete(ctx, { subject: EX("s"), graph: GRAPH });
 
             const rows = await getEdgeById(trx as unknown as Knex, "http://example.org/s");
             const row = rows[0];
@@ -963,14 +964,14 @@ for (const db of providers) {
                 object: literal("v1"),
                 graph: DEFAULT_GRAPH,
             });
-            await store.delete(ctx, { subject: EX("x"), predicate: NAME });
+            await store.delete(ctx, { subject: EX("x"), predicate: NAME, graph: null });
             await store.insert(ctx, {
                 subject: EX("x"),
                 predicate: NAME,
                 object: literal("v2"),
                 graph: DEFAULT_GRAPH,
             });
-            await store.delete(ctx, { subject: EX("x"), predicate: NAME });
+            await store.delete(ctx, { subject: EX("x"), predicate: NAME, graph: null });
             await store.insert(ctx, {
                 subject: EX("x"),
                 predicate: NAME,
@@ -978,7 +979,11 @@ for (const db of providers) {
                 graph: DEFAULT_GRAPH,
             });
 
-            const history = await store.findHistory(ctx, { subject: EX("x"), predicate: NAME });
+            const history = await store.findHistory(ctx, {
+                subject: EX("x"),
+                predicate: NAME,
+                graph: null,
+            });
             expect(history).toHaveLength(3);
 
             const values = history.map((h) => (h.object as Literal).value);
@@ -1002,7 +1007,7 @@ for (const db of providers) {
             total++;
             expect((await store.stats(ctx)).edgesTotal).toBe(total);
 
-            await store.delete(ctx, { subject: EX("a") });
+            await store.delete(ctx, { subject: EX("a"), graph: GRAPH });
             expect((await store.stats(ctx)).edgesTotal).toBe(total); // no decrease
 
             await store.insert(ctx, {
@@ -1051,7 +1056,7 @@ for (const db of providers) {
             await es.update(ctx, UserSchema, user.id, { displayName: "New" });
 
             const iri = `urn:sys:core:auth:displayName`;
-            const history = await store.findHistory(ctx);
+            const history = await store.findHistory(ctx, { graph: null });
             const displayNameHistory = history.filter((h) => (h.predicate as IRI).value === iri);
 
             expect(displayNameHistory).toHaveLength(2); // one deleted, one active
@@ -1150,7 +1155,7 @@ for (const db of providers) {
                 object: EX("T"),
                 graph: DEFAULT_GRAPH,
             });
-            await store.delete(ctx, { subject: EX("s") });
+            await store.delete(ctx, { subject: EX("s"), graph: null });
 
             const edges = await getEdgeById(trx as unknown as Knex, "http://example.org/s");
             const edge = edges[0];
@@ -1180,7 +1185,7 @@ for (const db of providers) {
                 throw new Error("before must not be null");
             }
 
-            await store.delete(ctx, { subject: EX("s") });
+            await store.delete(ctx, { subject: EX("s"), graph: null });
             const afterRows = await getEdgeById(trx as unknown as Knex, "http://example.org/s");
             const after = afterRows[0];
             if (after == null) {
@@ -1194,4 +1199,3 @@ for (const db of providers) {
         });
     });
 }
-

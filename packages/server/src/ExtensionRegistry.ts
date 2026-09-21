@@ -36,19 +36,31 @@ export interface ExtensionRecord {
  *     urn:sys:app:extName      "{name}" ;
  *     urn:sys:app:extVersion   "{version}" ;
  *     urn:sys:app:installedAt  "{iso-timestamp}" .
+ *
+ * Install records describe the installation, not a tenant's data: install()
+ * writes them with DEFAULT_GRAPH, so every read and delete below is scoped
+ * with `graph: null`.
  */
 export class ExtensionRegistry {
     constructor(private readonly _store: TripleStore) {}
 
     async isInstalled(ctx: ServerContext, name: string): Promise<boolean> {
         const iri = _extIri(name);
-        const rows = await this._store.find(ctx, { subject: iri, predicate: PRED_NAME });
+        const rows = await this._store.find(ctx, {
+            subject: iri,
+            predicate: PRED_NAME,
+            graph: null,
+        });
         return rows.length > 0;
     }
 
     async getVersion(ctx: ServerContext, name: string): Promise<string | null> {
         const iri = _extIri(name);
-        const rows = await this._store.find(ctx, { subject: iri, predicate: PRED_VERSION });
+        const rows = await this._store.find(ctx, {
+            subject: iri,
+            predicate: PRED_VERSION,
+            graph: null,
+        });
         if (rows.length === 0) {
             return null;
         }
@@ -92,18 +104,22 @@ export class ExtensionRegistry {
 
     async remove(ctx: ServerContext, name: string): Promise<void> {
         const iri = _extIri(name);
-        await this._store.delete(ctx, { subject: iri });
+        await this._store.delete(ctx, { subject: iri, graph: null });
     }
 
     async list(ctx: ServerContext): Promise<ExtensionRecord[]> {
         return this._store.withTransaction(ctx, async (txCtx) => {
-            const rows = await this._store.find(txCtx, { predicate: RDF_TYPE, object: EXT_TYPE });
+            const rows = await this._store.find(txCtx, {
+                predicate: RDF_TYPE,
+                object: EXT_TYPE,
+                graph: null,
+            });
             const subjects = [...new Set(rows.map((r) => (r.subject as IRI).value))];
 
             const results: ExtensionRecord[] = [];
             for (const subjectIri of subjects) {
                 const subj = new IRI(subjectIri);
-                const quads = await this._store.find(txCtx, { subject: subj });
+                const quads = await this._store.find(txCtx, { subject: subj, graph: null });
                 const map: Record<string, string> = {};
                 for (const q of quads) {
                     const pred = (q.predicate as IRI).value;

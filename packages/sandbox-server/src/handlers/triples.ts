@@ -11,7 +11,13 @@ import {
     type SystemTypeRef,
 } from "@jasonscharf/core";
 import { type QuadPattern, TripleStore } from "@jasonscharf/data";
-import { buildServerContext, RbacService, SuperuserService, systemSec } from "@jasonscharf/server";
+import {
+    buildServerContext,
+    RbacService,
+    SuperuserService,
+    systemSec,
+    tenantGraph,
+} from "@jasonscharf/server";
 
 type RdfTerm = IRI | BlankNode | Literal;
 
@@ -45,16 +51,22 @@ function termFromWire(raw: unknown): RdfTerm | undefined {
     return undefined;
 }
 
-function patternFromWire(raw: unknown): QuadPattern {
+/**
+ * Builds a read pattern from the wire, scoped to `scope` unless the caller
+ * names a graph itself.  A payload that omits `graph` must not turn into a read
+ * across every tenant just because nothing was said.
+ */
+function patternFromWire(raw: unknown, scope: IRI | null): QuadPattern {
     if (!raw || typeof raw !== "object") {
-        return {};
+        return { graph: scope };
     }
     const r = raw as Record<string, unknown>;
+    const graph = termFromWire(r.graph) as IRI | undefined;
     return {
         subject: termFromWire(r.subject) as IRI | BlankNode | undefined,
         predicate: termFromWire(r.predicate) as IRI | undefined,
         object: termFromWire(r.object) as RdfTerm | undefined,
-        graph: termFromWire(r.graph) as IRI | undefined,
+        graph: graph ?? scope,
     };
 }
 
@@ -130,8 +142,9 @@ export async function handleFind(
         return denied;
     }
     const store = getStore(ctx);
-    const pattern = patternFromWire(request.payload);
-    const quads = await store.find(contextFor(store, ctx), pattern);
+    const serverCtx = contextFor(store, ctx);
+    const pattern = patternFromWire(request.payload, tenantGraph(serverCtx));
+    const quads = await store.find(serverCtx, pattern);
     return okResult(request.id, SYSTEM_TYPES.tripleFind, { quads });
 }
 

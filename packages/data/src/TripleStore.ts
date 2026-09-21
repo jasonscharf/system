@@ -175,16 +175,51 @@ function nodeToTerm(row: NodeRow): RdfTerm {
 
 // ── Public API types ──────────────────────────────────────────────────────────
 
-export interface QuadPattern {
+/**
+ * The term half of a pattern: which quads to match, saying nothing about where
+ * to look for them.  Only findAcrossTenants() takes terms on their own.
+ */
+export interface QuadTerms {
     subject?: IRI | BlankNode;
     predicate?: IRI;
     object?: IRI | BlankNode | Literal;
-    /**
-     * Named graph IRI to scope the query.
-     * Pass `null` to scope to the default graph (urn:sys:graph:default).
-     * Omit to match across all graphs.
-     */
-    graph?: IRI | null;
+}
+
+/**
+ * Terms plus the scope they are read in.
+ *
+ * `graph` is required.  Scope is a decision the caller makes, never one that
+ * falls out of leaving a key off: pass a named graph IRI to read that tenant,
+ * or `null` to read the default graph (urn:sys:graph:default), where
+ * provisioning writes users, orgs, tenants and memberships.  To read every
+ * tenant's graph at once, call findAcrossTenants() instead.
+ */
+export interface QuadPattern extends QuadTerms {
+    graph: IRI | null;
+}
+
+/**
+ * Rejects a read that declares no scope.
+ *
+ * An omitted `graph` reaches _patternIds as undefined, which adds no WHERE
+ * clause and so reads every graph in the database, which is to say every
+ * tenant.  That is a real thing to want and a terrible thing to get by
+ * accident, because it looks exactly like a scoped read at the call site and
+ * its symptom (rows from a tenant you never asked about, or zero rows once a
+ * caller is tenanted) never points back here.  TypeScript already requires
+ * `graph`; this catches the JS callers and the casts it cannot see.
+ */
+function assertScoped(pattern: Partial<QuadPattern>, method: string): void {
+    if (pattern.graph !== undefined) {
+        return;
+    }
+    throw new Error(
+        `TripleStore.${method}() was given a pattern with no 'graph', which would read across ` +
+            "every tenant's graph. Declare the scope: 'graph: tenantGraph(ctx)' reads the " +
+            "caller's tenant, and 'graph: null' reads the default graph " +
+            "(urn:sys:graph:default), where users, orgs, tenants and memberships live. " +
+            "To span tenants on purpose, call TripleStore.findAcrossTenants().",
+    );
 }
 
 /** DB-managed creation/modification timestamps for an entity (a subject IRI). */
@@ -533,14 +568,27 @@ export class TripleStore {
     // ── Read ──────────────────────────────────────────────────────────────────
 
     /**
-     * Finds all active (non-deleted) quads matching the pattern.
+     * Finds all active (non-deleted) quads in the pattern's graph.
      * To include historical (soft-deleted) quads, use findHistory().
      */
-    async find(ctx: ServerContext, pattern: QuadPattern = {}): Promise<Quad[]> {
+    async find(ctx: ServerContext, pattern: QuadPattern): Promise<Quad[]> {
+        assertScoped(pattern, "find");
         return this.withTransaction(ctx, (ctx) => this._find(ctx, pattern));
     }
 
-    private async _find(ctx: ServerContext, pattern: QuadPattern = {}): Promise<Quad[]> {
+    /**
+     * Finds all active quads in EVERY tenant's graph.
+     *
+     * The deliberate cross-tenant read, and the only one: find() requires a
+     * scope, so spanning tenants cannot be reached by omitting a key.  Callers
+     * are the few surfaces that are cross-tenant by definition, and each says
+     * why at its call site.
+     */
+    async findAcrossTenants(ctx: ServerContext, terms: QuadTerms): Promise<Quad[]> {
+        return this.withTransaction(ctx, (ctx) => this._find(ctx, terms));
+    }
+
+    private async _find(ctx: ServerContext, pattern: Partial<QuadPattern>): Promise<Quad[]> {
         let q = this._db(ctx)(T.edges).where(C.isDeleted, false).select<EdgeRow[]>("*");
         const ids = await this._patternIds(ctx, pattern);
         if (ids === null) {
@@ -559,10 +607,11 @@ export class TripleStore {
      * Use this when the order of results is semantically meaningful (e.g. ordered collections).
      */
     async findOrdered(ctx: ServerContext, pattern: QuadPattern): Promise<Quad[]> {
+        assertScoped(pattern, "findOrdered");
         return this.withTransaction(ctx, (ctx) => this._findOrdered(ctx, pattern));
     }
 
-    private async _findOrdered(ctx: ServerContext, pattern: QuadPattern): Promise<Quad[]> {
+    private async _findOrdered(ctx: ServerContext, pattern: Partial<QuadPattern>): Promise<Quad[]> {
         let q = this._db(ctx)(T.edges)
             .where(C.isDeleted, false)
             .orderBy(C.id, "asc")
@@ -583,13 +632,14 @@ export class TripleStore {
      * Returns ALL versions of quads matching the pattern, including soft-deleted
      * ones, in ascending creation order.  Each result is annotated with temporal metadata.
      */
-    async findHistory(ctx: ServerContext, pattern: QuadPattern = {}): Promise<QuadHistory[]> {
+    async findHistory(ctx: ServerContext, pattern: QuadPattern): Promise<QuadHistory[]> {
+        assertScoped(pattern, "findHistory");
         return this.withTransaction(ctx, (ctx) => this._findHistory(ctx, pattern));
     }
 
     private async _findHistory(
         ctx: ServerContext,
-        pattern: QuadPattern = {},
+        pattern: Partial<QuadPattern>,
     ): Promise<QuadHistory[]> {
         let q = this._db(ctx)(T.edges).orderBy(C.createdAt, "asc").select<EdgeRow[]>("*");
         const ids = await this._patternIds(ctx, pattern);
@@ -649,7 +699,7 @@ export class TripleStore {
         return this.withTransaction(ctx, (ctx) => this._delete(ctx, pattern));
     }
 
-    private async _delete(ctx: ServerContext, pattern: QuadPattern): Promise<number> {
+    private async _delete(ctx: ServerContext, pattern: Partial<QuadPattern>): Promise<number> {
         const ids = await this._patternIds(ctx, pattern);
         if (ids === null) {
             return 0;
@@ -1266,7 +1316,7 @@ export class TripleStore {
      */
     private async _patternIds(
         ctx: ServerContext,
-        pattern: QuadPattern,
+        pattern: Partial<QuadPattern>,
     ): Promise<{
         subject?: number;
         predicate?: number;

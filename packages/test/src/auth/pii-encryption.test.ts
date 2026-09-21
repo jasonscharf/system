@@ -85,7 +85,7 @@ for (const db of providers) {
             });
 
             // Raw quad scan: no plaintext PII at rest, cipher envelope present.
-            const raw = JSON.stringify(await store.find(ctx, {}));
+            const raw = JSON.stringify(await store.findAcrossTenants(ctx, {}));
             expect(raw).not.toContain(ACCESS);
             expect(raw).not.toContain(REFRESH);
             expect(raw).not.toContain(DISPLAY);

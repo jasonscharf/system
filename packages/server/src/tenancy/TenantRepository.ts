@@ -17,11 +17,6 @@ export interface TenantIdArgs {
     id: string;
 }
 
-export interface TenantUserArgs {
-    tenantId: string;
-    userIri: string;
-}
-
 export interface UpdateTenantArgs {
     id: string;
     patch: Partial<Pick<TenantEntity, "name">>;
@@ -69,54 +64,6 @@ export class TenantRepository {
     ): Promise<TenantEntity | null> {
         const record = await this._entities.findById(ctx, TenantSchema, args.id);
         return record ? this._toEntity(record) : null;
-    }
-
-    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
-    async addUser(ctx: ServerContext, _sec: SecurityContext, args: TenantUserArgs): Promise<void> {
-        await this._entities.collectionPush(
-            ctx,
-            TenantSchema,
-            args.tenantId,
-            "users",
-            args.userIri,
-        );
-    }
-
-    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
-    async removeUser(
-        ctx: ServerContext,
-        _sec: SecurityContext,
-        args: TenantUserArgs,
-    ): Promise<void> {
-        await this._entities.collectionRemove(
-            ctx,
-            TenantSchema,
-            args.tenantId,
-            "users",
-            args.userIri,
-        );
-    }
-
-    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
-    async findUsers(
-        ctx: ServerContext,
-        _sec: SecurityContext,
-        args: TenantIdArgs,
-    ): Promise<string[]> {
-        const users = await this._entities.collectionGet(ctx, TenantSchema, args.id, "users");
-        return users.map(String);
-    }
-
-    /** @dataLayer — no checks here; RbacService enforces (see class doc). */
-    async findByUser(
-        ctx: ServerContext,
-        _sec: SecurityContext,
-        args: { userIri: string },
-    ): Promise<TenantEntity[]> {
-        const records = await EntityQuery.from(this._store, TenantSchema)
-            .where("users", "=", args.userIri)
-            .all(ctx);
-        return records.map((r) => this._toEntity(r));
     }
 
     /** @dataLayer — no checks here; RbacService enforces (see class doc). */

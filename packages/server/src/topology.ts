@@ -20,7 +20,7 @@ import { tenantGraph } from "./tenancy.js";
 /**
  * The core containment backbone every ServerContext carries:
  *
- *   Tenant --hasOrg--> Org --hasMember--> User
+ *   Tenant --hasOrg--> Org
  *   Tenant --hasDomain--> Domain
  *
  * buildServerContext always composes these, so the tenant root is reachable by

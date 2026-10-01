@@ -23,7 +23,7 @@
  */
 
 import { IRI } from "@jasonscharf/core";
-import { hasDomainIRI, hasMemberIRI, hasOrgIRI } from "@jasonscharf/core/tenancy";
+import { hasDomainIRI, hasOrgIRI } from "@jasonscharf/core/tenancy";
 import { createDataContext, TripleStore } from "@jasonscharf/data";
 import { EntitySchema, entityIriFor } from "@jasonscharf/entities";
 import {
@@ -107,14 +107,13 @@ describe("containment topology — composition", () => {
         const predicates = containmentPredicatesOf(CORE_CONTAINMENT_SCHEMAS).map((p) => p.value);
         expect(predicates).toContain(hasOrgIRI.value);
         expect(predicates).toContain(hasDomainIRI.value);
-        expect(predicates).toContain(hasMemberIRI.value);
     });
 
     it("test only containment edges join the topology", () => {
         // OrgSchema.tenant / OrgSchema.owner are back-references, deliberately not
         // containment, so they can never widen a principal's authority.
         const predicates = containmentPredicatesOf([OrgSchema]).map((p) => p.value);
-        expect(predicates).toEqual([hasMemberIRI.value]);
+        expect(predicates).toEqual([]);
     });
 
     it("test extension schemas extend the topology and duplicates collapse", () => {

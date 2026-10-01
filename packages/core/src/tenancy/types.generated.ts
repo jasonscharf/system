@@ -1,6 +1,5 @@
 // auto-generated — do not edit by hand
 
-import type { User } from "../auth/types.generated.js";
 import type { License } from "../licensing/types.generated.js";
 import { IRI } from "../semantics/IRI.js";
 
@@ -14,16 +13,12 @@ export interface Tenant {
     hasLicense?: License[];
     /** Display name of the tenant organisation. */
     tenantName?: string;
-    /** IRI of a member auth:User; one triple per member. */
-    tenantUser?: string;
 }
 
 export const TenantIRI = new IRI("urn:sys:core:tenancy:Tenant");
 
 /** A user-facing named group that wraps a backing Tenant. */
 export interface Organization {
-    /** Outward edge: an Organization contains a member User (org→user). */
-    hasMember?: User[];
     /** Display name of the organization (user-renameable). */
     orgName?: string;
     /** IRI of the Tenant that backs this Organization. */
@@ -51,11 +46,9 @@ export interface Domain {
 export const DomainIRI = new IRI("urn:sys:core:tenancy:Domain");
 
 export const hasOrgIRI = new IRI("urn:sys:core:tenancy:hasOrg");
-export const hasMemberIRI = new IRI("urn:sys:core:tenancy:hasMember");
 export const hasDomainIRI = new IRI("urn:sys:core:tenancy:hasDomain");
 export const hasLicenseIRI = new IRI("urn:sys:core:tenancy:hasLicense");
 export const tenantNameIRI = new IRI("urn:sys:core:tenancy:tenantName");
-export const tenantUserIRI = new IRI("urn:sys:core:tenancy:tenantUser");
 export const orgNameIRI = new IRI("urn:sys:core:tenancy:orgName");
 export const orgTenantIRI = new IRI("urn:sys:core:tenancy:orgTenant");
 export const orgUserIRI = new IRI("urn:sys:core:tenancy:orgUser");

@@ -7,7 +7,6 @@ import {
     systemSec,
     TenantSchema,
 } from "@jasonscharf/server";
-import { UserSchema } from "@jasonscharf/auth";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";
 
@@ -17,7 +16,10 @@ interface DbProvider {
 }
 
 const providers: DbProvider[] = [
-    { name: "SQLite (in-memory)", create: () => createDataContext({ client: "sqlite", filename: ":memory:" }) },
+    {
+        name: "SQLite (in-memory)",
+        create: () => createDataContext({ client: "sqlite", filename: ":memory:" }),
+    },
 ];
 
 if (process.env.SYS_PG_URL) {
@@ -36,24 +38,18 @@ if (process.env.SYS_PG_URL) {
     });
 }
 
-/** Builds a tenant→org→user tree in the given tenant's graph and returns the ids. */
+/** Builds a tenant with the named orgs attached under it in the tenant's graph. */
 async function seedTree(
     es: EntityStore,
     ctx: ServerContext,
     tenantId: string,
-    emails: string[],
-): Promise<{ orgId: string; userIris: string[] }> {
+    orgNames: string[],
+): Promise<void> {
     await es.create(ctx, TenantSchema, { name: `tenant-${tenantId}` }, tenantId);
-    const org = await es.create(ctx, OrgSchema, { name: `org-${tenantId}` });
-    await es.addEdge(ctx, TenantSchema, tenantId, "org", org);
-
-    const userIris: string[] = [];
-    for (const email of emails) {
-        const user = await es.create(ctx, UserSchema, { email });
-        await es.addEdge(ctx, OrgSchema, org.id, "member", user.iri);
-        userIris.push(user.iri);
+    for (const name of orgNames) {
+        const org = await es.create(ctx, OrgSchema, { name });
+        await es.addEdge(ctx, TenantSchema, tenantId, "org", org);
     }
-    return { orgId: org.id, userIris };
 }
 
 for (const provider of providers) {
@@ -78,63 +74,61 @@ for (const provider of providers) {
         const ctxFor = (tenantId: string): ServerContext =>
             buildServerContext(store, { trx, tenantId });
 
-        it("walks tenant→org→member to the users", async () => {
+        it("walks tenant→org to the orgs", async () => {
             const ctx = ctxFor("t1");
-            await seedTree(es, ctx, "t1", ["a@x.com", "b@x.com"]);
+            await seedTree(es, ctx, "t1", ["alpha", "beta"]);
 
-            const users = await ctx.graph(systemSec).out("org").out("member").all(UserSchema);
-            expect(users.map((u) => u.props.email).sort()).toEqual(["a@x.com", "b@x.com"]);
+            const orgs = await ctx.graph(systemSec).out("org").all(OrgSchema);
+            expect(orgs.map((o) => o.props.name).sort()).toEqual(["alpha", "beta"]);
         });
 
         it("filters the leaf with .where", async () => {
             const ctx = ctxFor("t1");
-            await seedTree(es, ctx, "t1", ["a@x.com", "b@x.com"]);
+            await seedTree(es, ctx, "t1", ["alpha", "beta"]);
 
             const found = await ctx
                 .graph(systemSec)
                 .out("org")
-                .out("member")
-                .where("email", "=", "a@x.com")
-                .all(UserSchema);
-            expect(found.map((u) => u.props.email)).toEqual(["a@x.com"]);
+                .where("name", "=", "alpha")
+                .all(OrgSchema);
+            expect(found.map((o) => o.props.name)).toEqual(["alpha"]);
 
             const none = await ctx
                 .graph(systemSec)
                 .out("org")
-                .out("member")
-                .where("email", "=", "nobody@x.com")
-                .all(UserSchema);
+                .where("name", "=", "nobody")
+                .all(OrgSchema);
             expect(none).toHaveLength(0);
         });
 
-        it("isolates tenants: a user in tenant B is unreachable from tenant A", async () => {
-            await seedTree(es, ctxFor("t1"), "t1", ["alice@x.com"]);
-            await seedTree(es, ctxFor("t2"), "t2", ["bob@x.com"]);
+        it("isolates tenants: an org in tenant B is unreachable from tenant A", async () => {
+            await seedTree(es, ctxFor("t1"), "t1", ["alice-org"]);
+            await seedTree(es, ctxFor("t2"), "t2", ["bob-org"]);
 
-            const fromA = await ctxFor("t1").graph(systemSec).out("org").out("member").all(UserSchema);
-            expect(fromA.map((u) => u.props.email)).toEqual(["alice@x.com"]);
+            const fromA = await ctxFor("t1").graph(systemSec).out("org").all(OrgSchema);
+            expect(fromA.map((o) => o.props.name)).toEqual(["alice-org"]);
 
-            const fromB = await ctxFor("t2").graph(systemSec).out("org").out("member").all(UserSchema);
-            expect(fromB.map((u) => u.props.email)).toEqual(["bob@x.com"]);
+            const fromB = await ctxFor("t2").graph(systemSec).out("org").all(OrgSchema);
+            expect(fromB.map((o) => o.props.name)).toEqual(["bob-org"]);
         });
 
-        it("reachability rigor: a user not attached under the tenant tree is invisible", async () => {
+        it("reachability rigor: an org not attached under the tenant tree is invisible", async () => {
             const ctx = ctxFor("t1");
-            await seedTree(es, ctx, "t1", ["attached@x.com"]);
-            // An orphan user in the same tenant graph, never linked via hasMember.
-            await es.create(ctx, UserSchema, { email: "orphan@x.com" });
+            await seedTree(es, ctx, "t1", ["attached"]);
+            // An orphan org in the same tenant graph, never linked via hasOrg.
+            await es.create(ctx, OrgSchema, { name: "orphan" });
 
-            const users = await ctx.graph(systemSec).out("org").out("member").all(UserSchema);
-            expect(users.map((u) => u.props.email)).toEqual(["attached@x.com"]);
+            const orgs = await ctx.graph(systemSec).out("org").all(OrgSchema);
+            expect(orgs.map((o) => o.props.name)).toEqual(["attached"]);
         });
 
         it("returns nothing when ctx has no tenant root", async () => {
             const ctx = ctxFor("t1");
-            await seedTree(es, ctx, "t1", ["a@x.com"]);
+            await seedTree(es, ctx, "t1", ["alpha"]);
 
             const rootless = buildServerContext(store, { trx }); // no tenantId
-            const users = await rootless.graph(systemSec).out("org").out("member").all(UserSchema);
-            expect(users).toHaveLength(0);
+            const orgs = await rootless.graph(systemSec).out("org").all(OrgSchema);
+            expect(orgs).toHaveLength(0);
         });
     });
 }

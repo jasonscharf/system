@@ -29,7 +29,7 @@ interface Where {
  * The one way to query domain objects: a rooted graph traversal.
  *
  * Every query is anchored at the caller's **tenant root** and walks the topology
- * outward (tenant → org → member → …) as a chain of edge joins. A leaf is
+ * outward (tenant → org → …) as a chain of edge joins. A leaf is
  * returned only when the full root→leaf path exists in the tenant's graph — there
  * is no flat "find all of type X". This is both the isolation guarantee (a node
  * not attached under the tenant is unreachable) and the substrate for RBAC, where

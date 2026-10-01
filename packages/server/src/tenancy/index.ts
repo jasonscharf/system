@@ -18,7 +18,6 @@ export {
     type CreateTenantArgs,
     type TenantIdArgs,
     TenantRepository,
-    type TenantUserArgs,
     type UpdateTenantArgs,
 } from "./TenantRepository.js";
 export type { DomainEntity, OrganizationEntity, TenantEntity } from "./types.js";

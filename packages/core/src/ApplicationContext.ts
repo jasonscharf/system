@@ -9,7 +9,7 @@ import { SystemLogger } from "./SystemLogger.js";
  *
  *   log.warn("send-failed", "Outgoing email send failed", { messageId });
  *
- * `code` is a short stable slug, unique within its logger, and is what you
+ * `code` is a short stable kebab-case code, unique within its logger, and is what you
  * filter and group on. `msg` is prose for a human and may be reworded freely.
  * Values go in `meta`, never interpolated into `msg`.
  */

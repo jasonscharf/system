@@ -6,8 +6,8 @@ import { IRI } from "../semantics/IRI.js";
 export interface Product {
     /** Display name of the product. */
     productName: string;
-    /** URL-safe unique identifier, e.g. 'labs'. */
-    productSlug: string;
+    /** Stable unique identifier, e.g. 'ternco-labs'. */
+    productKey: string;
     /** Human-readable description of the product. */
     productDescription?: string;
     /** Stock-keeping unit identifier for billing and catalog integration. */
@@ -51,7 +51,7 @@ export const EntitlementIRI = new IRI("urn:sys:core:licensing:Entitlement");
 export const hasEntitlementIRI = new IRI("urn:sys:core:licensing:hasEntitlement");
 export const entitlementProductIRI = new IRI("urn:sys:core:licensing:entitlementProduct");
 export const productNameIRI = new IRI("urn:sys:core:licensing:productName");
-export const productSlugIRI = new IRI("urn:sys:core:licensing:productSlug");
+export const productKeyIRI = new IRI("urn:sys:core:licensing:productKey");
 export const productDescriptionIRI = new IRI("urn:sys:core:licensing:productDescription");
 export const productSkuIRI = new IRI("urn:sys:core:licensing:productSku");
 export const licenseStatusIRI = new IRI("urn:sys:core:licensing:licenseStatus");

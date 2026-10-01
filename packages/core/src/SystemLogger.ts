@@ -12,7 +12,7 @@ import { declareService, resolveService } from "./container/ioc.js";
  *          |               |                              |
  *          code            message                        fields
  *
- *   code     What happened, as a short stable slug. Unique WITHIN its logger,
+ *   code     What happened, as a short stable kebab-case code. Unique WITHIN its logger,
  *            which is all it needs to be: the logger's URN already namespaces
  *            it, so the identity of a line is `name` + `code` and the same
  *            "send-failed" may appear under a dozen loggers. This is the field

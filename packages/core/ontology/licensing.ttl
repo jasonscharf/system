@@ -47,10 +47,10 @@ lics:productName a owl:DatatypeProperty ;
     rdfs:range  xsd:string ;
     rdfs:comment "Display name of the product." .
 
-lics:productSlug a owl:DatatypeProperty ;
+lics:productKey a owl:DatatypeProperty ;
     rdfs:domain lics:Product ;
     rdfs:range  xsd:string ;
-    rdfs:comment "URL-safe unique identifier, e.g. 'labs'." .
+    rdfs:comment "Stable unique identifier, e.g. 'ternco-labs'." .
 
 lics:productDescription a owl:DatatypeProperty ;
     rdfs:domain lics:Product ;

@@ -21,6 +21,12 @@
             "default": "./dist/licensing/index.js",
             "types": "./dist/licensing/index.d.ts",
             "import": "./dist/licensing/index.js"
+        },
+        "./list": {
+            "source": "./src/list/index.ts",
+            "default": "./dist/list/index.js",
+            "types": "./dist/list/index.d.ts",
+            "import": "./dist/list/index.js"
         }
     },
     "main": "./dist/index.js",

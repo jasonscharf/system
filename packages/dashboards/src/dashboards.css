@@ -3,56 +3,56 @@
  * properties; every selector sits in :where() so any host rule wins.
  */
 :where(:root) {
-    --dash-gap: 16px;
-    --dash-row-height: 160px;
-    --dash-radius: 10px;
-    --dash-surface: #ffffff;
-    --dash-surface-2: #f5f6f8;
-    --dash-border: #dfe2e7;
-    --dash-text: #1b1f24;
-    --dash-text-2: #59616c;
-    --dash-accent: #2f5bd3;
-    --dash-danger: #b42318;
-    --dash-fresh: rgba(47, 91, 211, 0.14);
-    --dash-focus: #2f5bd3;
+    --dboard-gap: 16px;
+    --dboard-row-height: 160px;
+    --dboard-radius: 10px;
+    --dboard-surface: #ffffff;
+    --dboard-surface-2: #f5f6f8;
+    --dboard-border: #dfe2e7;
+    --dboard-text: #1b1f24;
+    --dboard-text-2: #59616c;
+    --dboard-accent: #2f5bd3;
+    --dboard-danger: #b42318;
+    --dboard-fresh: rgba(47, 91, 211, 0.14);
+    --dboard-focus: #2f5bd3;
 }
 
-:where(.dash) {
+:where(.dboard) {
     display: grid;
-    grid-template-columns: repeat(var(--dash-columns, 4), minmax(0, 1fr));
-    grid-auto-rows: var(--dash-row-height);
+    grid-template-columns: repeat(var(--dboard-columns, 4), minmax(0, 1fr));
+    grid-auto-rows: var(--dboard-row-height);
     grid-auto-flow: row dense;
-    gap: var(--dash-gap);
+    gap: var(--dboard-gap);
 }
 
-:where(.dash-tile) {
+:where(.dboard-tile) {
     position: relative;
     display: flex;
     flex-direction: column;
     min-width: 0;
     min-height: 0;
-    background: var(--dash-surface);
-    color: var(--dash-text);
-    border: 1px solid var(--dash-border);
-    border-radius: var(--dash-radius);
+    background: var(--dboard-surface);
+    color: var(--dboard-text);
+    border: 1px solid var(--dboard-border);
+    border-radius: var(--dboard-radius);
     overflow: hidden;
-    grid-column: span var(--dash-cols, 1);
-    grid-row: span var(--dash-rows, 1);
+    grid-column: span var(--dboard-cols, 1);
+    grid-row: span var(--dboard-rows, 1);
 }
 
-:where(.dash-tile[data-resizing="true"]) {
-    outline: 2px dashed var(--dash-accent);
+:where(.dboard-tile[data-resizing="true"]) {
+    outline: 2px dashed var(--dboard-accent);
     outline-offset: 2px;
 }
 
-:where(.dash-tile__header) {
+:where(.dboard-tile__header) {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 12px 16px 0;
 }
 
-:where(.dash-tile__title) {
+:where(.dboard-tile__title) {
     flex: 1;
     margin: 0;
     font-size: 14px;
@@ -60,31 +60,32 @@
     line-height: 1.3;
 }
 
-:where(.dash-tile__body) {
+:where(.dboard-tile__body) {
     flex: 1;
     min-height: 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     padding: 8px 16px 16px;
 }
 
-:where(.dash-tile__action, .dash-tile__resize) {
+:where(.dboard-tile__action, .dboard-tile__resize) {
     display: inline-grid;
     place-items: center;
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--dash-text-2);
+    color: var(--dboard-text-2);
     border-radius: 6px;
     cursor: pointer;
 }
 
-:where(.dash-tile__action) {
+:where(.dboard-tile__action) {
     width: 32px;
     height: 32px;
 }
 
-:where(.dash-tile__action svg, .dash-tile__resize svg) {
+:where(.dboard-tile__action svg, .dboard-tile__resize svg) {
     width: 16px;
     height: 16px;
     fill: none;
@@ -94,12 +95,12 @@
     stroke-linejoin: round;
 }
 
-:where(.dash-tile__action:hover, .dash-tile__resize:hover) {
-    background: var(--dash-surface-2);
-    color: var(--dash-text);
+:where(.dboard-tile__action:hover, .dboard-tile__resize:hover) {
+    background: var(--dboard-surface-2);
+    color: var(--dboard-text);
 }
 
-:where(.dash-tile__resize) {
+:where(.dboard-tile__resize) {
     position: absolute;
     right: 2px;
     bottom: 2px;
@@ -109,56 +110,57 @@
     touch-action: none;
 }
 
-:where(.dash-tile__resize svg) {
+:where(.dboard-tile__resize svg) {
     width: 12px;
     height: 12px;
 }
 
-:where(.dash button:focus-visible, .dash input:focus-visible, .dash select:focus-visible) {
-    outline: 2px solid var(--dash-focus);
+:where(.dboard button:focus-visible, .dboard input:focus-visible, .dboard select:focus-visible) {
+    outline: 2px solid var(--dboard-focus);
     outline-offset: 2px;
 }
 
-:where(.dash-tile__error, .dash__error, .dash-list__error) {
+:where(.dboard-tile__error, .dboard__error, .dboard-list__error) {
     margin: 8px 16px 0;
-    color: var(--dash-danger);
+    color: var(--dboard-danger);
     font-size: 13px;
 }
 
-:where(.dash-list) {
+:where(.dboard-list) {
     display: flex;
     flex-direction: column;
     gap: 12px;
     min-height: 0;
+    min-width: 0;
     flex: 1;
 }
 
-:where(.dash-list__total) {
+:where(.dboard-list__total) {
     margin: 0;
     display: flex;
     align-items: baseline;
     gap: 6px;
 }
 
-:where(.dash-list__count) {
+:where(.dboard-list__count) {
     font-size: 32px;
     font-weight: 650;
     line-height: 1;
     font-variant-numeric: tabular-nums;
 }
 
-:where(.dash-list__noun) {
-    color: var(--dash-text-2);
+:where(.dboard-list__noun) {
+    color: var(--dboard-text-2);
     font-size: 14px;
 }
 
-:where(.dash-list__controls) {
+:where(.dboard-list__controls) {
     display: flex;
     flex-wrap: wrap;
     gap: 8px 12px;
 }
 
-:where(.dash-list__field) {
+:where(.dboard-list__field) {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -166,56 +168,59 @@
     min-width: 0;
 }
 
-:where(.dash-list__label) {
+:where(.dboard-list__label) {
     font-size: 12px;
-    color: var(--dash-text-2);
+    color: var(--dboard-text-2);
 }
 
-:where(.dash-list__search, .dash-list__filter) {
+:where(.dboard-list__search, .dboard-list__filter) {
+    width: 100%;
+    min-width: 0;
     min-height: 36px;
     padding: 0 10px;
     font: inherit;
     font-size: 14px;
-    color: var(--dash-text);
-    background: var(--dash-surface);
-    border: 1px solid var(--dash-border);
+    color: var(--dboard-text);
+    background: var(--dboard-surface);
+    border: 1px solid var(--dboard-border);
     border-radius: 8px;
 }
 
-:where(.dash-list__scroll) {
+:where(.dboard-list__scroll) {
     flex: 1;
     min-height: 0;
+    min-width: 0;
     overflow: auto;
-    border-top: 1px solid var(--dash-border);
+    border-top: 1px solid var(--dboard-border);
 }
 
-:where(.dash-list__table) {
+:where(.dboard-list__table) {
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
 }
 
-:where(.dash-list__table th, .dash-list__table td) {
+:where(.dboard-list__table th, .dboard-list__table td) {
     padding: 8px;
     text-align: start;
-    border-bottom: 1px solid var(--dash-border);
+    border-bottom: 1px solid var(--dboard-border);
     white-space: nowrap;
 }
 
-:where(.dash-list__table [data-align="end"]) {
+:where(.dboard-list__table [data-align="end"]) {
     text-align: end;
     font-variant-numeric: tabular-nums;
 }
 
-:where(.dash-list__table th) {
+:where(.dboard-list__table th) {
     position: sticky;
     top: 0;
-    background: var(--dash-surface);
-    color: var(--dash-text-2);
+    background: var(--dboard-surface);
+    color: var(--dboard-text-2);
     font-weight: 500;
 }
 
-:where(.dash-list__sort) {
+:where(.dboard-list__sort) {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -227,74 +232,74 @@
     cursor: pointer;
 }
 
-:where(.dash-list__sort-mark)::after {
+:where(.dboard-list__sort-mark)::after {
     content: "";
     display: inline-block;
     width: 8px;
 }
 
-:where([aria-sort="ascending"] .dash-list__sort-mark)::after {
+:where([aria-sort="ascending"] .dboard-list__sort-mark)::after {
     content: "\25B2";
     font-size: 8px;
 }
 
-:where([aria-sort="descending"] .dash-list__sort-mark)::after {
+:where([aria-sort="descending"] .dboard-list__sort-mark)::after {
     content: "\25BC";
     font-size: 8px;
 }
 
-:where(.dash-list__table tr[data-fresh="true"] td) {
-    animation: dash-fresh 2s ease-out;
+:where(.dboard-list__table tr[data-fresh="true"] td) {
+    animation: dboard-fresh 2s ease-out;
 }
 
-@keyframes dash-fresh {
+@keyframes dboard-fresh {
     from {
-        background: var(--dash-fresh);
+        background: var(--dboard-fresh);
     }
     to {
         background: transparent;
     }
 }
 
-:where(.dash-list__empty) {
+:where(.dboard-list__empty) {
     margin: 16px 0;
-    color: var(--dash-text-2);
+    color: var(--dboard-text-2);
     font-size: 13px;
     text-align: center;
 }
 
-:where(.dash-list__pager) {
+:where(.dboard-list__pager) {
     display: flex;
     align-items: center;
     gap: 8px;
     padding-right: 20px;
 }
 
-:where(.dash-list__range) {
+:where(.dboard-list__range) {
     flex: 1;
-    color: var(--dash-text-2);
+    color: var(--dboard-text-2);
     font-size: 12px;
     font-variant-numeric: tabular-nums;
 }
 
-:where(.dash-list__page) {
+:where(.dboard-list__page) {
     min-height: 32px;
     padding: 0 12px;
     font: inherit;
     font-size: 13px;
-    color: var(--dash-text);
-    background: var(--dash-surface);
-    border: 1px solid var(--dash-border);
+    color: var(--dboard-text);
+    background: var(--dboard-surface);
+    border: 1px solid var(--dboard-border);
     border-radius: 8px;
     cursor: pointer;
 }
 
-:where(.dash-list__page:disabled) {
+:where(.dboard-list__page:disabled) {
     opacity: 0.5;
     cursor: default;
 }
 
-:where(.dash-visually-hidden) {
+:where(.dboard-visually-hidden) {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -304,25 +309,25 @@
 }
 
 @media (max-width: 640px) {
-    :where(.dash) {
+    :where(.dboard) {
         grid-template-columns: minmax(0, 1fr);
         grid-auto-rows: auto;
     }
 
-    :where(.dash-tile) {
+    :where(.dboard-tile) {
         grid-column: auto;
         grid-row: auto;
-        min-height: var(--dash-row-height);
+        min-height: var(--dboard-row-height);
     }
 
-    :where(.dash-tile__resize) {
+    :where(.dboard-tile__resize) {
         display: none;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    :where(.dash-list__table tr[data-fresh="true"] td) {
+    :where(.dboard-list__table tr[data-fresh="true"] td) {
         animation: none;
-        background: var(--dash-fresh);
+        background: var(--dboard-fresh);
     }
 }

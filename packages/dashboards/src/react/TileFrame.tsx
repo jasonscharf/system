@@ -142,25 +142,25 @@ export function TileFrame(props: TileFrameProps): React.ReactElement {
         }
     };
 
-    const titleId = `dash-tile-title-${tile.dashboardId}-${tile.tileId}`;
+    const titleId = `dboard-tile-title-${tile.dashboardId}-${tile.tileId}`;
     return (
         <article
             ref={frame}
-            className="dash-tile"
+            className="dboard-tile"
             aria-labelledby={titleId}
             data-testid={`dashboard-tile-${tile.tileId}`}
             data-cols={size.cols}
             data-rows={size.rows}
             data-resizing={preview ? "true" : undefined}
-            style={{ "--dash-cols": size.cols, "--dash-rows": size.rows } as React.CSSProperties}
+            style={{ "--dboard-cols": size.cols, "--dboard-rows": size.rows } as React.CSSProperties}
         >
-            <header className="dash-tile__header">
-                <h2 className="dash-tile__title" id={titleId}>
+            <header className="dboard-tile__header">
+                <h2 className="dboard-tile__title" id={titleId}>
                     {tile.title}
                 </h2>
                 <button
                     type="button"
-                    className="dash-tile__action"
+                    className="dboard-tile__action"
                     onClick={onRefresh}
                     aria-label={`Refresh ${tile.title}`}
                     data-testid={`dashboard-tile-refresh-${tile.tileId}`}
@@ -171,14 +171,14 @@ export function TileFrame(props: TileFrameProps): React.ReactElement {
                 </button>
             </header>
             {failed && (
-                <p className="dash-tile__error" role="alert">
+                <p className="dboard-tile__error" role="alert">
                     {failed}
                 </p>
             )}
-            <div className="dash-tile__body">{children}</div>
+            <div className="dboard-tile__body">{children}</div>
             <button
                 type="button"
-                className="dash-tile__resize"
+                className="dboard-tile__resize"
                 aria-label={`Resize ${tile.title}, ${size.cols} by ${size.rows}. Use arrow keys.`}
                 data-testid={`dashboard-tile-resize-${tile.tileId}`}
                 onPointerDown={onPointerDown}

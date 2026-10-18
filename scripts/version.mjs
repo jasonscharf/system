@@ -40,6 +40,8 @@ const PACKAGES = [
     "app",
     "auth",
     "core",
+    "core-ui",
+    "dashboards",
     "data",
     "entities",
     "events",

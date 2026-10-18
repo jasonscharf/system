@@ -150,6 +150,9 @@ jobs:
           SYS_REDIS_URL: redis://localhost:6379
         run: yarn test
 
+      - name: Run dashboards suite
+        run: yarn workspace @jasonscharf/dashboards test
+
   # ── 2. Build and push Docker images to GHCR ──────────────────────────────────
   docker:
     needs: build-and-test
@@ -247,7 +250,7 @@ jobs:
         # expansion produces the correct scoped names in published manifests.
         run: |
           OWNER="${{ github.repository_owner }}"
-          for pkg in api app auth core data entities events flow gen server vaults worker; do
+          for pkg in api app auth core core-ui dashboards data entities events flow gen server vaults worker; do
             tmp=$(mktemp)
             sed "s|\"@system/|\"@${OWNER}/|g" "packages/${pkg}/package.json" > "$tmp"
             mv "$tmp" "packages/${pkg}/package.json"
@@ -298,6 +301,7 @@ jobs:
 
           # Layer 0 — no @{owner} deps
           publish_pkg core
+          publish_pkg core-ui
           publish_pkg vaults
 
           # Layer 1 — depend only on core (or core + flow)
@@ -308,6 +312,7 @@ jobs:
           publish_pkg gen
           publish_pkg api
           publish_pkg app
+          publish_pkg dashboards
 
           # Layer 2 — depends on core + data + gen
           publish_pkg entities

@@ -28,7 +28,7 @@ function Tiles(props: { mounted: MountedDashboard }): React.ReactNode {
                 {Render ? (
                     <Render tile={tile} />
                 ) : (
-                    <p className="dboard-tile__empty">Unknown tile type {tile.type}</p>
+                    <p className="dboard-tile-empty">Unknown tile type {tile.type}</p>
                 )}
             </TileFrame>
         );
@@ -77,7 +77,7 @@ export function Dashboard(props: DashboardProps): React.ReactElement {
             style={{ "--dboard-columns": definition.columns } as React.CSSProperties}
         >
             {failed ? (
-                <p className="dboard__error" role="alert">
+                <p className="dboard-error" role="alert">
                     {failed}
                 </p>
             ) : (

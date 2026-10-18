@@ -147,22 +147,22 @@ export function ListTile<T extends ListRow>(props: ListTileProps<T>): React.Reac
 
     return (
         <div className="dboard-list" data-testid={`dashboard-list-${tile.tileId}`}>
-            <p className="dboard-list__total" aria-live="polite" aria-atomic="true">
+            <p className="dboard-list-total" aria-live="polite" aria-atomic="true">
                 <span
-                    className="dboard-list__count"
+                    className="dboard-list-count"
                     data-testid={`dashboard-list-total-${tile.tileId}`}
                 >
                     {page ? COUNT.format(total) : "-"}
                 </span>{" "}
-                <span className="dboard-list__noun">{filtered ? `${word} match` : word}</span>
+                <span className="dboard-list-noun">{filtered ? `${word} match` : word}</span>
             </p>
 
-            <div className="dboard-list__controls">
-                <label className="dboard-list__field" htmlFor={`${ids}-search`}>
-                    <span className="dboard-list__label">Search</span>
+            <div className="dboard-list-controls">
+                <label className="dboard-list-field" htmlFor={`${ids}-search`}>
+                    <span className="dboard-list-label">Search</span>
                     <input
                         id={`${ids}-search`}
-                        className="dboard-list__search"
+                        className="dboard-list-search"
                         type="search"
                         value={draft}
                         onChange={(event) => setDraft(event.target.value)}
@@ -170,11 +170,11 @@ export function ListTile<T extends ListRow>(props: ListTileProps<T>): React.Reac
                     />
                 </label>
                 {filterChoices.length > 0 && (
-                    <label className="dboard-list__field" htmlFor={`${ids}-filter`}>
-                        <span className="dboard-list__label">Show</span>
+                    <label className="dboard-list-field" htmlFor={`${ids}-filter`}>
+                        <span className="dboard-list-label">Show</span>
                         <select
                             id={`${ids}-filter`}
-                            className="dboard-list__filter"
+                            className="dboard-list-filter"
                             value={settings.filter ?? ""}
                             onChange={(event) =>
                                 save({ filter: event.target.value || undefined, offset: 0 })
@@ -193,13 +193,13 @@ export function ListTile<T extends ListRow>(props: ListTileProps<T>): React.Reac
             </div>
 
             {(failed ?? live.error) && (
-                <p className="dboard-list__error" role="alert">
+                <p className="dboard-list-error" role="alert">
                     {failed ?? live.error}
                 </p>
             )}
 
-            <div className="dboard-list__scroll">
-                <table className="dboard-list__table" aria-busy={live.status === "loading"}>
+            <div className="dboard-list-scroll">
+                <table className="dboard-list-table" aria-busy={live.status === "loading"}>
                     <caption className="dboard-visually-hidden">
                         {tile.title}, {first}-{last} of {total}
                     </caption>
@@ -219,7 +219,7 @@ export function ListTile<T extends ListRow>(props: ListTileProps<T>): React.Reac
                                     {column.sortable ? (
                                         <button
                                             type="button"
-                                            className="dboard-list__sort"
+                                            className="dboard-list-sort"
                                             onClick={() =>
                                                 save({
                                                     sort: nextSort(query.sort, column.field),
@@ -230,7 +230,7 @@ export function ListTile<T extends ListRow>(props: ListTileProps<T>): React.Reac
                                         >
                                             {column.label}
                                             <span
-                                                className="dboard-list__sort-mark"
+                                                className="dboard-list-sort-mark"
                                                 aria-hidden="true"
                                             />
                                         </button>
@@ -264,25 +264,25 @@ export function ListTile<T extends ListRow>(props: ListTileProps<T>): React.Reac
                     </tbody>
                 </table>
                 {page && page.rows.length === 0 && (
-                    <p className="dboard-list__empty">
+                    <p className="dboard-list-empty">
                         {filtered ? `No ${noun.other} match.` : `No ${noun.other} yet.`}
                     </p>
                 )}
                 {!page && live.status === "loading" && (
-                    <p className="dboard-list__empty">Loading {noun.other}</p>
+                    <p className="dboard-list-empty">Loading {noun.other}</p>
                 )}
             </div>
 
-            <nav className="dboard-list__pager" aria-label={`${tile.title} pages`}>
+            <nav className="dboard-list-pager" aria-label={`${tile.title} pages`}>
                 <span
-                    className="dboard-list__range"
+                    className="dboard-list-range"
                     data-testid={`dashboard-list-range-${tile.tileId}`}
                 >
                     {first}-{last} of {COUNT.format(total)}
                 </span>
                 <button
                     type="button"
-                    className="dboard-list__page"
+                    className="dboard-list-page"
                     disabled={!page || page.offset === 0}
                     onClick={() =>
                         save({ offset: Math.max(0, query.page.offset - query.page.limit) })
@@ -293,7 +293,7 @@ export function ListTile<T extends ListRow>(props: ListTileProps<T>): React.Reac
                 </button>
                 <button
                     type="button"
-                    className="dboard-list__page"
+                    className="dboard-list-page"
                     disabled={!page || last >= total}
                     onClick={() => save({ offset: query.page.offset + query.page.limit })}
                     data-testid={`dashboard-list-next-${tile.tileId}`}

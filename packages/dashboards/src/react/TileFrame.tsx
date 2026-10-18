@@ -154,13 +154,13 @@ export function TileFrame(props: TileFrameProps): React.ReactElement {
             data-resizing={preview ? "true" : undefined}
             style={{ "--dboard-cols": size.cols, "--dboard-rows": size.rows } as React.CSSProperties}
         >
-            <header className="dboard-tile__header">
-                <h2 className="dboard-tile__title" id={titleId}>
+            <header className="dboard-tile-header">
+                <h2 className="dboard-tile-title" id={titleId}>
                     {tile.title}
                 </h2>
                 <button
                     type="button"
-                    className="dboard-tile__action"
+                    className="dboard-tile-action"
                     onClick={onRefresh}
                     aria-label={`Refresh ${tile.title}`}
                     data-testid={`dashboard-tile-refresh-${tile.tileId}`}
@@ -171,14 +171,14 @@ export function TileFrame(props: TileFrameProps): React.ReactElement {
                 </button>
             </header>
             {failed && (
-                <p className="dboard-tile__error" role="alert">
+                <p className="dboard-tile-error" role="alert">
                     {failed}
                 </p>
             )}
-            <div className="dboard-tile__body">{children}</div>
+            <div className="dboard-tile-body">{children}</div>
             <button
                 type="button"
-                className="dboard-tile__resize"
+                className="dboard-tile-resize"
                 aria-label={`Resize ${tile.title}, ${size.cols} by ${size.rows}. Use arrow keys.`}
                 data-testid={`dashboard-tile-resize-${tile.tileId}`}
                 onPointerDown={onPointerDown}

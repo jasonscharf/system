@@ -45,14 +45,14 @@
     outline-offset: 2px;
 }
 
-:where(.dboard-tile__header) {
+:where(.dboard-tile-header) {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 12px 16px 0;
 }
 
-:where(.dboard-tile__title) {
+:where(.dboard-tile-title) {
     flex: 1;
     margin: 0;
     font-size: 14px;
@@ -60,7 +60,7 @@
     line-height: 1.3;
 }
 
-:where(.dboard-tile__body) {
+:where(.dboard-tile-body) {
     flex: 1;
     min-height: 0;
     min-width: 0;
@@ -69,7 +69,7 @@
     padding: 8px 16px 16px;
 }
 
-:where(.dboard-tile__action, .dboard-tile__resize) {
+:where(.dboard-tile-action, .dboard-tile-resize) {
     display: inline-grid;
     place-items: center;
     padding: 0;
@@ -80,12 +80,12 @@
     cursor: pointer;
 }
 
-:where(.dboard-tile__action) {
+:where(.dboard-tile-action) {
     width: 32px;
     height: 32px;
 }
 
-:where(.dboard-tile__action svg, .dboard-tile__resize svg) {
+:where(.dboard-tile-action svg, .dboard-tile-resize svg) {
     width: 16px;
     height: 16px;
     fill: none;
@@ -95,12 +95,12 @@
     stroke-linejoin: round;
 }
 
-:where(.dboard-tile__action:hover, .dboard-tile__resize:hover) {
+:where(.dboard-tile-action:hover, .dboard-tile-resize:hover) {
     background: var(--dboard-surface-2);
     color: var(--dboard-text);
 }
 
-:where(.dboard-tile__resize) {
+:where(.dboard-tile-resize) {
     position: absolute;
     right: 2px;
     bottom: 2px;
@@ -110,7 +110,7 @@
     touch-action: none;
 }
 
-:where(.dboard-tile__resize svg) {
+:where(.dboard-tile-resize svg) {
     width: 12px;
     height: 12px;
 }
@@ -120,7 +120,7 @@
     outline-offset: 2px;
 }
 
-:where(.dboard-tile__error, .dboard__error, .dboard-list__error) {
+:where(.dboard-tile-error, .dboard-error, .dboard-list-error) {
     margin: 8px 16px 0;
     color: var(--dboard-danger);
     font-size: 13px;
@@ -135,32 +135,32 @@
     flex: 1;
 }
 
-:where(.dboard-list__total) {
+:where(.dboard-list-total) {
     margin: 0;
     display: flex;
     align-items: baseline;
     gap: 6px;
 }
 
-:where(.dboard-list__count) {
+:where(.dboard-list-count) {
     font-size: 32px;
     font-weight: 650;
     line-height: 1;
     font-variant-numeric: tabular-nums;
 }
 
-:where(.dboard-list__noun) {
+:where(.dboard-list-noun) {
     color: var(--dboard-text-2);
     font-size: 14px;
 }
 
-:where(.dboard-list__controls) {
+:where(.dboard-list-controls) {
     display: flex;
     flex-wrap: wrap;
     gap: 8px 12px;
 }
 
-:where(.dboard-list__field) {
+:where(.dboard-list-field) {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -168,12 +168,12 @@
     min-width: 0;
 }
 
-:where(.dboard-list__label) {
+:where(.dboard-list-label) {
     font-size: 12px;
     color: var(--dboard-text-2);
 }
 
-:where(.dboard-list__search, .dboard-list__filter) {
+:where(.dboard-list-search, .dboard-list-filter) {
     width: 100%;
     min-width: 0;
     min-height: 36px;
@@ -186,7 +186,7 @@
     border-radius: 8px;
 }
 
-:where(.dboard-list__scroll) {
+:where(.dboard-list-scroll) {
     flex: 1;
     min-height: 0;
     min-width: 0;
@@ -194,25 +194,25 @@
     border-top: 1px solid var(--dboard-border);
 }
 
-:where(.dboard-list__table) {
+:where(.dboard-list-table) {
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
 }
 
-:where(.dboard-list__table th, .dboard-list__table td) {
+:where(.dboard-list-table th, .dboard-list-table td) {
     padding: 8px;
     text-align: start;
     border-bottom: 1px solid var(--dboard-border);
     white-space: nowrap;
 }
 
-:where(.dboard-list__table [data-align="end"]) {
+:where(.dboard-list-table [data-align="end"]) {
     text-align: end;
     font-variant-numeric: tabular-nums;
 }
 
-:where(.dboard-list__table th) {
+:where(.dboard-list-table th) {
     position: sticky;
     top: 0;
     background: var(--dboard-surface);
@@ -220,7 +220,7 @@
     font-weight: 500;
 }
 
-:where(.dboard-list__sort) {
+:where(.dboard-list-sort) {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -232,23 +232,23 @@
     cursor: pointer;
 }
 
-:where(.dboard-list__sort-mark)::after {
+:where(.dboard-list-sort-mark)::after {
     content: "";
     display: inline-block;
     width: 8px;
 }
 
-:where([aria-sort="ascending"] .dboard-list__sort-mark)::after {
+:where([aria-sort="ascending"] .dboard-list-sort-mark)::after {
     content: "\25B2";
     font-size: 8px;
 }
 
-:where([aria-sort="descending"] .dboard-list__sort-mark)::after {
+:where([aria-sort="descending"] .dboard-list-sort-mark)::after {
     content: "\25BC";
     font-size: 8px;
 }
 
-:where(.dboard-list__table tr[data-fresh="true"] td) {
+:where(.dboard-list-table tr[data-fresh="true"] td) {
     animation: dboard-fresh 2s ease-out;
 }
 
@@ -261,28 +261,28 @@
     }
 }
 
-:where(.dboard-list__empty) {
+:where(.dboard-list-empty) {
     margin: 16px 0;
     color: var(--dboard-text-2);
     font-size: 13px;
     text-align: center;
 }
 
-:where(.dboard-list__pager) {
+:where(.dboard-list-pager) {
     display: flex;
     align-items: center;
     gap: 8px;
     padding-right: 20px;
 }
 
-:where(.dboard-list__range) {
+:where(.dboard-list-range) {
     flex: 1;
     color: var(--dboard-text-2);
     font-size: 12px;
     font-variant-numeric: tabular-nums;
 }
 
-:where(.dboard-list__page) {
+:where(.dboard-list-page) {
     min-height: 32px;
     padding: 0 12px;
     font: inherit;
@@ -294,7 +294,7 @@
     cursor: pointer;
 }
 
-:where(.dboard-list__page:disabled) {
+:where(.dboard-list-page:disabled) {
     opacity: 0.5;
     cursor: default;
 }
@@ -320,13 +320,13 @@
         min-height: var(--dboard-row-height);
     }
 
-    :where(.dboard-tile__resize) {
+    :where(.dboard-tile-resize) {
         display: none;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    :where(.dboard-list__table tr[data-fresh="true"] td) {
+    :where(.dboard-list-table tr[data-fresh="true"] td) {
         animation: none;
         background: var(--dboard-fresh);
     }

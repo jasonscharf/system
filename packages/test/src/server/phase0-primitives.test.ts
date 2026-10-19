@@ -16,11 +16,11 @@
  *     top-level transaction would deadlock.
  */
 
-import { IRI } from "@jasonscharf/core";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import type { EntityRecord } from "@jasonscharf/entities";
-import { EntitySchema } from "@jasonscharf/entities";
-import { buildServerContext, EntityStore, recordToEntity } from "@jasonscharf/server";
+import { IRI } from "@terncosoftware/core";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import type { EntityRecord } from "@terncosoftware/entities";
+import { EntitySchema } from "@terncosoftware/entities";
+import { buildServerContext, EntityStore, recordToEntity } from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";

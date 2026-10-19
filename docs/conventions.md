@@ -81,8 +81,8 @@ Biome enforces alphabetical import sort within each `import {}` block. Type impo
 
 ```typescript
 // Correct
-import { type ApplicationContext, defaultCtx, type UserSession } from "@jasonscharf/core";
+import { type ApplicationContext, defaultCtx, type UserSession } from "@terncosoftware/core";
 
 // Incorrect
-import { defaultCtx, type ApplicationContext, type UserSession } from "@jasonscharf/core";
+import { defaultCtx, type ApplicationContext, type UserSession } from "@terncosoftware/core";
 ```

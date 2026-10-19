@@ -13,7 +13,7 @@
  * stays a real, separately-resolved module (resolveModuleRef loads it fresh).
  */
 
-import type { JobContext } from "@jasonscharf/worker";
+import type { JobContext } from "@terncosoftware/worker";
 import type { Knex } from "knex";
 
 /** Captured invocations so the test can assert the handler actually ran. */

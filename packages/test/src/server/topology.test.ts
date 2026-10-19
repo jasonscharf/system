@@ -22,10 +22,10 @@
  * transaction that is rolled back.
  */
 
-import { IRI } from "@jasonscharf/core";
-import { hasDomainIRI, hasOrgIRI } from "@jasonscharf/core/tenancy";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { EntitySchema, entityIriFor } from "@jasonscharf/entities";
+import { IRI } from "@terncosoftware/core";
+import { hasDomainIRI, hasOrgIRI } from "@terncosoftware/core/tenancy";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import { EntitySchema, entityIriFor } from "@terncosoftware/entities";
 import {
     buildServerContext,
     CORE_CONTAINMENT_SCHEMAS,
@@ -45,7 +45,7 @@ import {
     TenantRepository,
     TenantSchema,
     UserGroupRepository,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";

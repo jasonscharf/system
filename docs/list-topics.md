@@ -1,7 +1,7 @@
 # List topics
 
 A list read has one shape everywhere: `ListQuery` in, `ListWindow` out
-(`@jasonscharf/core/list`). An HTTP endpoint answers one window. A live topic
+(`@terncosoftware/core/list`). An HTTP endpoint answers one window. A live topic
 answers a stream of `ListFrame`s for the same query.
 
 ## The query

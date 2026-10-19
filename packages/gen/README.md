@@ -1,4 +1,4 @@
-# @jasonscharf/gen
+# @terncosoftware/gen
 
 Code-generation tool for the Tern platform. Converts OWL ontologies and SHACL shapes into TypeScript type definitions and runtime validation descriptors.
 
@@ -20,9 +20,9 @@ Place a `tern-gen.json` in your package root to describe what to generate:
 {
     "bases": [
         {
-            "ontology":   "@jasonscharf/core/ontology/auth.ttl",
-            "package":    "@jasonscharf/core",
-            "importPath": "@jasonscharf/core"
+            "ontology":   "@terncosoftware/core/ontology/auth.ttl",
+            "package":    "@terncosoftware/core",
+            "importPath": "@terncosoftware/core"
         }
     ],
     "extensions":     ["./ontology/my-extension.ttl"],
@@ -64,7 +64,7 @@ const shape = shapes.byTargetClass.get('http://example.com/ns/my-extension/Widge
 ## Programmatic API
 
 ```typescript
-import { generate, generateFromConfig, OntologyReader, ShaclReader, ShaclValidator } from '@jasonscharf/gen';
+import { generate, generateFromConfig, OntologyReader, ShaclReader, ShaclValidator } from '@terncosoftware/gen';
 
 // Full pipeline from config
 await generateFromConfig('./tern-gen.json');
@@ -123,7 +123,7 @@ ex:WidgetShape a sh:NodeShape ;
 ## Installation
 
 ```bash
-yarn add @jasonscharf/gen
+yarn add @terncosoftware/gen
 ```
 
 The CLI binaries `tern-codegen` and `tern-gen` are installed automatically.

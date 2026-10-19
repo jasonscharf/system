@@ -1,4 +1,4 @@
-import type { SecurityContext } from "@jasonscharf/core";
+import type { SecurityContext } from "@terncosoftware/core";
 import type { JsonValue } from "./registry.js";
 
 // ── Dispatch kinds ─────────────────────────────────────────────────────────────

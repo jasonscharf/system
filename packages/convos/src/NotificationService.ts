@@ -8,7 +8,7 @@
  *   window       — at most once per N hours.
  */
 
-import type { SecurityContext, ServerContext } from "@jasonscharf/server";
+import type { SecurityContext, ServerContext } from "@terncosoftware/server";
 import type { NotificationRepository } from "./repository/NotificationRepository.js";
 import type { NotificationEntity, SendNotificationInput } from "./types.js";
 

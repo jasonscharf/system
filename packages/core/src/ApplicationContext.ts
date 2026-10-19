@@ -26,7 +26,7 @@ export interface Logger {
  *
  * Use module augmentation to add application-specific fields:
  *
- *   declare module '@jasonscharf/core' {
+ *   declare module '@terncosoftware/core' {
  *     interface ApplicationContext {
  *       tenantId?: string;
  *     }

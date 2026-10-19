@@ -10,10 +10,10 @@
  * Not wired into the convos package — it defines its own tiny schemas so the demo
  * is self-contained. Run: `yarn start server/convos-poc.test.ts`.
  */
-import { IRI } from "@jasonscharf/core";
-import { createDataContext, type Knex, TripleStore } from "@jasonscharf/data";
-import { EntitySchema } from "@jasonscharf/entities";
-import { entityIriFor } from "@jasonscharf/entities";
+import { IRI } from "@terncosoftware/core";
+import { createDataContext, type Knex, TripleStore } from "@terncosoftware/data";
+import { EntitySchema } from "@terncosoftware/entities";
+import { entityIriFor } from "@terncosoftware/entities";
 import {
     buildServerContext,
     EntityStore,
@@ -31,7 +31,7 @@ import {
     TenantSchema,
     tenantGraph,
     UserGroupRepository,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";
 

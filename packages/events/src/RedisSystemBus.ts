@@ -31,7 +31,7 @@ import {
     type ISystemBus,
     type RpcHandler,
     type RpcKind,
-} from "@jasonscharf/core";
+} from "@terncosoftware/core";
 import type { Redis } from "ioredis";
 
 const log = getLog("sys:events:redis-system-bus");

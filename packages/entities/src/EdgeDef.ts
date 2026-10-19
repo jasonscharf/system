@@ -1,4 +1,4 @@
-import type { IRI } from "@jasonscharf/core";
+import type { IRI } from "@terncosoftware/core";
 import type { EntitySchema } from "./EntitySchema.js";
 
 /** "one" → a single related entity (EdgeRef); "many" → a set (EdgeSet). */

@@ -1,4 +1,4 @@
-import { anonymousSec, resolveModuleRef, type SecurityContext } from "@jasonscharf/core";
+import { anonymousSec, resolveModuleRef, type SecurityContext } from "@terncosoftware/core";
 import type { DefRegistry } from "./DefRegistry.js";
 import type {
     DispatchDef,

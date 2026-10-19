@@ -16,14 +16,14 @@ import {
     anonymousSec,
     InMemorySystemBus,
     systemSec,
-} from "@jasonscharf/core";
-import { BusDispatchProvider, DefRegistry, DispatchHost, Runner } from "@jasonscharf/events";
+} from "@terncosoftware/core";
+import { BusDispatchProvider, DefRegistry, DispatchHost, Runner } from "@terncosoftware/events";
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetSideEffects, sideEffects } from "./__fixtures__/handlers.js";
 
 // Contribute the names this suite dispatches to the ambient registries the same
 // way a real consumer/extension would, so exec() args/results are type-checked.
-declare module "@jasonscharf/events" {
+declare module "@terncosoftware/events" {
     interface QueryRegistry {
         "principal.echo": null;
     }

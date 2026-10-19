@@ -1,5 +1,5 @@
-import type { IRI } from "@jasonscharf/core";
-import { entityIri, idFromIri, newId } from "@jasonscharf/entities";
+import type { IRI } from "@terncosoftware/core";
+import { entityIri, idFromIri, newId } from "@terncosoftware/entities";
 import { CONVOS_NS } from "../constants.js";
 
 export type ConvosEntityType =
@@ -14,7 +14,7 @@ export type ConvosEntityType =
     | "revision";
 
 // The strict-throwing id helpers (newId, entityIri, idFromIri) now live in
-// @jasonscharf/entities and are the single source other bounded contexts adopt.
+// @terncosoftware/entities and are the single source other bounded contexts adopt.
 // This module re-exports them under the convos-local names and keeps the
 // convos-specific `iriFor(type, id)` convenience that pins the CONVOS_NS namespace.
 

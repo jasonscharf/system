@@ -5,7 +5,7 @@ import {
     InMemorySecretsProvider,
     type ISecretsProvider,
     SecretsManager,
-} from "@jasonscharf/vaults";
+} from "@terncosoftware/vaults";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── EnvSecretsProvider ────────────────────────────────────────────────────────

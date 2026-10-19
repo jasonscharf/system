@@ -1,11 +1,11 @@
-# @jasonscharf/data
+# @terncosoftware/data
 
 Database layer for the Tern platform. Manages schema migrations and provides `TripleStore` — the low-level RDF quad store backed by SQLite or PostgreSQL.
 
 ## Setup
 
 ```typescript
-import { createDataContext, TripleStore } from '@jasonscharf/data';
+import { createDataContext, TripleStore } from '@terncosoftware/data';
 
 // SQLite (development / tests)
 const knex = await createDataContext({ client: 'sqlite', filename: ':memory:' });
@@ -27,10 +27,10 @@ const store = new TripleStore(knex);
 
 ## TripleStore
 
-`TripleStore` is the RDF quad storage layer. Normal application code does not interact with it directly — use `EntityStore` from `@jasonscharf/server` instead. `TripleStore` is used when bootstrapping the application and in migrations.
+`TripleStore` is the RDF quad storage layer. Normal application code does not interact with it directly — use `EntityStore` from `@terncosoftware/server` instead. `TripleStore` is used when bootstrapping the application and in migrations.
 
 ```typescript
-import { defaultServerContext } from '@jasonscharf/server';
+import { defaultServerContext } from '@terncosoftware/server';
 
 // Register a namespace prefix (call once at startup).
 await store.ensureNamespace(ctx, 'myapp', 'http://example.com/ns/');
@@ -68,7 +68,7 @@ yarn add pg               # PostgreSQL
 ## Installation
 
 ```bash
-yarn add @jasonscharf/data
+yarn add @terncosoftware/data
 ```
 
 Published to GitHub Packages (`https://npm.pkg.github.com`).

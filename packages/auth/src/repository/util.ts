@@ -1,10 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
-import { type IRI, makeUri, NS_CORE } from "@jasonscharf/core";
-import { entityIri, idFromIri, newId } from "@jasonscharf/entities";
+import { type IRI, makeUri, NS_CORE } from "@terncosoftware/core";
+import { entityIri, idFromIri, newId } from "@terncosoftware/entities";
 import { AUTH_NS } from "../constants.js";
 
 // The strict-throwing id helpers (newId, entityIri, idFromIri) now live in
-// @jasonscharf/entities and are the single source other bounded contexts should
+// @terncosoftware/entities and are the single source other bounded contexts should
 // adopt.  This module re-exports them under the auth-local names and keeps the
 // auth-specific `iriFor(type, id)` convenience that pins the AUTH_NS namespace.
 

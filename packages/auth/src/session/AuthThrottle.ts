@@ -1,4 +1,4 @@
-import { makeUri, NS_CORE } from "@jasonscharf/core";
+import { makeUri, NS_CORE } from "@terncosoftware/core";
 import {
     AUTH_THROTTLE_MAX_PER_IDENTITY,
     AUTH_THROTTLE_MAX_PER_IP,

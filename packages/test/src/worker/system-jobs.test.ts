@@ -11,8 +11,8 @@
  *     run) — an end-to-end smoke through registry → handler → effect.
  */
 
-import { systemSec } from "@jasonscharf/core";
-import { createDataContext } from "@jasonscharf/data";
+import { systemSec } from "@terncosoftware/core";
+import { createDataContext } from "@terncosoftware/data";
 import {
     type JobContext,
     JobHandlers,
@@ -21,7 +21,7 @@ import {
     SYS_JOB_REAPER_ID,
     SYS_SCHEDULER_ROLE,
     seedSystemJobs,
-} from "@jasonscharf/worker";
+} from "@terncosoftware/worker";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

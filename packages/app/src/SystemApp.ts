@@ -1,7 +1,7 @@
 import { dirname, resolve } from "node:path";
-import { anonymousSec, type SecurityContext, type SystemTypeRef } from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
-import { FlowApp } from "@jasonscharf/flow";
+import { anonymousSec, type SecurityContext, type SystemTypeRef } from "@terncosoftware/core";
+import type { TripleStore } from "@terncosoftware/data";
+import { FlowApp } from "@terncosoftware/flow";
 import { loadAppConfig, mergeHandlers } from "./config/loader.js";
 import type {
     AppConfig,

@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { Composition, InMemoryDispatch } from "@jasonscharf/core-ui";
+import { Composition, InMemoryDispatch } from "@terncosoftware/core-ui";
 import {
     CompositionProvider,
     CompositionRevision,
     RevisionProvider,
-} from "@jasonscharf/core-ui/react";
+} from "@terncosoftware/core-ui/react";
 import { act, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it } from "vitest";

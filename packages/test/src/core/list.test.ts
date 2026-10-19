@@ -10,7 +10,7 @@ import {
     normalizeListQuery,
     placeListChange,
     planListPush,
-} from "@jasonscharf/core/list";
+} from "@terncosoftware/core/list";
 import { describe, expect, it } from "vitest";
 
 interface Person {

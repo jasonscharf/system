@@ -1,4 +1,4 @@
-# @jasonscharf/core
+# @terncosoftware/core
 
 Foundational types and interfaces for the Tern platform. Every other package depends on this one.
 
@@ -28,7 +28,7 @@ The `ontology/` directory ships with the package and contains the canonical OWL 
 ## Installation
 
 ```bash
-npm install @jasonscharf/core
+npm install @terncosoftware/core
 ```
 
 Published to GitHub Packages (`https://npm.pkg.github.com`).
@@ -38,8 +38,8 @@ Published to GitHub Packages (`https://npm.pkg.github.com`).
 Every system-level function accepts `ctx` as its **first parameter**. This is the single most important convention in the platform.
 
 ```typescript
-import type { ApplicationContext } from '@jasonscharf/core';
-import { defaultCtx } from '@jasonscharf/core';
+import type { ApplicationContext } from '@terncosoftware/core';
+import { defaultCtx } from '@terncosoftware/core';
 
 // Reading from ctx
 function doWork(ctx: ApplicationContext, id: string): void {
@@ -54,7 +54,7 @@ doWork(defaultCtx, 'abc');
 Add application-specific fields via module augmentation:
 
 ```typescript
-declare module '@jasonscharf/core' {
+declare module '@terncosoftware/core' {
     interface ApplicationContext {
         tenantId?: string;
     }
@@ -63,10 +63,10 @@ declare module '@jasonscharf/core' {
 
 ## Event Bus
 
-`IDomainEventBus` is the interface; `@jasonscharf/events` provides the implementations.
+`IDomainEventBus` is the interface; `@terncosoftware/events` provides the implementations.
 
 ```typescript
-import type { IDomainEventBus, DomainEvent } from '@jasonscharf/core';
+import type { IDomainEventBus, DomainEvent } from '@terncosoftware/core';
 
 // Subscribe
 await ctx.events!.subscribe(
@@ -88,11 +88,11 @@ await ctx.events!.publish<{ userId: string }>({
 
 Services resolve from the platform container (typescript-ioc). Tokens are
 classes — abstract classes stand in for interface-shaped services. Always
-import the container from `@jasonscharf/core` (never `typescript-ioc`
+import the container from `@terncosoftware/core` (never `typescript-ioc`
 directly) so every package and downstream consumer shares one container.
 
 ```typescript
-import { bindService, declareService, resolveService, SystemBus } from '@jasonscharf/core';
+import { bindService, declareService, resolveService, SystemBus } from '@terncosoftware/core';
 
 // Declare a token where the service lives (a default factory is optional;
 // without one, resolving before boot binds an implementation throws).
@@ -113,7 +113,7 @@ const bus = resolveService(SystemBus);
 ## RDF Terms
 
 ```typescript
-import { IRI, Literal, BlankNode, Triple } from '@jasonscharf/core';
+import { IRI, Literal, BlankNode, Triple } from '@terncosoftware/core';
 
 const subject   = new IRI('http://example.com/user/1');
 const predicate = new IRI('http://tern.dev/ns/auth/email');
@@ -124,7 +124,7 @@ const triple    = new Triple(subject, predicate, object);
 ## TernMessage wire format
 
 ```typescript
-import { TernMessage } from '@jasonscharf/core';
+import { TernMessage } from '@terncosoftware/core';
 
 // All messages share this shape:
 const msg: TernMessage = {

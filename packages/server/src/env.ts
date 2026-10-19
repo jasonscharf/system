@@ -15,7 +15,7 @@
  */
 "use server";
 
-import { exists } from "@jasonscharf/core";
+import { exists } from "@terncosoftware/core";
 
 // NOTE: Adding a key here means it will get pulled from `process.env` if present
 export const defaults = {

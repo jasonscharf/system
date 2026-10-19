@@ -1,5 +1,5 @@
-import type { RdfObject, RdfSubject, Triple } from "@jasonscharf/core";
-import { IRI } from "@jasonscharf/core";
+import type { RdfObject, RdfSubject, Triple } from "@terncosoftware/core";
+import { IRI } from "@terncosoftware/core";
 
 const SH = "http://www.w3.org/ns/shacl#";
 

@@ -1,4 +1,4 @@
-import type { EntityRecord, EntitySchema, TernAggregate } from "@jasonscharf/entities";
+import type { EntityRecord, EntitySchema, TernAggregate } from "@terncosoftware/entities";
 import type { EntityStore } from "./EntityStore.js";
 import type { ServerContext } from "./ServerContext.js";
 

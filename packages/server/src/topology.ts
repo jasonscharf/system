@@ -1,5 +1,5 @@
-import type { IRI } from "@jasonscharf/core";
-import type { EntitySchema } from "@jasonscharf/entities";
+import type { IRI } from "@terncosoftware/core";
+import type { EntitySchema } from "@terncosoftware/entities";
 import type { ServerContext } from "./ServerContext.js";
 import { DomainSchema, OrgSchema, TenantSchema } from "./tenancy/schemas.js";
 import { tenantGraph } from "./tenancy.js";

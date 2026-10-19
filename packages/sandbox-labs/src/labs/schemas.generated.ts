@@ -1,7 +1,7 @@
 // auto-generated — do not edit by hand
 
-import { IRI } from "@jasonscharf/core";
-import { EntitySchema } from "@jasonscharf/entities";
+import { IRI } from "@terncosoftware/core";
+import { EntitySchema } from "@terncosoftware/entities";
 
 /** A Tern platform user. */
 export const UserSchema: EntitySchema = new EntitySchema({

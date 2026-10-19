@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { getLog, uuidv4Binary } from "@jasonscharf/core";
+import { getLog, uuidv4Binary } from "@terncosoftware/core";
 import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
 import type { FlowPort } from "../../FlowPort.js";
 import { wire } from "../../FlowTransport.js";

@@ -12,8 +12,8 @@
  */
 
 import { fileURLToPath } from "node:url";
-import { SystemApp } from "@jasonscharf/app";
-import { command, query, SYSTEM_TYPES } from "@jasonscharf/core";
+import { SystemApp } from "@terncosoftware/app";
+import { command, query, SYSTEM_TYPES } from "@terncosoftware/core";
 import { describe, expect, it } from "vitest";
 
 const SANDBOX_APP_CONFIG = fileURLToPath(

@@ -22,7 +22,7 @@ import {
     SessionStore,
     UserRepository,
     UserSessionRepository,
-} from "@jasonscharf/auth";
+} from "@terncosoftware/auth";
 import {
     bindService,
     ConsoleLogger,
@@ -35,18 +35,18 @@ import {
     SystemBus,
     SystemLogger,
     tryResolveService,
-} from "@jasonscharf/core";
-import { createDataContext, DataSource, TripleStore } from "@jasonscharf/data";
-import { FlowContext } from "@jasonscharf/flow";
+} from "@terncosoftware/core";
+import { createDataContext, DataSource, TripleStore } from "@terncosoftware/data";
+import { FlowContext } from "@terncosoftware/flow";
 import {
     buildServerContext,
     createEntityStore,
     EntityStore,
     EntityStoreFactory,
     FieldCipherService,
-} from "@jasonscharf/server";
-import { FieldCipher } from "@jasonscharf/vaults";
-import { JobScheduler } from "@jasonscharf/worker";
+} from "@terncosoftware/server";
+import { FieldCipher } from "@terncosoftware/vaults";
+import { JobScheduler } from "@terncosoftware/worker";
 import type { Knex } from "knex";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { up as seedData } from "../../../data/src/migrations/001_init.js";

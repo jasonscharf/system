@@ -20,10 +20,10 @@
 
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { _clearModuleRefCache, bindService } from "@jasonscharf/core";
-import { createDataContext, DataSource } from "@jasonscharf/data";
-import { FlowContext } from "@jasonscharf/flow";
-import { JobHandlers, JobRunner } from "@jasonscharf/worker";
+import { _clearModuleRefCache, bindService } from "@terncosoftware/core";
+import { createDataContext, DataSource } from "@terncosoftware/data";
+import { FlowContext } from "@terncosoftware/flow";
+import { JobHandlers, JobRunner } from "@terncosoftware/worker";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { invocations } from "./fixtures/noop-handler.js";

@@ -25,8 +25,8 @@ import {
     type Logger,
     runWithLogContext,
     SystemLogger,
-} from "@jasonscharf/core";
-import { PinoLogger } from "@jasonscharf/server";
+} from "@terncosoftware/core";
+import { PinoLogger } from "@terncosoftware/server";
 import { afterEach, describe, expect, it } from "vitest";
 
 interface Line {

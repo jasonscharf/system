@@ -1,4 +1,4 @@
-import type { EntityRecord, EntitySchema } from "@jasonscharf/entities";
+import type { EntityRecord, EntitySchema } from "@terncosoftware/entities";
 
 /**
  * A flat domain entity derived from an EntityRecord: every literal property,

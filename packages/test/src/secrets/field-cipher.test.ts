@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { FieldCipher, InMemorySecretsProvider, SecretsManager } from "@jasonscharf/vaults";
+import { FieldCipher, InMemorySecretsProvider, SecretsManager } from "@terncosoftware/vaults";
 import { describe, expect, it } from "vitest";
 
 function key(): string {

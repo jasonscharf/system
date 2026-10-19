@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
-import type { Triple } from "@jasonscharf/core";
+import type { Triple } from "@terncosoftware/core";
 import { generateTypes, parseNTriples, readOntology } from "./index.js";
 import { generateSchemas } from "./SchemaGenerator.js";
 import type { ShaclShapes } from "./ShaclReader.js";
@@ -39,15 +39,15 @@ export interface GenConfig {
     shapesOut?: string;
     /** Optional output path for generated EntitySchema constants (properties + edges). */
     schemasOut?: string;
-    /** Import path for EntitySchema in the generated schemas file.  Defaults to `@jasonscharf/entities`. */
+    /** Import path for EntitySchema in the generated schemas file.  Defaults to `@terncosoftware/entities`. */
     entitiesImport?: string;
     /** Absolute named-graph IRI to pin every generated schema to (global-backbone ontologies like RBAC). */
     schemaGraphIri?: string;
     /** Per-class IRI path-segment overrides for generated schemas (class local name → segment). */
     idSegments?: Record<string, string>;
     /**
-     * Import path for the `IRI` class.  Defaults to `"@jasonscharf/core"`.
-     * Override to `"../semantics/IRI.js"` when generating types inside @jasonscharf/core itself.
+     * Import path for the `IRI` class.  Defaults to `"@terncosoftware/core"`.
+     * Override to `"../semantics/IRI.js"` when generating types inside @terncosoftware/core itself.
      */
     iriImport?: string;
 }

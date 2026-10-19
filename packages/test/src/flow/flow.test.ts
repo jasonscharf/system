@@ -1,4 +1,4 @@
-import { type IRI, makeUri, NS_CORE } from "@jasonscharf/core";
+import { type IRI, makeUri, NS_CORE } from "@terncosoftware/core";
 import {
     Clock,
     createMessage,
@@ -18,7 +18,7 @@ import {
     type ScheduleMode,
     TickEvent,
     wire,
-} from "@jasonscharf/flow";
+} from "@terncosoftware/flow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Reusable components ───────────────────────────────────────────────────────

@@ -7,9 +7,9 @@
  * transaction that is rolled back afterwards.
  */
 
-import type { IRI, Quad } from "@jasonscharf/core";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { buildServerContext, type ServerContext } from "@jasonscharf/server";
+import type { IRI, Quad } from "@terncosoftware/core";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import { buildServerContext, type ServerContext } from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";

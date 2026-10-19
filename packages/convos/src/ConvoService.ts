@@ -1,5 +1,5 @@
-import { PermissionDeniedError } from "@jasonscharf/core";
-import type { RbacService, SecurityContext, ServerContext } from "@jasonscharf/server";
+import { PermissionDeniedError } from "@terncosoftware/core";
+import type { RbacService, SecurityContext, ServerContext } from "@terncosoftware/server";
 import {
     PERM_CONVO_ARCHIVE,
     PERM_CONVO_ASSIGN,

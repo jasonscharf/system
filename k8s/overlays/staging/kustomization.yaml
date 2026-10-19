@@ -52,8 +52,8 @@ patches:
 
 images:
   - name: tern/server
-    newName: ghcr.io/jasonlscharf/system-server
+    newName: ghcr.io/terncosoftware/system-server
     newTag: latest
   - name: tern/web
-    newName: ghcr.io/jasonlscharf/system-web
+    newName: ghcr.io/terncosoftware/system-web
     newTag: latest

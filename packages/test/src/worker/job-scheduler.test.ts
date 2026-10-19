@@ -1,4 +1,4 @@
-import { bindService } from "@jasonscharf/core";
+import { bindService } from "@terncosoftware/core";
 /**
  * TRN-156: Integration tests for JobScheduler.
  *
@@ -16,9 +16,9 @@ import { bindService } from "@jasonscharf/core";
  * ManualClock; _tick() is invoked directly.
  */
 
-import { createDataContext, DataSource } from "@jasonscharf/data";
-import { FlowContext } from "@jasonscharf/flow";
-import { JobScheduler } from "@jasonscharf/worker";
+import { createDataContext, DataSource } from "@terncosoftware/data";
+import { FlowContext } from "@terncosoftware/flow";
+import { JobScheduler } from "@terncosoftware/worker";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

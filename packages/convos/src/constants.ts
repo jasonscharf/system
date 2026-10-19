@@ -1,4 +1,4 @@
-import { IRI, makeUri, NS_EXT } from "@jasonscharf/core";
+import { IRI, makeUri, NS_EXT } from "@terncosoftware/core";
 
 export const CONVOS_NS = makeUri(NS_EXT, "convos");
 

@@ -1,6 +1,6 @@
-import { DEFAULT_GRAPH, IRI, makeUri, NS_ROOT } from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
-import { toLiteral } from "@jasonscharf/entities";
+import { DEFAULT_GRAPH, IRI, makeUri, NS_ROOT } from "@terncosoftware/core";
+import type { TripleStore } from "@terncosoftware/data";
+import { toLiteral } from "@terncosoftware/entities";
 import type { ServerContext } from "./ServerContext.js";
 
 // ── Ontology constants ────────────────────────────────────────────────────────

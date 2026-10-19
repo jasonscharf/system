@@ -1,4 +1,4 @@
-import { errResult } from "@jasonscharf/core";
+import { errResult } from "@terncosoftware/core";
 import type { PayloadSchemaRegistry } from "../registry/PayloadSchemaRegistry.js";
 import type { SystemMiddlewareFn } from "./SystemRouter.js";
 

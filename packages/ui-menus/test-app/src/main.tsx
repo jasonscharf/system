@@ -1,4 +1,4 @@
-import { Composition } from "@jasonscharf/core-ui";
+import { Composition } from "@terncosoftware/core-ui";
 import {
     Aside,
     CompositionProvider,
@@ -13,9 +13,9 @@ import {
     RegionHost,
     RevisionProvider,
     Span,
-} from "@jasonscharf/core-ui/react";
-import { MenuRegistry } from "@jasonscharf/ui-menus";
-import { MenuProvider, MenuView } from "@jasonscharf/ui-menus/react";
+} from "@terncosoftware/core-ui/react";
+import { MenuRegistry } from "@terncosoftware/ui-menus";
+import { MenuProvider, MenuView } from "@terncosoftware/ui-menus/react";
 import type React from "react";
 import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";

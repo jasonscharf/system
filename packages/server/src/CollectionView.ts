@@ -1,10 +1,10 @@
-import { DEFAULT_GRAPH, IRI, makeUri } from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
+import { DEFAULT_GRAPH, IRI, makeUri } from "@terncosoftware/core";
+import type { TripleStore } from "@terncosoftware/data";
 import type {
     CollectionViewItemRecord,
     CollectionViewOpts,
     CollectionViewRecord,
-} from "@jasonscharf/entities";
+} from "@terncosoftware/entities";
 import {
     fromLiteral,
     newId,
@@ -21,7 +21,7 @@ import {
     SYS_CVI_VIEW,
     SYS_VIEW_NS,
     toLiteral,
-} from "@jasonscharf/entities";
+} from "@terncosoftware/entities";
 import type { ServerContext } from "./ServerContext.js";
 import { tenantGraph } from "./tenancy.js";
 

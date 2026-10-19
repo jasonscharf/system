@@ -11,20 +11,20 @@
 
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { _clearModuleRefCache, InMemorySystemBus, type ISystemBus } from "@jasonscharf/core";
+import { _clearModuleRefCache, InMemorySystemBus, type ISystemBus } from "@terncosoftware/core";
 import {
     BusDispatchProvider,
     DefRegistry,
     DispatchHost,
     RedisSystemBus,
-} from "@jasonscharf/events";
+} from "@terncosoftware/events";
 import { Redis } from "ioredis";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resetSideEffects, resetStore, sideEffects, store } from "./__fixtures__/handlers.js";
 
 // The names this suite dispatches, contributed to the ambient registries the
 // same way a real consumer/extension would — so exec() args are type-checked.
-declare module "@jasonscharf/events" {
+declare module "@terncosoftware/events" {
     interface CommandRegistry {
         "view.activate": { viewId: string };
         "view.fail": { viewId: string };

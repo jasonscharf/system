@@ -8,11 +8,11 @@
  *   - RBAC is enforced inside ConvoService; permission errors surface as 403.
  */
 
-import type { AuthRouterComponent } from "@jasonscharf/auth";
-import type { ConvoService } from "@jasonscharf/convos";
-import { getLog, PermissionDeniedError } from "@jasonscharf/core";
-import type { HttpCtx, HttpRouter } from "@jasonscharf/flow";
-import type { RbacService } from "@jasonscharf/server";
+import type { AuthRouterComponent } from "@terncosoftware/auth";
+import type { ConvoService } from "@terncosoftware/convos";
+import { getLog, PermissionDeniedError } from "@terncosoftware/core";
+import type { HttpCtx, HttpRouter } from "@terncosoftware/flow";
+import type { RbacService } from "@terncosoftware/server";
 import {
     anonymousSec,
     buildServerContext,
@@ -20,7 +20,7 @@ import {
     type SecurityContext,
     type ServerContext,
     systemSec,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 
 const log = getLog("sys:sandbox:discussions");
 

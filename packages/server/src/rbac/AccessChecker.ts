@@ -6,8 +6,8 @@ import {
     inheritsFromIRI,
     isMemberOfIRI,
     permissionKeyIRI,
-} from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
+} from "@terncosoftware/core";
+import type { TripleStore } from "@terncosoftware/data";
 import { systemSec } from "../SecurityContext.js";
 import type { ServerContext } from "../ServerContext.js";
 import { tenantGraph } from "../tenancy.js";

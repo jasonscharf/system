@@ -1,4 +1,4 @@
-import { app } from "@jasonscharf/api";
+import { app } from "@terncosoftware/api";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 let server: ReturnType<typeof app.listen>;

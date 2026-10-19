@@ -1,5 +1,5 @@
-import type { RdfObject, Triple } from "@jasonscharf/core";
-import { IRI } from "@jasonscharf/core";
+import type { RdfObject, Triple } from "@terncosoftware/core";
+import { IRI } from "@terncosoftware/core";
 
 const RDF_TYPE = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
 const OWL_CLASS = new IRI("http://www.w3.org/2002/07/owl#Class");

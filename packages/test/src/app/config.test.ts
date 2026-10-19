@@ -18,7 +18,7 @@ import {
     parseYaml,
     SystemApp,
     type TernExtension,
-} from "@jasonscharf/app";
+} from "@terncosoftware/app";
 import {
     errResult,
     makeUri,
@@ -28,8 +28,8 @@ import {
     SYSTEM_TYPES,
     type SystemRequest,
     type SystemResult,
-} from "@jasonscharf/core";
-import { createDataContext } from "@jasonscharf/data";
+} from "@terncosoftware/core";
+import { createDataContext } from "@terncosoftware/data";
 import { describe, expect, it } from "vitest";
 
 describe("parseYaml", () => {

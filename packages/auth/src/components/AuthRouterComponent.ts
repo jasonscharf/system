@@ -1,5 +1,5 @@
-import { resolveService, tryResolveService } from "@jasonscharf/core";
-import type { HttpResponseDraft, ParsedHttpRequest } from "@jasonscharf/flow";
+import { resolveService, tryResolveService } from "@terncosoftware/core";
+import type { HttpResponseDraft, ParsedHttpRequest } from "@terncosoftware/flow";
 import {
     FlowComponent,
     type FlowComponentOptions,
@@ -7,13 +7,13 @@ import {
     type HttpMiddlewareFn,
     HttpRouter,
     wire,
-} from "@jasonscharf/flow";
+} from "@terncosoftware/flow";
 import {
     anonymousSec,
     buildServerContext,
     type SecurityContext,
     systemSec,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import { AuthService } from "../AuthService.js";
 import {
     AUTH_TRUSTED_PROXIES,

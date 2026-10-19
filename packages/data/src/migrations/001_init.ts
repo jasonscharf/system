@@ -1,4 +1,4 @@
-import { makeUri, NS_CORE } from "@jasonscharf/core";
+import { makeUri, NS_CORE } from "@terncosoftware/core";
 import type { Knex } from "knex";
 import { C, T } from "../schema.js";
 
@@ -28,7 +28,7 @@ const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 const XSD_STRING = "http://www.w3.org/2001/XMLSchema#string";
 const XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
 
-// Stable system IDs — must match constants in @jasonscharf/server
+// Stable system IDs — must match constants in @terncosoftware/server
 const SYS_INSTALL_ID = "sys0000000000000000000000000006";
 const SYS_TENANT_ID = "sys0000000000000000000000000001";
 const SYS_SUPERUSERS_ID = "sys0000000000000000000000000002";

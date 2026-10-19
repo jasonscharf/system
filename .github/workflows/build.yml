@@ -17,7 +17,7 @@
 #   Add to your .yarnrc.yml:
 #
 #     npmScopes:
-#       system:
+#       terncosoftware:
 #         npmRegistryServer: "https://npm.pkg.github.com"
 #         npmAlwaysAuth: true
 #
@@ -151,7 +151,7 @@ jobs:
         run: yarn test
 
       - name: Run dashboards suite
-        run: yarn workspace @jasonscharf/dashboards test
+        run: yarn workspace @terncosoftware/dashboards test
 
   # ── 2. Build and push Docker images to GHCR ──────────────────────────────────
   docker:
@@ -242,20 +242,6 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Scope packages to repository owner
-        # GitHub Packages for npm requires the package scope to match the
-        # repository owner.  Patch every publishable package.json in-place:
-        #   @system/core → @{owner}/core
-        # Also updates cross-package dependency keys so Yarn's workspace:^
-        # expansion produces the correct scoped names in published manifests.
-        run: |
-          OWNER="${{ github.repository_owner }}"
-          for pkg in api app auth core core-ui dashboards data entities events flow gen server vaults worker; do
-            tmp=$(mktemp)
-            sed "s|\"@system/|\"@${OWNER}/|g" "packages/${pkg}/package.json" > "$tmp"
-            mv "$tmp" "packages/${pkg}/package.json"
-          done
-
       - name: Compute versions
         # scripts/version.mjs sets the version for every publishable package:
         #   patch       = GITHUB_RUN_NUMBER (unique per run, always increasing)
@@ -277,29 +263,28 @@ jobs:
         # Yarn converts workspace:^ → ^<version> automatically when packing.
         run: |
           set -euo pipefail
-          OWNER="${{ github.repository_owner }}"
           fail=0
 
           publish_pkg() {
             local pkg="$1"
             echo ""
             echo "──────────────────────────────────────────"
-            echo "  Publishing @${OWNER}/${pkg} …"
+            echo "  Publishing @terncosoftware/${pkg} …"
             echo "──────────────────────────────────────────"
 
             local out
             out=$(cd "packages/$pkg" && yarn npm publish --access public 2>&1) && {
               echo "$out"
-              echo "  ✓ @${OWNER}/${pkg} published"
+              echo "  ✓ @terncosoftware/${pkg} published"
               return 0
             }
 
             echo "$out"
-            echo "  ✗ @${OWNER}/${pkg} failed"
+            echo "  ✗ @terncosoftware/${pkg} failed"
             fail=1
           }
 
-          # Layer 0 — no @{owner} deps
+          # Layer 0 — no @terncosoftware deps
           publish_pkg core
           publish_pkg core-ui
           publish_pkg vaults
@@ -339,7 +324,7 @@ jobs:
         package: [api, app, auth, core, data, entities, flow, gen, server, vaults, worker]
 
     steps:
-      - name: Prune old versions of @${{ github.repository_owner }}/${{ matrix.package }}
+      - name: Prune old versions of @terncosoftware/${{ matrix.package }}
         continue-on-error: true
         uses: actions/delete-package-versions@v5
         with:

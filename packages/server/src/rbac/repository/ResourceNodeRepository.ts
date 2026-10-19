@@ -1,6 +1,6 @@
-import type { TripleStore } from "@jasonscharf/data";
-import type { EntityRecord } from "@jasonscharf/entities";
-import { idFromIri } from "@jasonscharf/entities";
+import type { TripleStore } from "@terncosoftware/data";
+import type { EntityRecord } from "@terncosoftware/entities";
+import { idFromIri } from "@terncosoftware/entities";
 import type { EntityStore } from "../../EntityStore.js";
 import { createEntityStore } from "../../EntityStoreFactory.js";
 import type { SecurityContext } from "../../SecurityContext.js";

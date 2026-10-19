@@ -7,7 +7,7 @@ import { Container, Inject, Scope } from "typescript-ioc";
 /**
  * The platform IoC container (typescript-ioc), re-exported so every package —
  * inside this repo and downstream consumers — resolves the exact same module
- * instance. Import Container / Inject from "@jasonscharf/core", never from
+ * instance. Import Container / Inject from "@terncosoftware/core", never from
  * "typescript-ioc" directly: a second copy of the library is a second,
  * disconnected container, and overrides bound to one are invisible to the
  * other.
@@ -27,7 +27,7 @@ import { Container, Inject, Scope } from "typescript-ioc";
  * Override pattern for consumers: bind before the first context/component is
  * created —
  *
- *   import { bindService, SystemBus } from "@jasonscharf/core";
+ *   import { bindService, SystemBus } from "@terncosoftware/core";
  *   bindService(SystemBus, myBus);
  *
  * Every context/component built afterwards sees the override.

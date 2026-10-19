@@ -4,14 +4,14 @@
  * Uses a real SQLite in-memory store.  No mocks.
  */
 
-import type { ExtensionInstallContext, TernExtension } from "@jasonscharf/app";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
+import type { ExtensionInstallContext, TernExtension } from "@terncosoftware/app";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
 import {
     buildServerContext,
     ExtensionManager,
     ExtensionRegistry,
     type ServerContext,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { up as seedData } from "../../../data/src/migrations/001_init.js";
@@ -200,7 +200,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
     });
 
     it("test install hook throwing does not record extension", async () => {
-        const badExt: import("@jasonscharf/app").TernExtension = {
+        const badExt: import("@terncosoftware/app").TernExtension = {
             name: "ext.bad",
             version: "1.0.0",
             async install() {
@@ -218,7 +218,7 @@ describe("ExtensionRegistry + ExtensionManager", () => {
         // the new version so subsequent boots don't attempt to run install().
         const calls: string[] = [];
         const v1 = makeExt("ext.no-migrate", "1.0.0", calls);
-        const v2: import("@jasonscharf/app").TernExtension = {
+        const v2: import("@terncosoftware/app").TernExtension = {
             name: "ext.no-migrate",
             version: "2.0.0",
             async install() {

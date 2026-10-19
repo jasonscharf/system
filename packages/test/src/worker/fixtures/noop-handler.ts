@@ -5,7 +5,7 @@
  * can assert on them. The record is module-level so tests can inspect it.
  */
 
-import type { JobContext } from "@jasonscharf/worker";
+import type { JobContext } from "@terncosoftware/worker";
 
 /** Captured invocations — reset between tests. */
 export const invocations: Array<{ args: Record<string, string> }> = [];

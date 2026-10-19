@@ -1,5 +1,5 @@
 {
-    "name": "@jasonscharf/sandbox-server",
+    "name": "@terncosoftware/sandbox-server",
     "version": "0.1.0",
     "type": "module",
     "scripts": {
@@ -12,14 +12,14 @@
         "typecheck": "tsc -p tsconfig.json --noEmit"
     },
     "dependencies": {
-        "@jasonscharf/app": "workspace:^",
-        "@jasonscharf/auth": "workspace:^",
-        "@jasonscharf/convos": "workspace:^",
-        "@jasonscharf/core": "workspace:^",
-        "@jasonscharf/data": "workspace:^",
-        "@jasonscharf/flow": "workspace:^",
-        "@jasonscharf/server": "workspace:^",
-        "@jasonscharf/vaults": "workspace:^",
+        "@terncosoftware/app": "workspace:^",
+        "@terncosoftware/auth": "workspace:^",
+        "@terncosoftware/convos": "workspace:^",
+        "@terncosoftware/core": "workspace:^",
+        "@terncosoftware/data": "workspace:^",
+        "@terncosoftware/flow": "workspace:^",
+        "@terncosoftware/server": "workspace:^",
+        "@terncosoftware/vaults": "workspace:^",
         "better-sqlite3": "^11.10.0",
         "ioredis": "^5.6.1",
         "pg": "^8.16.0"

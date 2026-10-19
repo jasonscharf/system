@@ -12,8 +12,8 @@ import {
     orgUserIRI,
     TenantIRI,
     tenantNameIRI,
-} from "@jasonscharf/core/tenancy";
-import { EntitySchema } from "@jasonscharf/entities";
+} from "@terncosoftware/core/tenancy";
+import { EntitySchema } from "@terncosoftware/entities";
 import { TENANCY_NS } from "./constants.js";
 
 /**

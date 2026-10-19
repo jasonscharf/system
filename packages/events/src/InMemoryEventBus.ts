@@ -1,4 +1,4 @@
-import type { DomainEvent, EventSubscription, IDomainEventBus } from "@jasonscharf/core";
+import type { DomainEvent, EventSubscription, IDomainEventBus } from "@terncosoftware/core";
 
 type AnyHandler = (event: DomainEvent<unknown>) => Promise<void>;
 

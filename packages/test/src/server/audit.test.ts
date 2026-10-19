@@ -5,13 +5,13 @@
  * a rolled-back transaction for clean isolation.
  */
 
-import { createDataContext, TripleStore } from "@jasonscharf/data";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
 import {
     AuditRepository,
     buildServerContext,
     type ServerContext,
     systemSec,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";

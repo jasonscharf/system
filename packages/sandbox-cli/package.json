@@ -1,5 +1,5 @@
 {
-    "name": "@jasonscharf/sandbox-cli",
+    "name": "@terncosoftware/sandbox-cli",
     "version": "0.1.0",
     "type": "module",
     "bin": {
@@ -13,7 +13,7 @@
         "typecheck": "tsc -p tsconfig.json --noEmit"
     },
     "dependencies": {
-        "@jasonscharf/core": "workspace:^",
-        "@jasonscharf/flow": "workspace:^"
+        "@terncosoftware/core": "workspace:^",
+        "@terncosoftware/flow": "workspace:^"
     }
 }

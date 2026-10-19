@@ -9,7 +9,7 @@ import {
     HttpResponseWriter,
     HttpServer,
     type ParsedHttpRequest,
-} from "@jasonscharf/flow";
+} from "@terncosoftware/flow";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

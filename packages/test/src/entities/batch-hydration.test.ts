@@ -13,10 +13,10 @@
  * Runs against SQLite (always) and Postgres (when SYS_PG_URL is set).
  */
 
-import { IRI } from "@jasonscharf/core";
-import { createDataContext, type Knex, TripleStore } from "@jasonscharf/data";
-import { EntitySchema } from "@jasonscharf/entities";
-import { buildServerContext, EntityStore } from "@jasonscharf/server";
+import { IRI } from "@terncosoftware/core";
+import { createDataContext, type Knex, TripleStore } from "@terncosoftware/data";
+import { EntitySchema } from "@terncosoftware/entities";
+import { buildServerContext, EntityStore } from "@terncosoftware/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";
 

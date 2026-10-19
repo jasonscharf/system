@@ -52,7 +52,7 @@ The database stores RDF quads. A "quad" is `(subject, predicate, object, graph)`
 **Why this is AI-native:**
 Semantic Web vocabularies (OWL, SHACL, RDF) are part of the training data of every major language model. When entity schemas are expressed as standard ontologies, an AI agent can read the `.ttl` files and immediately understand the data model — its classes, properties, constraints, and relationships — without any translation layer. The graph structure also maps naturally to the way LLMs reason about knowledge, making semantic queries, schema inference, and data summarisation significantly more effective than with opaque relational schemas.
 
-The central RDF types/IRIs are defined in `@jasonscharf/core/ontology/`:
+The central RDF types/IRIs are defined in `@terncosoftware/core/ontology/`:
 
 | File | Namespace prefix | Key classes |
 |---|---|---|
@@ -66,19 +66,19 @@ The central RDF types/IRIs are defined in `@jasonscharf/core/ontology/`:
 ## Packages and Their Roles
 
 ```
-@jasonscharf/core          Foundation types, ApplicationContext, IRI, event bus interface
-@jasonscharf/entities      EntitySchema, EntityRecord — entity identity and type registry
-@jasonscharf/data          Database setup (createDataContext), TripleStore (raw quad access)
-@jasonscharf/server        EntityStore (CRUD+queries), EntityQuery (fluent), ServerContext
-@jasonscharf/events        InMemoryEventBus (dev/test), RedisStreamEventBus (prod)
-@jasonscharf/gen           Codegen CLI: OWL ontology + SHACL → TypeScript types + runtime shapes
-@jasonscharf/auth          User/Session/Device/Identity schemas, AuthService, OAuth providers
-@jasonscharf/rbac          RbacService, permission checking, tenant/role/grant management
-@jasonscharf/flow          FBP runtime: FlowApp, FlowComponent, FlowPort, HTTP/WS components
-@jasonscharf/app           TernApp, TernExtension lifecycle, HandlerRegistry
-@jasonscharf/vaults        SecretsManager, pluggable secret backends (env, Azure KV)
-@jasonscharf/convos        Conversations, messages, notifications extension
-@jasonscharf/api           Minimal health-check HTTP endpoint
+@terncosoftware/core          Foundation types, ApplicationContext, IRI, event bus interface
+@terncosoftware/entities      EntitySchema, EntityRecord — entity identity and type registry
+@terncosoftware/data          Database setup (createDataContext), TripleStore (raw quad access)
+@terncosoftware/server        EntityStore (CRUD+queries), EntityQuery (fluent), ServerContext
+@terncosoftware/events        InMemoryEventBus (dev/test), RedisStreamEventBus (prod)
+@terncosoftware/gen           Codegen CLI: OWL ontology + SHACL → TypeScript types + runtime shapes
+@terncosoftware/auth          User/Session/Device/Identity schemas, AuthService, OAuth providers
+@terncosoftware/rbac          RbacService, permission checking, tenant/role/grant management
+@terncosoftware/flow          FBP runtime: FlowApp, FlowComponent, FlowPort, HTTP/WS components
+@terncosoftware/app           TernApp, TernExtension lifecycle, HandlerRegistry
+@terncosoftware/vaults        SecretsManager, pluggable secret backends (env, Azure KV)
+@terncosoftware/convos        Conversations, messages, notifications extension
+@terncosoftware/api           Minimal health-check HTTP endpoint
 ```
 
 **Dependency direction:** `core ← entities ← data ← server ← auth/rbac ← app`  
@@ -107,8 +107,8 @@ All properties of an entity are triples with the entity IRI as subject:
 ### Defining an entity schema
 
 ```typescript
-import { EntitySchema } from '@jasonscharf/entities';
-import { IRI } from '@jasonscharf/core';
+import { EntitySchema } from '@terncosoftware/entities';
+import { IRI } from '@terncosoftware/core';
 
 const NS = 'http://example.com/ns/';
 
@@ -176,7 +176,7 @@ GRAPH <http://analytics.example.com/ext/users/123> {
 ### In code
 
 ```typescript
-import { extensionGraph } from '@jasonscharf/entities';
+import { extensionGraph } from '@terncosoftware/entities';
 import { lastActiveAtIRI, sessionCountIRI } from './analytics/types.generated.js';
 
 const ANALYTICS_NS = 'http://analytics.example.com/ext/';
@@ -219,7 +219,7 @@ const data = await store.readExtension(ctx, entityIri, ANALYTICS_NS, [
 | `tenantId?` | `string` | Tenant graph scope |
 
 ```typescript
-import { defaultServerContext } from '@jasonscharf/server';
+import { defaultServerContext } from '@terncosoftware/server';
 
 const ctx: ServerContext = {
     ...defaultServerContext,
@@ -232,7 +232,7 @@ const ctx: ServerContext = {
 Add application-specific fields via module augmentation:
 
 ```typescript
-declare module '@jasonscharf/core' {
+declare module '@terncosoftware/core' {
     interface ApplicationContext {
         myService?: MyService;
     }
@@ -245,7 +245,7 @@ Context members (`bus`, `logger`, `entityStore`) populate from the platform
 IoC container at context build time, and services are never passed by hand
 through options or constructor args when a container binding exists.
 
-- Import `Container`/`bindService`/`resolveService` from `@jasonscharf/core`,
+- Import `Container`/`bindService`/`resolveService` from `@terncosoftware/core`,
   never from `typescript-ioc` directly — one shared container instance is what
   makes downstream overrides work.
 - Tokens are classes. Interface-shaped services get an abstract token class
@@ -309,7 +309,7 @@ await store.delete(ctx, ProductSchema, id);
 ### Query (fluent)
 
 ```typescript
-import { entities } from '@jasonscharf/server';
+import { entities } from '@terncosoftware/server';
 
 const results = await entities(store, ProductSchema)
     .where(priceIRI, '>=', Literal.decimal(10))
@@ -344,7 +344,7 @@ await store.collectionRemove(ctx, ProductSchema, id, 'tags', tagIri);
 
 ## The Event Bus
 
-### Interface (in `@jasonscharf/core`)
+### Interface (in `@terncosoftware/core`)
 
 ```typescript
 interface IDomainEventBus {
@@ -366,8 +366,8 @@ interface DomainEvent<T> {
 
 | Class | Package | Use |
 |---|---|---|
-| `InMemoryEventBus` | `@jasonscharf/events` | Development, tests |
-| `RedisStreamEventBus` | `@jasonscharf/events` | Production (distributed) |
+| `InMemoryEventBus` | `@terncosoftware/events` | Development, tests |
+| `RedisStreamEventBus` | `@terncosoftware/events` | Production (distributed) |
 
 ### Delivery semantics
 
@@ -381,7 +381,7 @@ interface DomainEvent<T> {
 Set `ctx.events` at startup:
 
 ```typescript
-import { RedisStreamEventBus } from '@jasonscharf/events';
+import { RedisStreamEventBus } from '@terncosoftware/events';
 import { Redis } from 'ioredis';
 
 const bus = new RedisStreamEventBus(new Redis(), new Redis(), { streamPrefix: 'myapp:events:' });
@@ -426,7 +426,7 @@ System uses FBP for all IO, HTTP, WebSocket, and inter-component messaging. Comp
 ### FlowComponent
 
 ```typescript
-import { FlowComponent } from '@jasonscharf/flow';
+import { FlowComponent } from '@terncosoftware/flow';
 
 class ProductIndexer extends FlowComponent {
     private _in  = this.addPort<ProductCreatedEvent>('in',  'in');
@@ -444,7 +444,7 @@ class ProductIndexer extends FlowComponent {
 ### FlowApp
 
 ```typescript
-import { FlowApp, HttpServer, HttpDecoder, HttpRouter, HttpEncoder } from '@jasonscharf/flow';
+import { FlowApp, HttpServer, HttpDecoder, HttpRouter, HttpEncoder } from '@terncosoftware/flow';
 
 const app = new FlowApp({ mode: 'push' });
 
@@ -521,7 +521,7 @@ await app.start();
 ### Extension registry
 
 ```typescript
-import { ExtensionRegistry, ExtensionManager } from '@jasonscharf/server';
+import { ExtensionRegistry, ExtensionManager } from '@terncosoftware/server';
 
 const registry = new ExtensionRegistry();
 registry.register(ProductsExtension);
@@ -600,7 +600,7 @@ await rbac.createGrant(ctx, { principalIri: userIri, roleIri: editorRole.iri, sc
 **Rule: secrets never enter `process.env` in cloud deployments.** Fetch directly from the vault.
 
 ```typescript
-import { SecretsManager } from '@jasonscharf/vaults';
+import { SecretsManager } from '@terncosoftware/vaults';
 
 const secrets = SecretsManager.fromEnvironment();
 // Uses Azure Key Vault when AZURE_KEY_VAULT_URI is set; env vars otherwise.
@@ -617,7 +617,7 @@ Non-sensitive configuration (ports, feature flags) goes through `process.env` di
 
 ## Codegen from Ontologies
 
-Every entity type has a corresponding OWL ontology file (`.ttl`). The `@jasonscharf/gen` CLI reads these and emits TypeScript types and runtime SHACL descriptors.
+Every entity type has a corresponding OWL ontology file (`.ttl`). The `@terncosoftware/gen` CLI reads these and emits TypeScript types and runtime SHACL descriptors.
 
 ### Workflow
 
@@ -633,9 +633,9 @@ Every entity type has a corresponding OWL ontology file (`.ttl`). The `@jasonsch
 {
     "bases": [
         {
-            "ontology":   "@jasonscharf/core/ontology/auth.ttl",
-            "package":    "@jasonscharf/core",
-            "importPath": "@jasonscharf/core"
+            "ontology":   "@terncosoftware/core/ontology/auth.ttl",
+            "package":    "@terncosoftware/core",
+            "importPath": "@terncosoftware/core"
         }
     ],
     "extensions":     ["./ontology/my-extension.ttl"],

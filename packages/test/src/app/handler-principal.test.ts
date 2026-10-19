@@ -7,7 +7,7 @@
  * anonymous default.
  */
 
-import { HandlerRegistry, SystemApp } from "@jasonscharf/app";
+import { HandlerRegistry, SystemApp } from "@terncosoftware/app";
 import {
     anonymousSec,
     errResult,
@@ -16,7 +16,7 @@ import {
     type SecurityContext,
     SYSTEM_TYPES,
     systemSec,
-} from "@jasonscharf/core";
+} from "@terncosoftware/core";
 import { describe, expect, it } from "vitest";
 
 function principalOf(result: { data?: unknown }): string | null {

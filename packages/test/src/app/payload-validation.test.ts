@@ -6,9 +6,9 @@
  * and passes through normally when the shape is satisfied or unregistered.
  */
 
-import { command, okResult, typeRef } from "@jasonscharf/core";
-import { PayloadSchemaRegistry, payloadValidation, SystemRouter } from "@jasonscharf/app";
-import type { ShaclNodeShape } from "@jasonscharf/gen";
+import { command, okResult, typeRef } from "@terncosoftware/core";
+import { PayloadSchemaRegistry, payloadValidation, SystemRouter } from "@terncosoftware/app";
+import type { ShaclNodeShape } from "@terncosoftware/gen";
 import { describe, expect, it } from "vitest";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────

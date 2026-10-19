@@ -10,7 +10,7 @@
  *   - Jitter stays within [0, jitter] and base cadence is preserved
  */
 
-import { nextRun, nextRunBase, parseDuration, validateSchedule } from "@jasonscharf/worker";
+import { nextRun, nextRunBase, parseDuration, validateSchedule } from "@terncosoftware/worker";
 import { DateTime } from "luxon";
 import { describe, expect, it } from "vitest";
 

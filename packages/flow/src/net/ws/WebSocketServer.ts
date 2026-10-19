@@ -1,6 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
-import { getLog, uuidv4Binary } from "@jasonscharf/core";
+import { getLog, uuidv4Binary } from "@terncosoftware/core";
 import type { WebSocketServer as WsServerType, WebSocket as WsSocket } from "ws";
 import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
 import type { FlowPort } from "../../FlowPort.js";

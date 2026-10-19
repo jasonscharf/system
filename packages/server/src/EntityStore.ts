@@ -1,5 +1,5 @@
-import { DEFAULT_GRAPH, type DefaultGraph, type IRI, type Quad } from "@jasonscharf/core";
-import type { EntityTimestamps, TripleStore } from "@jasonscharf/data";
+import { DEFAULT_GRAPH, type DefaultGraph, type IRI, type Quad } from "@terncosoftware/core";
+import type { EntityTimestamps, TripleStore } from "@terncosoftware/data";
 import type {
     EdgeDef,
     EdgeHandle,
@@ -9,7 +9,7 @@ import type {
     EntitySchema,
     IFieldCipher,
     PropertyDef,
-} from "@jasonscharf/entities";
+} from "@terncosoftware/entities";
 import {
     EntityValidationError,
     entityIriFor,
@@ -21,8 +21,8 @@ import {
     RDF_TYPE,
     toEncryptedLiteral,
     toLiteral,
-} from "@jasonscharf/entities";
-import { validate } from "@jasonscharf/gen";
+} from "@terncosoftware/entities";
+import { validate } from "@terncosoftware/gen";
 import type { CollectionViewOpts } from "./CollectionView.js";
 import { CollectionViewStore } from "./CollectionView.js";
 import {

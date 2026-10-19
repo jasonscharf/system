@@ -6,7 +6,7 @@ lint error.
 ## Using it
 
 ```ts
-import { getLogger } from "@jasonscharf/core";
+import { getLogger } from "@terncosoftware/core";
 
 const log = getLogger("EventConsumer");
 
@@ -33,7 +33,7 @@ const reqLog = log.child({ correlationId: envelope.correlationId });
 
 ```
   getLogger("X")  ──►  SystemLogger (IoC token)  ──►  the bound sink
-   any package          @jasonscharf/core              one per process
+   any package          @terncosoftware/core              one per process
 ```
 
 - `Logger` is the sink interface: `debug` / `info` / `warn` / `error`, each
@@ -42,7 +42,7 @@ const reqLog = log.child({ correlationId: envelope.correlationId });
 - `SystemLogger` is the container token for the process-wide root sink.
 - `ConsoleLogger` is the default binding, so an unbooted process (a test, a
   script) still logs. It renders the logger name as a `[name]` prefix.
-- `PinoLogger` (`@jasonscharf/server`) is the production sink. It is the ONLY
+- `PinoLogger` (`@terncosoftware/server`) is the production sink. It is the ONLY
   module in the platform that imports pino.
 
 `getLogger()` resolves the sink on each call rather than capturing it, which is
@@ -54,7 +54,7 @@ sink long after every module has been imported.
 Bind the sink FIRST, before anything that logs:
 
 ```ts
-import { bindPinoLogger } from "@jasonscharf/server";
+import { bindPinoLogger } from "@terncosoftware/server";
 
 bindPinoLogger({
     service: "tern-server",
@@ -105,7 +105,7 @@ bindService(SystemLogger, { debug, info, warn, error });
 Everything that emits a LOG line, including every server, goes through
 `getLogger()`.
 
-Browser code included. `getLogger()` is exported from `@jasonscharf/core`'s
+Browser code included. `getLogger()` is exported from `@terncosoftware/core`'s
 `browser` entry and resolves the same way it does on the server; the default
 `ConsoleLogger` binding means devtools is the sink, which is the right
 destination in a browser.

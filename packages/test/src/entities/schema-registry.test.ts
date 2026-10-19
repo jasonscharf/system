@@ -20,10 +20,10 @@
  * Each suite runs inside a rolled-back transaction for full isolation.
  */
 
-import { UserSchema } from "@jasonscharf/auth";
-import { DEFAULT_GRAPH, IRI } from "@jasonscharf/core";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { EntitySchema, propIri, toLiteral } from "@jasonscharf/entities";
+import { UserSchema } from "@terncosoftware/auth";
+import { DEFAULT_GRAPH, IRI } from "@terncosoftware/core";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import { EntitySchema, propIri, toLiteral } from "@terncosoftware/entities";
 import {
     buildServerContext,
     EntityStore,
@@ -33,7 +33,7 @@ import {
     type TraversalPlan,
     type TypeSnapshot,
     type TypeVersion,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";

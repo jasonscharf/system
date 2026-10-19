@@ -1,6 +1,6 @@
-import { SystemRouter } from "@jasonscharf/app";
-import { errResult, okResult, query, SYSTEM_TYPES } from "@jasonscharf/core";
-import { FlowContext, HttpRouter, type ParsedHttpRequest } from "@jasonscharf/flow";
+import { SystemRouter } from "@terncosoftware/app";
+import { errResult, okResult, query, SYSTEM_TYPES } from "@terncosoftware/core";
+import { FlowContext, HttpRouter, type ParsedHttpRequest } from "@terncosoftware/flow";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -437,7 +437,7 @@ describe("HttpRouter", () => {
 
 // ── Additional coverage: compose + SystemRouter branches ───────────────────────
 
-import { compose, type Next } from "@jasonscharf/app";
+import { compose, type Next } from "@terncosoftware/app";
 
 describe("compose: defensive branches", () => {
     it("throws when next() is called a second time", async () => {

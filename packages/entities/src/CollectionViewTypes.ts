@@ -1,4 +1,4 @@
-import type { IRI } from "@jasonscharf/core";
+import type { IRI } from "@terncosoftware/core";
 
 export interface CollectionViewOpts {
     sortProp?: IRI;

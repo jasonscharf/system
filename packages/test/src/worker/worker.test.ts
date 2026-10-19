@@ -13,7 +13,7 @@ describe("worker", () => {
     });
 
     it("fires the interval callback", async () => {
-        await import("@jasonscharf/worker");
+        await import("@terncosoftware/worker");
         vi.advanceTimersByTime(2000);
     });
 });

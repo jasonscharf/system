@@ -1,7 +1,7 @@
-import type { TripleStore } from "@jasonscharf/data";
-import type { EntityRecord, IFieldCipher } from "@jasonscharf/entities";
-import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import { createEntityStore, EntityQuery, type EntityStore } from "@jasonscharf/server";
+import type { TripleStore } from "@terncosoftware/data";
+import type { EntityRecord, IFieldCipher } from "@terncosoftware/entities";
+import type { SecurityContext, ServerContext } from "@terncosoftware/server";
+import { createEntityStore, EntityQuery, type EntityStore } from "@terncosoftware/server";
 import { UserIdentitySchema } from "../entities/UserIdentitySchema.js";
 import type { OAuthProvider, UserIdentityEntity } from "../types.js";
 import { idFrom, iriFor, newId } from "./util.js";

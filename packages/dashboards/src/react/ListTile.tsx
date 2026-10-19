@@ -7,7 +7,7 @@ import {
     type ListSort,
     listKeyOf,
     normalizeListQuery,
-} from "@jasonscharf/core/list";
+} from "@terncosoftware/core/list";
 import type React from "react";
 import { useEffect, useId, useMemo, useState } from "react";
 import { useListTopic, useTileCommands } from "./hooks.js";

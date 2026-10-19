@@ -1,7 +1,7 @@
 // auto-generated — do not edit by hand
 
-import { IRI } from "@jasonscharf/core";
-import { EntitySchema } from "@jasonscharf/entities";
+import { IRI } from "@terncosoftware/core";
+import { EntitySchema } from "@terncosoftware/entities";
 
 /** A named menu: an aggregate root that owns a set of menu items. The slot keys which placeholder in the shell renders it. */
 export const MenuSchema: EntitySchema = new EntitySchema({

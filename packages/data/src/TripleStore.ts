@@ -6,7 +6,7 @@ import {
     type IRI,
     type Literal,
     type Quad,
-} from "@jasonscharf/core";
+} from "@terncosoftware/core";
 import type { Knex } from "knex";
 import { C, DEFAULT_GRAPH_IRI, type LiteralJson, type NodeKind, T } from "./schema.js";
 
@@ -332,7 +332,7 @@ export interface StoreStats {
  * @internal
  * TripleStore is the low-level quad store and is NOT the public data-access API.
  * The public surface is EntityStore / EntityQuery (built on top of this in
- * @jasonscharf/server), which add domain entities, schema-aware projection, PII
+ * @terncosoftware/server), which add domain entities, schema-aware projection, PII
  * decryption, and rooted-traversal queries.  Do NOT add new direct importers of
  * TripleStore from application or bounded-context code — the architecture gate
  * test (packages/test/src/architecture/triplestore-internal.test.ts) enforces

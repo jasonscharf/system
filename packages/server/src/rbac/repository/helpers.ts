@@ -1,10 +1,10 @@
-import type { IRI } from "@jasonscharf/core";
-import type { EdgeRef, EntityRecord } from "@jasonscharf/entities";
-import { entityIri } from "@jasonscharf/entities";
+import type { IRI } from "@terncosoftware/core";
+import type { EdgeRef, EntityRecord } from "@terncosoftware/entities";
+import { entityIri } from "@terncosoftware/entities";
 import { RBAC_NS } from "../constants.js";
 
 // The id helpers (newId / idFromIri / entityIri) now live in
-// @jasonscharf/entities and are the single source every bounded context adopts;
+// @terncosoftware/entities and are the single source every bounded context adopts;
 // the divergent rbac copies (newId / idFrom / iriFor) that used to live in
 // ./util.ts have been deleted. This module keeps only the rbac-specific
 // quad-reading helpers plus a thin iriFor that pins the RBAC namespace.

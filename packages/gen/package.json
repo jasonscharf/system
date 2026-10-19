@@ -1,5 +1,5 @@
 {
-    "name": "@jasonscharf/gen",
+    "name": "@terncosoftware/gen",
     "version": "0.1.0",
     "type": "module",
     "exports": {
@@ -21,7 +21,7 @@
     ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/jasonlscharf/system.git",
+        "url": "https://github.com/terncosoftware/system.git",
         "directory": "packages/gen"
     },
     "publishConfig": {
@@ -36,6 +36,6 @@
         "watch": "tsc -b -w"
     },
     "dependencies": {
-        "@jasonscharf/core": "workspace:^"
+        "@terncosoftware/core": "workspace:^"
     }
 }

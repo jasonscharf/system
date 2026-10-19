@@ -1,4 +1,4 @@
-import { createDataContext, type Knex, TripleStore } from "@jasonscharf/data";
+import { createDataContext, type Knex, TripleStore } from "@terncosoftware/data";
 import {
     buildServerContext,
     EntityStore,
@@ -6,7 +6,7 @@ import {
     type ServerContext,
     systemSec,
     TenantSchema,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";
 

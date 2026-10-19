@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import type { ListSchema } from "@jasonscharf/core/list";
-import { InMemoryDispatch } from "@jasonscharf/core-ui";
+import type { ListSchema } from "@terncosoftware/core/list";
+import { InMemoryDispatch } from "@terncosoftware/core-ui";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

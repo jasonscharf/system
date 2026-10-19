@@ -1,4 +1,4 @@
-import type { InvocationCtx, ReducerCtx } from "@jasonscharf/events";
+import type { InvocationCtx, ReducerCtx } from "@terncosoftware/events";
 
 // Real fixture handlers used by the dispatch tests.  No mocks: these are
 // ordinary exported async functions resolved through the module-ref loader and

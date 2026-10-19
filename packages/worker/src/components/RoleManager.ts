@@ -1,8 +1,8 @@
 import { hostname } from "node:os";
-import { getLog, Inject } from "@jasonscharf/core";
+import { getLog, Inject } from "@terncosoftware/core";
 // biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
-import { DataSource } from "@jasonscharf/data";
-import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
+import { DataSource } from "@terncosoftware/data";
+import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@terncosoftware/flow";
 import type { Knex } from "knex";
 import {
     ROLE_DEFAULT_SLOTS,

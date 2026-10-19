@@ -28,7 +28,7 @@ export interface RequestSig<TArg = unknown, TResult = unknown> {
 // over the index signature). Extensions add their messages by declaration
 // merging:
 //
-//   declare module "@jasonscharf/core-ui" {
+//   declare module "@terncosoftware/core-ui" {
 //       interface SystemCommands { "nav.go": { to: string }; }
 //       interface SystemQueries  { "user.find": RequestSig<{ id: string }, User>; }
 //   }

@@ -29,9 +29,9 @@ export const CONTAINS_IRI = "urn:sys:core:contains";
 export interface SchemaGenConfig {
     /** IRI prefix identifying classes/properties defined in this ontology. */
     localNamespace: string;
-    /** Import path for EntitySchema.  Defaults to `@jasonscharf/entities`. */
+    /** Import path for EntitySchema.  Defaults to `@terncosoftware/entities`. */
     entitiesImport?: string;
-    /** Import path for the IRI class.  Defaults to `@jasonscharf/core`. */
+    /** Import path for the IRI class.  Defaults to `@terncosoftware/core`. */
     iriImport?: string;
     /**
      * Absolute named-graph IRI to pin every generated schema to (graphIri).
@@ -215,8 +215,8 @@ export function generateSchemas(
     shapes: ShaclShapes,
     config: SchemaGenConfig,
 ): string {
-    const entitiesPkg = config.entitiesImport ?? "@jasonscharf/entities";
-    const iriPkg = config.iriImport ?? "@jasonscharf/core";
+    const entitiesPkg = config.entitiesImport ?? "@terncosoftware/entities";
+    const iriPkg = config.iriImport ?? "@terncosoftware/core";
 
     // A class is generated when it is local, or when an extension property declares
     // it as `rdfs:domain` (so an external class can gain a containment edge).

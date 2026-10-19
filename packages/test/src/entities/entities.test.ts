@@ -12,12 +12,12 @@
  *   - Collection API: push / get / remove / pop / set / insertAt
  */
 
-import { UserSchema } from "@jasonscharf/auth";
-import { IRI } from "@jasonscharf/core";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { EntitySchema } from "@jasonscharf/entities";
-import type { ShaclNodeShape } from "@jasonscharf/gen";
-import { buildServerContext, EntityStore, EntityValidationError } from "@jasonscharf/server";
+import { UserSchema } from "@terncosoftware/auth";
+import { IRI } from "@terncosoftware/core";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import { EntitySchema } from "@terncosoftware/entities";
+import type { ShaclNodeShape } from "@terncosoftware/gen";
+import { buildServerContext, EntityStore, EntityValidationError } from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fromLiteral, invertPropertyMap, propertyMapFor } from "../../../entities/src/util.js";

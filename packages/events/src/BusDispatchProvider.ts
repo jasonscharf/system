@@ -1,4 +1,4 @@
-import type { ISystemBus } from "@jasonscharf/core";
+import type { ISystemBus } from "@terncosoftware/core";
 import type { DataExec, DispatchProvider, VoidExec } from "./DispatchProvider.js";
 import { dispatchIri } from "./iri.js";
 import type {

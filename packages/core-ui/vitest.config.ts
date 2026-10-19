@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 // Package-local vitest config. Run from the repo root with:
-//   yarn workspace @jasonscharf/core-ui test
+//   yarn workspace @terncosoftware/core-ui test
 // The @system/* aliases mirror the portal symlinks used elsewhere in the repo
 // so fixtures that reference them resolve to source.
 const pkg = (name: string): string => path.resolve(__dirname, `../${name}/src`);
@@ -28,7 +28,7 @@ export default defineConfig({
         // className (RNW passes className through on web).
         alias: {
             "react-native": "react-native-web",
-            "@jasonscharf/core-ui": path.resolve(__dirname, "src"),
+            "@terncosoftware/core-ui": path.resolve(__dirname, "src"),
             "@system/core": pkg("core"),
             "@system/gen": pkg("gen"),
         },

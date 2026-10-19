@@ -1,4 +1,4 @@
-import { getLog } from "@jasonscharf/core";
+import { getLog } from "@terncosoftware/core";
 import type { Knex } from "knex";
 import { recordMigrationBaseline } from "./migrationBaseline.js";
 import { up as migrate001 } from "./migrations/001_init.js";

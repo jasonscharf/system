@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 // Package-local vitest config. Run from the repo root with:
-//   yarn workspace @jasonscharf/ui-menus test
+//   yarn workspace @terncosoftware/ui-menus test
 // The aliases resolve workspace packages to source so tests track edits without
 // a build step, and bare `react-native` imports (pulled in via core-ui's React
 // primitives) resolve to react-native-web under jsdom.
@@ -25,12 +25,12 @@ export default defineConfig({
     resolve: {
         alias: {
             "react-native": "react-native-web",
-            "@jasonscharf/ui-menus/react": path.resolve(__dirname, "src/react"),
-            "@jasonscharf/ui-menus": path.resolve(__dirname, "src"),
-            "@jasonscharf/core-ui/react": `${pkg("core-ui")}/react`,
-            "@jasonscharf/core-ui": pkg("core-ui"),
-            "@jasonscharf/core": pkg("core"),
-            "@jasonscharf/entities": pkg("entities"),
+            "@terncosoftware/ui-menus/react": path.resolve(__dirname, "src/react"),
+            "@terncosoftware/ui-menus": path.resolve(__dirname, "src"),
+            "@terncosoftware/core-ui/react": `${pkg("core-ui")}/react`,
+            "@terncosoftware/core-ui": pkg("core-ui"),
+            "@terncosoftware/core": pkg("core"),
+            "@terncosoftware/entities": pkg("entities"),
         },
     },
 });

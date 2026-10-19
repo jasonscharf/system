@@ -1,6 +1,6 @@
-import { declareService, resolveService } from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
-import type { IFieldCipher } from "@jasonscharf/entities";
+import { declareService, resolveService } from "@terncosoftware/core";
+import type { TripleStore } from "@terncosoftware/data";
+import type { IFieldCipher } from "@terncosoftware/entities";
 import { EntityStore } from "./EntityStore.js";
 import type { SchemaRegistry } from "./SchemaRegistry.js";
 

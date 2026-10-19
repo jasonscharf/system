@@ -1,4 +1,4 @@
-import { IRI, makeUri, NS_CORE } from "@jasonscharf/core";
+import { IRI, makeUri, NS_CORE } from "@terncosoftware/core";
 
 export const RBAC_NS = makeUri(NS_CORE, "rbac");
 export const RBAC_GRAPH = new IRI(makeUri(RBAC_NS, "graph"));

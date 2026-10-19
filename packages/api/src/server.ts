@@ -1,4 +1,4 @@
-import { getLog } from "@jasonscharf/core";
+import { getLog } from "@terncosoftware/core";
 import { app } from "./index.js";
 
 const log = getLog("sys:api:server");

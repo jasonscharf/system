@@ -1,5 +1,5 @@
-import { avatarUrlIRI, displayNameIRI, emailIRI, UserIRI } from "@jasonscharf/core";
-import { EntitySchema } from "@jasonscharf/entities";
+import { avatarUrlIRI, displayNameIRI, emailIRI, UserIRI } from "@terncosoftware/core";
+import { EntitySchema } from "@terncosoftware/entities";
 import { AUTH_NS } from "../constants.js";
 
 export const UserSchema = new EntitySchema({

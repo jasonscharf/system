@@ -5,12 +5,12 @@
  * EntityStore / EntityQuery (plus the entity-infrastructure that builds them).
  * Every bounded-context repo has been migrated onto EntityStore, so this test
  * locks in the win: it scans the source tree and FAILS if any file imports
- * `TripleStore` from `@jasonscharf/data` unless that file is on the explicit
+ * `TripleStore` from `@terncosoftware/data` unless that file is on the explicit
  * ALLOWLIST below.  The intent is to stop NEW direct TripleStore data access —
  * not to refactor the existing legitimate importers.
  *
  * The gate is deliberately additive and low-churn: it does not move the
- * `@jasonscharf/data` re-export behind an `/internal` entry point (that would
+ * `@terncosoftware/data` re-export behind an `/internal` entry point (that would
  * touch dozens of files).  It just prevents regressions.
  *
  * HOW TO (rarely) EXTEND THE ALLOWLIST
@@ -34,7 +34,7 @@ const PACKAGES_DIR = path.join(REPO_ROOT, "packages");
 
 /**
  * Files (relative to the repo root, POSIX separators) that are PERMITTED to
- * import `TripleStore` from `@jasonscharf/data`.  Grouped by why they are
+ * import `TripleStore` from `@terncosoftware/data`.  Grouped by why they are
  * legitimate.  Captured as the baseline on `main` so the gate is GREEN today.
  */
 const ALLOWLIST: ReadonlyArray<string> = [
@@ -102,14 +102,14 @@ const ALLOWLIST_SET = new Set(ALLOWLIST);
 
 /**
  * Matches an ESM import that pulls `TripleStore` (named or type-only) from
- * `@jasonscharf/data`.  Examples it catches:
- *   import { TripleStore } from "@jasonscharf/data";
- *   import type { TripleStore } from "@jasonscharf/data";
- *   import { createDataContext, TripleStore } from "@jasonscharf/data";
- *   import { type QuadPattern, TripleStore } from "@jasonscharf/data";
+ * `@terncosoftware/data`.  Examples it catches:
+ *   import { TripleStore } from "@terncosoftware/data";
+ *   import type { TripleStore } from "@terncosoftware/data";
+ *   import { createDataContext, TripleStore } from "@terncosoftware/data";
+ *   import { type QuadPattern, TripleStore } from "@terncosoftware/data";
  */
 const IMPORT_RE =
-    /import\s+(?:type\s+)?\{[^}]*\bTripleStore\b[^}]*\}\s*from\s*["']@jasonscharf\/data["']/;
+    /import\s+(?:type\s+)?\{[^}]*\bTripleStore\b[^}]*\}\s*from\s*["']@terncosoftware\/data["']/;
 
 function listTsFiles(dir: string): string[] {
     const out: string[] = [];
@@ -135,7 +135,7 @@ function packageOf(relPath: string): string {
 }
 
 describe("architecture: TripleStore is internal (TRN-197)", () => {
-    it("no file outside the allowlist imports TripleStore from @jasonscharf/data", () => {
+    it("no file outside the allowlist imports TripleStore from @terncosoftware/data", () => {
         const violations: string[] = [];
 
         for (const pkg of readdirSync(PACKAGES_DIR)) {
@@ -167,7 +167,7 @@ describe("architecture: TripleStore is internal (TRN-197)", () => {
 
         const message = [
             "TripleStore is internal — use EntityStore / EntityQuery instead.",
-            "These files import TripleStore from @jasonscharf/data but are NOT on the allowlist:",
+            "These files import TripleStore from @terncosoftware/data but are NOT on the allowlist:",
             ...violations.map((v) => `  - ${v}`),
             "",
             "If this is genuinely entity-infrastructure / a migration / a documented",

@@ -7,12 +7,12 @@
  * with two properties (name, color) and one domain event (renamed).
  */
 
-import type { DomainEvent } from "@jasonscharf/core";
-import { IRI } from "@jasonscharf/core";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { type EntityRecord, EntitySchema, TernAggregate } from "@jasonscharf/entities";
-import type { ServerContext } from "@jasonscharf/server";
-import { AggregateRepository, buildServerContext, EntityStore } from "@jasonscharf/server";
+import type { DomainEvent } from "@terncosoftware/core";
+import { IRI } from "@terncosoftware/core";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import { type EntityRecord, EntitySchema, TernAggregate } from "@terncosoftware/entities";
+import type { ServerContext } from "@terncosoftware/server";
+import { AggregateRepository, buildServerContext, EntityStore } from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { up as seedData } from "../../../data/src/migrations/001_init.js";
@@ -227,7 +227,7 @@ describe("TernAggregate + AggregateRepository", () => {
     });
 
     it("test save publishes domain events to ctx bus", async () => {
-        const { InMemorySystemBus } = await import("@jasonscharf/core");
+        const { InMemorySystemBus } = await import("@terncosoftware/core");
         const bus = new InMemorySystemBus();
         const received: DomainEvent[] = [];
         await bus.subscribe(Widget.RENAMED, "test", async (e) => {

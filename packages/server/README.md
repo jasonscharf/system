@@ -1,4 +1,4 @@
-# @jasonscharf/server
+# @terncosoftware/server
 
 Entity storage, querying, and extension management for the Tern platform. The primary data access layer for application code.
 
@@ -7,8 +7,8 @@ Entity storage, querying, and extension management for the Tern platform. The pr
 `ServerContext` extends `ApplicationContext` with database transaction, session, and tenancy fields.
 
 ```typescript
-import type { ServerContext } from '@jasonscharf/server';
-import { defaultServerContext } from '@jasonscharf/server';
+import type { ServerContext } from '@terncosoftware/server';
+import { defaultServerContext } from '@terncosoftware/server';
 
 const ctx: ServerContext = {
     ...defaultServerContext,
@@ -25,8 +25,8 @@ const ctx: ServerContext = {
 The main data access object. All entity reads and writes go through here — never access `TripleStore` directly in application code.
 
 ```typescript
-import { EntityStore } from '@jasonscharf/server';
-import { TripleStore } from '@jasonscharf/data';
+import { EntityStore } from '@terncosoftware/server';
+import { TripleStore } from '@terncosoftware/data';
 
 const store = new EntityStore(new TripleStore(knex));
 ```
@@ -83,7 +83,7 @@ The transaction `ctx` automatically propagates `trx` to all nested store operati
 Fluent query builder for filtering and sorting entities.
 
 ```typescript
-import { entities } from '@jasonscharf/server';
+import { entities } from '@terncosoftware/server';
 
 const results = await entities(store, ProductSchema)
     .where(priceIRI, '>=', Literal.decimal(10))
@@ -140,7 +140,7 @@ const view = await store.createCollectionView(ctx, ProductSchema, id, 'tags', {
 Track and drive the lifecycle of installed extensions.
 
 ```typescript
-import { ExtensionRegistry, ExtensionManager } from '@jasonscharf/server';
+import { ExtensionRegistry, ExtensionManager } from '@terncosoftware/server';
 
 const registry = new ExtensionRegistry();
 const manager  = new ExtensionManager(registry, store);
@@ -162,7 +162,7 @@ const record = await store.create(ctx, ProductSchema, { /* ... */ });
 ## Installation
 
 ```bash
-yarn add @jasonscharf/server
+yarn add @terncosoftware/server
 yarn add knex better-sqlite3   # or: knex pg
 ```
 

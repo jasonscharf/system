@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Triple, TripleSource } from "@jasonscharf/core";
+import type { Triple, TripleSource } from "@terncosoftware/core";
 import {
     DatabaseSource,
     FileSource,
@@ -11,7 +11,7 @@ import {
     SocketSource,
     TripleStream,
     triple,
-} from "@jasonscharf/core";
+} from "@terncosoftware/core";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

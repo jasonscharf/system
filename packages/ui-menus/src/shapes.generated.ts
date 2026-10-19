@@ -1,5 +1,5 @@
 // auto-generated shapes descriptor — do not edit by hand
-import type { ShaclNodeShape, ShaclShapes } from "@jasonscharf/gen";
+import type { ShaclNodeShape, ShaclShapes } from "@terncosoftware/gen";
 
 const list: ShaclNodeShape[] = [
     {

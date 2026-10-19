@@ -12,8 +12,8 @@ import {
     utmCampaignIRI,
     utmMediumIRI,
     utmSourceIRI,
-} from "@jasonscharf/core";
-import { EntitySchema } from "@jasonscharf/entities";
+} from "@terncosoftware/core";
+import { EntitySchema } from "@terncosoftware/entities";
 import { AUTH_NS } from "../constants.js";
 
 export const LoginAttemptSchema = new EntitySchema({

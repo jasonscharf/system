@@ -1,4 +1,4 @@
-# @jasonscharf/core-ui
+# @terncosoftware/core-ui
 
 A Prism-borrowed composition framework. Product packages contribute UI into a
 shell by **configuration**, not hardcoded wiring.
@@ -28,18 +28,18 @@ import {
     bindView,           // bind a ViewDefinition to a Dispatch -> BoundView
     assembleMenu,       // (MenuItemConfig[], { capabilities }) -> MenuNode[]
     InMemoryDispatch,   // real in-process Dispatch implementation
-} from "@jasonscharf/core-ui";
+} from "@terncosoftware/core-ui";
 
 import type {
     UiContribution, RegionContribution, ViewDefinition, ViewModelFactory,
     MenuItemConfig, MenuNode, Dispatch, CommandHandle, EventListener,
-} from "@jasonscharf/core-ui";
+} from "@terncosoftware/core-ui";
 
 // React (RNW-style: plain React + classic CSS classNames):
 import {
     CompositionProvider, RevisionProvider, CompositionRevision,
     RegionHost, MenuView, useComposition,
-} from "@jasonscharf/core-ui/react";
+} from "@terncosoftware/core-ui/react";
 ```
 
 ### The Dispatch seam
@@ -58,14 +58,14 @@ implementing this interface replaces `InMemoryDispatch`; nothing else changes.
 
 ## Scripts
 
-- `yarn workspace @jasonscharf/core-ui build` — `tsc -b`
-- `yarn workspace @jasonscharf/core-ui test` — vitest (regions, binding, menu,
+- `yarn workspace @terncosoftware/core-ui build` — `tsc -b`
+- `yarn workspace @terncosoftware/core-ui test` — vitest (regions, binding, menu,
   dispatch, React shell)
-- `yarn workspace @jasonscharf/core-ui dev` — Vite test app on
+- `yarn workspace @terncosoftware/core-ui dev` — Vite test app on
   http://localhost:5174
-- `yarn workspace @jasonscharf/core-ui e2e` — Playwright E2E against the test app
-- `yarn workspace @jasonscharf/core-ui e2e:headed` — same, headed
-- `yarn workspace @jasonscharf/core-ui lint` — Biome check
+- `yarn workspace @terncosoftware/core-ui e2e` — Playwright E2E against the test app
+- `yarn workspace @terncosoftware/core-ui e2e:headed` — same, headed
+- `yarn workspace @terncosoftware/core-ui lint` — Biome check
 
 ## E2E
 
@@ -73,7 +73,7 @@ The Playwright config boots the Vite test app itself (`webServer`), so the only
 command needed is:
 
 ```
-yarn workspace @jasonscharf/core-ui e2e
+yarn workspace @terncosoftware/core-ui e2e
 ```
 
 Browsers must be installed once with `yarn dlx playwright install chromium` (or

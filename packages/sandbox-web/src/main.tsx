@@ -5,7 +5,7 @@ import { ClientApp } from "./ClientApp.js";
 import { ComponentShowcaseView } from "./components/ComponentShowcase.js";
 import { DiscussionsPage } from "./components/DiscussionsPage.js";
 import "./style.css";
-import { getLog } from "@jasonscharf/core";
+import { getLog } from "@terncosoftware/core";
 
 const log = getLog("sys:sandbox:web");
 

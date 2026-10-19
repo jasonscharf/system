@@ -1,4 +1,4 @@
-import type { ShaclNodeShape, ShaclPropertyShape } from "@jasonscharf/gen";
+import type { ShaclNodeShape, ShaclPropertyShape } from "@terncosoftware/gen";
 
 export interface ValidationViolation {
     /** TypeScript property name (or RDF IRI path if not in the property map). */

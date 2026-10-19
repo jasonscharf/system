@@ -1,5 +1,5 @@
-import type { RdfObject, RdfSubject, Triple } from "@jasonscharf/core";
-import { blankNode, IRI, literal } from "@jasonscharf/core";
+import type { RdfObject, RdfSubject, Triple } from "@terncosoftware/core";
+import { blankNode, IRI, literal } from "@terncosoftware/core";
 
 const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 const XSD_STRING = new IRI("http://www.w3.org/2001/XMLSchema#string");

@@ -1,4 +1,4 @@
-# @jasonscharf/entities
+# @terncosoftware/entities
 
 Entity definition primitives for the Tern platform. An entity is an identified graph node — a UUID paired with an IRI — whose properties are triples stored directly against that IRI.
 
@@ -7,8 +7,8 @@ Entity definition primitives for the Tern platform. An entity is an identified g
 Describes a domain entity type: its RDF type IRI and namespace. Register once at startup before using `EntityStore`.
 
 ```typescript
-import { EntitySchema } from '@jasonscharf/entities';
-import { IRI } from '@jasonscharf/core';
+import { EntitySchema } from '@terncosoftware/entities';
+import { IRI } from '@terncosoftware/core';
 
 const NS = 'http://example.com/ns/';
 
@@ -44,7 +44,7 @@ interface EntityRecord {
 Extensions that need to associate data with an existing entity type write into a **named subgraph** scoped to their namespace and the entity IRI — they do not modify the base entity's data.
 
 ```typescript
-import { extensionGraph } from '@jasonscharf/entities';
+import { extensionGraph } from '@terncosoftware/entities';
 
 const ANALYTICS_NS = 'http://analytics.example.com/ext/';
 
@@ -73,7 +73,7 @@ import {
     localName,   // localName(iri) → local name segment
     toLiteral,   // toLiteral(value) → RDF Literal
     fromLiteral, // fromLiteral(obj) → JS value
-} from '@jasonscharf/entities';
+} from '@terncosoftware/entities';
 ```
 
 ## RDF Constants
@@ -86,13 +86,13 @@ import {
     XSD_BOOLEAN,
     XSD_DATETIME,
     SYS_CV_SOURCE,    // CollectionView constants
-} from '@jasonscharf/entities';
+} from '@terncosoftware/entities';
 ```
 
 ## Installation
 
 ```bash
-yarn add @jasonscharf/entities
+yarn add @terncosoftware/entities
 ```
 
 Published to GitHub Packages (`https://npm.pkg.github.com`).

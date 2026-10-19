@@ -15,7 +15,7 @@ import {
     HttpRouter,
     HttpServer,
     type ParsedHttpRequest,
-} from "@jasonscharf/flow";
+} from "@terncosoftware/flow";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -805,8 +805,8 @@ describe("FileStreamHandler: directory request returns 404", () => {
         const { mkdtemp, rm, mkdir } = await import("node:fs/promises");
         const { join } = await import("node:path");
         const { tmpdir } = await import("node:os");
-        const { FileStreamHandler } = await import("@jasonscharf/flow");
-        const { FlowContext: FC } = await import("@jasonscharf/flow");
+        const { FileStreamHandler } = await import("@terncosoftware/flow");
+        const { FlowContext: FC } = await import("@terncosoftware/flow");
 
         const dir = await mkdtemp(join(tmpdir(), "tern-fsh-"));
         try {

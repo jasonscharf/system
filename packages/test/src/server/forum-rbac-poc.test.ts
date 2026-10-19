@@ -13,9 +13,9 @@
  * Demonstrates: Alice is a moderator in SubForum A but not B, with a deny carve-out
  * on one thread inside A.  Run: `yarn start server/forum-rbac-poc.test.ts`.
  */
-import { IRI } from "@jasonscharf/core";
-import { createDataContext, type Knex, TripleStore } from "@jasonscharf/data";
-import { EntitySchema, entityIriFor } from "@jasonscharf/entities";
+import { IRI } from "@terncosoftware/core";
+import { createDataContext, type Knex, TripleStore } from "@terncosoftware/data";
+import { EntitySchema, entityIriFor } from "@terncosoftware/entities";
 import {
     buildServerContext,
     EntityStore,
@@ -32,7 +32,7 @@ import {
     TenantSchema,
     tenantGraph,
     UserGroupRepository,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";
 

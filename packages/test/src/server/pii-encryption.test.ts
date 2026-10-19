@@ -9,11 +9,11 @@
  * set) Postgres, with real infrastructure and a real deterministic FieldCipher.
  */
 
-import { IRI } from "@jasonscharf/core";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { ProjectSchema } from "@jasonscharf/sandbox-labs";
-import { buildServerContext, EntityStore } from "@jasonscharf/server";
-import { FieldCipher } from "@jasonscharf/vaults";
+import { IRI } from "@terncosoftware/core";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import { ProjectSchema } from "@terncosoftware/sandbox-labs";
+import { buildServerContext, EntityStore } from "@terncosoftware/server";
+import { FieldCipher } from "@terncosoftware/vaults";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

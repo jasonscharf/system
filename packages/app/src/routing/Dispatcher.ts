@@ -1,4 +1,4 @@
-import type { SystemRequest, SystemResult } from "@jasonscharf/core";
+import type { SystemRequest, SystemResult } from "@terncosoftware/core";
 
 /**
  * Minimal dispatch contract shared by SystemRouter, HandlerRegistry, and any

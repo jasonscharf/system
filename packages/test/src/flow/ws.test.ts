@@ -12,7 +12,7 @@ import {
     type WsConnection,
     type WsMessage,
     type WsPrincipal,
-} from "@jasonscharf/flow";
+} from "@terncosoftware/flow";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WebSocket as WsClient } from "ws";
 

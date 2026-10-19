@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
-import type { FlowApp } from "@jasonscharf/flow";
+import type { FlowApp } from "@terncosoftware/flow";
 
 interface RunningApp {
     id: string;
@@ -24,7 +24,7 @@ export async function flowRun(args: string[]): Promise<void> {
     const ext = extname(absPath).toLowerCase();
 
     // Lazy import so the flow package is only loaded when the command is used
-    const { FlowLoader } = await import("@jasonscharf/flow");
+    const { FlowLoader } = await import("@terncosoftware/flow");
 
     let app!: FlowApp;
     if (ext === ".json") {

@@ -39,10 +39,10 @@
  *   - tickIntervalMs            — override tick cadence
  */
 
-import { getLog, Inject, resolveModuleRef, systemSec } from "@jasonscharf/core";
+import { getLog, Inject, resolveModuleRef, systemSec } from "@terncosoftware/core";
 // biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
-import { DataSource } from "@jasonscharf/data";
-import { FlowComponent, type FlowComponentOptions } from "@jasonscharf/flow";
+import { DataSource } from "@terncosoftware/data";
+import { FlowComponent, type FlowComponentOptions } from "@terncosoftware/flow";
 import type { Knex } from "knex";
 import {
     RUNNER_BACKOFF_BASE_MS,

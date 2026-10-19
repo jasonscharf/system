@@ -1,4 +1,4 @@
-import { InMemoryDispatch } from "@jasonscharf/core-ui";
+import { InMemoryDispatch } from "@terncosoftware/core-ui";
 import { beforeEach, describe, expect, it } from "vitest";
 import { DashboardRuntime } from "./DashboardRuntime.js";
 import { DashboardCommands, DashboardEvents } from "./messages.js";

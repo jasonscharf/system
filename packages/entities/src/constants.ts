@@ -1,4 +1,4 @@
-import { IRI, makeUri, NS_CORE } from "@jasonscharf/core";
+import { IRI, makeUri, NS_CORE } from "@terncosoftware/core";
 
 export const SYS_NS = NS_CORE;
 export const XSD_NS = "http://www.w3.org/2001/XMLSchema#";

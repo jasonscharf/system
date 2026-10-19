@@ -1,4 +1,4 @@
-// @jasonscharf/core-ui — a Prism-borrowed composition framework.
+// @terncosoftware/core-ui — a Prism-borrowed composition framework.
 //
 // Product packages contribute UI into a shell by CONFIGURATION, not hardcoded
 // wiring. The pieces:
@@ -9,7 +9,7 @@
 //                 (TODO(TRN-229)).
 //
 // The React layer (./react) renders regions from a Composition. Menus are a
-// separate, higher-level concern in @jasonscharf/ui-menus.
+// separate, higher-level concern in @terncosoftware/ui-menus.
 
 export {
     Composition,

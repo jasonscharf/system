@@ -1,6 +1,6 @@
-import type { Dispatcher } from "@jasonscharf/app";
-import { anonymousSec, errResult, getLog, type SecurityContext } from "@jasonscharf/core";
-import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
+import type { Dispatcher } from "@terncosoftware/app";
+import { anonymousSec, errResult, getLog, type SecurityContext } from "@terncosoftware/core";
+import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@terncosoftware/flow";
 import type { IncomingMessage } from "./MessageDecoder.js";
 import type { OutgoingMessage } from "./MessageEncoder.js";
 

@@ -1,6 +1,6 @@
-import type { SystemResult } from "@jasonscharf/core";
-import type { WsMessage } from "@jasonscharf/flow";
-import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
+import type { SystemResult } from "@terncosoftware/core";
+import type { WsMessage } from "@terncosoftware/flow";
+import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@terncosoftware/flow";
 
 export interface OutgoingMessage {
     readonly connectionId: string;

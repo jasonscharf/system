@@ -1,4 +1,4 @@
-import { Composition } from "@jasonscharf/core-ui";
+import { Composition } from "@terncosoftware/core-ui";
 import {
     Button,
     CompositionProvider,
@@ -11,7 +11,7 @@ import {
     RegionHost,
     RevisionProvider,
     Span,
-} from "@jasonscharf/core-ui/react";
+} from "@terncosoftware/core-ui/react";
 import type React from "react";
 import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";

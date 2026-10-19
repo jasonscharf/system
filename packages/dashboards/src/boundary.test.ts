@@ -10,8 +10,8 @@ const ROOT = path.resolve(__dirname);
 
 const ALLOWED_IMPORTS = [
     /^\.{1,2}\//,
-    /^@jasonscharf\/core\/list$/,
-    /^@jasonscharf\/core-ui$/,
+    /^@terncosoftware\/core\/list$/,
+    /^@terncosoftware\/core-ui$/,
     /^react$/,
     /^react\/jsx-runtime$/,
 ];

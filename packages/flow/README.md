@@ -1,4 +1,4 @@
-# @jasonscharf/flow
+# @terncosoftware/flow
 
 Flow-based programming (FBP) runtime for the Tern platform. Components communicate exclusively through typed ports; no direct method calls cross component boundaries.
 
@@ -12,7 +12,7 @@ Flow-based programming (FBP) runtime for the Tern platform. Components communica
 ## FlowComponent
 
 ```typescript
-import { FlowComponent, type FlowContext } from '@jasonscharf/flow';
+import { FlowComponent, type FlowContext } from '@terncosoftware/flow';
 
 interface GreetInput  { name: string; }
 interface GreetOutput { message: string; }
@@ -52,7 +52,7 @@ this.addDisposable({ dispose: () => clearInterval(timer) });
 Assembles components into a running graph.
 
 ```typescript
-import { FlowApp } from '@jasonscharf/flow';
+import { FlowApp } from '@terncosoftware/flow';
 
 const app = new FlowApp({ mode: 'push' });
 
@@ -75,7 +75,7 @@ await app.stop();
 ### HTTP Server Pipeline
 
 ```typescript
-import { HttpServer, HttpDecoder, HttpEncoder, HttpRouter } from '@jasonscharf/flow';
+import { HttpServer, HttpDecoder, HttpEncoder, HttpRouter } from '@terncosoftware/flow';
 
 const http    = new HttpServer({ port: 8080, context });
 const decoder = new HttpDecoder({ context });
@@ -91,7 +91,7 @@ app.connect(encoder.ports.get('out')!,  http.ports.get('in')!);
 ### WebSocket Server
 
 ```typescript
-import { WebSocketServer } from '@jasonscharf/flow';
+import { WebSocketServer } from '@terncosoftware/flow';
 
 const ws = new WebSocketServer({ port: 8081, context });
 app.addComponent(ws);
@@ -124,7 +124,7 @@ const quads = greeter.toQuads();
 ## Installation
 
 ```bash
-yarn add @jasonscharf/flow
+yarn add @terncosoftware/flow
 ```
 
 Published to GitHub Packages (`https://npm.pkg.github.com`).

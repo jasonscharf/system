@@ -1,4 +1,4 @@
-import { declareService } from "@jasonscharf/core";
+import { declareService } from "@terncosoftware/core";
 import { LoginAttemptRepository } from "./repository/LoginAttemptRepository.js";
 import { UserDeviceRepository } from "./repository/UserDeviceRepository.js";
 import { UserIdentityRepository } from "./repository/UserIdentityRepository.js";

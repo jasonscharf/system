@@ -1,4 +1,4 @@
-import type { ValidationViolation } from "@jasonscharf/gen";
+import type { ValidationViolation } from "@terncosoftware/gen";
 
 export class EntityValidationError extends Error {
     readonly violations: ValidationViolation[];

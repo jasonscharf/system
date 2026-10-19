@@ -13,8 +13,8 @@ import {
     type SystemKind,
     type SystemResult,
     type SystemTypeRef,
-} from "@jasonscharf/core";
-import { FlowApp, WebSocketClient } from "@jasonscharf/flow";
+} from "@terncosoftware/core";
+import { FlowApp, WebSocketClient } from "@terncosoftware/flow";
 import type { StoreStats } from "./types.js";
 
 interface PendingRequest {

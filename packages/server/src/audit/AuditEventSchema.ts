@@ -1,4 +1,4 @@
-import { EntitySchema } from "@jasonscharf/entities";
+import { EntitySchema } from "@terncosoftware/entities";
 import {
     AUDIT_GRAPH,
     AUDIT_NS,

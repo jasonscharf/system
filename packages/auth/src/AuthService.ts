@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { getLog } from "@jasonscharf/core";
+import { getLog } from "@terncosoftware/core";
 import {
     anonymousSec,
     buildServerContext,
@@ -7,7 +7,7 @@ import {
     type SecurityContext,
     type ServerContext,
     systemSec,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import { AUTH_NEG_CACHE_TTL_SECS, NEG_CACHE_SENTINEL, SESSION_TTL_SECS } from "./constants.js";
 import type { IOAuthProvider } from "./oauth/types.js";
 import { PERM_SESSION_LIST_ANY, PERM_SESSION_REVOKE_ANY } from "./permissions.js";

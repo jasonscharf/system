@@ -9,8 +9,8 @@
  * even across repeated runs.
  */
 
-import { makeUri, NS_TEST, type DomainEvent, type IDomainEventBus } from "@jasonscharf/core";
-import { InMemoryEventBus, RedisStreamEventBus } from "@jasonscharf/events";
+import { makeUri, NS_TEST, type DomainEvent, type IDomainEventBus } from "@terncosoftware/core";
+import { InMemoryEventBus, RedisStreamEventBus } from "@terncosoftware/events";
 import { Redis } from "ioredis";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

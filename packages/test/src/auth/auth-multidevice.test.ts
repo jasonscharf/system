@@ -30,10 +30,10 @@ import {
     UserIdentityRepository,
     UserRepository,
     UserSessionRepository,
-} from "@jasonscharf/auth";
+} from "@terncosoftware/auth";
 import { TEST_CIPHER } from "./testCipher.js";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { buildServerContext, systemSec } from "@jasonscharf/server";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import { buildServerContext, systemSec } from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";

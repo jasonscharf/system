@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import type { IRI, Quad } from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
-import type { EntityRecord, EntitySchema, PropertyDef } from "@jasonscharf/entities";
-import { fromLiteral, propIri, toLiteral } from "@jasonscharf/entities";
+import type { IRI, Quad } from "@terncosoftware/core";
+import type { TripleStore } from "@terncosoftware/data";
+import type { EntityRecord, EntitySchema, PropertyDef } from "@terncosoftware/entities";
+import { fromLiteral, propIri, toLiteral } from "@terncosoftware/entities";
 import type { ServerContext } from "./ServerContext.js";
 
 // ── Registry named graph ──────────────────────────────────────────────────────

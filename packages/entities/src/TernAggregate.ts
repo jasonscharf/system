@@ -1,4 +1,4 @@
-import type { DomainEvent } from "@jasonscharf/core";
+import type { DomainEvent } from "@terncosoftware/core";
 import type { EntityRecord } from "./EntityRecord.js";
 
 /**

@@ -1,4 +1,4 @@
-import type { DispatchKind } from "@jasonscharf/core-ui";
+import type { DispatchKind } from "@terncosoftware/core-ui";
 
 /**
  * A single contributed menu item. Serializable config — no functions — so menus

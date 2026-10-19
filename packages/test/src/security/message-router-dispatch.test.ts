@@ -11,9 +11,9 @@
  * handler, and a real MessageRouter. No mocks/spies.
  */
 
-import { HandlerRegistry } from "@jasonscharf/app";
-import { errResult, query, SYSTEM_TYPES, type SystemResult } from "@jasonscharf/core";
-import { FlowApp } from "@jasonscharf/flow";
+import { HandlerRegistry } from "@terncosoftware/app";
+import { errResult, query, SYSTEM_TYPES, type SystemResult } from "@terncosoftware/core";
+import { FlowApp } from "@terncosoftware/flow";
 import { afterEach, describe, expect, it } from "vitest";
 import type { OutgoingMessage } from "../../../sandbox-server/src/components/MessageEncoder.js";
 import { MessageRouter } from "../../../sandbox-server/src/components/MessageRouter.js";

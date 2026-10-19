@@ -1,4 +1,4 @@
-import type { ExtensionInstallContext, TernExtension } from "@jasonscharf/app";
+import type { ExtensionInstallContext, TernExtension } from "@terncosoftware/app";
 import type { ExtensionRegistry } from "./ExtensionRegistry.js";
 import type { ServerContext } from "./ServerContext.js";
 

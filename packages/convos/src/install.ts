@@ -1,5 +1,5 @@
 /**
- * Extension lifecycle for @jasonscharf/convos.
+ * Extension lifecycle for @terncosoftware/convos.
  *
  * installConvos()   — seeds all convos permissions and the two built-in roles
  *                     into the RBAC store. Safe to call at application startup
@@ -10,8 +10,8 @@
  *                     they issued and drop the extension data via migrations.
  */
 
-import type { RbacService } from "@jasonscharf/server";
-import { type SecurityContext, type ServerContext, systemSec } from "@jasonscharf/server";
+import type { RbacService } from "@terncosoftware/server";
+import { type SecurityContext, type ServerContext, systemSec } from "@terncosoftware/server";
 import {
     ALL_CONVOS_PERMISSIONS,
     CONVO_MODERATOR_PERMISSIONS,

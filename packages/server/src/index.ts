@@ -19,7 +19,7 @@ export { ExtensionRegistry } from "./ExtensionRegistry.js";
 export * from "./env.js";
 export { type AttachUnder, GraphQuery } from "./GraphQuery.js";
 export { bindPinoLogger, PinoLogger, type PinoLoggerOptions } from "./PinoLogger.js";
-// ── RBAC (moved in from the retired @jasonscharf/rbac package) ───────────────
+// ── RBAC (moved in from the retired @terncosoftware/rbac package) ───────────────
 export * from "./rbac/index.js";
 export { type MappedEntity, recordToEntity } from "./recordToEntity.js";
 export {

@@ -1,4 +1,4 @@
-import { DEFAULT_GRAPH, type DefaultGraph, IRI, makeUri, NS_CORE } from "@jasonscharf/core";
+import { DEFAULT_GRAPH, type DefaultGraph, IRI, makeUri, NS_CORE } from "@terncosoftware/core";
 import type { ServerContext } from "./ServerContext.js";
 
 const TENANT_NS = makeUri(NS_CORE, "tenant");

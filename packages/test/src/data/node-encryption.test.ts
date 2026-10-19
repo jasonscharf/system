@@ -7,7 +7,7 @@
  * SQLite always and Postgres when SYS_PG_URL is set.
  */
 
-import { createDataContext } from "@jasonscharf/data";
+import { createDataContext } from "@terncosoftware/data";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { up as migrate004 } from "../../../data/src/migrations/004_node_encryption.js";

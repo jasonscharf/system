@@ -39,8 +39,8 @@ import {
     TenantIRI,
     tenantNameIRI,
     UserGroupIRI,
-} from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
+} from "@terncosoftware/core";
+import type { TripleStore } from "@terncosoftware/data";
 import type { ServerContext } from "../ServerContext.js";
 import {
     RDF_TYPE,

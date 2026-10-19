@@ -12,8 +12,8 @@
  *   - emitJobMetrics warns only for jobs at/over the threshold.
  */
 
-import { createDataContext } from "@jasonscharf/data";
-import { computeJobMetrics, emitJobMetrics, type JobMetricAlert } from "@jasonscharf/worker";
+import { createDataContext } from "@terncosoftware/data";
+import { computeJobMetrics, emitJobMetrics, type JobMetricAlert } from "@terncosoftware/worker";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

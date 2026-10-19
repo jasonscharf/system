@@ -8,9 +8,9 @@
  *
  * Usage in a consuming app:
  *
- *   import { rbacExtension, getRbacService }  from "@jasonscharf/server";
+ *   import { rbacExtension, getRbacService }  from "@terncosoftware/server";
  *   import { convosExtension, getConvoService, getNotificationService,
- *             getConvosInstall }               from "@jasonscharf/convos";
+ *             getConvosInstall }               from "@terncosoftware/convos";
  *
  *   const rbacInstalled  = await ternApp.use(rbacExtension);
  *   const convosInstalled = await ternApp.use(convosExtension);
@@ -25,10 +25,14 @@
  * can access them as ctx.convos, ctx.notifs, ctx.convosInstall.
  */
 
-import type { ExtensionInstallContext, InstalledExtension, TernExtension } from "@jasonscharf/app";
-import type { TripleStore } from "@jasonscharf/data";
-import type { RbacService } from "@jasonscharf/server";
-import { buildServerContext, getRbacService } from "@jasonscharf/server";
+import type {
+    ExtensionInstallContext,
+    InstalledExtension,
+    TernExtension,
+} from "@terncosoftware/app";
+import type { TripleStore } from "@terncosoftware/data";
+import type { RbacService } from "@terncosoftware/server";
+import { buildServerContext, getRbacService } from "@terncosoftware/server";
 import { ConvoService } from "./ConvoService.js";
 import type { ConvosInstallResult } from "./install.js";
 import { installConvos } from "./install.js";

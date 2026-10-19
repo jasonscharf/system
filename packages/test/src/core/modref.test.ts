@@ -10,7 +10,7 @@
 
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { _clearModuleRefCache, resolveModuleRef } from "@jasonscharf/core";
+import { _clearModuleRefCache, resolveModuleRef } from "@terncosoftware/core";
 import { afterEach, describe, expect, it } from "vitest";
 
 // ── Fixture paths ─────────────────────────────────────────────────────────────
@@ -121,9 +121,9 @@ describe("resolveModuleRef: specifier varieties", () => {
         expect(fn("file-user")).toBe("Hello, file-user!");
     });
 
-    it("resolves an npm package specifier (named export from @jasonscharf/core)", async () => {
-        // uuidv4Binary is a real named export from @jasonscharf/core.
-        const uri = "module://@jasonscharf/core#uuidv4Binary";
+    it("resolves an npm package specifier (named export from @terncosoftware/core)", async () => {
+        // uuidv4Binary is a real named export from @terncosoftware/core.
+        const uri = "module://@terncosoftware/core#uuidv4Binary";
         const { fn } = await resolveModuleRef(uri);
         expect(typeof fn).toBe("function");
         const bytes = fn() as Uint8Array;

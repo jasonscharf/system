@@ -10,9 +10,9 @@
  *
  * Run: `yarn start server/secure-mutations.test.ts`.
  */
-import { IRI } from "@jasonscharf/core";
-import { createDataContext, type Knex, TripleStore } from "@jasonscharf/data";
-import { EntitySchema, entityIriFor, RDF_TYPE } from "@jasonscharf/entities";
+import { IRI } from "@terncosoftware/core";
+import { createDataContext, type Knex, TripleStore } from "@terncosoftware/data";
+import { EntitySchema, entityIriFor, RDF_TYPE } from "@terncosoftware/entities";
 import {
     buildServerContext,
     EntityStore,
@@ -29,7 +29,7 @@ import {
     TenantSchema,
     tenantGraph,
     UserGroupRepository,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";
 

@@ -12,9 +12,9 @@
  *   - Non-running rows (pending / succeeded / dead) are never touched.
  */
 
-import { systemSec } from "@jasonscharf/core";
-import { createDataContext } from "@jasonscharf/data";
-import { createStaleRunReaper, type JobContext, type JobHandler } from "@jasonscharf/worker";
+import { systemSec } from "@terncosoftware/core";
+import { createDataContext } from "@terncosoftware/data";
+import { createStaleRunReaper, type JobContext, type JobHandler } from "@terncosoftware/worker";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

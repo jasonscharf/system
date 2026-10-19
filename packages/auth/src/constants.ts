@@ -1,4 +1,4 @@
-import { IRI, makeUri, NS_CORE } from "@jasonscharf/core";
+import { IRI, makeUri, NS_CORE } from "@terncosoftware/core";
 import { authEnv } from "./defaults.js";
 
 export const AUTH_NS = makeUri(NS_CORE, "auth");

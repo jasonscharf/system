@@ -19,10 +19,10 @@ export default defineConfig({
             // RNW on web (core-ui primitives render to DOM via react-native-web).
             "react-native": "react-native-web",
             // Resolve the libraries to source so the test app tracks edits.
-            "@jasonscharf/ui-menus/react": path.resolve(__dirname, "../src/react/index.ts"),
-            "@jasonscharf/ui-menus": path.resolve(__dirname, "../src/index.ts"),
-            "@jasonscharf/core-ui/react": `${pkg("core-ui")}/react/index.ts`,
-            "@jasonscharf/core-ui": `${pkg("core-ui")}/index.ts`,
+            "@terncosoftware/ui-menus/react": path.resolve(__dirname, "../src/react/index.ts"),
+            "@terncosoftware/ui-menus": path.resolve(__dirname, "../src/index.ts"),
+            "@terncosoftware/core-ui/react": `${pkg("core-ui")}/react/index.ts`,
+            "@terncosoftware/core-ui": `${pkg("core-ui")}/index.ts`,
         },
     },
     server: {

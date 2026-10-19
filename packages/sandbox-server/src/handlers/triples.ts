@@ -1,4 +1,4 @@
-import type { HandlerContext } from "@jasonscharf/app";
+import type { HandlerContext } from "@terncosoftware/app";
 import {
     type BlankNode,
     errResult,
@@ -9,15 +9,15 @@ import {
     type SystemRequest,
     type SystemResult,
     type SystemTypeRef,
-} from "@jasonscharf/core";
-import { type QuadPattern, TripleStore } from "@jasonscharf/data";
+} from "@terncosoftware/core";
+import { type QuadPattern, TripleStore } from "@terncosoftware/data";
 import {
     buildServerContext,
     RbacService,
     SuperuserService,
     systemSec,
     tenantGraph,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 
 type RdfTerm = IRI | BlankNode | Literal;
 

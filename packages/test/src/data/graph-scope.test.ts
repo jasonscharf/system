@@ -17,10 +17,10 @@
  * suite in this package uses.
  */
 
-import type { IRI, Literal, Quad } from "@jasonscharf/core";
-import { DEFAULT_GRAPH } from "@jasonscharf/core";
-import { createDataContext, type Knex, type QuadPattern, TripleStore } from "@jasonscharf/data";
-import { buildServerContext, type ServerContext } from "@jasonscharf/server";
+import type { IRI, Literal, Quad } from "@terncosoftware/core";
+import { DEFAULT_GRAPH } from "@terncosoftware/core";
+import { createDataContext, type Knex, type QuadPattern, TripleStore } from "@terncosoftware/data";
+import { buildServerContext, type ServerContext } from "@terncosoftware/server";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore, assertStoreIntegrity } from "../assertEmptyStore.js";
 

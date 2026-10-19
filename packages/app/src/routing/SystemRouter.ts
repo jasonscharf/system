@@ -3,7 +3,7 @@ import {
     type SystemRequest,
     type SystemResult,
     type SystemTypeRef,
-} from "@jasonscharf/core";
+} from "@terncosoftware/core";
 import { compose, type MiddlewareFn } from "./compose.js";
 import type { Dispatcher } from "./Dispatcher.js";
 

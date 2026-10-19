@@ -1,7 +1,7 @@
-import type { TripleStore } from "@jasonscharf/data";
-import type { EntityRecord } from "@jasonscharf/entities";
-import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import { createEntityStore, EntityQuery, type EntityStore } from "@jasonscharf/server";
+import type { TripleStore } from "@terncosoftware/data";
+import type { EntityRecord } from "@terncosoftware/entities";
+import type { SecurityContext, ServerContext } from "@terncosoftware/server";
+import { createEntityStore, EntityQuery, type EntityStore } from "@terncosoftware/server";
 import { MessageRevisionSchema } from "../entities/MessageRevisionSchema.js";
 import { MessageSchema } from "../entities/MessageSchema.js";
 import type { ContentType, MessageEntity, MessageRevisionEntity } from "../types.js";

@@ -7,10 +7,10 @@
  *      commits (or rolls back on error) before returning.
  */
 
-import { IRI } from "@jasonscharf/core";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { EntitySchema } from "@jasonscharf/entities";
-import { buildServerContext, EntityQuery, EntityStore } from "@jasonscharf/server";
+import { IRI } from "@terncosoftware/core";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import { EntitySchema } from "@terncosoftware/entities";
+import { buildServerContext, EntityQuery, EntityStore } from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

@@ -1,11 +1,11 @@
-import type { HandlerContext } from "@jasonscharf/app";
+import type { HandlerContext } from "@terncosoftware/app";
 import {
     errResult,
     okResult,
     SYSTEM_TYPES,
     type SystemRequest,
     type SystemResult,
-} from "@jasonscharf/core";
+} from "@terncosoftware/core";
 
 interface EchoPayload {
     message: string;

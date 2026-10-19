@@ -1,4 +1,4 @@
-import type { ListQuery, ListRow, ListSchema } from "@jasonscharf/core/list";
+import type { ListQuery, ListRow, ListSchema } from "@terncosoftware/core/list";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { ListTopicView, type ListViewSnapshot } from "../ListTopicView.js";
 import { DashboardCommands, DashboardEvents } from "../messages.js";

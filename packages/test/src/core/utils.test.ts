@@ -9,7 +9,7 @@ import {
     uint8ToHex,
     uuidToHex,
     uuidv4Binary,
-} from "@jasonscharf/core";
+} from "@terncosoftware/core";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

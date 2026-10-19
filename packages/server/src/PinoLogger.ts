@@ -3,9 +3,9 @@
  * Logging.
  *
  * This is the ONLY module in the platform that imports pino. Everything else
- * goes through `getLog()` from @jasonscharf/core, so replacing pino is a
+ * goes through `getLog()` from @terncosoftware/core, so replacing pino is a
  * change to this file and the one `bindService` call at boot. It lives in
- * @jasonscharf/server rather than @jasonscharf/core because core is also loaded
+ * @terncosoftware/server rather than @terncosoftware/core because core is also loaded
  * in the browser, and pino has no business in a browser bundle.
  *
  * ── Why the output looks like this ────────────────────────────────────────────
@@ -27,7 +27,7 @@
  * identifies a log line is two equality filters and never a substring match on
  * the message.
  */
-import { bindService, LOGGER_NAME_KEY, type Logger, SystemLogger } from "@jasonscharf/core";
+import { bindService, LOGGER_NAME_KEY, type Logger, SystemLogger } from "@terncosoftware/core";
 import { type Logger as PinoBaseLogger, pino } from "pino";
 import { env } from "./env.js";
 

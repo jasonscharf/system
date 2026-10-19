@@ -1,4 +1,4 @@
-import { declareService } from "@jasonscharf/core";
+import { declareService } from "@terncosoftware/core";
 
 /**
  * Container token for the at-rest PII field cipher (IFieldCipher has no

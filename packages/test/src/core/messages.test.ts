@@ -9,7 +9,7 @@ import {
     result,
     SYSTEM_TYPES,
     typeRef,
-} from "@jasonscharf/core";
+} from "@terncosoftware/core";
 import { describe, expect, it } from "vitest";
 
 describe("typeRef", () => {

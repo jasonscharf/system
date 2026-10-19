@@ -1,4 +1,4 @@
-# @jasonscharf/convos
+# @terncosoftware/convos
 
 Conversations, messaging, and notifications extension for the Tern platform. Provides discussion threads, participant management, inboxes, and notification delivery.
 
@@ -7,7 +7,7 @@ Conversations, messaging, and notifications extension for the Tern platform. Pro
 Call `installConvos` once at application startup. It is idempotent and seeds the required RBAC roles and permissions.
 
 ```typescript
-import { installConvos } from '@jasonscharf/convos';
+import { installConvos } from '@terncosoftware/convos';
 
 const result = await installConvos(ctx, rbacService);
 // result.userRoleIri, result.moderatorRoleIri, etc.
@@ -22,8 +22,8 @@ import {
     MessageRepository,
     ParticipantRepository,
     InboxRepository,
-} from '@jasonscharf/convos';
-import { EntityStore } from '@jasonscharf/server';
+} from '@terncosoftware/convos';
+import { EntityStore } from '@terncosoftware/server';
 
 const store = new EntityStore(/* knex */);
 
@@ -61,7 +61,7 @@ await service.archiveConversation(ctx, convo.iri);
 ## NotificationService
 
 ```typescript
-import { NotificationService, NotificationRepository } from '@jasonscharf/convos';
+import { NotificationService, NotificationRepository } from '@terncosoftware/convos';
 
 const notifications = new NotificationService({
     store,
@@ -93,7 +93,7 @@ import {
     CONVO_MODERATOR_PERMISSIONS,
     CONVO_USER_ROLE_NAME,
     CONVO_MODERATOR_ROLE_NAME,
-} from '@jasonscharf/convos';
+} from '@terncosoftware/convos';
 
 await rbac.assert(ctx, { principal: userIri, permission: PERM_CONVO_CREATE });
 ```
@@ -110,13 +110,13 @@ import type {
     ConversationStatus,   // 'open' | 'archived' | 'closed'
     ParticipantRole,      // 'member' | 'moderator'
     ContentType,          // 'text/plain' | 'text/markdown'
-} from '@jasonscharf/convos';
+} from '@terncosoftware/convos';
 ```
 
 ## Installation
 
 ```bash
-yarn add @jasonscharf/convos
+yarn add @terncosoftware/convos
 ```
 
 Published to GitHub Packages (`https://npm.pkg.github.com`).

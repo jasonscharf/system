@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
-import type { Literal } from "@jasonscharf/core";
-import { IRI, literal, makeUri } from "@jasonscharf/core";
+import type { Literal } from "@terncosoftware/core";
+import { IRI, literal, makeUri } from "@terncosoftware/core";
 import { XSD_BOOLEAN, XSD_DATETIME, XSD_DECIMAL, XSD_INTEGER, XSD_STRING } from "./constants.js";
 import type { PropertyDef } from "./EntitySchema.js";
 import { propIri } from "./EntitySchema.js";

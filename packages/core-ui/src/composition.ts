@@ -9,7 +9,7 @@ import { type BoundView, bindView, type ViewDefinition, type ViewModel } from ".
  * spread across the app.
  *
  * Menus are NOT part of this bundle: they are a higher-level concern owned by
- * @jasonscharf/ui-menus (its MenuRegistry), which sits on top of core-ui.
+ * @terncosoftware/ui-menus (its MenuRegistry), which sits on top of core-ui.
  */
 export interface UiContribution {
     /** Views contributed into named regions. */

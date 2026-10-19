@@ -1,4 +1,4 @@
-import { FieldCipher } from "@jasonscharf/vaults";
+import { FieldCipher } from "@terncosoftware/vaults";
 
 /**
  * A deterministic field cipher for auth tests.  The User and UserIdentity repos

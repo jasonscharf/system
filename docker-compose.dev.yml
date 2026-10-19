@@ -42,7 +42,7 @@ services:
       target: worker
 
     entrypoint: []
-    command: yarn workspace @jasonscharf/worker start:debug
+    command: yarn workspace @terncosoftware/worker start:debug
     stop_grace_period: 1s
     ports:
       - "9230:9000"

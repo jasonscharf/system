@@ -114,7 +114,7 @@ yarn workspaces foreach --all run gen
 Individual package:
 
 ```bash
-yarn workspace @jasonscharf/core run gen
+yarn workspace @terncosoftware/core run gen
 ```
 
 Generated files are checked in, and CI regenerates them and fails on any diff, so a hand-edited `*.generated.ts` or an unregenerated `.ttl` change is caught in the build.

@@ -8,8 +8,8 @@
  * a rolled-back transaction.
  */
 
-import { DomainIRI, hasDomainIRI } from "@jasonscharf/core/tenancy";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
+import { DomainIRI, hasDomainIRI } from "@terncosoftware/core/tenancy";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
 import {
     buildServerContext,
     CORE_CONTAINMENT_SCHEMAS,
@@ -18,7 +18,7 @@ import {
     EntityStore,
     type ServerContext,
     TenantSchema,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { up as seedData } from "../../../data/src/migrations/001_init.js";

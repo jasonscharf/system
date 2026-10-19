@@ -6,7 +6,7 @@
  * SYS_PG_URL is set), each in a rolled-back transaction.
  */
 
-import { createDataContext, TripleStore } from "@jasonscharf/data";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
 import {
     buildServerContext,
     PermissionRepository,
@@ -21,7 +21,7 @@ import {
     systemSec,
     TenantRepository,
     UserGroupRepository,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";

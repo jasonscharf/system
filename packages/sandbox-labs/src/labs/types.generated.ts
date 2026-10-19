@@ -1,7 +1,7 @@
 // auto-generated — do not edit by hand
 
-import type { User } from "@jasonscharf/core";
-import { IRI } from "@jasonscharf/core";
+import type { User } from "@terncosoftware/core";
+import { IRI } from "@terncosoftware/core";
 
 /** An analytics workspace scoped to a team or product. */
 export interface Project {
@@ -21,7 +21,7 @@ export interface Project {
 
 export const ProjectIRI = new IRI("urn:sys:ext:labs:Project");
 
-declare module "@jasonscharf/core" {
+declare module "@terncosoftware/core" {
     interface User {
         /** Platform role: 'owner', 'member', or 'viewer'. */
         analyticsRole: string;

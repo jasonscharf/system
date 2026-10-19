@@ -5,7 +5,7 @@
  * order:  user-level  >  application  >  extension  >  defaults.
  */
 
-import type { TripleStore } from "@jasonscharf/data";
+import type { TripleStore } from "@terncosoftware/data";
 
 /**
  * One handler module registration for a named message type.
@@ -17,8 +17,8 @@ import type { TripleStore } from "@jasonscharf/data";
  *
  *   2. **Unified `ref`**: provide a single `module://` URI that encodes the
  *      specifier, member name, and optional bind-time arguments in one string.
- *      Resolved via `resolveModuleRef` from `@jasonscharf/core`.
- *      Example: `module://@jasonscharf/server/ComputeStates.js#sweepDomains?scope=active`
+ *      Resolved via `resolveModuleRef` from `@terncosoftware/core`.
+ *      Example: `module://@terncosoftware/server/ComputeStates.js#sweepDomains?scope=active`
  *
  * When `ref` is present it takes precedence; `module` and `export` are ignored.
  * When `ref` is absent, `module` must be provided.

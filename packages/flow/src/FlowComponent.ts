@@ -1,4 +1,12 @@
-import { IRI, literal, makeUri, NS_ROOT, type Quad, quad, uuidv4Binary } from "@jasonscharf/core";
+import {
+    IRI,
+    literal,
+    makeUri,
+    NS_ROOT,
+    type Quad,
+    quad,
+    uuidv4Binary,
+} from "@terncosoftware/core";
 import { Control, type ControlSignal } from "./ControlSignal.js";
 import type { FlowContext } from "./FlowContext.js";
 import type { FlowNode } from "./FlowNode.js";

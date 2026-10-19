@@ -29,9 +29,9 @@ import {
     UserDeviceSchema,
     UserSchema,
     UserSessionSchema,
-} from "@jasonscharf/auth";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { buildServerContext, EntityStore } from "@jasonscharf/server";
+} from "@terncosoftware/auth";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import { buildServerContext, EntityStore } from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";

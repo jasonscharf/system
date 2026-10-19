@@ -13,8 +13,8 @@ import {
     type ISystemBus,
     makeUri,
     NS_TEST,
-} from "@jasonscharf/core";
-import { RedisSystemBus } from "@jasonscharf/events";
+} from "@terncosoftware/core";
+import { RedisSystemBus } from "@terncosoftware/events";
 import { Redis } from "ioredis";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

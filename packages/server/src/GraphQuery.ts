@@ -1,7 +1,7 @@
-import { type IRI, PermissionDeniedError } from "@jasonscharf/core";
-import type { TraverseHop, TripleStore } from "@jasonscharf/data";
-import type { EntityRecord, EntitySchema, FilterOp } from "@jasonscharf/entities";
-import { entityIriFor, toLiteral } from "@jasonscharf/entities";
+import { type IRI, PermissionDeniedError } from "@terncosoftware/core";
+import type { TraverseHop, TripleStore } from "@terncosoftware/data";
+import type { EntityRecord, EntitySchema, FilterOp } from "@terncosoftware/entities";
+import { entityIriFor, toLiteral } from "@terncosoftware/entities";
 import { type EntityInput, EntityStore } from "./EntityStore.js";
 import { createEntityStore } from "./EntityStoreFactory.js";
 import { AccessChecker } from "./rbac/AccessChecker.js";

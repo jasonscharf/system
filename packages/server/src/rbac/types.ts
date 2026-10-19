@@ -1,4 +1,4 @@
-import type { EdgeRef } from "@jasonscharf/entities";
+import type { EdgeRef } from "@terncosoftware/entities";
 
 export interface UserGroupEntity {
     id: string;

@@ -38,22 +38,22 @@ import {
     UserSchema,
     UserSessionRepository,
     UserSessionSchema,
-} from "@jasonscharf/auth";
-import { bindService } from "@jasonscharf/core";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
+} from "@terncosoftware/auth";
+import { bindService } from "@terncosoftware/core";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
 import {
     FlowContext,
     type HttpCtx,
     type HttpResponseDraft,
     type ParsedHttpRequest,
     PushScheduler,
-} from "@jasonscharf/flow";
+} from "@terncosoftware/flow";
 import {
     buildServerContext,
     EntityStore,
     type ServerContext,
     systemSec,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";

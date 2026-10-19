@@ -1,4 +1,4 @@
-import { getLog } from "@jasonscharf/core";
+import { getLog } from "@terncosoftware/core";
 import { FlowComponent, type FlowComponentOptions } from "../../FlowComponent.js";
 import type { FlowPort } from "../../FlowPort.js";
 import type { HttpHeaders, HttpRequest, HttpResponse } from "./HttpTypes.js";

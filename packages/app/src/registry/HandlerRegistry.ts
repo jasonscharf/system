@@ -9,7 +9,7 @@ import {
     type SystemRequest,
     type SystemResult,
     type SystemTypeRef,
-} from "@jasonscharf/core";
+} from "@terncosoftware/core";
 import type { HandlerEntry } from "../config/types.js";
 import type { Dispatcher } from "../routing/Dispatcher.js";
 

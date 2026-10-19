@@ -1,7 +1,7 @@
 // auto-generated — do not edit by hand
 
-import { IRI } from "@jasonscharf/core";
-import { EntitySchema } from "@jasonscharf/entities";
+import { IRI } from "@terncosoftware/core";
+import { EntitySchema } from "@terncosoftware/entities";
 
 /** A deployment of the platform (cloud-native, hybrid, or on-premise). Contains one or more Tenants. */
 export const InstallSchema: EntitySchema = new EntitySchema({

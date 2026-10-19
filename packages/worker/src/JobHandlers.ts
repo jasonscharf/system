@@ -7,11 +7,11 @@
  *   - JobHandlers — a simple registry of id → handler mappings.
  *
  * Resolution of a job's `handler` string happens in JobRunner:
- *   - `module://…` URIs are forwarded to resolveModuleRef (from @jasonscharf/core).
+ *   - `module://…` URIs are forwarded to resolveModuleRef (from @terncosoftware/core).
  *   - All other strings are looked up here (in-process registered handlers).
  */
 
-import type { SecurityContext } from "@jasonscharf/core";
+import type { SecurityContext } from "@terncosoftware/core";
 import type { Knex } from "knex";
 
 // ── JobContext ────────────────────────────────────────────────────────────────

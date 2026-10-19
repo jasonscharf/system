@@ -1,8 +1,8 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { blankNode, IRI, type Literal, literal, type Triple } from "@jasonscharf/core";
-import type { ShaclShapes } from "@jasonscharf/gen";
+import { blankNode, IRI, type Literal, literal, type Triple } from "@terncosoftware/core";
+import type { ShaclShapes } from "@terncosoftware/gen";
 import {
     generate,
     generateAugmentedTypes,
@@ -15,7 +15,7 @@ import {
     readOntology,
     readShaclShapes,
     validate,
-} from "@jasonscharf/gen";
+} from "@terncosoftware/gen";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -832,25 +832,25 @@ describe("generateAugmentedTypes", () => {
             t(`${LOCAL_NS}owner`, `${RDFS}range`, `${BASE_NS}User`),
         ];
         const ontology = readOntology(rangeTriples);
-        const externalClasses = new Map([[`${BASE_NS}User`, "@jasonscharf/auth"]]);
+        const externalClasses = new Map([[`${BASE_NS}User`, "@terncosoftware/auth"]]);
         const output = generateAugmentedTypes(ontology, emptyShapes, {
             externalClasses,
             localNamespace: LOCAL_NS,
         });
-        expect(output).toContain('import type { User } from "@jasonscharf/auth"');
+        expect(output).toContain('import type { User } from "@terncosoftware/auth"');
     });
 
     it("does not import external classes that are only augmented, never used as a range", () => {
         // baseTriples/localTriples augment User (via `score`) but never use it as a range.
         const ontology = readOntology([...baseTriples, ...localTriples]);
-        const externalClasses = new Map([[`${BASE_NS}User`, "@jasonscharf/auth"]]);
+        const externalClasses = new Map([[`${BASE_NS}User`, "@terncosoftware/auth"]]);
         const output = generateAugmentedTypes(ontology, emptyShapes, {
             externalClasses,
             localNamespace: LOCAL_NS,
         });
         expect(output).not.toContain("import type { User }");
         // The augmentation block is still emitted (it does not require an import).
-        expect(output).toContain('declare module "@jasonscharf/auth"');
+        expect(output).toContain('declare module "@terncosoftware/auth"');
     });
 
     it("skips external classes that have no local-namespace properties", () => {

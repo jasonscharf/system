@@ -32,11 +32,11 @@ import {
     UserIdentityRepository,
     UserRepository,
     UserSessionRepository,
-} from "@jasonscharf/auth";
-import { bindService } from "@jasonscharf/core";
-import { createDataContext, type Knex, TripleStore } from "@jasonscharf/data";
-import { FlowContext, type FlowPort } from "@jasonscharf/flow";
-import { buildServerContext, type ServerContext, systemSec } from "@jasonscharf/server";
+} from "@terncosoftware/auth";
+import { bindService } from "@terncosoftware/core";
+import { createDataContext, type Knex, TripleStore } from "@terncosoftware/data";
+import { FlowContext, type FlowPort } from "@terncosoftware/flow";
+import { buildServerContext, type ServerContext, systemSec } from "@terncosoftware/server";
 import { Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";

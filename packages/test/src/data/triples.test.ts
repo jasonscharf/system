@@ -12,9 +12,9 @@ import {
     type IRI,
     type Literal,
     type Quad,
-} from "@jasonscharf/core";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { buildServerContext, type ServerContext } from "@jasonscharf/server";
+} from "@terncosoftware/core";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import { buildServerContext, type ServerContext } from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { down as migration001Down } from "../../../data/src/migrations/001_init.js";

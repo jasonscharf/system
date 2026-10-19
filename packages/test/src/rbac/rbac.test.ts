@@ -9,7 +9,7 @@
  * groups, roles, and resources.
  */
 
-import { createDataContext, TripleStore } from "@jasonscharf/data";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
 import {
     AccessChecker,
     buildServerContext,
@@ -26,7 +26,7 @@ import {
     systemSec,
     TenantRepository,
     UserGroupRepository,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";

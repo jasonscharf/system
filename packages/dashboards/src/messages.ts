@@ -35,7 +35,7 @@ export const DashboardEvents = {
     tileRefreshRequested: "dashboard.tile.refresh-requested",
 } as const;
 
-declare module "@jasonscharf/core-ui" {
+declare module "@terncosoftware/core-ui" {
     interface SystemCommands {
         "dashboard.tile.resize": ResizeTileArgs;
         "dashboard.tile.configure": ConfigureTileArgs;

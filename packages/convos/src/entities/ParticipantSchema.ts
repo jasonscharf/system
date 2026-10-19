@@ -1,4 +1,4 @@
-import { EntitySchema } from "@jasonscharf/entities";
+import { EntitySchema } from "@terncosoftware/entities";
 import {
     CONVOS_NS,
     conversationRefIRI,

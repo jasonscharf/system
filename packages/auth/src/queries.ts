@@ -6,9 +6,9 @@
  *   session.props.sessionUser  → User entity IRI  → findById(UserSchema, id)
  *   session.props.sessionDevice → UserDevice IRI  → findById(UserDeviceSchema, id)
  */
-import type { EntityRecord } from "@jasonscharf/entities";
-import type { EntityStore, ServerContext } from "@jasonscharf/server";
-import { EntityQuery } from "@jasonscharf/server";
+import type { EntityRecord } from "@terncosoftware/entities";
+import type { EntityStore, ServerContext } from "@terncosoftware/server";
+import { EntityQuery } from "@terncosoftware/server";
 import { UserDeviceSchema } from "./entities/UserDeviceSchema.js";
 import { UserSchema } from "./entities/UserSchema.js";
 import { UserSessionSchema } from "./entities/UserSessionSchema.js";

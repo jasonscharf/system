@@ -7,7 +7,7 @@ import {
     type ListState,
     type ListWindow,
     listKeyOf,
-} from "@jasonscharf/core/list";
+} from "@terncosoftware/core/list";
 
 /** One view of a live list topic. Two tiles on the same topic hold two views. */
 export interface ListTopicSubscription {

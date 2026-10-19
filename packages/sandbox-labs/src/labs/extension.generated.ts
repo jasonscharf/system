@@ -19,7 +19,7 @@ export const labsExtensionDescriptor = {
     /** Extension IRI — the stable identity used by the host and the marketplace. */
     iri: LABS_EXTENSION_IRI,
     /** npm package name that ships this extension. */
-    name: "@jasonscharf/sandbox-labs",
+    name: "@terncosoftware/sandbox-labs",
     /** Package version, used as the extension version. */
     version: "0.1.0",
     /** Extension IRIs that must be installed before this one. */

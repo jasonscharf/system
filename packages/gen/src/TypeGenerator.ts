@@ -62,8 +62,8 @@ export interface AugmentedGenConfig {
     /** IRI prefix that identifies all local (extension) classes and properties. */
     localNamespace: string;
     /**
-     * Import path for the IRI class.  Defaults to `"@jasonscharf/core"`.
-     * Override when generating types inside @jasonscharf/core itself.
+     * Import path for the IRI class.  Defaults to `"@terncosoftware/core"`.
+     * Override when generating types inside @terncosoftware/core itself.
      */
     iriImport?: string;
 }
@@ -136,7 +136,7 @@ export function generateAugmentedTypes(
 ): string {
     const { externalClasses, localNamespace } = config;
 
-    const iriPkg = config.iriImport ?? "@jasonscharf/core";
+    const iriPkg = config.iriImport ?? "@terncosoftware/core";
 
     // Only import external classes that the generated output actually references as
     // object-property ranges — not every class defined in a base ontology.
@@ -223,12 +223,12 @@ export function generateAugmentedTypes(
 
 /**
  * Generates a TypeScript source file from an ontology.
- * The file is self-contained and can be imported anywhere @jasonscharf/core is available.
+ * The file is self-contained and can be imported anywhere @terncosoftware/core is available.
  */
 export function generateTypes(ontology: Ontology, sourceFile: string): string {
     const lines: string[] = [
         `// auto-generated from ${sourceFile} — do not edit by hand`,
-        `import { IRI } from '@jasonscharf/core';`,
+        `import { IRI } from '@terncosoftware/core';`,
         "",
     ];
 

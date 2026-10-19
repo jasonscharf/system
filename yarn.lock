@@ -1209,347 +1209,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jasonscharf/api@workspace:^, @jasonscharf/api@workspace:packages/api":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/api@workspace:packages/api"
-  dependencies:
-    "@jasonscharf/core": "workspace:^"
-    "@types/koa": "npm:^3"
-    "@types/koa-bodyparser": "npm:^4"
-    koa: "npm:^3.1.1"
-    koa-bodyparser: "npm:^4.4.1"
-    koa-router: "npm:^14.0.0"
-  bin:
-    tern-api: ./dist/server.js
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/app@workspace:^, @jasonscharf/app@workspace:packages/app":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/app@workspace:packages/app"
-  dependencies:
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/data": "workspace:^"
-    "@jasonscharf/flow": "workspace:^"
-    "@jasonscharf/gen": "workspace:^"
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/auth@workspace:^, @jasonscharf/auth@workspace:packages/auth":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/auth@workspace:packages/auth"
-  dependencies:
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/data": "workspace:^"
-    "@jasonscharf/entities": "workspace:^"
-    "@jasonscharf/flow": "workspace:^"
-    "@jasonscharf/server": "workspace:^"
-    "@types/node": "npm:^22.0.0"
-    ioredis: "npm:^5.6.1"
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/convos@workspace:^, @jasonscharf/convos@workspace:packages/convos":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/convos@workspace:packages/convos"
-  dependencies:
-    "@jasonscharf/app": "workspace:^"
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/data": "workspace:^"
-    "@jasonscharf/server": "workspace:^"
-    "@types/node": "npm:^22.0.0"
-    "@types/react": "npm:^19"
-  peerDependencies:
-    react: ^19
-  peerDependenciesMeta:
-    react:
-      optional: true
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/core-ui@workspace:^, @jasonscharf/core-ui@workspace:packages/core-ui":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/core-ui@workspace:packages/core-ui"
-  dependencies:
-    "@playwright/test": "npm:^1.57.0"
-    "@testing-library/dom": "npm:^10.4.1"
-    "@testing-library/react": "npm:^16.3.1"
-    "@types/react": "npm:^19"
-    "@types/react-dom": "npm:^19"
-    "@vitejs/plugin-react": "npm:^4.0.0"
-    jsdom: "npm:^27.4.0"
-    react: "npm:^19.2.3"
-    react-dom: "npm:^19.2.3"
-    react-native-web: "npm:^0.21.2"
-    vite: "npm:^6.0.0"
-    vitest: "npm:^4.0.16"
-  peerDependencies:
-    react: ^19.0.0
-  peerDependenciesMeta:
-    react:
-      optional: true
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/core@workspace:^, @jasonscharf/core@workspace:packages/core":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/core@workspace:packages/core"
-  dependencies:
-    "@jasonscharf/gen": "workspace:^"
-    reflect-metadata: "npm:^0.1.14"
-    typescript-ioc: "npm:^3.2.2"
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/dashboards@workspace:packages/dashboards":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/dashboards@workspace:packages/dashboards"
-  dependencies:
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/core-ui": "workspace:^"
-    "@testing-library/dom": "npm:^10.4.1"
-    "@testing-library/react": "npm:^16.3.1"
-    "@types/react": "npm:^19"
-    "@types/react-dom": "npm:^19"
-    "@vitejs/plugin-react": "npm:^4.0.0"
-    jsdom: "npm:^27.4.0"
-    react: "npm:^19.2.3"
-    react-dom: "npm:^19.2.3"
-    vitest: "npm:^4.0.16"
-  peerDependencies:
-    react: ^19.0.0
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/data@workspace:^, @jasonscharf/data@workspace:packages/data":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/data@workspace:packages/data"
-  dependencies:
-    "@jasonscharf/core": "workspace:^"
-    "@types/better-sqlite3": "npm:^7.6.12"
-    better-sqlite3: "npm:^11.10.0"
-    knex: "npm:^3.1.0"
-  peerDependencies:
-    better-sqlite3: ^11.0.0
-    pg: ^8.0.0
-  peerDependenciesMeta:
-    pg:
-      optional: true
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/entities@workspace:^, @jasonscharf/entities@workspace:packages/entities":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/entities@workspace:packages/entities"
-  dependencies:
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/gen": "workspace:^"
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/events@workspace:^, @jasonscharf/events@workspace:packages/events":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/events@workspace:packages/events"
-  dependencies:
-    "@jasonscharf/core": "workspace:^"
-    "@types/node": "npm:^22.0.0"
-    ioredis: "npm:^5.6.1"
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/flow@workspace:^, @jasonscharf/flow@workspace:packages/flow":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/flow@workspace:packages/flow"
-  dependencies:
-    "@jasonscharf/core": "workspace:^"
-    "@types/ws": "npm:^8.5.14"
-    ws: "npm:^8.18.0"
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/gen@workspace:^, @jasonscharf/gen@workspace:packages/gen":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/gen@workspace:packages/gen"
-  dependencies:
-    "@jasonscharf/core": "workspace:^"
-  bin:
-    tern-codegen: ./dist/bin.js
-    tern-gen: ./dist/bin.js
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/sandbox-cli@workspace:packages/sandbox-cli":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/sandbox-cli@workspace:packages/sandbox-cli"
-  dependencies:
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/flow": "workspace:^"
-  bin:
-    sandbox: ./dist/bin.js
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/sandbox-labs@workspace:^, @jasonscharf/sandbox-labs@workspace:packages/sandbox-labs":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/sandbox-labs@workspace:packages/sandbox-labs"
-  dependencies:
-    "@jasonscharf/auth": "workspace:^"
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/entities": "workspace:^"
-    "@jasonscharf/gen": "workspace:^"
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/sandbox-server@workspace:packages/sandbox-server":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/sandbox-server@workspace:packages/sandbox-server"
-  dependencies:
-    "@jasonscharf/app": "workspace:^"
-    "@jasonscharf/auth": "workspace:^"
-    "@jasonscharf/convos": "workspace:^"
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/data": "workspace:^"
-    "@jasonscharf/flow": "workspace:^"
-    "@jasonscharf/server": "workspace:^"
-    "@jasonscharf/vaults": "workspace:^"
-    better-sqlite3: "npm:^11.10.0"
-    ioredis: "npm:^5.6.1"
-    pg: "npm:^8.16.0"
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/sandbox-web@workspace:packages/sandbox-web":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/sandbox-web@workspace:packages/sandbox-web"
-  dependencies:
-    "@jasonscharf/convos": "workspace:^"
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/flow": "workspace:^"
-    "@types/react": "npm:^19"
-    "@types/react-dom": "npm:^19"
-    "@vitejs/plugin-react": "npm:^4.0.0"
-    react: "npm:^19.2.3"
-    react-dom: "npm:^19.2.3"
-    vite: "npm:^6.0.0"
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/server@workspace:^, @jasonscharf/server@workspace:packages/server":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/server@workspace:packages/server"
-  dependencies:
-    "@jasonscharf/app": "workspace:^"
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/data": "workspace:^"
-    "@jasonscharf/entities": "workspace:^"
-    "@jasonscharf/gen": "workspace:^"
-    knex: "npm:^3.1.0"
-    pino: "npm:^8.17.2"
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/test@workspace:packages/test":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/test@workspace:packages/test"
-  dependencies:
-    "@istanbuljs/nyc-config-typescript": "npm:^1.0.2"
-    "@jasonscharf/api": "workspace:^"
-    "@jasonscharf/app": "workspace:^"
-    "@jasonscharf/auth": "workspace:^"
-    "@jasonscharf/convos": "workspace:^"
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/data": "workspace:^"
-    "@jasonscharf/entities": "workspace:^"
-    "@jasonscharf/events": "workspace:^"
-    "@jasonscharf/flow": "workspace:^"
-    "@jasonscharf/gen": "workspace:^"
-    "@jasonscharf/sandbox-labs": "workspace:^"
-    "@jasonscharf/server": "workspace:^"
-    "@jasonscharf/vaults": "workspace:^"
-    "@jasonscharf/worker": "workspace:^"
-    "@playwright/test": "npm:^1.57.0"
-    "@swc/core": "npm:^1.15.43"
-    "@testing-library/dom": "npm:^10.4.1"
-    "@testing-library/jest-dom": "npm:^6.9.1"
-    "@testing-library/react": "npm:^16.3.1"
-    "@types/react": "npm:^19"
-    "@types/react-dom": "npm:^19"
-    "@types/ws": "npm:^8.5.14"
-    "@vitest/coverage-istanbul": "npm:4.0.16"
-    "@vitest/coverage-v8": "npm:^4.0.16"
-    jsdom: "npm:^27.4.0"
-    nyc: "npm:^17.1.0"
-    playwright-coverage: "npm:^0.0.1-security"
-    react: "npm:^19.2.3"
-    react-dom: "npm:^19.2.3"
-    unplugin-swc: "npm:^1.5.9"
-    vitest: "npm:^4.0.16"
-    ws: "npm:^8.18.0"
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/ui-menus@workspace:packages/ui-menus":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/ui-menus@workspace:packages/ui-menus"
-  dependencies:
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/core-ui": "workspace:^"
-    "@jasonscharf/entities": "workspace:^"
-    "@jasonscharf/gen": "workspace:^"
-    "@playwright/test": "npm:^1.57.0"
-    "@testing-library/dom": "npm:^10.4.1"
-    "@testing-library/react": "npm:^16.3.1"
-    "@types/react": "npm:^19"
-    "@types/react-dom": "npm:^19"
-    "@vitejs/plugin-react": "npm:^4.0.0"
-    jsdom: "npm:^27.4.0"
-    react: "npm:^19.2.3"
-    react-dom: "npm:^19.2.3"
-    react-native-web: "npm:^0.21.2"
-    vite: "npm:^6.0.0"
-    vitest: "npm:^4.0.16"
-  peerDependencies:
-    react: ^19.0.0
-  peerDependenciesMeta:
-    react:
-      optional: true
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/vaults@workspace:^, @jasonscharf/vaults@workspace:packages/vaults":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/vaults@workspace:packages/vaults"
-  dependencies:
-    "@azure/identity": "npm:^4.4.1"
-    "@azure/keyvault-secrets": "npm:^4.8.0"
-    "@jasonscharf/core": "workspace:^"
-    "@types/node": "npm:^22.0.0"
-  peerDependencies:
-    "@azure/identity": ^4.0.0
-    "@azure/keyvault-secrets": ^4.0.0
-  peerDependenciesMeta:
-    "@azure/identity":
-      optional: true
-    "@azure/keyvault-secrets":
-      optional: true
-  languageName: unknown
-  linkType: soft
-
-"@jasonscharf/worker@workspace:^, @jasonscharf/worker@workspace:packages/worker":
-  version: 0.0.0-use.local
-  resolution: "@jasonscharf/worker@workspace:packages/worker"
-  dependencies:
-    "@jasonscharf/core": "workspace:^"
-    "@jasonscharf/data": "workspace:^"
-    "@jasonscharf/flow": "workspace:^"
-    "@types/luxon": "npm:^3.7.1"
-    cron-parser: "npm:^5.5.0"
-    knex: "npm:^3.1.0"
-    luxon: "npm:^3.7.2"
-    nodemon: "npm:^3.1.11"
-  languageName: unknown
-  linkType: soft
-
 "@jridgewell/gen-mapping@npm:^0.3.12, @jridgewell/gen-mapping@npm:^0.3.13, @jridgewell/gen-mapping@npm:^0.3.5":
   version: 0.3.13
   resolution: "@jridgewell/gen-mapping@npm:0.3.13"
@@ -2144,6 +1803,347 @@ __metadata:
   checksum: 10c0/25f1bfa0ac34e9ac60aa7de91778f70906cd77a7abb3eb68c5da8d38d5202286b293300d4bb2792b3bb8840a7f5d5c4627c4ec34d2fae6533bfb3e14a70fd8fb
   languageName: node
   linkType: hard
+
+"@terncosoftware/api@workspace:^, @terncosoftware/api@workspace:packages/api":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/api@workspace:packages/api"
+  dependencies:
+    "@terncosoftware/core": "workspace:^"
+    "@types/koa": "npm:^3"
+    "@types/koa-bodyparser": "npm:^4"
+    koa: "npm:^3.1.1"
+    koa-bodyparser: "npm:^4.4.1"
+    koa-router: "npm:^14.0.0"
+  bin:
+    tern-api: ./dist/server.js
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/app@workspace:^, @terncosoftware/app@workspace:packages/app":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/app@workspace:packages/app"
+  dependencies:
+    "@terncosoftware/core": "workspace:^"
+    "@terncosoftware/data": "workspace:^"
+    "@terncosoftware/flow": "workspace:^"
+    "@terncosoftware/gen": "workspace:^"
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/auth@workspace:^, @terncosoftware/auth@workspace:packages/auth":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/auth@workspace:packages/auth"
+  dependencies:
+    "@terncosoftware/core": "workspace:^"
+    "@terncosoftware/data": "workspace:^"
+    "@terncosoftware/entities": "workspace:^"
+    "@terncosoftware/flow": "workspace:^"
+    "@terncosoftware/server": "workspace:^"
+    "@types/node": "npm:^22.0.0"
+    ioredis: "npm:^5.6.1"
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/convos@workspace:^, @terncosoftware/convos@workspace:packages/convos":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/convos@workspace:packages/convos"
+  dependencies:
+    "@terncosoftware/app": "workspace:^"
+    "@terncosoftware/core": "workspace:^"
+    "@terncosoftware/data": "workspace:^"
+    "@terncosoftware/server": "workspace:^"
+    "@types/node": "npm:^22.0.0"
+    "@types/react": "npm:^19"
+  peerDependencies:
+    react: ^19
+  peerDependenciesMeta:
+    react:
+      optional: true
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/core-ui@workspace:^, @terncosoftware/core-ui@workspace:packages/core-ui":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/core-ui@workspace:packages/core-ui"
+  dependencies:
+    "@playwright/test": "npm:^1.57.0"
+    "@testing-library/dom": "npm:^10.4.1"
+    "@testing-library/react": "npm:^16.3.1"
+    "@types/react": "npm:^19"
+    "@types/react-dom": "npm:^19"
+    "@vitejs/plugin-react": "npm:^4.0.0"
+    jsdom: "npm:^27.4.0"
+    react: "npm:^19.2.3"
+    react-dom: "npm:^19.2.3"
+    react-native-web: "npm:^0.21.2"
+    vite: "npm:^6.0.0"
+    vitest: "npm:^4.0.16"
+  peerDependencies:
+    react: ^19.0.0
+  peerDependenciesMeta:
+    react:
+      optional: true
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/core@workspace:^, @terncosoftware/core@workspace:packages/core":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/core@workspace:packages/core"
+  dependencies:
+    "@terncosoftware/gen": "workspace:^"
+    reflect-metadata: "npm:^0.1.14"
+    typescript-ioc: "npm:^3.2.2"
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/dashboards@workspace:packages/dashboards":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/dashboards@workspace:packages/dashboards"
+  dependencies:
+    "@terncosoftware/core": "workspace:^"
+    "@terncosoftware/core-ui": "workspace:^"
+    "@testing-library/dom": "npm:^10.4.1"
+    "@testing-library/react": "npm:^16.3.1"
+    "@types/react": "npm:^19"
+    "@types/react-dom": "npm:^19"
+    "@vitejs/plugin-react": "npm:^4.0.0"
+    jsdom: "npm:^27.4.0"
+    react: "npm:^19.2.3"
+    react-dom: "npm:^19.2.3"
+    vitest: "npm:^4.0.16"
+  peerDependencies:
+    react: ^19.0.0
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/data@workspace:^, @terncosoftware/data@workspace:packages/data":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/data@workspace:packages/data"
+  dependencies:
+    "@terncosoftware/core": "workspace:^"
+    "@types/better-sqlite3": "npm:^7.6.12"
+    better-sqlite3: "npm:^11.10.0"
+    knex: "npm:^3.1.0"
+  peerDependencies:
+    better-sqlite3: ^11.0.0
+    pg: ^8.0.0
+  peerDependenciesMeta:
+    pg:
+      optional: true
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/entities@workspace:^, @terncosoftware/entities@workspace:packages/entities":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/entities@workspace:packages/entities"
+  dependencies:
+    "@terncosoftware/core": "workspace:^"
+    "@terncosoftware/gen": "workspace:^"
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/events@workspace:^, @terncosoftware/events@workspace:packages/events":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/events@workspace:packages/events"
+  dependencies:
+    "@terncosoftware/core": "workspace:^"
+    "@types/node": "npm:^22.0.0"
+    ioredis: "npm:^5.6.1"
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/flow@workspace:^, @terncosoftware/flow@workspace:packages/flow":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/flow@workspace:packages/flow"
+  dependencies:
+    "@terncosoftware/core": "workspace:^"
+    "@types/ws": "npm:^8.5.14"
+    ws: "npm:^8.18.0"
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/gen@workspace:^, @terncosoftware/gen@workspace:packages/gen":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/gen@workspace:packages/gen"
+  dependencies:
+    "@terncosoftware/core": "workspace:^"
+  bin:
+    tern-codegen: ./dist/bin.js
+    tern-gen: ./dist/bin.js
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/sandbox-cli@workspace:packages/sandbox-cli":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/sandbox-cli@workspace:packages/sandbox-cli"
+  dependencies:
+    "@terncosoftware/core": "workspace:^"
+    "@terncosoftware/flow": "workspace:^"
+  bin:
+    sandbox: ./dist/bin.js
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/sandbox-labs@workspace:^, @terncosoftware/sandbox-labs@workspace:packages/sandbox-labs":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/sandbox-labs@workspace:packages/sandbox-labs"
+  dependencies:
+    "@terncosoftware/auth": "workspace:^"
+    "@terncosoftware/core": "workspace:^"
+    "@terncosoftware/entities": "workspace:^"
+    "@terncosoftware/gen": "workspace:^"
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/sandbox-server@workspace:packages/sandbox-server":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/sandbox-server@workspace:packages/sandbox-server"
+  dependencies:
+    "@terncosoftware/app": "workspace:^"
+    "@terncosoftware/auth": "workspace:^"
+    "@terncosoftware/convos": "workspace:^"
+    "@terncosoftware/core": "workspace:^"
+    "@terncosoftware/data": "workspace:^"
+    "@terncosoftware/flow": "workspace:^"
+    "@terncosoftware/server": "workspace:^"
+    "@terncosoftware/vaults": "workspace:^"
+    better-sqlite3: "npm:^11.10.0"
+    ioredis: "npm:^5.6.1"
+    pg: "npm:^8.16.0"
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/sandbox-web@workspace:packages/sandbox-web":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/sandbox-web@workspace:packages/sandbox-web"
+  dependencies:
+    "@terncosoftware/convos": "workspace:^"
+    "@terncosoftware/core": "workspace:^"
+    "@terncosoftware/flow": "workspace:^"
+    "@types/react": "npm:^19"
+    "@types/react-dom": "npm:^19"
+    "@vitejs/plugin-react": "npm:^4.0.0"
+    react: "npm:^19.2.3"
+    react-dom: "npm:^19.2.3"
+    vite: "npm:^6.0.0"
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/server@workspace:^, @terncosoftware/server@workspace:packages/server":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/server@workspace:packages/server"
+  dependencies:
+    "@terncosoftware/app": "workspace:^"
+    "@terncosoftware/core": "workspace:^"
+    "@terncosoftware/data": "workspace:^"
+    "@terncosoftware/entities": "workspace:^"
+    "@terncosoftware/gen": "workspace:^"
+    knex: "npm:^3.1.0"
+    pino: "npm:^8.17.2"
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/test@workspace:packages/test":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/test@workspace:packages/test"
+  dependencies:
+    "@istanbuljs/nyc-config-typescript": "npm:^1.0.2"
+    "@playwright/test": "npm:^1.57.0"
+    "@swc/core": "npm:^1.15.43"
+    "@terncosoftware/api": "workspace:^"
+    "@terncosoftware/app": "workspace:^"
+    "@terncosoftware/auth": "workspace:^"
+    "@terncosoftware/convos": "workspace:^"
+    "@terncosoftware/core": "workspace:^"
+    "@terncosoftware/data": "workspace:^"
+    "@terncosoftware/entities": "workspace:^"
+    "@terncosoftware/events": "workspace:^"
+    "@terncosoftware/flow": "workspace:^"
+    "@terncosoftware/gen": "workspace:^"
+    "@terncosoftware/sandbox-labs": "workspace:^"
+    "@terncosoftware/server": "workspace:^"
+    "@terncosoftware/vaults": "workspace:^"
+    "@terncosoftware/worker": "workspace:^"
+    "@testing-library/dom": "npm:^10.4.1"
+    "@testing-library/jest-dom": "npm:^6.9.1"
+    "@testing-library/react": "npm:^16.3.1"
+    "@types/react": "npm:^19"
+    "@types/react-dom": "npm:^19"
+    "@types/ws": "npm:^8.5.14"
+    "@vitest/coverage-istanbul": "npm:4.0.16"
+    "@vitest/coverage-v8": "npm:^4.0.16"
+    jsdom: "npm:^27.4.0"
+    nyc: "npm:^17.1.0"
+    playwright-coverage: "npm:^0.0.1-security"
+    react: "npm:^19.2.3"
+    react-dom: "npm:^19.2.3"
+    unplugin-swc: "npm:^1.5.9"
+    vitest: "npm:^4.0.16"
+    ws: "npm:^8.18.0"
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/ui-menus@workspace:packages/ui-menus":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/ui-menus@workspace:packages/ui-menus"
+  dependencies:
+    "@playwright/test": "npm:^1.57.0"
+    "@terncosoftware/core": "workspace:^"
+    "@terncosoftware/core-ui": "workspace:^"
+    "@terncosoftware/entities": "workspace:^"
+    "@terncosoftware/gen": "workspace:^"
+    "@testing-library/dom": "npm:^10.4.1"
+    "@testing-library/react": "npm:^16.3.1"
+    "@types/react": "npm:^19"
+    "@types/react-dom": "npm:^19"
+    "@vitejs/plugin-react": "npm:^4.0.0"
+    jsdom: "npm:^27.4.0"
+    react: "npm:^19.2.3"
+    react-dom: "npm:^19.2.3"
+    react-native-web: "npm:^0.21.2"
+    vite: "npm:^6.0.0"
+    vitest: "npm:^4.0.16"
+  peerDependencies:
+    react: ^19.0.0
+  peerDependenciesMeta:
+    react:
+      optional: true
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/vaults@workspace:^, @terncosoftware/vaults@workspace:packages/vaults":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/vaults@workspace:packages/vaults"
+  dependencies:
+    "@azure/identity": "npm:^4.4.1"
+    "@azure/keyvault-secrets": "npm:^4.8.0"
+    "@terncosoftware/core": "workspace:^"
+    "@types/node": "npm:^22.0.0"
+  peerDependencies:
+    "@azure/identity": ^4.0.0
+    "@azure/keyvault-secrets": ^4.0.0
+  peerDependenciesMeta:
+    "@azure/identity":
+      optional: true
+    "@azure/keyvault-secrets":
+      optional: true
+  languageName: unknown
+  linkType: soft
+
+"@terncosoftware/worker@workspace:^, @terncosoftware/worker@workspace:packages/worker":
+  version: 0.0.0-use.local
+  resolution: "@terncosoftware/worker@workspace:packages/worker"
+  dependencies:
+    "@terncosoftware/core": "workspace:^"
+    "@terncosoftware/data": "workspace:^"
+    "@terncosoftware/flow": "workspace:^"
+    "@types/luxon": "npm:^3.7.1"
+    cron-parser: "npm:^5.5.0"
+    knex: "npm:^3.1.0"
+    luxon: "npm:^3.7.2"
+    nodemon: "npm:^3.1.11"
+  languageName: unknown
+  linkType: soft
 
 "@testing-library/dom@npm:^10.4.1":
   version: 10.4.1

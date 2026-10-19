@@ -39,8 +39,8 @@ import {
     PERM_MESSAGE_POST,
     ReadReceiptRepository,
     uninstallConvos,
-} from "@jasonscharf/convos";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
+} from "@terncosoftware/convos";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
 import {
     buildServerContext,
     PermissionRepository,
@@ -55,7 +55,7 @@ import {
     systemSec,
     TenantRepository,
     UserGroupRepository,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";

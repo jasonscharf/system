@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { DomainEvent, EventSubscription, IDomainEventBus } from "@jasonscharf/core";
-import { makeUri, NS_CORE } from "@jasonscharf/core";
+import type { DomainEvent, EventSubscription, IDomainEventBus } from "@terncosoftware/core";
+import { makeUri, NS_CORE } from "@terncosoftware/core";
 import { Redis } from "ioredis";
 
 // ── Options ───────────────────────────────────────────────────────────────────

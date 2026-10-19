@@ -5,7 +5,7 @@
  * it existed, codegen configuration lived in sidecar `tern-gen*.json` files that
  * nothing linked back to the package: the build could not enumerate extensions,
  * and neither could a marketplace.  A sidecar was easy to orphan — `superuser.ttl`
- * had no config at all, and `@jasonscharf/server` shipped a `tern-gen-rbac.json`
+ * had no config at all, and `@terncosoftware/server` shipped a `tern-gen-rbac.json`
  * that no script ever ran.
  *
  * This gate locks that in from both directions:

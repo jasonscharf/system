@@ -1,4 +1,4 @@
-import type { CommandImpl, Dispatch } from "@jasonscharf/core-ui";
+import type { CommandImpl, Dispatch } from "@terncosoftware/core-ui";
 import {
     type ConfigureTileArgs,
     DashboardCommands,

@@ -1,4 +1,4 @@
-import { blankNode, DEFAULT_GRAPH, IRI, literal, quad, triple } from "@jasonscharf/core";
+import { blankNode, DEFAULT_GRAPH, IRI, literal, quad, triple } from "@terncosoftware/core";
 
 import { describe, expect, it } from "vitest";
 

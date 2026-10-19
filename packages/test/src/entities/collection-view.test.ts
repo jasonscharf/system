@@ -17,11 +17,11 @@
  *   - delete() cleans up all nodes
  */
 
-import { UserSchema } from "@jasonscharf/auth";
-import { IRI } from "@jasonscharf/core";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { EntitySchema } from "@jasonscharf/entities";
-import { CollectionViewStore, buildServerContext, EntityStore } from "@jasonscharf/server";
+import { UserSchema } from "@terncosoftware/auth";
+import { IRI } from "@terncosoftware/core";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import { EntitySchema } from "@terncosoftware/entities";
+import { CollectionViewStore, buildServerContext, EntityStore } from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";

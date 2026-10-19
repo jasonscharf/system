@@ -1,7 +1,7 @@
-import type { TripleStore } from "@jasonscharf/data";
-import type { EntityRecord } from "@jasonscharf/entities";
-import type { SecurityContext, ServerContext } from "@jasonscharf/server";
-import { createEntityStore, EntityQuery, type EntityStore } from "@jasonscharf/server";
+import type { TripleStore } from "@terncosoftware/data";
+import type { EntityRecord } from "@terncosoftware/entities";
+import type { SecurityContext, ServerContext } from "@terncosoftware/server";
+import { createEntityStore, EntityQuery, type EntityStore } from "@terncosoftware/server";
 import { ParticipantSchema } from "../entities/ParticipantSchema.js";
 import type { ParticipantEntity, ParticipantRole } from "../types.js";
 import { idFrom, iriFor, newId } from "./util.js";

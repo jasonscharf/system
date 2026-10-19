@@ -7,7 +7,7 @@ Tracking: **TRN-153** (Infrastructure), with workstreams **TRN-154** (schema),
 Every worker today keeps itself ticking with a hand-rolled `setTimeout` loop
 buried inside a bespoke FlowComponent. `ExperimentLifecycle` sweeps all domains
 every 30s; `StatsAggregator` flushes roll-ups every 2s; the discovery sources
-re-poll every 30s; `@jasonscharf/worker` (system-worker) is literally a
+re-poll every 30s; `@terncosoftware/worker` (system-worker) is literally a
 `setInterval` that logs `Hello from worker!`. Each of these re-implements the
 same loop, swallows its own errors, and self-schedules with the
 `void this._run()` pattern our conventions forbid.
@@ -175,7 +175,7 @@ answerable.
 
 ## Runtime — built in system-worker
 
-The engine lives in **`@jasonscharf/worker`** (`packages/worker`), replacing its
+The engine lives in **`@terncosoftware/worker`** (`packages/worker`), replacing its
 `setInterval` stub. It ships two faces of the same code: a reusable runtime
 library that any product worker (`labs-worker`, `tubemail-worker`,
 `switchyard-worker`) imports and wires into its `FlowApp`, and a standalone
@@ -206,9 +206,9 @@ new dependencies.
 
 A job has to name the code it runs, and that name must survive in a database row
 and a config file — not just a closure registered at boot. The platform already
-has most of this machinery: `HandlerRegistry` (`@jasonscharf/app`) maps type
+has most of this machinery: `HandlerRegistry` (`@terncosoftware/app`) maps type
 IRIs to `{ module, export }` pairs and lazily `import()`s them, and `FlowLoader`
-(`@jasonscharf/flow`) carries a `ModuleResolver` for component types. What's
+(`@terncosoftware/flow`) carries a `ModuleResolver` for component types. What's
 missing is a single, uniform way to *address a specific method in a specific
 module, with bound arguments*. We add it once and use it everywhere — job
 handlers and application/extension handler config alike.
@@ -216,10 +216,10 @@ handlers and application/extension handler config alike.
 The address is a `module://` URI:
 
 ```
-module://@jasonscharf/server/ComputeStates.js#sweepDomains?scope=active&dryRun=false
+module://@terncosoftware/server/ComputeStates.js#sweepDomains?scope=active&dryRun=false
 ```
 
-- the path (`@jasonscharf/server/ComputeStates.js`) is the module specifier — an
+- the path (`@terncosoftware/server/ComputeStates.js`) is the module specifier — an
   npm package + subpath, a relative path, or a `file://` — resolved by the same
   rules `HandlerRegistry` already applies.
 - the fragment (`#sweepDomains`) is the member: a named export, or a method on

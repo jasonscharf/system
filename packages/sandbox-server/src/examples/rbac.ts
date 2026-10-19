@@ -1,15 +1,15 @@
 /**
  * RBAC sandbox — runnable developer walkthrough.
  *
- * Demonstrates every major RBAC feature (now part of @jasonscharf/server) using an
+ * Demonstrates every major RBAC feature (now part of @terncosoftware/server) using an
  * in-memory SQLite database.  Run with:
  *
- *   yarn workspace @jasonscharf/sandbox-rbac start
+ *   yarn workspace @terncosoftware/sandbox-rbac start
  *
  * Output is structured so you can follow along section by section.
  */
 
-import { createDataContext, TripleStore } from "@jasonscharf/data";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
 import {
     buildServerContext,
     PermissionRepository,
@@ -24,7 +24,7 @@ import {
     systemSec,
     TenantRepository,
     UserGroupRepository,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

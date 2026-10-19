@@ -9,8 +9,8 @@
  * patterns and uses real registry/host objects (no mocks).
  */
 
-import { InMemorySystemBus } from "@jasonscharf/core";
-import { DefRegistry, DispatchHost, type DispatchManifestEntry } from "@jasonscharf/events";
+import { InMemorySystemBus } from "@terncosoftware/core";
+import { DefRegistry, DispatchHost, type DispatchManifestEntry } from "@terncosoftware/events";
 import { describe, expect, it } from "vitest";
 
 // JSON-Schema args/result objects, exactly as an authoring layer would supply.

@@ -16,7 +16,7 @@ import {
     manifestInputs,
     manifestTargets,
     readManifest,
-} from "@jasonscharf/gen";
+} from "@terncosoftware/gen";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const ONTOLOGY = `

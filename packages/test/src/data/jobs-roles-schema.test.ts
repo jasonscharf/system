@@ -12,7 +12,7 @@
  * Each suite rolls back its transaction so the schema stays clean.
  */
 
-import { createDataContext } from "@jasonscharf/data";
+import { createDataContext } from "@terncosoftware/data";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -103,7 +103,7 @@ for (const provider of providers) {
             await trx("sys_job").insert({
                 id: "labs.lifecycle.sweep",
                 schedule: JSON.stringify({ every: "PT30S" }),
-                handler: "module://@jasonscharf/worker/LifecycleHandler.js#sweep",
+                handler: "module://@terncosoftware/worker/LifecycleHandler.js#sweep",
                 requires_role: "labs.lifecycle",
                 enabled: true,
                 next_run_at: new Date(Date.now() + 30_000),
@@ -112,14 +112,16 @@ for (const provider of providers) {
             });
             const rows = await trx("sys_job").where({ id: "labs.lifecycle.sweep" }).select("*");
             expect(rows).toHaveLength(1);
-            expect(rows[0].handler).toBe("module://@jasonscharf/worker/LifecycleHandler.js#sweep");
+            expect(rows[0].handler).toBe(
+                "module://@terncosoftware/worker/LifecycleHandler.js#sweep",
+            );
         });
 
         it("inserts a row into sys_job_run", async () => {
             await trx("sys_job").insert({
                 id: "test.job",
                 schedule: JSON.stringify({ every: "PT1M" }),
-                handler: "module://@jasonscharf/worker/TestHandler.js#run",
+                handler: "module://@terncosoftware/worker/TestHandler.js#run",
                 requires_role: null,
                 enabled: true,
                 next_run_at: new Date(Date.now() + 60_000),
@@ -149,7 +151,7 @@ for (const provider of providers) {
             await trx("sys_job").insert({
                 id: "dedup.job",
                 schedule: JSON.stringify({ every: "PT5M" }),
-                handler: "module://@jasonscharf/worker/DedupHandler.js#run",
+                handler: "module://@terncosoftware/worker/DedupHandler.js#run",
                 requires_role: null,
                 enabled: true,
                 next_run_at: new Date(Date.now() + 300_000),

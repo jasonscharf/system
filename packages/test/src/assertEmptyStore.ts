@@ -1,4 +1,4 @@
-import { getMigrationBaseline } from "@jasonscharf/data";
+import { getMigrationBaseline } from "@terncosoftware/data";
 import type { Knex } from "knex";
 
 const STORE_TABLES = ["edges", "nodes", "namespaces"] as const;

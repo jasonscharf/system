@@ -1,5 +1,5 @@
 {
-    "name": "@jasonscharf/sandbox-web",
+    "name": "@terncosoftware/sandbox-web",
     "version": "0.1.0",
     "type": "module",
     "private": true,
@@ -11,9 +11,9 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "@jasonscharf/convos": "workspace:^",
-        "@jasonscharf/core": "workspace:^",
-        "@jasonscharf/flow": "workspace:^",
+        "@terncosoftware/convos": "workspace:^",
+        "@terncosoftware/core": "workspace:^",
+        "@terncosoftware/flow": "workspace:^",
         "react": "^19.2.3",
         "react-dom": "^19.2.3"
     },

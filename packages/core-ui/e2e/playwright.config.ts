@@ -4,7 +4,7 @@ import { defineConfig } from "@playwright/test";
 
 // E2E config driving the Vite test-app. The webServer block boots the test app
 // on port 5174 and waits for it before running specs. Run with:
-//   yarn workspace @jasonscharf/core-ui e2e
+//   yarn workspace @terncosoftware/core-ui e2e
 const here = path.dirname(fileURLToPath(import.meta.url));
 const port = 5191;
 

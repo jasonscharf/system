@@ -14,9 +14,9 @@
  * Runs against SQLite (always) and Postgres (when SYS_PG_URL is set).
  */
 
-import type { IRI, Literal } from "@jasonscharf/core";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { buildServerContext, type ServerContext } from "@jasonscharf/server";
+import type { IRI, Literal } from "@terncosoftware/core";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import { buildServerContext, type ServerContext } from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";

@@ -1,5 +1,5 @@
-import { actsForIRI, IRI, PermissionDeniedError } from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
+import { actsForIRI, IRI, PermissionDeniedError } from "@terncosoftware/core";
+import type { TripleStore } from "@terncosoftware/data";
 import type { SecurityContext } from "../SecurityContext.js";
 import type { ServerContext } from "../ServerContext.js";
 import type { TenantEntity, TenantRepository } from "../tenancy/index.js";

@@ -6,7 +6,7 @@ import { MenuItemSchema, MenuSchema } from "./schemas.generated.js";
 // Smoke test for the public barrels: the runtime values resolve (including the
 // generated IRI constants and, on the ./schemas entry, the EntitySchemas), and
 // the React surface is wired.
-describe("@jasonscharf/ui-menus public surface", () => {
+describe("@terncosoftware/ui-menus public surface", () => {
     it("test runtime barrel exposes assembly, registry, and generated IRIs", () => {
         expect(typeof api.assembleMenu).toBe("function");
         expect(typeof api.MenuRegistry).toBe("function");

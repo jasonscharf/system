@@ -1,4 +1,4 @@
-import { getLog } from "@jasonscharf/core";
+import { getLog } from "@terncosoftware/core";
 import { AzureKeyVaultProvider } from "./AzureKeyVaultProvider.js";
 import { CachedSecretsProvider } from "./CachedSecretsProvider.js";
 import { EnvSecretsProvider } from "./EnvSecretsProvider.js";

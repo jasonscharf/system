@@ -20,10 +20,10 @@
  * inside rolled-back transactions so the schema stays clean.
  */
 
-import { type BlankNode, DEFAULT_GRAPH, type IRI, type Literal } from "@jasonscharf/core";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import type { ServerContext } from "@jasonscharf/server";
-import { buildServerContext } from "@jasonscharf/server";
+import { type BlankNode, DEFAULT_GRAPH, type IRI, type Literal } from "@terncosoftware/core";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import type { ServerContext } from "@terncosoftware/server";
+import { buildServerContext } from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";
@@ -1027,14 +1027,14 @@ for (const db of providers) {
         let knex: Knex;
         let trx: Knex.Transaction;
         let store: TripleStore;
-        let es: import("@jasonscharf/server").EntityStore;
-        let ctx: import("@jasonscharf/server").ServerContext;
+        let es: import("@terncosoftware/server").EntityStore;
+        let ctx: import("@terncosoftware/server").ServerContext;
 
         beforeEach(async () => {
             knex = await db.create();
             trx = await knex.transaction();
             store = new TripleStore(knex);
-            const { EntityStore } = await import("@jasonscharf/server");
+            const { EntityStore } = await import("@terncosoftware/server");
             es = new EntityStore(store, undefined, TEST_CIPHER);
             ctx = buildServerContext(store, { trx, cipher: TEST_CIPHER });
         });
@@ -1045,7 +1045,7 @@ for (const db of providers) {
         });
 
         it("EntityStore.update produces two history rows for the changed predicate", async () => {
-            const { UserSchema } = await import("@jasonscharf/auth");
+            const { UserSchema } = await import("@terncosoftware/auth");
 
             const user = await es.create(ctx, UserSchema, {
                 email: "test@example.com",
@@ -1075,7 +1075,7 @@ for (const db of providers) {
         });
 
         it("EntityStore.delete soft-deletes all entity edges", async () => {
-            const { UserSchema } = await import("@jasonscharf/auth");
+            const { UserSchema } = await import("@terncosoftware/auth");
 
             const user = await es.create(ctx, UserSchema, { email: "del@example.com" });
 

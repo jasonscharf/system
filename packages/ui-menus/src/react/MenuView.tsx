@@ -1,5 +1,13 @@
-import type { Dispatch } from "@jasonscharf/core-ui";
-import { Button, Li, Nav, Span, Ul, useComposition, useRevision } from "@jasonscharf/core-ui/react";
+import type { Dispatch } from "@terncosoftware/core-ui";
+import {
+    Button,
+    Li,
+    Nav,
+    Span,
+    Ul,
+    useComposition,
+    useRevision,
+} from "@terncosoftware/core-ui/react";
 import type React from "react";
 import type { MenuItemConfig, MenuNode } from "../menu.js";
 import { useMenus } from "./context.js";

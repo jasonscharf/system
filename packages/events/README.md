@@ -1,16 +1,16 @@
-# @jasonscharf/events
+# @terncosoftware/events
 
 Event bus implementations for the Tern platform. Provides `InMemoryEventBus` for development/testing and `RedisStreamEventBus` for distributed production deployments.
 
-The `IDomainEventBus` interface lives in `@jasonscharf/core` and is what all platform code depends on. This package provides the concrete implementations.
+The `IDomainEventBus` interface lives in `@terncosoftware/core` and is what all platform code depends on. This package provides the concrete implementations.
 
 ## InMemoryEventBus
 
 Single-process, synchronous delivery. Use in development and tests.
 
 ```typescript
-import { InMemoryEventBus } from '@jasonscharf/events';
-import type { DomainEvent } from '@jasonscharf/core';
+import { InMemoryEventBus } from '@terncosoftware/events';
+import type { DomainEvent } from '@terncosoftware/core';
 
 const bus = new InMemoryEventBus();
 
@@ -41,7 +41,7 @@ await bus.close();
 Distributed, at-least-once delivery via Redis Streams and consumer groups. Use in production.
 
 ```typescript
-import { RedisStreamEventBus } from '@jasonscharf/events';
+import { RedisStreamEventBus } from '@terncosoftware/events';
 import { Redis } from 'ioredis';
 
 const publisher = new Redis();
@@ -75,7 +75,7 @@ await bus.close();
 The event bus should be set on `ctx.events` at startup so all platform code can use it without a direct dependency on this package.
 
 ```typescript
-import { InMemoryEventBus } from '@jasonscharf/events';
+import { InMemoryEventBus } from '@terncosoftware/events';
 
 const ctx = {
     ...defaultCtx,
@@ -86,7 +86,7 @@ const ctx = {
 ## Installation
 
 ```bash
-yarn add @jasonscharf/events
+yarn add @terncosoftware/events
 # Production:
 yarn add ioredis
 ```

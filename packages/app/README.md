@@ -1,4 +1,4 @@
-# @jasonscharf/app
+# @terncosoftware/app
 
 Application assembly for the Tern platform. Loads handler registries from YAML config and provides the `TernExtension` lifecycle contract.
 
@@ -7,7 +7,7 @@ Application assembly for the Tern platform. Loads handler registries from YAML c
 `TernApp` is the top-level application object. It ties together a handler registry and a `FlowApp` FBP runtime.
 
 ```typescript
-import { TernApp } from '@jasonscharf/app';
+import { TernApp } from '@terncosoftware/app';
 
 const ternApp = await TernApp.fromYAML('./config/app.yaml', { context: ctx });
 
@@ -42,7 +42,7 @@ const ternApp = await TernApp.fromEntries(config, [
 A handler is an async function that receives typed input and a context:
 
 ```typescript
-import type { HandlerFn, HandlerContext } from '@jasonscharf/app';
+import type { HandlerFn, HandlerContext } from '@terncosoftware/app';
 import { nameIRI, priceIRI } from './product/types.generated.js';
 
 const createProductHandler: HandlerFn = async (input, context) => {
@@ -60,8 +60,8 @@ const createProductHandler: HandlerFn = async (input, context) => {
 Extensions are the primary mechanism for packaging reusable functionality. Implement `TernExtension` to participate in the application lifecycle.
 
 ```typescript
-import type { TernExtension } from '@jasonscharf/app';
-import type { ApplicationContext } from '@jasonscharf/core';
+import type { TernExtension } from '@terncosoftware/app';
+import type { ApplicationContext } from '@terncosoftware/core';
 
 export const MyExtension: TernExtension = {
     name:    'com.example.my-extension',
@@ -79,7 +79,7 @@ export const MyExtension: TernExtension = {
 
         // Extensions do NOT modify other packages' entity schemas.
         // If you need to associate data with an existing entity type,
-        // write into a named subgraph (see @jasonscharf/server writeExtension).
+        // write into a named subgraph (see @terncosoftware/server writeExtension).
     },
 
     async uninstall(ctx: ApplicationContext): Promise<void> {
@@ -99,7 +99,7 @@ Extension hooks are always **idempotent** — the platform may call `install` on
 Maps message type IRIs to their handler implementations.
 
 ```typescript
-import { HandlerRegistry } from '@jasonscharf/app';
+import { HandlerRegistry } from '@terncosoftware/app';
 
 const registry = new HandlerRegistry();
 registry.register([
@@ -116,7 +116,7 @@ const result = await registry.dispatch(
 ## Installation
 
 ```bash
-yarn add @jasonscharf/app
+yarn add @terncosoftware/app
 ```
 
 Published to GitHub Packages (`https://npm.pkg.github.com`).

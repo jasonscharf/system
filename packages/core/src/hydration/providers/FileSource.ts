@@ -9,7 +9,7 @@ export type TripleParser = (content: string) => AsyncIterable<Triple>;
  * Parsing is delegated to the supplied TripleParser so the source is format-agnostic.
  *
  * @example
- * import { parseNTriples } from '@jasonscharf/gen';
+ * import { parseNTriples } from '@terncosoftware/gen';
  * const source = new FileSource('/data/graph.nt', parseNTriples);
  */
 export class FileSource implements TripleSource {

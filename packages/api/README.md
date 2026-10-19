@@ -1,4 +1,4 @@
-# @jasonscharf/api
+# @terncosoftware/api
 
 Minimal HTTP health-check and version endpoint for Tern applications. Exposes `GET /` and `GET /version` over a Koa server.
 
@@ -13,18 +13,18 @@ Minimal HTTP health-check and version endpoint for Tern applications. Exposes `G
 ## Usage
 
 ```typescript
-import { createApiServer } from '@jasonscharf/api';
+import { createApiServer } from '@terncosoftware/api';
 
 const server = createApiServer({ port: 3000 });
 await server.start();
 ```
 
-This package is a thin integration aid. For full application HTTP routing, use `@jasonscharf/flow` (`HttpServer`, `HttpRouter`) or Koa directly.
+This package is a thin integration aid. For full application HTTP routing, use `@terncosoftware/flow` (`HttpServer`, `HttpRouter`) or Koa directly.
 
 ## Installation
 
 ```bash
-yarn add @jasonscharf/api
+yarn add @terncosoftware/api
 ```
 
 Published to GitHub Packages (`https://npm.pkg.github.com`).

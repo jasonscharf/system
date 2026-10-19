@@ -1,6 +1,6 @@
-import { Inject } from "@jasonscharf/core";
-import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@jasonscharf/flow";
-import { buildServerContext, systemSec } from "@jasonscharf/server";
+import { Inject } from "@terncosoftware/core";
+import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@terncosoftware/flow";
+import { buildServerContext, systemSec } from "@terncosoftware/server";
 import { SESSION_TTL_SECS } from "../constants.js";
 import type { IOAuthProvider } from "../oauth/types.js";
 // biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it

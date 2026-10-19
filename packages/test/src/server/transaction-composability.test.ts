@@ -10,15 +10,15 @@
  * into the same unit of work rather than auto-committing piecemeal.
  */
 
-import { IRI } from "@jasonscharf/core";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { EntitySchema } from "@jasonscharf/entities";
+import { IRI } from "@terncosoftware/core";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import { EntitySchema } from "@terncosoftware/entities";
 import {
     buildServerContext,
     CollectionViewStore,
     EntityStore,
     ExtensionRegistry,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

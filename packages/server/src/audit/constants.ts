@@ -1,4 +1,4 @@
-import { IRI, makeUri, NS_CORE } from "@jasonscharf/core";
+import { IRI, makeUri, NS_CORE } from "@terncosoftware/core";
 
 // Audit lives in its own system-level named graph. It is intentionally NOT
 // tenant-scoped: a single trail records sensitive cross-tenant actions (e.g. a

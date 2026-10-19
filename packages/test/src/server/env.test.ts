@@ -7,7 +7,7 @@ import {
     isStagingDev,
     isStagingOrProduction,
     isTest,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

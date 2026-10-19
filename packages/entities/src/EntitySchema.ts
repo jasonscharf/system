@@ -1,5 +1,5 @@
-import type { IRI } from "@jasonscharf/core";
-import type { ShaclNodeShape } from "@jasonscharf/gen";
+import type { IRI } from "@terncosoftware/core";
+import type { ShaclNodeShape } from "@terncosoftware/gen";
 import type { EdgeDef } from "./EdgeDef.js";
 
 export type DefaultValue<T> = T | (() => T);

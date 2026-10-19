@@ -1,13 +1,13 @@
-import type { InMemoryDispatch, UiContribution } from "@jasonscharf/core-ui";
-import { Button, Div, H1 } from "@jasonscharf/core-ui/react";
+import type { InMemoryDispatch, UiContribution } from "@terncosoftware/core-ui";
+import { Button, Div, H1 } from "@terncosoftware/core-ui/react";
 import type React from "react";
 
 // core-ui's test app demonstrates Region/View composability ONLY. Menus are a
-// separate concern (see @jasonscharf/ui-menus and its own test app).
+// separate concern (see @terncosoftware/ui-menus and its own test app).
 
 // Declare this app's dispatch messages ambiently so their args/payloads flow
 // through `command`/`event`/`on` at every call site.
-declare module "@jasonscharf/core-ui" {
+declare module "@terncosoftware/core-ui" {
     interface SystemCommands {
         "counter.bump": { delta: number };
     }

@@ -1,4 +1,4 @@
-import type { ISystemBus } from "@jasonscharf/core";
+import type { ISystemBus } from "@terncosoftware/core";
 import type { DefRegistry } from "./DefRegistry.js";
 import { dispatchIri, rpcKindFor } from "./iri.js";
 import { Runner, type RunnerOptions } from "./runner.js";

@@ -4,7 +4,7 @@ import {
     type ListSchema,
     listWindowFrame,
     planListPush,
-} from "@jasonscharf/core/list";
+} from "@terncosoftware/core/list";
 import type {
     ListTopicHandle,
     ListTopicListener,

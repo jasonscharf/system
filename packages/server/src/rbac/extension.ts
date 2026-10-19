@@ -8,7 +8,7 @@
  *
  * Usage in a consuming app:
  *
- *   import { rbacExtension, getRbacService } from "@jasonscharf/server";
+ *   import { rbacExtension, getRbacService } from "@terncosoftware/server";
  *
  *   const installed = await ternApp.use(rbacExtension);
  *   const rbac = getRbacService(installed);
@@ -17,8 +17,12 @@
  * WS message handlers can access it as ctx.rbac.
  */
 
-import type { ExtensionInstallContext, InstalledExtension, TernExtension } from "@jasonscharf/app";
-import type { TripleStore } from "@jasonscharf/data";
+import type {
+    ExtensionInstallContext,
+    InstalledExtension,
+    TernExtension,
+} from "@terncosoftware/app";
+import type { TripleStore } from "@terncosoftware/data";
 import { buildServerContext } from "../ServerContext.js";
 import { TenantRepository } from "../tenancy/TenantRepository.js";
 import { RbacService } from "./RbacService.js";

@@ -1,4 +1,4 @@
-import { declareService } from "@jasonscharf/core";
+import { declareService } from "@terncosoftware/core";
 import type { Knex } from "knex";
 import { TripleStore } from "./TripleStore.js";
 

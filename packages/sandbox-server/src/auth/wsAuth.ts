@@ -14,10 +14,10 @@
  *     MessageRouter can thread it into dispatch.
  */
 import type { IncomingMessage } from "node:http";
-import type { AuthRouterComponent } from "@jasonscharf/auth";
-import { SESSION_COOKIE } from "@jasonscharf/auth";
-import { anonymousSec, type SecurityContext } from "@jasonscharf/core";
-import type { WsPrincipal } from "@jasonscharf/flow";
+import type { AuthRouterComponent } from "@terncosoftware/auth";
+import { SESSION_COOKIE } from "@terncosoftware/auth";
+import { anonymousSec, type SecurityContext } from "@terncosoftware/core";
+import type { WsPrincipal } from "@terncosoftware/flow";
 
 /**
  * The principal stamped onto a WS connection at upgrade. JSON-serializable by

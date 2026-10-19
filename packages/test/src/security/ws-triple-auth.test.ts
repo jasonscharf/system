@@ -26,7 +26,7 @@ import {
     UserIdentityRepository,
     UserRepository,
     UserSessionRepository,
-} from "@jasonscharf/auth";
+} from "@terncosoftware/auth";
 import {
     anonymousSec,
     query,
@@ -34,9 +34,9 @@ import {
     SYSTEM_TYPES,
     type SystemRequest,
     type SystemResult,
-} from "@jasonscharf/core";
-import { createDataContext, type Knex, TripleStore } from "@jasonscharf/data";
-import { FlowApp, WebSocketServer, type WsPrincipal } from "@jasonscharf/flow";
+} from "@terncosoftware/core";
+import { createDataContext, type Knex, TripleStore } from "@terncosoftware/data";
+import { FlowApp, WebSocketServer, type WsPrincipal } from "@terncosoftware/flow";
 import {
     buildServerContext,
     PermissionRepository,
@@ -51,7 +51,7 @@ import {
     systemSec,
     TenantRepository,
     UserGroupRepository,
-} from "@jasonscharf/server";
+} from "@terncosoftware/server";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { WebSocket as WsClient } from "ws";
 // The real sandbox-server seams under test — imported directly (never the

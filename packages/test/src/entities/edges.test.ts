@@ -7,10 +7,10 @@
  * record.  Runs against SQLite (always) and Postgres (when SYS_PG_URL is set).
  */
 
-import { IRI } from "@jasonscharf/core";
-import { createDataContext, TripleStore } from "@jasonscharf/data";
-import { type EdgeRef, EntitySchema } from "@jasonscharf/entities";
-import { buildServerContext, EntityStore, type ServerContext } from "@jasonscharf/server";
+import { IRI } from "@terncosoftware/core";
+import { createDataContext, TripleStore } from "@terncosoftware/data";
+import { type EdgeRef, EntitySchema } from "@terncosoftware/entities";
+import { buildServerContext, EntityStore, type ServerContext } from "@terncosoftware/server";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertEmptyStore } from "../assertEmptyStore.js";

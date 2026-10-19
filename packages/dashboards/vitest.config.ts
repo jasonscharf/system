@@ -13,8 +13,8 @@ export default defineConfig({
     },
     resolve: {
         alias: {
-            "@jasonscharf/core/list": path.join(pkg("core"), "list"),
-            "@jasonscharf/core-ui": pkg("core-ui"),
+            "@terncosoftware/core/list": path.join(pkg("core"), "list"),
+            "@terncosoftware/core-ui": pkg("core-ui"),
         },
     },
 });

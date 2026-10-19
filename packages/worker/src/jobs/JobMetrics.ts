@@ -22,7 +22,7 @@
  * the call site.
  */
 
-import { getLog } from "@jasonscharf/core";
+import { getLog } from "@terncosoftware/core";
 import type { Knex } from "knex";
 import { METRICS_CONSECUTIVE_FAILURE_ALERT_THRESHOLD } from "../config.js";
 

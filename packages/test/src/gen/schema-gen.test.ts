@@ -7,7 +7,7 @@
  * foreign-key destruction generator-driven.
  */
 
-import type { Triple } from "@jasonscharf/core";
+import type { Triple } from "@terncosoftware/core";
 import {
     generateSchemas,
     mergeShapes,
@@ -15,7 +15,7 @@ import {
     readOntology,
     readShaclShapes,
     type ShaclShapes,
-} from "@jasonscharf/gen";
+} from "@terncosoftware/gen";
 import { describe, expect, it } from "vitest";
 
 async function triples(turtle: string): Promise<Triple[]> {
@@ -60,7 +60,7 @@ describe("generateSchemas", () => {
 
         const src = generateSchemas(ontology, shapes, {
             localNamespace: "http://ex.org/lib/",
-            iriImport: "@jasonscharf/core",
+            iriImport: "@terncosoftware/core",
         });
 
         // Datatype properties → properties; no fooId.
@@ -98,17 +98,17 @@ describe("generateSchemas", () => {
             ),
             {
                 localNamespace: "http://ex.org/lib/",
-                iriImport: "@jasonscharf/core",
+                iriImport: "@terncosoftware/core",
                 schemaImports: new Map([
                     [
                         "http://ex.org/auth/User",
-                        { importPath: "@jasonscharf/auth", schemaName: "UserSchema" },
+                        { importPath: "@terncosoftware/auth", schemaName: "UserSchema" },
                     ],
                 ]),
             },
         );
 
-        expect(src).toContain('import { UserSchema } from "@jasonscharf/auth";');
+        expect(src).toContain('import { UserSchema } from "@terncosoftware/auth";');
         expect(src).toContain("target: () => UserSchema");
     });
 
@@ -178,7 +178,7 @@ describe("generateSchemas", () => {
         // and runs no import-time side effect, so no import order can change the
         // authorization scope chain (TRN-627).
         expect(src).not.toContain("registerTopology");
-        expect(src).not.toContain("@jasonscharf/server");
+        expect(src).not.toContain("@terncosoftware/server");
     });
 
     it("does not emit containment when no property is contains-marked", async () => {

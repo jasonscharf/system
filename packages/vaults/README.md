@@ -1,11 +1,11 @@
-# @jasonscharf/vaults
+# @terncosoftware/vaults
 
 Secrets management for the Tern platform. Abstracts environment variables, Azure Key Vault, and in-process stores behind a single interface.
 
 ## Quick Start
 
 ```typescript
-import { SecretsManager } from '@jasonscharf/vaults';
+import { SecretsManager } from '@terncosoftware/vaults';
 
 // Auto-detects backend:
 //   - Azure Key Vault when AZURE_KEY_VAULT_URI is set
@@ -25,7 +25,7 @@ await secrets.close();
 Reads from `process.env`. Default when no vault URI is configured.
 
 ```typescript
-import { EnvSecretsProvider, SecretsManager } from '@jasonscharf/vaults';
+import { EnvSecretsProvider, SecretsManager } from '@terncosoftware/vaults';
 
 const secrets = new SecretsManager(new EnvSecretsProvider());
 ```
@@ -35,7 +35,7 @@ const secrets = new SecretsManager(new EnvSecretsProvider());
 Reads from Azure Key Vault via Workload Identity or environment credentials.
 
 ```typescript
-import { AzureKeyVaultProvider, SecretsManager } from '@jasonscharf/vaults';
+import { AzureKeyVaultProvider, SecretsManager } from '@terncosoftware/vaults';
 
 const secrets = new SecretsManager(
     new AzureKeyVaultProvider('https://my-vault.vault.azure.net/'),
@@ -49,7 +49,7 @@ Set `AZURE_KEY_VAULT_URI` to have `SecretsManager.fromEnvironment()` use this au
 For tests — inject secrets directly without touching the environment.
 
 ```typescript
-import { InMemorySecretsProvider, SecretsManager } from '@jasonscharf/vaults';
+import { InMemorySecretsProvider, SecretsManager } from '@terncosoftware/vaults';
 
 const secrets = new SecretsManager(
     new InMemorySecretsProvider({ DB_PASSWORD: 'test-secret' }),
@@ -61,7 +61,7 @@ const secrets = new SecretsManager(
 Wraps any provider with TTL-based caching to avoid repeated remote calls.
 
 ```typescript
-import { AzureKeyVaultProvider, CachedSecretsProvider, SecretsManager } from '@jasonscharf/vaults';
+import { AzureKeyVaultProvider, CachedSecretsProvider, SecretsManager } from '@terncosoftware/vaults';
 
 const secrets = new SecretsManager(
     new CachedSecretsProvider(
@@ -86,7 +86,7 @@ Never put production secrets in `process.env` when a vault is available. Use `ge
 Implement this interface to add your own backend:
 
 ```typescript
-import type { ISecretsProvider } from '@jasonscharf/vaults';
+import type { ISecretsProvider } from '@terncosoftware/vaults';
 
 class MyProvider implements ISecretsProvider {
     async get(key: string): Promise<string | undefined> {
@@ -99,7 +99,7 @@ class MyProvider implements ISecretsProvider {
 ## Installation
 
 ```bash
-yarn add @jasonscharf/vaults
+yarn add @terncosoftware/vaults
 # Azure Key Vault (optional):
 yarn add @azure/identity @azure/keyvault-secrets
 ```

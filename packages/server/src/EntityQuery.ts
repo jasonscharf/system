@@ -1,7 +1,7 @@
-import type { IRI, Quad } from "@jasonscharf/core";
-import type { QuadTerms, TripleStore } from "@jasonscharf/data";
-import type { EntityRecord, EntitySchema, FilterOp, IFieldCipher } from "@jasonscharf/entities";
-import { RDF_TYPE, toLiteral } from "@jasonscharf/entities";
+import type { IRI, Quad } from "@terncosoftware/core";
+import type { QuadTerms, TripleStore } from "@terncosoftware/data";
+import type { EntityRecord, EntitySchema, FilterOp, IFieldCipher } from "@terncosoftware/entities";
+import { RDF_TYPE, toLiteral } from "@terncosoftware/entities";
 import {
     type EdgeInput,
     type EntityInput,

@@ -13,7 +13,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SystemApp } from "@jasonscharf/app";
+import { SystemApp } from "@terncosoftware/app";
 import {
     AuthRouterComponent,
     GitHubProvider,
@@ -25,10 +25,10 @@ import {
     UserIdentityRepository,
     UserRepository,
     UserSessionRepository,
-} from "@jasonscharf/auth";
-import { convosExtension, getConvoService, getConvosInstall } from "@jasonscharf/convos";
-import { bindService, getLog } from "@jasonscharf/core";
-import { createDataContext, DataSource, TripleStore } from "@jasonscharf/data";
+} from "@terncosoftware/auth";
+import { convosExtension, getConvoService, getConvosInstall } from "@terncosoftware/convos";
+import { bindService, getLog } from "@terncosoftware/core";
+import { createDataContext, DataSource, TripleStore } from "@terncosoftware/data";
 import {
     FlowApp,
     HttpDecoder,
@@ -36,15 +36,15 @@ import {
     HttpRouter,
     HttpServer,
     WebSocketServer,
-} from "@jasonscharf/flow";
+} from "@terncosoftware/flow";
 import {
     buildServerContext,
     DEFAULT_SANDBOX_TENANT,
     FieldCipherService,
     getRbacService,
     rbacExtension,
-} from "@jasonscharf/server";
-import { FieldCipher, SecretsManager } from "@jasonscharf/vaults";
+} from "@terncosoftware/server";
+import { FieldCipher, SecretsManager } from "@terncosoftware/vaults";
 import { buildWsAuthenticate, secFromPrincipal } from "./auth/wsAuth.js";
 import { MessageDecoder } from "./components/MessageDecoder.js";
 import { MessageEncoder } from "./components/MessageEncoder.js";

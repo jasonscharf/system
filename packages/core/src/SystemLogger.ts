@@ -38,7 +38,7 @@ import { declareService, resolveService } from "./container/ioc.js";
  * single bind at boot, because the sink is a container service and nothing
  * holds a direct reference to it:
  *
- *   bindService(SystemLogger, new PinoLogger());     // @jasonscharf/server
+ *   bindService(SystemLogger, new PinoLogger());     // @terncosoftware/server
  *   bindService(SystemLogger, captureForAssertions); // a test
  */
 

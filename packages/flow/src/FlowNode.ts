@@ -1,4 +1,4 @@
-import type { IRI } from "@jasonscharf/core";
+import type { IRI } from "@terncosoftware/core";
 import type { ID } from "./types.js";
 
 export interface FlowNode {

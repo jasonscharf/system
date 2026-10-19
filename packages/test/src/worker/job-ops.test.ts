@@ -12,7 +12,7 @@
  *     non-dead runs.
  */
 
-import { createDataContext } from "@jasonscharf/data";
+import { createDataContext } from "@terncosoftware/data";
 import {
     disableJob,
     enableJob,
@@ -21,7 +21,7 @@ import {
     listStuckRuns,
     requeueRun,
     runNow,
-} from "@jasonscharf/worker";
+} from "@terncosoftware/worker";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

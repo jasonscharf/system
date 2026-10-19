@@ -14,7 +14,7 @@ import {
     interpolateSql,
     SQL_LOG_FLAG,
     sqlLoggingEnabled,
-} from "@jasonscharf/data";
+} from "@terncosoftware/data";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

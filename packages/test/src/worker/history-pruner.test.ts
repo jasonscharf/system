@@ -12,9 +12,9 @@
  *   - pending / running rows are never deleted regardless of age.
  */
 
-import { systemSec } from "@jasonscharf/core";
-import { createDataContext } from "@jasonscharf/data";
-import { createHistoryPruner, type JobContext, type JobHandler } from "@jasonscharf/worker";
+import { systemSec } from "@terncosoftware/core";
+import { createDataContext } from "@terncosoftware/data";
+import { createHistoryPruner, type JobContext, type JobHandler } from "@terncosoftware/worker";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

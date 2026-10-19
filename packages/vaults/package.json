@@ -1,5 +1,5 @@
 {
-    "name": "@jasonscharf/vaults",
+    "name": "@terncosoftware/vaults",
     "version": "0.1.0",
     "type": "module",
     "exports": {
@@ -17,7 +17,7 @@
     ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/jasonlscharf/system.git",
+        "url": "https://github.com/terncosoftware/system.git",
         "directory": "packages/vaults"
     },
     "publishConfig": {
@@ -33,7 +33,7 @@
     "dependencies": {
         "@azure/identity": "^4.4.1",
         "@azure/keyvault-secrets": "^4.8.0",
-        "@jasonscharf/core": "workspace:^"
+        "@terncosoftware/core": "workspace:^"
     },
     "devDependencies": {
         "@types/node": "^22.0.0"

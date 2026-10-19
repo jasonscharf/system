@@ -1,9 +1,9 @@
-import type { IRI } from "@jasonscharf/core";
-import { entityIri, idFromIri, newId } from "@jasonscharf/entities";
+import type { IRI } from "@terncosoftware/core";
+import { entityIri, idFromIri, newId } from "@terncosoftware/entities";
 import { TENANCY_NS } from "./constants.js";
 
 // The strict-throwing id helpers (newId, entityIri, idFromIri) live in
-// @jasonscharf/entities and are the single source every bounded context adopts.
+// @terncosoftware/entities and are the single source every bounded context adopts.
 // This module re-exports them under the tenancy-local names and keeps the
 // tenancy-specific `iriFor(type, id)` convenience that pins the TENANCY_NS
 // namespace. The previous local copy diverged: its idFrom returned the whole IRI

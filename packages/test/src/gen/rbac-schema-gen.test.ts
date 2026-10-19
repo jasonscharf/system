@@ -11,8 +11,8 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Triple } from "@jasonscharf/core";
-import { generateSchemas, parseTurtle, readOntology } from "@jasonscharf/gen";
+import type { Triple } from "@terncosoftware/core";
+import { generateSchemas, parseTurtle, readOntology } from "@terncosoftware/gen";
 import { beforeAll, describe, expect, it } from "vitest";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -30,7 +30,7 @@ beforeAll(async () => {
     src = generateSchemas(
         ontology,
         { nodeShapes: new Map(), byTargetClass: new Map() },
-        { localNamespace: "urn:sys:core:rbac:", iriImport: "@jasonscharf/core" },
+        { localNamespace: "urn:sys:core:rbac:", iriImport: "@terncosoftware/core" },
     );
 });
 

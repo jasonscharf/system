@@ -1,4 +1,4 @@
-import type { ApplicationContext } from "@jasonscharf/core";
+import type { ApplicationContext } from "@terncosoftware/core";
 import type { EntityRecord } from "./EntityRecord.js";
 
 /**

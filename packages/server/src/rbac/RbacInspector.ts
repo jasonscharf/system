@@ -7,8 +7,8 @@ import {
     PermissionDeniedError,
     permissionKeyIRI,
     roleNameIRI,
-} from "@jasonscharf/core";
-import type { TripleStore } from "@jasonscharf/data";
+} from "@terncosoftware/core";
+import type { TripleStore } from "@terncosoftware/data";
 import { type SecurityContext, systemSec } from "../SecurityContext.js";
 import type { ServerContext } from "../ServerContext.js";
 import { tenantGraph } from "../tenancy.js";

@@ -1,6 +1,6 @@
-import type { SystemTypeRef } from "@jasonscharf/core";
-import type { ShaclNodeShape, ValidationResult } from "@jasonscharf/gen";
-import { validate } from "@jasonscharf/gen";
+import type { SystemTypeRef } from "@terncosoftware/core";
+import type { ShaclNodeShape, ValidationResult } from "@terncosoftware/gen";
+import { validate } from "@terncosoftware/gen";
 
 interface RegisteredShape {
     readonly shape: ShaclNodeShape;

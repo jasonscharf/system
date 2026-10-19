@@ -9,7 +9,7 @@
 //
 // Example (in an extension package):
 //
-//   declare module "@jasonscharf/events" {
+//   declare module "@terncosoftware/events" {
 //       interface CommandRegistry {
 //           "view.activate": { viewId: string; focus?: boolean };
 //       }

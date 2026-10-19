@@ -1,7 +1,7 @@
 /**
  * Minimal cipher contract the entity layer needs to encrypt PII at rest.
  *
- * The concrete deterministic AEAD implementation lives in `@jasonscharf/vaults`
+ * The concrete deterministic AEAD implementation lives in `@terncosoftware/vaults`
  * (`FieldCipher`).  This interface is declared here so the entity / server layer
  * can depend on the capability without depending on the vaults package — the app
  * builds the real cipher at startup (where vaults is available) and threads it

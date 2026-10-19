@@ -17,8 +17,8 @@ export default defineConfig({
             "react-native": "react-native-web",
             // Resolve the library to source so the test app tracks edits without
             // a build step.
-            "@jasonscharf/core-ui/react": path.resolve(__dirname, "../src/react/index.ts"),
-            "@jasonscharf/core-ui": path.resolve(__dirname, "../src/index.ts"),
+            "@terncosoftware/core-ui/react": path.resolve(__dirname, "../src/react/index.ts"),
+            "@terncosoftware/core-ui": path.resolve(__dirname, "../src/index.ts"),
         },
     },
     server: {

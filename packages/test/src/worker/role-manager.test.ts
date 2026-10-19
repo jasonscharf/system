@@ -1,4 +1,4 @@
-import { bindService } from "@jasonscharf/core";
+import { bindService } from "@terncosoftware/core";
 /**
  * TRN-155: Integration tests for RoleManager.
  *
@@ -27,9 +27,9 @@ import { bindService } from "@jasonscharf/core";
  *     manager's port to capture events into a plain array.
  */
 
-import { createDataContext, DataSource } from "@jasonscharf/data";
-import { FlowContext, FlowTransport } from "@jasonscharf/flow";
-import { type RoleChangeEvent, RoleManager } from "@jasonscharf/worker";
+import { createDataContext, DataSource } from "@terncosoftware/data";
+import { FlowContext, FlowTransport } from "@terncosoftware/flow";
+import { type RoleChangeEvent, RoleManager } from "@terncosoftware/worker";
 import type { Knex } from "knex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -101,7 +101,7 @@ function makeManager(
  */
 function collectEvents(manager: RoleManager): CollectorTransport<RoleChangeEvent> {
     const collector = new CollectorTransport<RoleChangeEvent>();
-    // wire() from FlowTransport is not exported from @jasonscharf/flow so we
+    // wire() from FlowTransport is not exported from @terncosoftware/flow so we
     // call addTransport directly. The transport's from/to are not needed for
     // a sink-style collector.
     collector._attach(manager.outRoleChanged, undefined);

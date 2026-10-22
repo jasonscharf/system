@@ -2,6 +2,7 @@ import { Inject } from "@terncosoftware/core";
 import { FlowComponent, type FlowComponentOptions, type FlowPort } from "@terncosoftware/flow";
 import { buildServerContext, systemSec } from "@terncosoftware/server";
 import { SESSION_TTL_SECS } from "../constants.js";
+import { assertEmailVerified } from "../oauth/emailVerification.js";
 import type { IOAuthProvider } from "../oauth/types.js";
 // biome-ignore lint/style/useImportType: runtime DI token for @Inject (emitDecoratorMetadata); import type would elide it
 import { UserDeviceRepository } from "../repository/UserDeviceRepository.js";
@@ -92,6 +93,9 @@ export class CallbackComponent extends FlowComponent {
 
             // Exchange code → tokens + profile
             const { profile, tokens } = await provider.exchangeCode(req.code, req.redirectUri);
+            // The user is found by this address, so an unverified one is refused
+            // before any lookup, exactly as AuthService does (GH #1214).
+            assertEmailVerified(req.provider, profile);
 
             const ctx = buildServerContext(this._users.store);
             const sec = systemSec;

@@ -28,6 +28,11 @@ export { UserDeviceSchema } from "./entities/UserDeviceSchema.js";
 export { UserIdentitySchema } from "./entities/UserIdentitySchema.js";
 export { UserSchema } from "./entities/UserSchema.js";
 export { UserSessionSchema } from "./entities/UserSessionSchema.js";
+export {
+    assertEmailVerified,
+    OAUTH_EMAIL_NOT_VERIFIED,
+    OAuthEmailNotVerifiedError,
+} from "./oauth/emailVerification.js";
 export { GitHubProvider } from "./oauth/GitHubProvider.js";
 // ── OAuth providers ───────────────────────────────────────────────────────────
 export { GoogleProvider } from "./oauth/GoogleProvider.js";

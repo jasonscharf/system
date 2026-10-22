@@ -9,6 +9,7 @@ import {
     systemSec,
 } from "@terncosoftware/server";
 import { AUTH_NEG_CACHE_TTL_SECS, NEG_CACHE_SENTINEL, SESSION_TTL_SECS } from "./constants.js";
+import { assertEmailVerified } from "./oauth/emailVerification.js";
 import type { IOAuthProvider } from "./oauth/types.js";
 import { PERM_SESSION_LIST_ANY, PERM_SESSION_REVOKE_ANY } from "./permissions.js";
 import type { LoginAttemptRepository } from "./repository/LoginAttemptRepository.js";
@@ -143,6 +144,9 @@ export class AuthService {
             opts.code,
             opts.redirectUri,
         );
+        // Before any lookup: the user is found by this address, so one the
+        // provider has not verified must never reach findByEmail (GH #1214).
+        assertEmailVerified(opts.provider, profile);
 
         // All DB writes are atomic within a single transaction.
         const { user, session } = await this._users.store.withTransaction(

@@ -17,7 +17,6 @@ interface GitHubUser {
     login: string;
     name?: string;
     avatar_url?: string;
-    email?: string;
 }
 
 interface GitHubEmail {
@@ -101,18 +100,28 @@ export class GitHubProvider implements IOAuthProvider {
             throw new Error(`GitHub user fetch failed: ${userRes.status} — ${body}`);
         }
 
-        const user = (await userRes.json()) as GitHubUser;
-        const emails = emailRes.ok ? ((await emailRes.json()) as GitHubEmail[]) : [];
+        // The address comes from the emails call alone, and only its primary
+        // entry, whose `verified` flag is GitHub's claim that the account owns
+        // it. The profile's public `email` carries no such claim, so it is
+        // never a fallback; nor is a made-up noreply address, which nobody owns
+        // and anyone could register first.
+        if (!emailRes.ok) {
+            const body = await emailRes.text();
+            throw new Error(`GitHub email fetch failed: ${emailRes.status} — ${body}`);
+        }
 
-        const primary =
-            emails.find((e) => e.primary && e.verified)?.email ??
-            user.email ??
-            `${user.login}@users.noreply.github.com`;
+        const user = (await userRes.json()) as GitHubUser;
+        const emails = (await emailRes.json()) as GitHubEmail[];
+        const primary = emails.find((e) => e.primary);
+        if (!primary) {
+            throw new Error("GitHub account has no primary email");
+        }
 
         return {
             profile: {
                 providerUserId: String(user.id),
-                email: primary,
+                email: primary.email,
+                emailVerified: primary.verified === true,
                 displayName: user.name ?? user.login,
                 avatarUrl: user.avatar_url,
             },

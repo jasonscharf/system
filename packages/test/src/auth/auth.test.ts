@@ -749,6 +749,7 @@ describe("AuthService", () => {
                 json: async () => ({
                     sub: overrides?.sub ?? "g-sub",
                     email: overrides?.email ?? "svc@test.com",
+                    email_verified: true,
                     name: "Service User",
                     picture: "http://pic",
                 }),
@@ -1095,6 +1096,7 @@ class TestOAuthProvider implements IOAuthProvider {
         profile: {
             providerUserId: string;
             email: string;
+            emailVerified: boolean;
             displayName?: string;
             avatarUrl?: string;
         };
@@ -1104,6 +1106,7 @@ class TestOAuthProvider implements IOAuthProvider {
             profile: {
                 providerUserId: "test-sub-1",
                 email: "callback@test.com",
+                emailVerified: true,
                 displayName: "CB User",
             },
             tokens: { accessToken: "at-1", expiresAt: new Date(Date.now() + 3600_000) },
@@ -1222,7 +1225,12 @@ describe("AuthService.validateToken — fallback path", () => {
                 } as Response)
                 .mockResolvedValueOnce({
                     ok: true,
-                    json: async () => ({ sub: "fb-sub", email: "fb@test.com", name: "Fallback" }),
+                    json: async () => ({
+                        sub: "fb-sub",
+                        email: "fb@test.com",
+                        email_verified: true,
+                        name: "Fallback",
+                    }),
                 } as Response),
         );
 
@@ -1273,7 +1281,11 @@ describe("AuthRouterComponent.sessionMiddleware()", () => {
                 } as Response)
                 .mockResolvedValueOnce({
                     ok: true,
-                    json: async () => ({ sub: "mw-sub", email: "mw@test.com" }),
+                    json: async () => ({
+                        sub: "mw-sub",
+                        email: "mw@test.com",
+                        email_verified: true,
+                    }),
                 } as Response),
         );
 
@@ -1660,6 +1672,7 @@ describe("AuthService.validateToken — cache hit", () => {
                     json: async () => ({
                         sub: "cache-sub",
                         email: "cache@test.com",
+                        email_verified: true,
                         name: "Cache User",
                     }),
                 } as Response),

@@ -54,6 +54,7 @@ class TestOAuthProvider implements IOAuthProvider {
         profile: {
             providerUserId: string;
             email: string;
+            emailVerified: boolean;
             displayName?: string;
             avatarUrl?: string;
         };
@@ -63,6 +64,7 @@ class TestOAuthProvider implements IOAuthProvider {
             profile: {
                 providerUserId: "trn171-sub",
                 email: "trn171@test.com",
+                emailVerified: true,
                 displayName: "TRN171 User",
             },
             tokens: { accessToken: "at-171", expiresAt: new Date(Date.now() + 3600_000) },

@@ -15,6 +15,8 @@ interface GoogleTokenResponse {
 interface GoogleUserInfo {
     sub: string;
     email: string;
+    /** Google's own claim that the account owns `email`. Absent counts as false. */
+    email_verified?: boolean;
     name?: string;
     picture?: string;
 }
@@ -88,6 +90,7 @@ export class GoogleProvider implements IOAuthProvider {
             profile: {
                 providerUserId: user.sub,
                 email: user.email,
+                emailVerified: user.email_verified === true,
                 displayName: user.name,
                 avatarUrl: user.picture,
             },
